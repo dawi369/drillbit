@@ -1,7 +1,5 @@
 export const DATABASE_NAME = "drillbit.db";
 
-export const DATABASE_SCHEMA_VERSION = 1;
-
 export const CREATE_CHALLENGES_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS challenges (
     id TEXT PRIMARY KEY NOT NULL,
@@ -54,10 +52,10 @@ export const CREATE_SETTINGS_TABLE_SQL = `
     id TEXT PRIMARY KEY NOT NULL,
     focus_prompt TEXT NOT NULL,
     preferred_difficulty TEXT,
-    default_mode TEXT,
+    preferred_mode TEXT,
     default_model TEXT,
     challenge_cadence_hours INTEGER,
-    widget_mode_default TEXT,
+    first_challenge_time_minutes INTEGER,
     updated_at TEXT NOT NULL
   );
 `;

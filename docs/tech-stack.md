@@ -19,6 +19,7 @@ State & Data
 • zustand – lightweight global state (focus prompt, model config, schedule)
 • expo-sqlite + expo-widgets App Groups – rich local memory cards, challenge history, dedupe keys, and shared widget sync
 • expo-secure-store – OpenRouter API key / BYOK credentials
+• Scheduling model – first challenge time plus cadence values restricted to divisors of 24h
 
 Architecture
 • No custom deployed backend/API – challenge state, memory, summaries, and personalization stored locally on device

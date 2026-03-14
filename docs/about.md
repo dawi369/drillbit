@@ -21,7 +21,7 @@ Style: Pure X-inspired minimalism with both light and dark themes — crisp whit
 
 Implementation bias: native first wherever practical. Prefer Expo and React Native native capabilities, platform components, and device APIs before reaching for web-style abstractions. Use web-only or DOM-based fallbacks only when they unlock something clearly worth it.
 
-After one-time setup in the Params tab (focus prompt with expandable/blurred-full-edit modal, difficulty sliders, model picker including OpenRouter default + BYOK config, widget size/mode defaults, schedule/cadence), users live almost entirely in the widget:
+After one-time setup in the Params tab (focus prompt with expandable/blurred-full-edit modal, difficulty setting, model picker including OpenRouter default + BYOK config, preferred mode, first challenge time, and a cadence that cleanly divides 24h), users live almost entirely in the widget:
 
 Daily flow:
 

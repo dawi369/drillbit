@@ -6,8 +6,14 @@ import type {
   WidgetViewState,
 } from "@/lib/widgets/types";
 
+export const ALLOWED_CHALLENGE_CADENCE_HOURS = [1, 2, 3, 4, 6, 8, 12, 24] as const;
+
+export type ChallengeCadenceHours = (typeof ALLOWED_CHALLENGE_CADENCE_HOURS)[number];
+
 export type ChallengeRecord = Challenge & {
   createdAt: string;
+  sourceModel?: string;
+  sourcePromptVersion?: string;
 };
 
 export type ChallengeSummaryRecord = {
@@ -34,10 +40,10 @@ export type UserSettingsRecord = {
   id: "default";
   focusPrompt: string;
   preferredDifficulty?: ChallengeDifficulty;
-  defaultMode?: ChallengeMode;
+  preferredMode?: ChallengeMode;
   defaultModel?: string;
-  challengeCadenceHours?: number;
-  widgetModeDefault?: ChallengeMode;
+  challengeCadenceHours?: ChallengeCadenceHours;
+  firstChallengeTimeMinutes?: number;
   updatedAt: string;
 };
 
@@ -65,3 +71,11 @@ export type ModelCallContext = {
 export type ChallengeLifecycleRow = ChallengeRecord["lifecycle"];
 export type ChallengeModeRow = ChallengeMode;
 export type ChallengeSkipReasonRow = ChallengeSkipReason;
+
+export function isValidChallengeCadenceHours(value: number): value is ChallengeCadenceHours {
+  return ALLOWED_CHALLENGE_CADENCE_HOURS.includes(value as ChallengeCadenceHours);
+}
+
+export function isValidFirstChallengeTimeMinutes(value: number) {
+  return Number.isInteger(value) && value >= 0 && value < 24 * 60;
+}
