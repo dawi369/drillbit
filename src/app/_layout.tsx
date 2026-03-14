@@ -10,8 +10,6 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaListener, SafeAreaProvider } from "react-native-safe-area-context";
 import { Uniwind } from "uniwind";
 
-import { bootstrapWidgets } from "@/lib/widgets/bootstrap";
-
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme !== "light";
@@ -20,7 +18,6 @@ export default function RootLayout() {
   useEffect(() => {
     Uniwind.setTheme(resolvedTheme);
     void SystemUI.setBackgroundColorAsync(isDark ? "#000000" : "#ffffff");
-    void bootstrapWidgets();
   }, [isDark, resolvedTheme]);
 
   return (
@@ -32,7 +29,7 @@ export default function RootLayout() {
             Uniwind.updateInsets(insets);
           }}
         >
-          <HeroUINativeProvider>
+          <HeroUINativeProvider config={{ devInfo: { stylingPrinciples: false } }}>
             <StatusBar style={isDark ? "light" : "dark"} />
             <Stack
               screenOptions={{

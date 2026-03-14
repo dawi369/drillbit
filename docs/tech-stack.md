@@ -42,6 +42,7 @@ Builds & Dev
 Dev Tools / Extras
 • lucide-react-native – subtle icons
 • react-native-svg – thin progress graph line (if needed beyond Reanimated)
+• Dev-only app tab – local reset/debug actions such as wiping SQLite, seeding widget payloads, and inspecting future model context
 
 Key Constraints / Notes
 • Widget UI limited to @expo/ui primitives (no HeroUI / uniwind inside widgets)
@@ -51,3 +52,4 @@ Key Constraints / Notes
 • Bundle goal: tree-shake HeroUI imports, keep app lean (widget as hero surface)
 • Skipped challenges are stored in local history and excluded from future generation
 • Untouched expired challenges may be deleted locally to save space and allow similar future prompts
+• Params scheduling uses a first-time anchor plus cadence options that divide evenly into 24h

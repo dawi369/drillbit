@@ -1,5 +1,5 @@
-import { BlankTabScreen } from "@/components/blank-tab-screen";
+import { ParamsScreen } from "@/components/params/params-screen";
 
 export default function ParamsTabScreen() {
-  return <BlankTabScreen />;
+  return <ParamsScreen />;
 }

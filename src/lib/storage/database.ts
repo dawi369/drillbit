@@ -1,4 +1,4 @@
-import { openDatabaseAsync, type SQLiteDatabase } from "expo-sqlite";
+import { deleteDatabaseAsync, openDatabaseAsync, type SQLiteDatabase } from "expo-sqlite";
 
 import {
   CREATE_ALL_TABLES_SQL,
@@ -29,4 +29,17 @@ export async function getDatabase() {
 
 export async function initializeDatabase() {
   return getDatabase();
+}
+
+export async function resetDatabase() {
+  const existing = await databasePromise;
+
+  if (existing) {
+    await existing.closeAsync();
+  }
+
+  databasePromise = null;
+  await deleteDatabaseAsync(DATABASE_NAME);
+
+  return initializeDatabase();
 }

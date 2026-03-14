@@ -11,7 +11,7 @@ import {
   type WidgetViewState,
 } from "@/lib/widgets/types";
 
-export const DRILLBIT_WIDGET_NAME = "drillbitWidget";
+export const DRILLBIT_WIDGET_NAME = "DrillbitWidget";
 
 export type DrillbitWidgetProps = WidgetViewState;
 
@@ -129,8 +129,6 @@ const DrillbitWidget = createWidget<DrillbitWidgetProps>(
   DrillbitWidgetLayout,
 );
 
-export function seedDrillbitWidget() {
-  DrillbitWidget.updateSnapshot(createPlaceholderWidgetState());
-}
-
 export default DrillbitWidget;
+
+export const DRILLBIT_WIDGET_PLACEHOLDER_STATE = createPlaceholderWidgetState();
