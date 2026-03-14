@@ -8,6 +8,8 @@ Customizable home-screen widget lets users choose their preferred interaction mo
 
 AI-native with a local-first product shape and OpenRouter-first model access. OpenRouter is the default integration from day one — giving users seamless access to high-quality frontier, reasoning, and fast models through one API with free tiers and pay-as-you-go credits. Advanced users can still opt into BYOK (Bring Your Own Key) to point to fully local models (MLX/CoreML/Ollama bundles), self-hosted endpoints, or custom remote APIs for maximum privacy/control.
 
+Architecture note: drillbit ships with no custom deployed backend/API of its own. App data, challenge history, summaries, and personalization stay on-device. The only network calls are direct client calls to third-party services such as OpenRouter for model access and RevenueCat for subscriptions/billing.
+
 Users set their focus once (or tweak anytime) via a free-form prompt (e.g., "system design medium-hard: live collaboration tools, payment gateways, recommendation engines, URL shorteners; probe deeply on consistency, latency, partitioning; avoid basic CRUD and easy arrays"). The app maintains rich local memory to:
 
 - Avoid repeating near-duplicate questions.
@@ -23,7 +25,7 @@ After one-time setup in the Params tab (focus prompt with expandable/blurred-ful
 
 Daily flow:
 
-1. Home-screen widget refreshes (per schedule, e.g., every 6h, cap 5/day) → shows fresh problem teaser (title, difficulty pill, 1-2 line description, topic badges) + three tappable buttons: Solo | AI Coach | Reveal. Tiny struggle badge (e.g., "Consistency: 2 fails") appears in corner if relevant.
+1. Home-screen widget refreshes (per schedule, e.g., every 6h, cap 5/day) → shows fresh problem teaser (title, difficulty pill, 1-2 line description, topic badges) + tappable actions such as Solo | AI Coach | Reveal | Skip. Tiny struggle badge (e.g., "Consistency: 2 fails") appears in corner if relevant.
 2. User taps preferred mode → haptic + deep-link opens Answer Modal directly (fast/minimized launch).
 3. Answer Modal:
    - Fixed top strip: problem title/teaser + brief past-performance context ("Last similar: 58% · 3 attempts on CRDTs vs OT · AI Coach used 4× · Weak: conflict resolution").
@@ -38,10 +40,12 @@ Daily flow:
    - "View full chain" link → this problem's Memory Card.
    - Close → app backgrounds; widget refreshes next problem soon after.
 
-Memory stores every interaction as a rich card (local SQLite/JSON):
+Memory stores every interaction as a rich card locally (SQLite + shared widget state):
 
-- Full conversation chain (user notes/responses + AI messages).
+- Full conversation chain (user notes/responses + AI messages) for active or completed challenges that are still retained.
 - Performance metrics (completion %, modes used, AI usage count, detected struggle patterns/tags).
+- Challenge lifecycle metadata, including completed and skipped items, with a dedupe key so skipped challenges never reappear.
+- Expired untouched challenges may be pruned entirely to save space and allow future similar prompts again.
 - Accessible in Mem tab: thin progress graph (drag/scrub days, replay past sessions), accordion cards for deep review, bulk forget/re-enable.
 
 System prompt for every new problem generation and AI Coach response is dynamically constructed from:

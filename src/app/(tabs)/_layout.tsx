@@ -4,7 +4,7 @@ import { APP_TABS } from "@/constants/tabs";
 
 export default function TabsLayout() {
   return (
-    <NativeTabs>
+    <NativeTabs tintColor="#1d9bf0">
       {APP_TABS.map((tab) => (
         <NativeTabs.Trigger key={tab.name} name={tab.name}>
           <NativeTabs.Trigger.Icon sf={tab.icon.sf} md={tab.icon.md} />

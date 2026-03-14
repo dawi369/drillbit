@@ -39,7 +39,28 @@
       ],
       "expo-secure-store",
       "expo-sqlite",
-      "expo-widgets"
+      [
+        "expo-widgets",
+        {
+          "bundleIdentifier": "com.dawi369.drillbit.ExpoWidgetsTarget",
+          "groupIdentifier": "group.com.dawi369.drillbit",
+          "enablePushNotifications": false,
+          "frequentUpdates": false,
+          "widgets": [
+            {
+              "name": "DrillbitWidget",
+              "displayName": "Drillbit",
+              "description": "Daily interview prep at a glance.",
+              "supportedFamilies": [
+                "systemSmall",
+                "systemMedium",
+                "systemLarge"
+              ],
+              "contentMarginsDisabled": false
+            }
+          ]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

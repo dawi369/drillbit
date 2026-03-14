@@ -9,10 +9,10 @@ export const APP_TABS = [
   },
   {
     name: "memory",
-    label: "Mem",
+    label: "Memory",
     icon: {
-      sf: "clock.arrow.circlepath",
-      md: "history",
+      sf: "books.vertical.fill",
+      md: "auto_stories",
     },
   },
 ] as const;

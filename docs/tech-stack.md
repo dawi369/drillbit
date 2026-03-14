@@ -17,8 +17,12 @@ Styling & UI
 
 State & Data
 • zustand – lightweight global state (focus prompt, model config, schedule)
-• expo-sqlite + expo-widgets App Groups – rich local memory cards + shared widget sync
+• expo-sqlite + expo-widgets App Groups – rich local memory cards, challenge history, dedupe keys, and shared widget sync
 • expo-secure-store – OpenRouter API key / BYOK credentials
+
+Architecture
+• No custom deployed backend/API – challenge state, memory, summaries, and personalization stored locally on device
+• Direct third-party calls only – OpenRouter for AI, RevenueCat for billing/subscription state
 
 LLM / AI Backend
 • OpenRouter – primary model provider (default from the start, strong reasoning models)
@@ -44,3 +48,5 @@ Key Constraints / Notes
 • Prefer native implementations first – Expo/React Native APIs and platform primitives before web/DOM fallbacks
 • No Expo Go for widgets – dev builds / EAS only
 • Bundle goal: tree-shake HeroUI imports, keep app lean (widget as hero surface)
+• Skipped challenges are stored in local history and excluded from future generation
+• Untouched expired challenges may be deleted locally to save space and allow similar future prompts

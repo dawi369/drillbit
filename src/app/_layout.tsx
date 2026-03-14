@@ -10,14 +10,18 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaListener, SafeAreaProvider } from "react-native-safe-area-context";
 import { Uniwind } from "uniwind";
 
+import { bootstrapWidgets } from "@/lib/widgets/bootstrap";
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme !== "light";
+  const resolvedTheme = colorScheme === "light" || colorScheme === "dark" ? colorScheme : "system";
 
   useEffect(() => {
-    Uniwind.setTheme(colorScheme ?? "system");
+    Uniwind.setTheme(resolvedTheme);
     void SystemUI.setBackgroundColorAsync(isDark ? "#000000" : "#ffffff");
-  }, [colorScheme, isDark]);
+    void bootstrapWidgets();
+  }, [isDark, resolvedTheme]);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
