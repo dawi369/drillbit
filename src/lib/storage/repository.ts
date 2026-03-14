@@ -184,7 +184,9 @@ export async function getMostRecentResolvedChallenge() {
   return rows[0] ? fromChallengeRow(rows[0]) : null;
 }
 
-export async function pruneExpiredUnstartedChallenges(nowIso: string = createNowIso()) {
+export async function pruneExpiredUnstartedChallenges(
+  nowIso: string = createNowIso(),
+) {
   const db = await getDatabase();
 
   const result = await db.runAsync(
@@ -201,7 +203,10 @@ export async function pruneExpiredUnstartedChallenges(nowIso: string = createNow
   return result.changes;
 }
 
-export async function pruneSkippedChallenges(retentionDays: number = 30, now: Date = new Date()) {
+export async function pruneSkippedChallenges(
+  retentionDays: number = 30,
+  now: Date = new Date(),
+) {
   const db = await getDatabase();
   const cutoff = new Date(now);
 
@@ -358,7 +363,9 @@ export async function getSettings() {
   return rows[0] ? fromSettingsRow(rows[0]) : null;
 }
 
-export function createDefaultSettings(overrides: Partial<UserSettingsRecord> = {}): UserSettingsRecord {
+export function createDefaultSettings(
+  overrides: Partial<UserSettingsRecord> = {},
+): UserSettingsRecord {
   return {
     id: "default",
     focusPrompt:
@@ -373,9 +380,13 @@ export function createDefaultSettings(overrides: Partial<UserSettingsRecord> = {
   };
 }
 
-export function normalizeChallengeCadenceHours(value: number): ChallengeCadenceHours {
+export function normalizeChallengeCadenceHours(
+  value: number,
+): ChallengeCadenceHours {
   if (!isValidChallengeCadenceHours(value)) {
-    throw new Error(`Invalid challenge cadence: ${value}. Cadence must divide evenly into 24 hours.`);
+    throw new Error(
+      `Invalid challenge cadence: ${value}. Cadence must divide evenly into 24 hours.`,
+    );
   }
 
   return value;
@@ -383,7 +394,9 @@ export function normalizeChallengeCadenceHours(value: number): ChallengeCadenceH
 
 export function normalizeFirstChallengeTimeMinutes(value: number) {
   if (!isValidFirstChallengeTimeMinutes(value)) {
-    throw new Error(`Invalid first challenge time: ${value}. Expected minutes from 0 to 1439.`);
+    throw new Error(
+      `Invalid first challenge time: ${value}. Expected minutes from 0 to 1439.`,
+    );
   }
 
   return value;
@@ -400,7 +413,10 @@ export async function ensureDefaultSettings() {
   return defaults;
 }
 
-export async function markChallengeInProgress(challengeId: string, mode: ChallengeMode) {
+export async function markChallengeInProgress(
+  challengeId: string,
+  mode: ChallengeMode,
+) {
   const challenge = await getChallengeById(challengeId);
   if (!challenge) {
     return null;

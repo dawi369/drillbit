@@ -28,11 +28,15 @@ Daily flow:
 1. Home-screen widget refreshes (per schedule, e.g., every 6h, cap 5/day) → shows fresh problem teaser (title, difficulty pill, 1-2 line description, topic badges) + tappable actions such as Solo | AI Coach | Reveal | Skip. Tiny struggle badge (e.g., "Consistency: 2 fails") appears in corner if relevant.
 2. User taps preferred mode → haptic + deep-link opens Answer Modal directly (fast/minimized launch).
 3. Answer Modal:
-   - Fixed top strip: problem title/teaser + brief past-performance context ("Last similar: 58% · 3 attempts on CRDTs vs OT · AI Coach used 4× · Weak: conflict resolution").
-   - Segmented pills to switch modes freely (Solo / AI Coach / Reveal) — state preserved.
-   - In AI Coach: streaming chat starts with gentle opener, then back-and-forth probing/hints ("How would offline merges impact your chosen model? Any latency trade-offs?") + quick-reply chips ("Deeper probe", "Trade-offs?", "Next component", "Stuck").
-   - Large text area for notes, reasoning outlines, ASCII diagrams — no heavy code editor needed.
-4. When finished → tap Done (bottom blue pill).
+    - Fixed top strip: problem title/teaser + brief past-performance context ("Last similar: 58% · 3 attempts on CRDTs vs OT · AI Coach used 4× · Weak: conflict resolution").
+    - Compact topic/difficulty pills sit alongside a native mode picker so the header stays tight and the user can still switch modes without losing context.
+    - A thin collapse handle sits at the bottom of the header so the prompt can shrink away and give more room to the solving surface.
+    - A second thin assistant header appears only in AI Coach and Reveal; it surfaces one short guidance line at a time and opens a separate ask-AI input when tapped.
+    - Large shared notes canvas stays central in every mode so the user always works in one consistent solving surface.
+    - Below the notes canvas, the lower panel changes by mode: quiet helper surface in Solo, guided probing tray in AI Coach, structured answer tray in Reveal.
+    - In AI Coach: streaming chat starts with gentle opener, then back-and-forth probing/hints ("How would offline merges impact your chosen model? Any latency trade-offs?") + quick-reply chips ("Deeper probe", "Trade-offs?", "Next component", "Stuck").
+    - Session state owned by the modal: `selectedMode`, `notesDraft`, `conversationSummary`, `updatedAt`.
+4. Bottom action bar is fixed with Skip | Save | Done, with Done taking the most space.
 5. Summary Page (brief & rewarding):
    - AI-generated completion percentage (e.g., "82% — strong partitioning, explore optimistic locking more").
    - Concise personalized feedback ("You nailed CRDT fit but hesitated on merge conflicts — next time push resolution strategies").

@@ -81,7 +81,8 @@ function ModeCard({
 export function ParamsScreen() {
   const initialDraft = useMemo(() => createDefaultSettings(), []);
   const [draft, setDraft] = useState<UserSettingsRecord>(initialDraft);
-  const [savedSettings, setSavedSettings] = useState<UserSettingsRecord>(initialDraft);
+  const [savedSettings, setSavedSettings] =
+    useState<UserSettingsRecord>(initialDraft);
   const [isTimePickerVisible, setTimePickerVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -136,10 +137,14 @@ export function ParamsScreen() {
       const nextSettings: UserSettingsRecord = {
         ...draft,
         challengeCadenceHours: normalizeChallengeCadenceHours(
-          draft.challengeCadenceHours ?? initialDraft.challengeCadenceHours ?? 24,
+          draft.challengeCadenceHours ??
+            initialDraft.challengeCadenceHours ??
+            24,
         ),
         firstChallengeTimeMinutes: normalizeFirstChallengeTimeMinutes(
-          draft.firstChallengeTimeMinutes ?? initialDraft.firstChallengeTimeMinutes ?? 0,
+          draft.firstChallengeTimeMinutes ??
+            initialDraft.firstChallengeTimeMinutes ??
+            0,
         ),
         updatedAt: new Date().toISOString(),
       };
@@ -149,7 +154,9 @@ export function ParamsScreen() {
       setSavedSettings(nextSettings);
       setSaveStatus("saved locally");
     } catch (error) {
-      setSaveStatus(error instanceof Error ? error.message : "failed to save settings");
+      setSaveStatus(
+        error instanceof Error ? error.message : "failed to save settings",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -187,7 +194,9 @@ export function ParamsScreen() {
               challenge generation.
             </Card.Description>
             {isLoading ? (
-              <Text className="text-sm text-muted">loading saved settings...</Text>
+              <Text className="text-sm text-muted">
+                loading saved settings...
+              </Text>
             ) : saveStatus ? (
               <Text className="text-sm text-accent">{saveStatus}</Text>
             ) : null}
@@ -432,11 +441,13 @@ export function ParamsScreen() {
                 void handleSaveSettings();
               }}
             >
-              <Button.Label>{isSaving ? "saving..." : "save settings"}</Button.Label>
+              <Button.Label>
+                {isSaving ? "saving..." : "save settings"}
+              </Button.Label>
             </Button>
           </View>
 
-          <Link href="/answer" asChild>
+          <Link href={{ pathname: "/answer", params: { mode: draft.preferredMode ?? "coach" } }} asChild>
             <Button variant="ghost">
               <Button.Label>open temp answer modal</Button.Label>
             </Button>
