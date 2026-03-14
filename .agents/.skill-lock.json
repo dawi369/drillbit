@@ -1,0 +1,209 @@
+{
+  "version": 3,
+  "skills": {
+    "building-native-ui": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/expo/skills.git",
+      "skillPath": "plugins/expo/skills/building-native-ui/SKILL.md",
+      "skillFolderHash": "0078663cbdc42e388d2eb9c291dda1a0774eee29",
+      "installedAt": "2026-02-03T15:08:51.174Z",
+      "updatedAt": "2026-03-14T13:02:21.930Z"
+    },
+    "find-skills": {
+      "source": "vercel-labs/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/vercel-labs/skills.git",
+      "skillPath": "skills/find-skills/SKILL.md",
+      "skillFolderHash": "3013fdeb8a11b10b1eb795ec3ae8bfca38f7c26d",
+      "installedAt": "2026-02-03T15:09:51.759Z",
+      "updatedAt": "2026-03-14T13:00:55.288Z"
+    },
+    "vercel-react-best-practices": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/vercel-labs/agent-skills.git",
+      "skillPath": "skills/react-best-practices/SKILL.md",
+      "skillFolderHash": "18a9a6d17d5958d4ab10405883b80960644dbd5b",
+      "installedAt": "2026-02-03T15:32:38.090Z",
+      "updatedAt": "2026-03-14T13:00:58.380Z"
+    },
+    "web-design-guidelines": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/vercel-labs/agent-skills.git",
+      "skillPath": "skills/web-design-guidelines/SKILL.md",
+      "skillFolderHash": "3116f3e62dbd02b44a598b1aa690d2a8938e8f89",
+      "installedAt": "2026-02-03T15:34:45.650Z",
+      "updatedAt": "2026-02-03T15:34:45.650Z"
+    },
+    "frontend-design": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/anthropics/skills.git",
+      "skillPath": "skills/frontend-design/SKILL.md",
+      "skillFolderHash": "928950704df8a8b885c03de5da626331e6f29cf8",
+      "installedAt": "2026-02-03T15:37:36.389Z",
+      "updatedAt": "2026-02-03T15:37:36.389Z"
+    },
+    "vercel-composition-patterns": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/vercel-labs/agent-skills.git",
+      "skillPath": "skills/composition-patterns/SKILL.md",
+      "skillFolderHash": "bf90d0a4b83ea054653350f9c67f6de235d3a368",
+      "installedAt": "2026-02-03T15:38:15.476Z",
+      "updatedAt": "2026-02-03T15:38:15.476Z"
+    },
+    "seo-audit": {
+      "source": "coreyhaines31/marketingskills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/coreyhaines31/marketingskills.git",
+      "skillPath": "skills/seo-audit/SKILL.md",
+      "skillFolderHash": "c5423e592d1ce900fafca88b17f3896eea53b237",
+      "installedAt": "2026-02-03T15:38:55.453Z",
+      "updatedAt": "2026-03-14T13:01:01.289Z"
+    },
+    "native-data-fetching": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/expo/skills.git",
+      "skillPath": "plugins/expo/skills/native-data-fetching/SKILL.md",
+      "skillFolderHash": "43d26c96331a2240e33d319998d21da4191b5587",
+      "installedAt": "2026-02-15T11:03:12.513Z",
+      "updatedAt": "2026-03-14T13:02:22.392Z"
+    },
+    "expo-dev-client": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/expo/skills.git",
+      "skillPath": "plugins/expo/skills/expo-dev-client/SKILL.md",
+      "skillFolderHash": "5adb1357248d76daeb2a80ee65824819b0b21a49",
+      "installedAt": "2026-02-15T11:03:55.184Z",
+      "updatedAt": "2026-03-14T13:02:22.249Z"
+    },
+    "expo-deployment": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/expo/skills.git",
+      "skillPath": "plugins/expo/skills/expo-deployment/SKILL.md",
+      "skillFolderHash": "1b85cb69d451371559ff6af4f08283a0a6679d1c",
+      "installedAt": "2026-02-15T11:04:17.103Z",
+      "updatedAt": "2026-03-14T13:02:22.177Z"
+    },
+    "expo-api-routes": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/expo/skills.git",
+      "skillPath": "plugins/expo/skills/expo-api-routes/SKILL.md",
+      "skillFolderHash": "43ff4f9cb35a82e83b97cd48e0cd4dfa7aa912a1",
+      "installedAt": "2026-02-15T11:04:44.509Z",
+      "updatedAt": "2026-03-14T13:02:22.001Z"
+    },
+    "elysiajs": {
+      "source": "elysiajs/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/elysiajs/skills.git",
+      "skillPath": "elysia/SKILL.md",
+      "skillFolderHash": "067301d49f2a392d2994548ae686ff45c5424ba9",
+      "installedAt": "2026-02-15T11:07:14.226Z",
+      "updatedAt": "2026-02-15T11:07:14.226Z"
+    },
+    "elysiajs-expert": {
+      "source": "lammesen/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/lammesen/skills.git",
+      "skillPath": ".claude/skills/elysiajs-expert/SKILL.md",
+      "skillFolderHash": "e654a43c999a955bc9f182b79d2e957b2847ac79",
+      "installedAt": "2026-02-15T11:07:47.366Z",
+      "updatedAt": "2026-02-15T11:07:47.366Z"
+    },
+    "bun-expert": {
+      "source": "lammesen/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/lammesen/skills.git",
+      "skillPath": ".claude/skills/bun-expert/SKILL.md",
+      "skillFolderHash": "46dc22560fa675df33ef5d21ee30685ab9fee893",
+      "installedAt": "2026-02-15T11:08:33.088Z",
+      "updatedAt": "2026-02-15T11:08:33.088Z"
+    },
+    "gluestack-ui-v4": {
+      "source": "gluestack/agent-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/gluestack/agent-skills.git",
+      "skillPath": "skills/gluestack-ui-v4/SKILL.md",
+      "skillFolderHash": "8c340f7a0ce55bd9d8b50f294260cd900be4515f",
+      "installedAt": "2026-02-19T01:12:25.720Z",
+      "updatedAt": "2026-03-14T13:01:04.163Z"
+    },
+    "migrate-nativewind-to-uniwind": {
+      "source": "uni-stack/uniwind",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/uni-stack/uniwind.git",
+      "skillPath": "skills/migrate-nativewind-to-uniwind/SKILL.md",
+      "skillFolderHash": "0f287616b5abb57be99a2d7e901a72ac9ceb8c1f",
+      "installedAt": "2026-02-19T08:44:55.368Z",
+      "updatedAt": "2026-03-14T13:01:07.485Z"
+    },
+    "expo-cicd-workflows": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/expo/skills.git",
+      "skillPath": "plugins/expo/skills/expo-cicd-workflows/SKILL.md",
+      "skillFolderHash": "3e9753a3ba093b8be385deb28db384d183f1e8b9",
+      "installedAt": "2026-02-27T10:46:33.761Z",
+      "updatedAt": "2026-03-14T13:02:22.065Z"
+    },
+    "expo-tailwind-setup": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/expo/skills.git",
+      "skillPath": "plugins/expo/skills/expo-tailwind-setup/SKILL.md",
+      "skillFolderHash": "bf60256bc226ad60a1eb0a6ce5e32b4aa83b5576",
+      "installedAt": "2026-02-27T10:46:33.979Z",
+      "updatedAt": "2026-03-14T13:02:22.321Z"
+    },
+    "upgrading-expo": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/expo/skills.git",
+      "skillPath": "plugins/expo/skills/upgrading-expo/SKILL.md",
+      "skillFolderHash": "23cb4cb2d723d4c8d1a7996e37288f28a44f23dc",
+      "installedAt": "2026-02-27T10:46:34.180Z",
+      "updatedAt": "2026-03-14T13:02:22.463Z"
+    },
+    "use-dom": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/expo/skills.git",
+      "skillPath": "plugins/expo/skills/use-dom/SKILL.md",
+      "skillFolderHash": "ce309744c9ec448b2a4ac7152910da46797e316a",
+      "installedAt": "2026-02-27T10:46:34.246Z",
+      "updatedAt": "2026-03-14T13:02:22.529Z"
+    },
+    "heroui-native": {
+      "source": "heroui-inc/heroui",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/heroui-inc/heroui.git",
+      "skillPath": "skills/heroui-native/SKILL.md",
+      "skillFolderHash": "",
+      "installedAt": "2026-03-07T19:36:05.492Z",
+      "updatedAt": "2026-03-07T19:36:05.492Z"
+    }
+  },
+  "dismissed": {
+    "findSkillsPrompt": true
+  },
+  "lastSelectedAgents": [
+    "amp",
+    "cline",
+    "codex",
+    "cursor",
+    "gemini-cli",
+    "github-copilot",
+    "kimi-cli",
+    "opencode",
+    "warp",
+    "antigravity"
+  ]
+}

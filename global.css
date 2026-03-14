@@ -1,0 +1,121 @@
+@import "tailwindcss";
+@import "uniwind";
+@import "heroui-native/styles";
+
+@source "./node_modules/heroui-native/lib";
+
+@theme {
+  --radius: 0.625rem;
+  --field-radius: 1rem;
+  --field-border-width: 1px;
+}
+
+@layer theme {
+  :root {
+    @variant light {
+      --background: #ffffff;
+      --foreground: #0f1419;
+
+      --surface: #ffffff;
+      --surface-foreground: #0f1419;
+
+      --surface-secondary: #f7f9f9;
+      --surface-secondary-foreground: #0f1419;
+
+      --surface-tertiary: #eff3f4;
+      --surface-tertiary-foreground: #0f1419;
+
+      --overlay: #ffffff;
+      --overlay-foreground: #0f1419;
+
+      --muted: #536471;
+
+      --default: #eff3f4;
+      --default-foreground: #0f1419;
+
+      --accent: #1d9bf0;
+      --accent-foreground: #ffffff;
+
+      --field-background: #ffffff;
+      --field-foreground: #0f1419;
+      --field-placeholder: #75828d;
+      --field-border: #d7dfe4;
+
+      --success: #30d158;
+      --success-foreground: #04130a;
+
+      --warning: #ffd60a;
+      --warning-foreground: #1c1500;
+
+      --danger: #ff5e57;
+      --danger-foreground: #220504;
+
+      --segment: #eff3f4;
+      --segment-foreground: #0f1419;
+
+      --border: #d7dfe4;
+      --separator: #e5eaed;
+      --focus: #1d9bf0;
+      --link: #1d9bf0;
+
+      --surface-shadow:
+        0 8px 24px 0 rgba(15, 20, 25, 0.05),
+        0 0 0 1px rgba(15, 20, 25, 0.04) inset;
+      --overlay-shadow:
+        0 12px 32px 0 rgba(15, 20, 25, 0.08),
+        0 0 0 1px rgba(15, 20, 25, 0.05) inset;
+      --field-shadow: 0 0 0 1px rgba(15, 20, 25, 0.03) inset;
+    }
+
+    @variant dark {
+      --background: #000000;
+      --foreground: #f5f7fa;
+
+      --surface: #0f0f0f;
+      --surface-foreground: #f5f7fa;
+
+      --surface-secondary: #131313;
+      --surface-secondary-foreground: #f5f7fa;
+
+      --surface-tertiary: #171717;
+      --surface-tertiary-foreground: #f5f7fa;
+
+      --overlay: #111111;
+      --overlay-foreground: #f5f7fa;
+
+      --muted: #7d8894;
+
+      --default: #171717;
+      --default-foreground: #f5f7fa;
+
+      --accent: #1d9bf0;
+      --accent-foreground: #f8fbff;
+
+      --field-background: #0f0f0f;
+      --field-foreground: #f5f7fa;
+      --field-placeholder: #6f7a85;
+      --field-border: #232a31;
+
+      --success: #30d158;
+      --success-foreground: #04130a;
+
+      --warning: #ffd60a;
+      --warning-foreground: #1c1500;
+
+      --danger: #ff5e57;
+      --danger-foreground: #220504;
+
+      --segment: #0f0f0f;
+      --segment-foreground: #f5f7fa;
+
+      --border: #232a31;
+      --separator: #1b2127;
+      --focus: #1d9bf0;
+      --link: #7dc8ff;
+
+      --surface-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+      --overlay-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+      --field-shadow: 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+    }
+  }
+}
