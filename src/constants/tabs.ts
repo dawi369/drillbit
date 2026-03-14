@@ -1,7 +1,7 @@
 export const APP_TABS = [
   {
     name: "index",
-    label: "Params",
+    label: "params",
     icon: {
       sf: "line.3.horizontal.decrease.circle.fill",
       md: "tune",
@@ -9,7 +9,7 @@ export const APP_TABS = [
   },
   {
     name: "memory",
-    label: "Memory",
+    label: "memory",
     icon: {
       sf: "brain.head.profile",
       md: "psychology",
@@ -19,7 +19,7 @@ export const APP_TABS = [
 
 export const DEV_TAB = {
   name: "dev",
-  label: "Dev",
+  label: "dev",
   icon: {
     sf: "hammer.circle.fill",
     md: "build_circle",

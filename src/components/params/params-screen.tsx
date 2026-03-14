@@ -72,7 +72,7 @@ export function ParamsScreen() {
             setup draft
           </Text>
         </View>
-        <Text className="text-4xl font-semibold tracking-tight text-foreground">Params</Text>
+        <Text className="text-4xl font-semibold tracking-tight text-foreground">params</Text>
         <Text className="max-w-2xl text-base leading-7 text-muted">
           Shape the kinds of drills drillbit generates, when they arrive, and how the widget opens the modal by default.
         </Text>
@@ -81,7 +81,7 @@ export function ParamsScreen() {
       <Card className="rounded-[28px] border border-border bg-surface">
         <Card.Body className="gap-4">
           <View className="gap-2">
-            <Card.Title className="text-2xl text-foreground">Current setup</Card.Title>
+            <Card.Title className="text-2xl text-foreground">current setup</Card.Title>
             <Card.Description className="text-sm leading-6 text-muted">
               A quick read of the current draft before we wire persistence and challenge generation.
             </Card.Description>
@@ -271,7 +271,7 @@ export function ParamsScreen() {
       <Card className="rounded-[28px] border border-accent/20 bg-accent/10">
         <Card.Body className="gap-4">
           <View className="gap-2">
-            <Card.Title className="text-lg text-foreground">Draft-only for now</Card.Title>
+            <Card.Title className="text-lg text-foreground">draft-only for now</Card.Title>
             <Card.Description className="text-sm leading-6 text-muted">
               This screen is interactive and reflects the settings model, but it is not persisted yet. We can wire save/load next after the UI feels right.
             </Card.Description>
@@ -286,10 +286,10 @@ export function ParamsScreen() {
                 setTimePickerVisible(false);
               }}
             >
-              <Button.Label>Reset draft</Button.Label>
+              <Button.Label>reset draft</Button.Label>
             </Button>
             <Button className="flex-1" variant="ghost" onPress={() => {}}>
-              <Button.Label>TODO: save locally</Button.Label>
+              <Button.Label>todo: save locally</Button.Label>
             </Button>
           </View>
         </Card.Body>

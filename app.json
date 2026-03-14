@@ -8,22 +8,20 @@
     "scheme": "drillbit",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.dawi369.drillbit"
+      "supportsTablet": true,
+      "usesAppleSignIn": true,
+      "icon": "./assets/images/icon.png",
+      "bundleIdentifier": "dawi.drillbit",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#000000"
       },
-      "predictiveBackGestureEnabled": false,
-      "package": "com.dawi369.drillbit"
-    },
-    "web": {
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "package": "dawi.drillbit"
     },
     "plugins": [
       "expo-router",
@@ -42,14 +40,14 @@
       [
         "expo-widgets",
         {
-          "bundleIdentifier": "com.dawi369.drillbit.ExpoWidgetsTarget",
-          "groupIdentifier": "group.com.dawi369.drillbit",
+          "bundleIdentifier": "dawi.drillbit.widget",
+          "groupIdentifier": "group.dawi.drillbit",
           "enablePushNotifications": false,
           "frequentUpdates": false,
           "widgets": [
             {
-              "name": "DrillbitWidget",
-              "displayName": "Drillbit",
+              "name": "drillbitWidget",
+              "displayName": "drillbit",
               "description": "Daily interview prep at a glance.",
               "supportedFamilies": [
                 "systemSmall",
@@ -76,10 +74,10 @@
               "appExtensions": [
                 {
                   "targetName": "ExpoWidgetsTarget",
-                  "bundleIdentifier": "com.dawi369.drillbit.ExpoWidgetsTarget",
+                  "bundleIdentifier": "dawi.drillbit.widget",
                   "entitlements": {
                     "com.apple.security.application-groups": [
-                      "group.com.dawi369.drillbit"
+                      "group.dawi.drillbit"
                     ]
                   }
                 }

@@ -11,7 +11,7 @@ import {
   type WidgetViewState,
 } from "@/lib/widgets/types";
 
-export const DRILLBIT_WIDGET_NAME = "DrillbitWidget";
+export const DRILLBIT_WIDGET_NAME = "drillbitWidget";
 
 export type DrillbitWidgetProps = WidgetViewState;
 
@@ -38,14 +38,14 @@ function DrillbitWidgetLayout(
   const titleColor = environment.colorScheme === "dark" ? "#f5f7fa" : "#0f1419";
   const eyebrow =
     props.status === "in_progress"
-      ? "In progress"
+      ? "in progress"
       : props.status === "awaiting_next"
-        ? "Awaiting next"
+        ? "awaiting next"
         : props.status === "unconfigured"
-          ? "Setup"
+          ? "setup"
           : props.status === "error"
-            ? "Attention"
-            : "Ready";
+            ? "attention"
+            : "ready";
 
   return (
     <VStack modifiers={[padding({ all: paddingValue })]}>
@@ -56,7 +56,7 @@ function DrillbitWidgetLayout(
             foregroundStyle("#1d9bf0"),
           ]}
         >
-          Drillbit
+          drillbit
         </Text>
         <Spacer />
         <Text
@@ -98,7 +98,7 @@ function DrillbitWidgetLayout(
           >
             {props.status === "ready" || props.status === "in_progress"
               ? props.challenge.topic
-              : "OpenRouter-first"}
+               : "openrouter-first"}
           </Text>
           <Spacer />
           <Text
