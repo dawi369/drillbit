@@ -10,6 +10,7 @@ import {
   toSettingsRow,
 } from "@/lib/storage/mappers";
 import type {
+  BlockedChallengeRecord,
   ChallengeCadenceHours,
   ChallengeRecord,
   ChallengeSessionRecord,
@@ -31,6 +32,35 @@ function createNowIso() {
   return new Date().toISOString();
 }
 
+function createBlockedChallengeSummary(record: ChallengeRecord) {
+  const difficulty = record.difficulty ? `${record.difficulty} ` : "";
+  const modeClause = record.mode ? ` intended for ${record.mode} mode` : "";
+
+  return `Do not repeat a ${difficulty}${record.topic} challenge about ${record.title.toLowerCase()} where the user must ${record.teaser.charAt(0).toLowerCase()}${record.teaser.slice(1)}${modeClause}.`.replace(
+    /\s+/g,
+    " ",
+  );
+}
+
+async function upsertBlockedChallenge(record: BlockedChallengeRecord) {
+  const db = await getDatabase();
+
+  await db.runAsync(
+    `
+      INSERT INTO blocked_challenges (challenge_id, summary, blocked_at, source_lifecycle)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(challenge_id) DO UPDATE SET
+        summary = excluded.summary,
+        blocked_at = excluded.blocked_at,
+        source_lifecycle = excluded.source_lifecycle
+    `,
+    record.challengeId,
+    record.summary,
+    record.blockedAt,
+    record.sourceLifecycle,
+  );
+}
+
 export async function upsertChallenge(record: ChallengeRecord) {
   const db = await getDatabase();
   const row = toChallengeRow(record);
@@ -38,11 +68,10 @@ export async function upsertChallenge(record: ChallengeRecord) {
   await db.runAsync(
     `
       INSERT INTO challenges (
-        id, dedupe_key, title, teaser, topic, difficulty, lifecycle, mode, skip_reason,
+        id, title, teaser, topic, difficulty, lifecycle, mode, skip_reason,
         created_at, started_at, completed_at, skipped_at, expires_at, source_model, source_prompt_version
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
-        dedupe_key = excluded.dedupe_key,
         title = excluded.title,
         teaser = excluded.teaser,
         topic = excluded.topic,
@@ -59,7 +88,6 @@ export async function upsertChallenge(record: ChallengeRecord) {
         source_prompt_version = excluded.source_prompt_version
     `,
     row.id,
-    row.dedupe_key,
     row.title,
     row.teaser,
     row.topic,
@@ -75,6 +103,15 @@ export async function upsertChallenge(record: ChallengeRecord) {
     row.source_model,
     row.source_prompt_version,
   );
+
+  if (record.lifecycle === "completed" || record.lifecycle === "skipped") {
+    await upsertBlockedChallenge({
+      challengeId: record.id,
+      summary: createBlockedChallengeSummary(record),
+      blockedAt: record.completedAt ?? record.skippedAt ?? record.createdAt,
+      sourceLifecycle: record.lifecycle,
+    });
+  }
 
   return record;
 }
@@ -107,13 +144,44 @@ export async function listChallenges(options: ChallengeQueryOptions = {}) {
   return rows.map(fromChallengeRow);
 }
 
-export async function listExcludedDedupeKeys() {
+export async function listBlockedChallenges(limit: number = 365) {
   const db = await getDatabase();
-  const rows = await db.getAllAsync<{ dedupe_key: string }>(
-    "SELECT dedupe_key FROM challenges WHERE lifecycle IN ('completed', 'skipped')",
+  const rows = await db.getAllAsync<{
+    challenge_id: string;
+    summary: string;
+    blocked_at: string;
+    source_lifecycle: "completed" | "skipped";
+  }>(
+    `
+      SELECT challenge_id, summary, blocked_at, source_lifecycle
+      FROM blocked_challenges
+      ORDER BY blocked_at DESC
+      LIMIT ?
+    `,
+    limit,
   );
 
-  return rows.map((row) => row.dedupe_key);
+  return rows.map((row) => ({
+    challengeId: row.challenge_id,
+    summary: row.summary,
+    blockedAt: row.blocked_at,
+    sourceLifecycle: row.source_lifecycle,
+  }));
+}
+
+export async function getMostRecentResolvedChallenge() {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<ReturnType<typeof toChallengeRow>>(
+    `
+      SELECT *
+      FROM challenges
+      WHERE lifecycle IN ('completed', 'skipped')
+      ORDER BY COALESCE(completed_at, skipped_at, created_at) DESC
+      LIMIT 1
+    `,
+  );
+
+  return rows[0] ? fromChallengeRow(rows[0]) : null;
 }
 
 export async function pruneExpiredUnstartedChallenges(nowIso: string = createNowIso()) {
@@ -128,6 +196,25 @@ export async function pruneExpiredUnstartedChallenges(nowIso: string = createNow
         AND expires_at <= ?
     `,
     nowIso,
+  );
+
+  return result.changes;
+}
+
+export async function pruneSkippedChallenges(retentionDays: number = 30, now: Date = new Date()) {
+  const db = await getDatabase();
+  const cutoff = new Date(now);
+
+  cutoff.setDate(cutoff.getDate() - retentionDays);
+
+  const result = await db.runAsync(
+    `
+      DELETE FROM challenges
+      WHERE lifecycle = 'skipped'
+        AND skipped_at IS NOT NULL
+        AND skipped_at <= ?
+    `,
+    cutoff.toISOString(),
   );
 
   return result.changes;

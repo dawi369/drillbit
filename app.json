@@ -4,13 +4,13 @@
     "slug": "drillbit",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/logo.png",
     "scheme": "drillbit",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
       "usesAppleSignIn": true,
-      "icon": "./assets/images/icon.png",
+      "icon": "./assets/logo.png",
       "bundleIdentifier": "dawi.drillbit",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
@@ -18,8 +18,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
-        "backgroundColor": "#000000"
+        "foregroundImage": "./assets/logo_transparent.png",
+        "backgroundColor": "#0F0F0F"
       },
       "package": "dawi.drillbit"
     },
@@ -28,10 +28,12 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#000000",
+          "backgroundColor": "#0F0F0F", 
+          "image": "./assets/logo_transparent.png",
+          "imageWidth": 200, 
           "android": {
-            "image": "./assets/images/splash-icon.png",
-            "imageWidth": 76
+             "image": "./assets/logo_transparent.png",
+             "imageWidth": 200 
           }
         }
       ],

@@ -12,7 +12,7 @@ Architecture note: drillbit ships with no custom deployed backend/API of its own
 
 Users set their focus once (or tweak anytime) via a free-form prompt (e.g., "system design medium-hard: live collaboration tools, payment gateways, recommendation engines, URL shorteners; probe deeply on consistency, latency, partitioning; avoid basic CRUD and easy arrays"). The app maintains rich local memory to:
 
-- Avoid repeating near-duplicate questions.
+- Avoid repeating exact challenges while still allowing fresh similar ones later.
 - Track struggles/weak areas (e.g., "consistency models: 3 fails").
 - Boost weak topics in future feeds.
 - Personalize every problem generation and AI Coach interaction.
@@ -44,15 +44,17 @@ Memory stores every interaction as a rich card locally (SQLite + shared widget s
 
 - Full conversation chain (user notes/responses + AI messages) for active or completed challenges that are still retained.
 - Performance metrics (completion %, modes used, AI usage count, detected struggle patterns/tags).
-- Challenge lifecycle metadata, including completed and skipped items, with a dedupe key so skipped challenges never reappear.
-- Expired untouched challenges may be pruned entirely to save space and allow future similar prompts again.
+- Challenge lifecycle metadata, including completed and skipped items, plus a short blocked summary used to tell the model which exact challenge shapes not to repeat.
+- Similar challenges are still allowed later; repeat blocking targets exact prior challenge shapes, not the whole topic area.
+- Untouched expired challenges may be pruned entirely to save space and allow future similar prompts again.
+- Skipped challenge rows may be cleaned up after a retention window, while their blocked summaries remain preserved so exact skipped prompts do not return.
 - Accessible in Mem tab: thin progress graph (drag/scrub days, replay past sessions), accordion cards for deep review, bulk forget/re-enable.
 
 System prompt for every new problem generation and AI Coach response is dynamically constructed from:
 
 - App core description & goals.
 - User's current focus prompt.
-- Relevant memory slice (weak areas, avoided similars, recent performance).
+- Relevant memory slice (weak areas, blocked exact-repeat summaries, recent performance).
 - Specific problem's past context (for continuity in modal sessions).
 
 Result: a truly adaptive, non-repetitive, guiding experience that feels intelligent and evolves with the user — all local/privacy-first, widget-heroic, and X-clean.

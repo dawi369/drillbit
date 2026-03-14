@@ -53,20 +53,64 @@ export type WidgetSharedPayload = {
   viewState: WidgetViewState;
 };
 
-export type ModelCallKind = "generate" | "coach" | "reveal";
+export type BlockedChallengeRecord = {
+  challengeId: string;
+  summary: string;
+  blockedAt: string;
+  sourceLifecycle: "completed" | "skipped";
+};
 
-export type ModelCallContext = {
-  kind: ModelCallKind;
+export type PromptKind = "generate" | "coach" | "reveal" | "summarize";
+
+export type AppContext = {
+  kind: PromptKind;
   settings: UserSettingsRecord;
   challenge?: ChallengeRecord;
   session?: ChallengeSessionRecord;
+  runtime: {
+    blockedChallenges: BlockedChallengeRecord[];
+  };
   memory: {
     recentSummaries: ChallengeSummaryRecord[];
     weakTopicSummaries: ChallengeSummaryRecord[];
-    excludedDedupeKeys: string[];
     lastResolvedChallenge?: ChallengeRecord;
   };
 };
+
+export type PromptContext =
+  | {
+      kind: "generate";
+      systemPrompt: string;
+      focusPrompt: string;
+      preferredDifficulty?: ChallengeDifficulty;
+      blockedChallenges: AppContext["runtime"]["blockedChallenges"];
+      memory: AppContext["memory"];
+    }
+  | {
+      kind: "coach";
+      systemPrompt: string;
+      focusPrompt: string;
+      preferredDifficulty?: ChallengeDifficulty;
+      challenge: ChallengeRecord;
+      session?: ChallengeSessionRecord;
+      memory: AppContext["memory"];
+    }
+  | {
+      kind: "reveal";
+      systemPrompt: string;
+      focusPrompt: string;
+      preferredDifficulty?: ChallengeDifficulty;
+      challenge: ChallengeRecord;
+      session?: ChallengeSessionRecord;
+      memory: AppContext["memory"];
+    }
+  | {
+      kind: "summarize";
+      systemPrompt: string;
+      challenge: ChallengeRecord;
+      session?: ChallengeSessionRecord;
+      memory: AppContext["memory"];
+    };
 
 export type ChallengeLifecycleRow = ChallengeRecord["lifecycle"];
 export type ChallengeModeRow = ChallengeMode;

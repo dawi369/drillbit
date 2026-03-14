@@ -16,7 +16,6 @@ type Nullable<T> = T | null;
 
 type ChallengeRow = {
   id: string;
-  dedupe_key: string;
   title: string;
   teaser: string;
   topic: string;
@@ -80,7 +79,6 @@ export function parseJsonArray(value: string) {
 export function toChallengeRow(record: ChallengeRecord): ChallengeRow {
   return {
     id: record.id,
-    dedupe_key: record.dedupeKey,
     title: record.title,
     teaser: record.teaser,
     topic: record.topic,
@@ -101,7 +99,6 @@ export function toChallengeRow(record: ChallengeRecord): ChallengeRow {
 export function fromChallengeRow(row: ChallengeRow): ChallengeRecord {
   return {
     id: row.id,
-    dedupeKey: row.dedupe_key,
     title: row.title,
     teaser: row.teaser,
     topic: row.topic,

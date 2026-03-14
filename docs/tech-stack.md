@@ -17,7 +17,7 @@ Styling & UI
 
 State & Data
 • zustand – lightweight global state (focus prompt, model config, schedule)
-• expo-sqlite + expo-widgets App Groups – rich local memory cards, challenge history, dedupe keys, and shared widget sync
+• expo-sqlite + expo-widgets App Groups – rich local memory cards, challenge history, blocked exact-repeat summaries, and shared widget sync
 • expo-secure-store – OpenRouter API key / BYOK credentials
 • Scheduling model – first challenge time plus cadence values restricted to divisors of 24h
 
@@ -50,6 +50,8 @@ Key Constraints / Notes
 • Prefer native implementations first – Expo/React Native APIs and platform primitives before web/DOM fallbacks
 • No Expo Go for widgets – dev builds / EAS only
 • Bundle goal: tree-shake HeroUI imports, keep app lean (widget as hero surface)
-• Skipped challenges are stored in local history and excluded from future generation
+• Completed and skipped challenges are excluded from future exact-repeat generation via short blocked summaries sent with generate prompts
+• Similar challenges are still allowed later; repeat blocking targets exact prior challenge shapes, not broad topic bans
 • Untouched expired challenges may be deleted locally to save space and allow similar future prompts
+• Skipped challenge rows may be pruned after a retention window while their blocked summaries remain preserved
 • Params scheduling uses a first-time anchor plus cadence options that divide evenly into 24h

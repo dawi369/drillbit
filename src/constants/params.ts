@@ -1,13 +1,16 @@
-import { ALLOWED_CHALLENGE_CADENCE_HOURS, type ChallengeCadenceHours } from "@/lib/storage/types";
+import {
+  ALLOWED_CHALLENGE_CADENCE_HOURS,
+  type ChallengeCadenceHours,
+} from "@/lib/storage/types";
 import type { ChallengeDifficulty, ChallengeMode } from "@/lib/widgets/types";
 
 export const DIFFICULTY_OPTIONS: {
   value: ChallengeDifficulty;
   label: string;
 }[] = [
-  { value: "easy", label: "Easy" },
-  { value: "medium", label: "Medium" },
-  { value: "hard", label: "Hard" },
+  { value: "easy", label: "easy" },
+  { value: "medium", label: "medium" },
+  { value: "hard", label: "hard" },
 ];
 
 export const MODE_OPTIONS: {
@@ -17,18 +20,21 @@ export const MODE_OPTIONS: {
 }[] = [
   {
     value: "solo",
-    label: "Solo",
-    description: "Clean prompt, private reasoning, and no AI steering unless you switch later.",
+    label: "solo",
+    description:
+      "Clean prompt, private reasoning, and no AI steering unless you switch later.",
   },
   {
     value: "coach",
-    label: "AI Coach",
-    description: "Socratic pressure with hints, trade-offs, and probing follow-ups instead of spoilers.",
+    label: "ai coach",
+    description:
+      "Socratic pressure with hints, trade-offs, and probing follow-ups instead of spoilers.",
   },
   {
     value: "reveal",
-    label: "Reveal",
-    description: "A direct model answer with components, alternatives, failure modes, and pitfalls.",
+    label: "reveal",
+    description:
+      "A direct model answer with components, alternatives, failure modes, and pitfalls.",
   },
 ];
 
@@ -37,5 +43,5 @@ export const CADENCE_OPTIONS: {
   label: string;
 }[] = ALLOWED_CHALLENGE_CADENCE_HOURS.map((value) => ({
   value,
-  label: value === 24 ? "Daily" : `${value}h`,
+  label: value === 24 ? "daily" : `${value}h`,
 }));

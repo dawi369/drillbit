@@ -28,7 +28,6 @@ export type ChallengeDifficulty = "easy" | "medium" | "hard";
 
 export type Challenge = {
   id: string;
-  dedupeKey: string;
   title: string;
   teaser: string;
   topic: string;
@@ -92,7 +91,6 @@ export function createPlaceholderWidgetState(): WidgetViewState {
     cta: "Open challenge",
     challenge: {
       id: "placeholder-system-design-warmup",
-      dedupeKey: "system-design-feature-flag-platform",
       title: "System design warm-up",
       teaser: "Design a feature-flag platform with safe rollout controls.",
       topic: "System design",

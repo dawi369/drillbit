@@ -3,7 +3,6 @@ export const DATABASE_NAME = "drillbit.db";
 export const CREATE_CHALLENGES_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS challenges (
     id TEXT PRIMARY KEY NOT NULL,
-    dedupe_key TEXT NOT NULL UNIQUE,
     title TEXT NOT NULL,
     teaser TEXT NOT NULL,
     topic TEXT NOT NULL,
@@ -60,10 +59,20 @@ export const CREATE_SETTINGS_TABLE_SQL = `
   );
 `;
 
+export const CREATE_BLOCKED_CHALLENGES_TABLE_SQL = `
+  CREATE TABLE IF NOT EXISTS blocked_challenges (
+    challenge_id TEXT PRIMARY KEY NOT NULL,
+    summary TEXT NOT NULL,
+    blocked_at TEXT NOT NULL,
+    source_lifecycle TEXT NOT NULL
+  );
+`;
+
 export const CREATE_INDEXES_SQL = [
   "CREATE INDEX IF NOT EXISTS idx_challenges_lifecycle ON challenges (lifecycle);",
   "CREATE INDEX IF NOT EXISTS idx_challenges_topic ON challenges (topic);",
   "CREATE INDEX IF NOT EXISTS idx_challenge_summaries_challenge_id ON challenge_summaries (challenge_id);",
+  "CREATE INDEX IF NOT EXISTS idx_blocked_challenges_lifecycle ON blocked_challenges (source_lifecycle);",
 ];
 
 export const CREATE_ALL_TABLES_SQL = [
@@ -71,5 +80,6 @@ export const CREATE_ALL_TABLES_SQL = [
   CREATE_CHALLENGE_SUMMARIES_TABLE_SQL,
   CREATE_CHALLENGE_SESSIONS_TABLE_SQL,
   CREATE_SETTINGS_TABLE_SQL,
+  CREATE_BLOCKED_CHALLENGES_TABLE_SQL,
   ...CREATE_INDEXES_SQL,
 ];

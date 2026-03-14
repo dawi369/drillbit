@@ -1,6 +1,9 @@
 import { Alert, Pressable, ScrollView, Text, View } from "react-native";
+import { useState } from "react";
 
+import { buildPromptPreviewChain } from "@/lib/prompts/dev-preview";
 import { resetDatabase } from "@/lib/storage/database";
+import type { PromptKind } from "@/lib/storage/types";
 
 type DevActionCardProps = {
   title: string;
@@ -52,6 +55,22 @@ function DevActionCard({
 }
 
 export default function DevTabScreen() {
+  const [activePreviewKind, setActivePreviewKind] = useState<PromptKind | null>(null);
+  const [appContextPreview, setAppContextPreview] = useState<string | null>(null);
+  const [promptContextPreview, setPromptContextPreview] = useState<string | null>(null);
+  const [renderedPromptPreview, setRenderedPromptPreview] = useState<string | null>(null);
+
+  async function handleInspectPromptPipeline(kind: PromptKind) {
+    const preview = await buildPromptPreviewChain(kind);
+
+    setActivePreviewKind(kind);
+    setAppContextPreview(JSON.stringify(preview.appContext, null, 2));
+    setPromptContextPreview(
+      preview.promptContext ? JSON.stringify(preview.promptContext, null, 2) : "null",
+    );
+    setRenderedPromptPreview(preview.renderedPrompt ?? "null");
+  }
+
   if (!__DEV__) {
     return null;
   }
@@ -102,11 +121,85 @@ export default function DevTabScreen() {
       />
 
       <DevActionCard
-        title="inspect model context"
-        description="Build and preview the exact context payload that would be sent to the next model call."
-        actionLabel="todo: inspect context"
-        todo
+        title="inspect generate pipeline"
+        description="Build the app context, prompt context, and final rendered prompt for a generate call."
+        actionLabel="inspect generate"
+        onPress={async () => {
+          await handleInspectPromptPipeline("generate");
+        }}
       />
+
+      <DevActionCard
+        title="inspect coach pipeline"
+        description="Preview the full context chain for an in-progress coach call using seeded dev challenge data."
+        actionLabel="inspect coach"
+        onPress={async () => {
+          await handleInspectPromptPipeline("coach");
+        }}
+      />
+
+      <DevActionCard
+        title="inspect reveal pipeline"
+        description="Preview the full context chain for a reveal call using seeded dev challenge data."
+        actionLabel="inspect reveal"
+        onPress={async () => {
+          await handleInspectPromptPipeline("reveal");
+        }}
+      />
+
+      <DevActionCard
+        title="inspect summarize pipeline"
+        description="Preview the full context chain for post-session summarization using seeded dev challenge data."
+        actionLabel="inspect summarize"
+        onPress={async () => {
+          await handleInspectPromptPipeline("summarize");
+        }}
+      />
+
+      {appContextPreview ? (
+        <View className="gap-3 rounded-3xl border border-border bg-surface px-4 py-4">
+          <View className="gap-1">
+            <Text className="text-base font-semibold text-foreground">app context preview</Text>
+            <Text className="text-sm leading-6 text-muted">
+              Structured app-side context assembled for `{activePreviewKind}`.
+            </Text>
+          </View>
+
+          <Text selectable className="text-xs leading-5 text-foreground">
+            {appContextPreview}
+          </Text>
+        </View>
+      ) : null}
+
+      {promptContextPreview ? (
+        <View className="gap-3 rounded-3xl border border-border bg-surface px-4 py-4">
+          <View className="gap-1">
+            <Text className="text-base font-semibold text-foreground">prompt context preview</Text>
+            <Text className="text-sm leading-6 text-muted">
+              AI-facing context filtered from the broader app context for `{activePreviewKind}`.
+            </Text>
+          </View>
+
+          <Text selectable className="text-xs leading-5 text-foreground">
+            {promptContextPreview}
+          </Text>
+        </View>
+      ) : null}
+
+      {renderedPromptPreview ? (
+        <View className="gap-3 rounded-3xl border border-border bg-surface px-4 py-4">
+          <View className="gap-1">
+            <Text className="text-base font-semibold text-foreground">rendered prompt preview</Text>
+            <Text className="text-sm leading-6 text-muted">
+              Final english prompt text built from the selected system prompt and prompt context for `{activePreviewKind}`.
+            </Text>
+          </View>
+
+          <Text selectable className="text-xs leading-5 text-foreground">
+            {renderedPromptPreview}
+          </Text>
+        </View>
+      ) : null}
     </ScrollView>
   );
 }
