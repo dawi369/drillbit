@@ -3,7 +3,7 @@ export const APP_TABS = [
     name: "index",
     label: "params",
     icon: {
-      sf: "line.3.horizontal.decrease.circle.fill",
+      sf: "slider.horizontal.3",
       md: "tune",
     },
   },
@@ -11,8 +11,8 @@ export const APP_TABS = [
     name: "memory",
     label: "memory",
     icon: {
-      sf: "brain.head.profile",
-      md: "psychology",
+      sf: "square.stack.3d.up.fill",
+      md: "layers",
     },
   },
 ] as const;
@@ -21,8 +21,8 @@ export const DEV_TAB = {
   name: "dev",
   label: "dev",
   icon: {
-    sf: "hammer.circle.fill",
-    md: "build_circle",
+    sf: "hammer",
+    md: "construction",
   },
 } as const;
 
