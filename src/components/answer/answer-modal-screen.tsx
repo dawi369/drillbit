@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ANSWER_MODAL_MODEL_OPTIONS,
   ANSWER_MODAL_PREVIEW_CHALLENGE,
+  ANSWER_MODAL_PREVIEW_COACH_MESSAGES,
 } from "@/constants/answer-modal";
 import { MODE_OPTIONS } from "@/constants/params";
 import { cn } from "@/lib/cn";
@@ -149,7 +150,7 @@ function ModelPicker({
             {selectedOption?.value ?? selectedModel}
           </Text>
           <Text className="text-[9px] text-muted">v</Text>
-          </View>
+        </View>
       </Pressable>
 
       <Modal
@@ -336,13 +337,13 @@ export function AnswerModalScreen() {
           style={{ paddingTop: insets.top }}
         >
           {!isHeaderCollapsed ? (
-            <View className="gap-2 pb-1">
+            <View className="gap-1 pb-1">
               <View className="gap-1">
                 <Text className="text-lg font-semibold tracking-tight text-foreground">
                   {ANSWER_MODAL_PREVIEW_CHALLENGE.title}
                 </Text>
                 <ScrollView
-                  style={{ maxHeight: 100 }}
+                  style={{ maxHeight: 120 }}
                   showsVerticalScrollIndicator={false}
                 >
                   <Text className="pr-2 text-sm leading-5 text-muted">
@@ -356,7 +357,7 @@ export function AnswerModalScreen() {
           )}
 
           {!isHeaderCollapsed ? (
-            <View className="items-center pb-2 pt-1">
+            <View className="items-center pb-1 pt-0.5">
               <View className="flex-row justify-center gap-2">
                 <MetaPill label={ANSWER_MODAL_PREVIEW_CHALLENGE.topic} />
                 <MetaPill label={ANSWER_MODAL_PREVIEW_CHALLENGE.difficulty} />
@@ -364,7 +365,7 @@ export function AnswerModalScreen() {
             </View>
           ) : null}
 
-          <View className="flex-row items-center gap-2 pb-2">
+          <View className="flex-row items-center gap-2 pb-1">
             <View className="min-w-0 flex-1 items-start">
               <ModelPicker
                 selectedModel={selectedModel}
@@ -468,13 +469,48 @@ export function AnswerModalScreen() {
             <Pressable className="mt-auto rounded-t-[28px] border border-border bg-background px-5 pb-safe-offset-4 pt-4">
               <View className="mb-3 gap-1">
                 <Text className="text-lg font-semibold text-foreground">
-                  ask the ai
-                </Text>
-                <Text className="text-sm leading-6 text-muted">
-                  This prompt stays separate from the main answer canvas so the
-                  user keeps full control of the working area.
+                  ask the coach
                 </Text>
               </View>
+
+              <ScrollView
+                className="mb-4"
+                style={{ maxHeight: 320 }}
+                showsVerticalScrollIndicator={false}
+              >
+               <View className="gap-3">
+                  {ANSWER_MODAL_PREVIEW_COACH_MESSAGES.map((message) => (
+                    <View
+                      key={message.id}
+                      className={cn(
+                        "w-full",
+                        message.role === "coach" ? "items-start" : "items-end",
+                      )}
+                    >
+                      <View
+                        className={cn(
+                          "rounded-3xl border px-4 py-3",
+                          message.role === "coach"
+                            ? "border-accent/20 bg-accent/10"
+                            : "border-border bg-surface-secondary",
+                        )}
+                        style={
+                          message.role === "coach"
+                            ? { marginRight: "15%" }
+                            : { marginLeft: "15%" }
+                        }
+                      >
+                        <Text className="mb-1 text-[10px] font-medium uppercase tracking-[1.2px] text-muted">
+                          {message.role}
+                        </Text>
+                        <Text className="text-sm leading-6 text-foreground">
+                          {message.text}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              </ScrollView>
 
               <TextField>
                 <Label>clarifying question</Label>

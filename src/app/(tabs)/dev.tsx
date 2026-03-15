@@ -1,5 +1,5 @@
-import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 import { useState } from "react";
+import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 
 import { buildPromptPreviewChain } from "@/lib/prompts/dev-preview";
 import { resetDatabase } from "@/lib/storage/database";
@@ -48,17 +48,27 @@ function DevActionCard({
           void onPress?.();
         }}
       >
-        <Text className={`text-sm font-medium ${labelClassName}`}>{actionLabel}</Text>
+        <Text className={`text-sm font-medium ${labelClassName}`}>
+          {actionLabel}
+        </Text>
       </Pressable>
     </View>
   );
 }
 
 export default function DevTabScreen() {
-  const [activePreviewKind, setActivePreviewKind] = useState<PromptKind | null>(null);
-  const [appContextPreview, setAppContextPreview] = useState<string | null>(null);
-  const [promptContextPreview, setPromptContextPreview] = useState<string | null>(null);
-  const [renderedPromptPreview, setRenderedPromptPreview] = useState<string | null>(null);
+  const [activePreviewKind, setActivePreviewKind] = useState<PromptKind | null>(
+    null,
+  );
+  const [appContextPreview, setAppContextPreview] = useState<string | null>(
+    null,
+  );
+  const [promptContextPreview, setPromptContextPreview] = useState<
+    string | null
+  >(null);
+  const [renderedPromptPreview, setRenderedPromptPreview] = useState<
+    string | null
+  >(null);
 
   async function handleInspectPromptPipeline(kind: PromptKind) {
     const preview = await buildPromptPreviewChain(kind);
@@ -66,7 +76,9 @@ export default function DevTabScreen() {
     setActivePreviewKind(kind);
     setAppContextPreview(JSON.stringify(preview.appContext, null, 2));
     setPromptContextPreview(
-      preview.promptContext ? JSON.stringify(preview.promptContext, null, 2) : "null",
+      preview.promptContext
+        ? JSON.stringify(preview.promptContext, null, 2)
+        : "null",
     );
     setRenderedPromptPreview(preview.renderedPrompt ?? "null");
   }
@@ -82,9 +94,12 @@ export default function DevTabScreen() {
       contentContainerClassName="gap-4 px-5 pb-10 pt-6"
     >
       <View className="gap-1">
-        <Text className="text-3xl font-semibold tracking-tight text-foreground">dev tools</Text>
+        <Text className="text-3xl font-semibold tracking-tight text-foreground">
+          dev tools
+        </Text>
         <Text className="text-sm leading-6 text-muted">
-          Safe local development actions for storage, widget testing, and future challenge tooling.
+          Local development actions for storage, widget testing, and future
+          challenge tooling.
         </Text>
       </View>
 
@@ -95,7 +110,10 @@ export default function DevTabScreen() {
         tone="danger"
         onPress={async () => {
           await resetDatabase();
-          Alert.alert("database reset", "Local SQLite storage was wiped and recreated.");
+          Alert.alert(
+            "database reset",
+            "Local SQLite storage was wiped and recreated.",
+          );
         }}
       />
 
@@ -159,7 +177,9 @@ export default function DevTabScreen() {
       {appContextPreview ? (
         <View className="gap-3 rounded-3xl border border-border bg-surface px-4 py-4">
           <View className="gap-1">
-            <Text className="text-base font-semibold text-foreground">app context preview</Text>
+            <Text className="text-base font-semibold text-foreground">
+              app context preview
+            </Text>
             <Text className="text-sm leading-6 text-muted">
               Structured app-side context assembled for `{activePreviewKind}`.
             </Text>
@@ -174,9 +194,12 @@ export default function DevTabScreen() {
       {promptContextPreview ? (
         <View className="gap-3 rounded-3xl border border-border bg-surface px-4 py-4">
           <View className="gap-1">
-            <Text className="text-base font-semibold text-foreground">prompt context preview</Text>
+            <Text className="text-base font-semibold text-foreground">
+              prompt context preview
+            </Text>
             <Text className="text-sm leading-6 text-muted">
-              AI-facing context filtered from the broader app context for `{activePreviewKind}`.
+              AI-facing context filtered from the broader app context for `
+              {activePreviewKind}`.
             </Text>
           </View>
 
@@ -189,9 +212,12 @@ export default function DevTabScreen() {
       {renderedPromptPreview ? (
         <View className="gap-3 rounded-3xl border border-border bg-surface px-4 py-4">
           <View className="gap-1">
-            <Text className="text-base font-semibold text-foreground">rendered prompt preview</Text>
+            <Text className="text-base font-semibold text-foreground">
+              rendered prompt preview
+            </Text>
             <Text className="text-sm leading-6 text-muted">
-              Final english prompt text built from the selected system prompt and prompt context for `{activePreviewKind}`.
+              Final english prompt text built from the selected system prompt
+              and prompt context for `{activePreviewKind}`.
             </Text>
           </View>
 

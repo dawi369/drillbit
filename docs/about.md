@@ -31,7 +31,7 @@ Daily flow:
     - Fixed top strip: problem title/teaser + brief past-performance context ("Last similar: 58% · 3 attempts on CRDTs vs OT · AI Coach used 4× · Weak: conflict resolution").
     - The lower header row places the model picker on the left, the collapse handle in the middle, and the mode picker on the right, with the topic/difficulty pills centered beneath them.
     - A thin collapse handle sits at the bottom of the header so the prompt can shrink away and give more room to the solving surface.
-    - A second thin assistant header appears only in AI Coach and Reveal; it surfaces one short guidance line at a time and opens a separate ask-AI input when tapped.
+    - A second thin assistant header appears only in AI Coach and Reveal; it surfaces one short guidance line at a time and opens a capped-height coach/reveal modal with prior AI history when tapped.
     - The main body is one large answer area that stays central in every mode so the user always works in one consistent solving surface.
     - AI guidance lives in the thin assistant header and separate ask-AI entry point, not inside the main answer surface.
     - In AI Coach: streaming chat starts with gentle opener, then back-and-forth probing/hints ("How would offline merges impact your chosen model? Any latency trade-offs?") + quick-reply chips ("Deeper probe", "Trade-offs?", "Next component", "Stuck").

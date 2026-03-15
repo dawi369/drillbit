@@ -17,16 +17,18 @@ export const ANSWER_MODAL_PREVIEW_CHALLENGE = {
 
 export const ANSWER_MODAL_MODEL_OPTIONS = [
   {
-    value: "gpt 5.4",
-    description: "Strong reasoning and polished structured answers.",
+    value: "gpt",
+    description: "GPT-4.5 - Strong reasoning and polished structured answers.",
   },
   {
-    value: "opus 4.6",
-    description: "High depth for heavier multi-step design thinking.",
+    value: "opus",
+    description:
+      "Opus-4.6 - High depth for heavier multi-step design thinking.",
   },
   {
-    value: "qwen 3.5 flash",
-    description: "Fast, lightweight guidance for quick iteration.",
+    value: "qwen",
+    description:
+      "Qwen-3.5 Flash - Fast, lightweight guidance for quick iteration.",
   },
 ] as const;
 
@@ -50,3 +52,26 @@ export const ANSWER_MODAL_MODE_COPY: Record<
     body: "A structured model answer lives here with architecture, trade-offs, alternatives, and common failure modes.",
   },
 };
+
+export const ANSWER_MODAL_PREVIEW_COACH_MESSAGES = [
+  {
+    id: "coach-1",
+    role: "coach",
+    text: "Start by separating the control plane from the data plane. Which one needs stronger consistency and which one needs lower latency?",
+  },
+  {
+    id: "coach-2",
+    role: "you",
+    text: "I think the control plane needs stronger consistency, while the data plane should optimize for low-latency local evaluation.",
+  },
+  {
+    id: "coach-3",
+    role: "coach",
+    text: "Good. Now pressure-test rule propagation: how do stale configs, rollout reversals, and offline SDKs affect the guarantees you can make?",
+  },
+  {
+    id: "coach-4",
+    role: "coach",
+    text: "You should also explain how percentage rollouts are computed consistently across clients so two users do not bounce between variants unexpectedly.",
+  },
+] as const;
