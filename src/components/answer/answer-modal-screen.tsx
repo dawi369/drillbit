@@ -1,6 +1,6 @@
 import { Stack, useLocalSearchParams } from "expo-router";
 import { Button, Input, Label, TextField } from "heroui-native";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Keyboard,
   Modal,
@@ -294,6 +294,7 @@ export function AnswerModalScreen() {
   const [selectedModel, setSelectedModel] = useState<string>(
     ANSWER_MODAL_MODEL_OPTIONS[0].value,
   );
+  const assistantHistoryRef = useRef<ScrollView | null>(null);
 
   function updateTimestamp() {
     setUpdatedAt(new Date().toISOString());
@@ -320,6 +321,18 @@ export function AnswerModalScreen() {
       hideSubscription.remove();
     };
   }, []);
+
+  useEffect(() => {
+    if (!isAssistantInputOpen) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      assistantHistoryRef.current?.scrollToEnd({ animated: false });
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [isAssistantInputOpen]);
 
   return (
     <>
@@ -462,11 +475,13 @@ export function AnswerModalScreen() {
           visible={isAssistantInputOpen}
           onRequestClose={() => setAssistantInputOpen(false)}
         >
-          <Pressable
-            className="flex-1 bg-black/30"
-            onPress={() => setAssistantInputOpen(false)}
-          >
-            <Pressable className="mt-auto rounded-t-[28px] border border-border bg-background px-5 pb-safe-offset-4 pt-4">
+          <View className="flex-1 justify-end">
+            <Pressable
+              className="absolute inset-0 bg-black/30"
+              onPress={() => setAssistantInputOpen(false)}
+            />
+
+            <View className="rounded-t-[28px] border border-border bg-background px-5 pb-safe-offset-4 pt-4">
               <View className="mb-3 gap-1">
                 <Text className="text-lg font-semibold text-foreground">
                   ask the coach
@@ -474,9 +489,15 @@ export function AnswerModalScreen() {
               </View>
 
               <ScrollView
+                ref={assistantHistoryRef}
                 className="mb-4"
                 style={{ maxHeight: 320 }}
                 showsVerticalScrollIndicator={false}
+                onContentSizeChange={() => {
+                  if (isAssistantInputOpen) {
+                    assistantHistoryRef.current?.scrollToEnd({ animated: false });
+                  }
+                }}
               >
                <View className="gap-3">
                   {ANSWER_MODAL_PREVIEW_COACH_MESSAGES.map((message) => (
@@ -545,8 +566,8 @@ export function AnswerModalScreen() {
                   <Button.Label>send later</Button.Label>
                 </Button>
               </View>
-            </Pressable>
-          </Pressable>
+            </View>
+          </View>
         </Modal>
       </View>
     </>
