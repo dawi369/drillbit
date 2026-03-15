@@ -1,20 +1,29 @@
 import { Stack, useLocalSearchParams } from "expo-router";
-import { Button, Card, Input, Label, TextField } from "heroui-native";
-import { useMemo, useState } from "react";
-import { KeyboardAvoidingView, Modal, Pressable, Text, View } from "react-native";
-
-import { MODE_OPTIONS } from "@/constants/params";
+import { Button, Input, Label, TextField } from "heroui-native";
+import { useEffect, useMemo, useState } from "react";
 import {
-  ANSWER_MODAL_MODE_COPY,
+  Keyboard,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import {
+  ANSWER_MODAL_MODEL_OPTIONS,
   ANSWER_MODAL_PREVIEW_CHALLENGE,
 } from "@/constants/answer-modal";
+import { MODE_OPTIONS } from "@/constants/params";
 import { cn } from "@/lib/cn";
 import type { ChallengeMode } from "@/lib/widgets/types";
 
 function MetaPill({ label }: { label: string }) {
   return (
-    <View className="rounded-full border border-border bg-surface-secondary px-2.5 py-1">
-      <Text className="text-[11px] font-medium uppercase tracking-[1.2px] text-foreground">
+    <View className="rounded-full border border-border bg-surface-secondary px-2 py-0.5">
+      <Text className="text-[10px] font-medium uppercase tracking-[1px] text-foreground">
         {label}
       </Text>
     </View>
@@ -22,26 +31,38 @@ function MetaPill({ label }: { label: string }) {
 }
 
 function ModePicker({
+  label,
   selectedMode,
   onSelect,
 }: {
+  label: string;
   selectedMode: ChallengeMode;
   onSelect: (mode: ChallengeMode) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const selectedOption = MODE_OPTIONS.find((item) => item.value === selectedMode);
+  const selectedOption = MODE_OPTIONS.find(
+    (item) => item.value === selectedMode,
+  );
 
   return (
     <>
       <Pressable
-        className="rounded-full border border-accent/20 bg-accent/10 px-2.5 py-1"
+        className="w-full rounded-full border border-border bg-surface-secondary px-2 py-0.5"
         onPress={() => setIsOpen(true)}
       >
-        <View className="flex-row items-center gap-1.5">
-          <Text className="text-[11px] font-medium uppercase tracking-[1.2px] text-accent">
+        <View className="flex-row items-center gap-1.5 overflow-hidden">
+          <Text className="text-[9px] font-medium uppercase tracking-[1px] text-muted">
+            {label}
+          </Text>
+          <View className="h-3 w-px bg-border" />
+          <Text
+            numberOfLines={1}
+            ellipsizeMode="tail"
+            className="flex-1 text-[10px] font-semibold uppercase tracking-[1px] text-foreground"
+          >
             {selectedOption?.label ?? selectedMode}
           </Text>
-          <Text className="text-[10px] text-accent">v</Text>
+          <Text className="text-[9px] text-muted">v</Text>
         </View>
       </Pressable>
 
@@ -56,7 +77,9 @@ function ModePicker({
           onPress={() => setIsOpen(false)}
         >
           <View className="mt-8 rounded-[28px] border border-border bg-background px-4 py-4">
-            <Text className="mb-3 text-sm font-semibold text-foreground">choose mode</Text>
+            <Text className="mb-3 text-sm font-semibold text-foreground">
+              choose mode
+            </Text>
             <View className="gap-2">
               {MODE_OPTIONS.map((option) => (
                 <Pressable
@@ -75,12 +98,102 @@ function ModePicker({
                   <Text
                     className={cn(
                       "mb-1 text-sm font-semibold",
-                      option.value === selectedMode ? "text-accent" : "text-foreground",
+                      option.value === selectedMode
+                        ? "text-accent"
+                        : "text-foreground",
                     )}
                   >
                     {option.label}
                   </Text>
-                  <Text className="text-sm leading-6 text-muted">{option.description}</Text>
+                  <Text className="text-sm leading-6 text-muted">
+                    {option.description}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
+    </>
+  );
+}
+
+function ModelPicker({
+  selectedModel,
+  onSelect,
+}: {
+  selectedModel: string;
+  onSelect: (model: string) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const selectedOption = ANSWER_MODAL_MODEL_OPTIONS.find(
+    (option) => option.value === selectedModel,
+  );
+
+  return (
+    <>
+      <Pressable
+        className="w-full rounded-full border border-border bg-surface-secondary px-2 py-0.5"
+        onPress={() => setIsOpen(true)}
+      >
+        <View className="flex-row items-center gap-1.5 overflow-hidden">
+          <Text className="text-[9px] font-medium uppercase tracking-[1px] text-muted">
+            model
+          </Text>
+          <View className="h-3 w-px bg-border" />
+          <Text
+            numberOfLines={1}
+            ellipsizeMode="tail"
+            className="flex-1 text-[10px] font-semibold uppercase tracking-[1px] text-foreground"
+          >
+            {selectedOption?.value ?? selectedModel}
+          </Text>
+          <Text className="text-[9px] text-muted">v</Text>
+          </View>
+      </Pressable>
+
+      <Modal
+        transparent
+        animationType="fade"
+        visible={isOpen}
+        onRequestClose={() => setIsOpen(false)}
+      >
+        <Pressable
+          className="flex-1 bg-black/30 px-5 py-16"
+          onPress={() => setIsOpen(false)}
+        >
+          <View className="mt-8 rounded-[28px] border border-border bg-background px-4 py-4">
+            <Text className="mb-3 text-sm font-semibold text-foreground">
+              choose model
+            </Text>
+            <View className="gap-2">
+              {ANSWER_MODAL_MODEL_OPTIONS.map((option) => (
+                <Pressable
+                  key={option.value}
+                  className={cn(
+                    "rounded-2xl border px-4 py-3",
+                    option.value === selectedModel
+                      ? "border-accent bg-accent/10"
+                      : "border-border bg-surface-secondary",
+                  )}
+                  onPress={() => {
+                    onSelect(option.value);
+                    setIsOpen(false);
+                  }}
+                >
+                  <Text
+                    className={cn(
+                      "text-sm font-semibold",
+                      option.value === selectedModel
+                        ? "text-accent"
+                        : "text-foreground",
+                    )}
+                  >
+                    {option.value}
+                  </Text>
+                  <Text className="mt-1 text-sm leading-6 text-muted">
+                    {option.description}
+                  </Text>
                 </Pressable>
               ))}
             </View>
@@ -101,18 +214,18 @@ function HeaderToggle({
   return (
     <Pressable className="items-center py-1" onPress={onPress}>
       <View className="items-center gap-1">
-        <View className="h-4 w-20 items-center justify-center">
-          <View className="relative h-3 w-16">
+        <View className="h-4 w-16 items-center justify-center">
+          <View className="relative h-3 w-13">
             <View
               className={cn(
-                "absolute left-1 top-1 h-[2px] w-7 rounded-full bg-border",
-                collapsed ? "rotate-[12deg]" : "-rotate-[12deg]",
+                "absolute left-1 top-1 h-[2px] w-6 rounded-full bg-border",
+                collapsed ? "rotate-12" : "-rotate-12",
               )}
             />
             <View
               className={cn(
-                "absolute right-1 top-1 h-[2px] w-7 rounded-full bg-border",
-                collapsed ? "-rotate-[12deg]" : "rotate-[12deg]",
+                "absolute right-1 top-1 h-[2px] w-6 rounded-full bg-border",
+                collapsed ? "-rotate-12" : "rotate-12",
               )}
             />
           </View>
@@ -154,6 +267,7 @@ function AssistantHeader({
 }
 
 export function AnswerModalScreen() {
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ mode?: string }>();
   const initialMode = useMemo<ChallengeMode>(() => {
     if (
@@ -174,14 +288,39 @@ export function AnswerModalScreen() {
   const [isHeaderCollapsed, setHeaderCollapsed] = useState(false);
   const [isAssistantInputOpen, setAssistantInputOpen] = useState(false);
   const [assistantMessage, setAssistantMessage] = useState("");
-
-  const modeCopy = ANSWER_MODAL_MODE_COPY[selectedMode];
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [selectedModel, setSelectedModel] = useState<string>(
+    ANSWER_MODAL_MODEL_OPTIONS[0].value,
+  );
 
   function updateTimestamp() {
     setUpdatedAt(new Date().toISOString());
   }
 
-    return (
+  useEffect(() => {
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const showSubscription = Keyboard.addListener(showEvent, (event) => {
+      setKeyboardVisible(true);
+      setKeyboardHeight(event.endCoordinates.height);
+    });
+
+    const hideSubscription = Keyboard.addListener(hideEvent, () => {
+      setKeyboardVisible(false);
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+
+  return (
     <>
       <Stack.Screen
         options={{
@@ -191,36 +330,58 @@ export function AnswerModalScreen() {
         }}
       />
 
-      <KeyboardAvoidingView className="flex-1 bg-background" behavior="padding">
-        <View className="border-b border-border bg-background px-5 pt-safe-offset-4">
+      <View className="flex-1 bg-background">
+        <View
+          className="border-b border-border bg-background px-5"
+          style={{ paddingTop: insets.top }}
+        >
           {!isHeaderCollapsed ? (
             <View className="gap-2 pb-1">
               <View className="gap-1">
                 <Text className="text-lg font-semibold tracking-tight text-foreground">
                   {ANSWER_MODAL_PREVIEW_CHALLENGE.title}
                 </Text>
-                <Text className="text-sm leading-5 text-muted">
-                  {ANSWER_MODAL_PREVIEW_CHALLENGE.teaser}
-                </Text>
-              </View>
-
-              <View className="flex-row flex-wrap items-center gap-2">
-                <MetaPill label={ANSWER_MODAL_PREVIEW_CHALLENGE.topic} />
-                <MetaPill label={ANSWER_MODAL_PREVIEW_CHALLENGE.difficulty} />
-                <ModePicker
-                  selectedMode={selectedMode}
-                  onSelect={(mode) => {
-                    setSelectedMode(mode);
-                    updateTimestamp();
-                  }}
-                />
+                <ScrollView
+                  style={{ maxHeight: 100 }}
+                  showsVerticalScrollIndicator={false}
+                >
+                  <Text className="pr-2 text-sm leading-5 text-muted">
+                    {ANSWER_MODAL_PREVIEW_CHALLENGE.teaser}
+                  </Text>
+                </ScrollView>
               </View>
             </View>
           ) : (
-            <View className="flex-row flex-wrap items-center gap-2 pb-1">
-              <MetaPill label={ANSWER_MODAL_PREVIEW_CHALLENGE.topic} />
-              <MetaPill label={ANSWER_MODAL_PREVIEW_CHALLENGE.difficulty} />
+            <View className="pb-1" />
+          )}
+
+          {!isHeaderCollapsed ? (
+            <View className="items-center pb-2 pt-1">
+              <View className="flex-row justify-center gap-2">
+                <MetaPill label={ANSWER_MODAL_PREVIEW_CHALLENGE.topic} />
+                <MetaPill label={ANSWER_MODAL_PREVIEW_CHALLENGE.difficulty} />
+              </View>
+            </View>
+          ) : null}
+
+          <View className="flex-row items-center gap-2 pb-2">
+            <View className="min-w-0 flex-1 items-start">
+              <ModelPicker
+                selectedModel={selectedModel}
+                onSelect={(model) => setSelectedModel(model)}
+              />
+            </View>
+
+            <View className="shrink-0 items-center px-1">
+              <HeaderToggle
+                collapsed={isHeaderCollapsed}
+                onPress={() => setHeaderCollapsed((current) => !current)}
+              />
+            </View>
+
+            <View className="min-w-0 flex-1 items-end">
               <ModePicker
+                label="mode"
                 selectedMode={selectedMode}
                 onSelect={(mode) => {
                   setSelectedMode(mode);
@@ -228,12 +389,7 @@ export function AnswerModalScreen() {
                 }}
               />
             </View>
-          )}
-
-          <HeaderToggle
-            collapsed={isHeaderCollapsed}
-            onPress={() => setHeaderCollapsed((current) => !current)}
-          />
+          </View>
         </View>
 
         <AssistantHeader
@@ -243,80 +399,59 @@ export function AnswerModalScreen() {
           }}
         />
 
-        <View className="flex-1 px-5 pb-safe-offset-4 pt-4">
+        <View
+          className={cn(
+            "flex-1 px-5 pt-4",
+            isKeyboardVisible ? "pb-0" : "pb-safe-offset-4",
+          )}
+          style={
+            isKeyboardVisible
+              ? { marginBottom: Math.max(keyboardHeight + 10, 0) }
+              : undefined
+          }
+        >
           <View className="flex-1 gap-4">
-            <Card className="flex-1 rounded-[28px] border border-border bg-surface">
-              <Card.Body className="gap-4">
-                <View className="gap-2">
-                  <Card.Title className="text-xl text-foreground">notes canvas</Card.Title>
-                  <Card.Description className="text-sm leading-6 text-muted">
-                    The primary solving surface. Keep this central in every mode for outlines, trade-offs, and rough diagrams.
-                  </Card.Description>
-                </View>
-
-                <TextField className="flex-1">
-                  <Label>working notes</Label>
-                  <Input
-                    multiline
-                    numberOfLines={10}
-                    placeholder="Sketch components, trade-offs, bottlenecks, and edge cases here..."
-                    value={notesDraft}
-                    onChangeText={(value) => {
-                      setNotesDraft(value);
-                      updateTimestamp();
-                    }}
-                    className="min-h-48 flex-1 items-start py-4"
-                    textAlignVertical="top"
-                  />
-                </TextField>
-              </Card.Body>
-            </Card>
-
-            <Card className="min-h-40 rounded-[28px] border border-border bg-surface">
-              <Card.Body className="gap-4">
-                <View className="gap-1.5">
-                  <Card.Title className="text-xl text-foreground">{modeCopy.title}</Card.Title>
-                  <Card.Description className="text-sm leading-6 text-muted">
-                    {modeCopy.body}
-                  </Card.Description>
-                </View>
-
-                <View
-                  className={cn(
-                    "rounded-3xl border px-4 py-4",
-                    selectedMode === "solo"
-                      ? "border-border bg-surface-secondary"
-                      : "border-accent/20 bg-accent/10",
-                  )}
+            <TextField className="flex-1">
+              <View className="mb-1 mt-[-4px] flex-row items-center justify-between gap-3 px-1">
+                <Pressable
+                  className="flex-1 flex-row items-center"
+                  onPress={() => Keyboard.dismiss()}
                 >
-                  <Text className="text-sm leading-6 text-foreground">
-                    {selectedMode === "solo"
-                      ? "solo stays intentionally quiet. The answer area above remains the full solving surface without AI interruption."
-                      : selectedMode === "coach"
-                        ? "coach responses will appear here as a guided interview thread with probes, hinting, and trade-off pressure."
-                        : "reveal content will appear here as a structured answer surface instead of a traditional chat thread."}
-                  </Text>
+                  <Label>answer</Label>
+                  <View className="flex-1" />
+                </Pressable>
+                <View className="flex-row items-center gap-2">
+                  <Button size="sm" variant="ghost">
+                    <Button.Label>skip</Button.Label>
+                  </Button>
+                  <Button size="sm" variant="secondary">
+                    <Button.Label>save</Button.Label>
+                  </Button>
+                  <Button size="sm" variant="primary">
+                    <Button.Label>done</Button.Label>
+                  </Button>
                 </View>
+              </View>
+              <Input
+                multiline
+                numberOfLines={18}
+                placeholder={
+                  "Work through the problem here.\n\n1. State the product and user-facing goal.\n2. Outline the main components and data flow.\n3. Call out trade-offs, bottlenecks, failure modes, and what you would validate next.\n4. Think in multiple passes before locking the design."
+                }
+                value={notesDraft}
+                onChangeText={(value) => {
+                  setNotesDraft(value);
+                  updateTimestamp();
+                }}
+                scrollEnabled
+                className="flex-1 items-start rounded-[28px] border border-border bg-surface px-4 py-4"
+                textAlignVertical="top"
+              />
+            </TextField>
 
-                {/* TODO: wire selectedMode, notesDraft, conversationSummary, updatedAt to ChallengeSessionRecord persistence */}
-                {/* TODO: trigger coach inference only after meaningful note changes and under a cooldown instead of constant polling */}
-                {/* TODO: save-for-later action should persist this session and remove it from the active flow until reopened */}
-              </Card.Body>
-            </Card>
-          </View>
-
-          <View className="border-t border-border bg-background pt-3">
-            <View className="flex-row gap-3">
-              <Button className="flex-1" variant="ghost">
-                <Button.Label>skip</Button.Label>
-              </Button>
-              <Button className="flex-1" variant="secondary">
-                <Button.Label>save</Button.Label>
-              </Button>
-              <Button className="flex-[2]" variant="primary">
-                <Button.Label>done</Button.Label>
-              </Button>
-            </View>
+            {/* TODO: wire selectedMode, notesDraft, conversationSummary, updatedAt to ChallengeSessionRecord persistence */}
+            {/* TODO: trigger coach inference only after meaningful note changes and under a cooldown instead of constant polling */}
+            {/* TODO: save-for-later action should persist this session and remove it from the active flow until reopened */}
           </View>
         </View>
 
@@ -326,12 +461,18 @@ export function AnswerModalScreen() {
           visible={isAssistantInputOpen}
           onRequestClose={() => setAssistantInputOpen(false)}
         >
-          <Pressable className="flex-1 bg-black/30" onPress={() => setAssistantInputOpen(false)}>
+          <Pressable
+            className="flex-1 bg-black/30"
+            onPress={() => setAssistantInputOpen(false)}
+          >
             <Pressable className="mt-auto rounded-t-[28px] border border-border bg-background px-5 pb-safe-offset-4 pt-4">
               <View className="mb-3 gap-1">
-                <Text className="text-lg font-semibold text-foreground">ask the ai</Text>
+                <Text className="text-lg font-semibold text-foreground">
+                  ask the ai
+                </Text>
                 <Text className="text-sm leading-6 text-muted">
-                  This prompt stays separate from the main answer canvas so the user keeps full control of the working area.
+                  This prompt stays separate from the main answer canvas so the
+                  user keeps full control of the working area.
                 </Text>
               </View>
 
@@ -353,17 +494,25 @@ export function AnswerModalScreen() {
               </TextField>
 
               <View className="mt-4 flex-row gap-3">
-                <Button className="flex-1" variant="ghost" onPress={() => setAssistantInputOpen(false)}>
+                <Button
+                  className="flex-1"
+                  variant="ghost"
+                  onPress={() => setAssistantInputOpen(false)}
+                >
                   <Button.Label>close</Button.Label>
                 </Button>
-                <Button className="flex-1" variant="primary" onPress={() => setAssistantInputOpen(false)}>
+                <Button
+                  className="flex-1"
+                  variant="primary"
+                  onPress={() => setAssistantInputOpen(false)}
+                >
                   <Button.Label>send later</Button.Label>
                 </Button>
               </View>
             </Pressable>
           </Pressable>
         </Modal>
-      </KeyboardAvoidingView>
+      </View>
     </>
   );
 }

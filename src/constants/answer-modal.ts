@@ -10,10 +10,25 @@ export const ANSWER_MODAL_SESSION_FIELDS = [
 export const ANSWER_MODAL_PREVIEW_CHALLENGE = {
   title: "design a feature-flag platform",
   teaser:
-    "Design a distributed feature-flag platform with audit logs, rollout controls, low-latency evaluation, and safe rollback behavior.",
+    "Design a distributed feature-flag platform for a large product organization that needs audit logs, staged rollout controls, low-latency SDK evaluation, environment isolation, emergency kill switches, and safe rollback behavior across web and mobile clients. Explain how you would separate the control plane from the data plane, handle rule propagation, support percentage rollouts and targeting, and keep evaluation reliable during outages or partial config delivery.",
   topic: "system design",
   difficulty: "medium",
 } as const;
+
+export const ANSWER_MODAL_MODEL_OPTIONS = [
+  {
+    value: "gpt 5.4",
+    description: "Strong reasoning and polished structured answers.",
+  },
+  {
+    value: "opus 4.6",
+    description: "High depth for heavier multi-step design thinking.",
+  },
+  {
+    value: "qwen 3.5 flash",
+    description: "Fast, lightweight guidance for quick iteration.",
+  },
+] as const;
 
 export const ANSWER_MODAL_MODE_COPY: Record<
   ChallengeMode,

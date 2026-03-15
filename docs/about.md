@@ -29,14 +29,14 @@ Daily flow:
 2. User taps preferred mode → haptic + deep-link opens Answer Modal directly (fast/minimized launch).
 3. Answer Modal:
     - Fixed top strip: problem title/teaser + brief past-performance context ("Last similar: 58% · 3 attempts on CRDTs vs OT · AI Coach used 4× · Weak: conflict resolution").
-    - Compact topic/difficulty pills sit alongside a native mode picker so the header stays tight and the user can still switch modes without losing context.
+    - The lower header row places the model picker on the left, the collapse handle in the middle, and the mode picker on the right, with the topic/difficulty pills centered beneath them.
     - A thin collapse handle sits at the bottom of the header so the prompt can shrink away and give more room to the solving surface.
     - A second thin assistant header appears only in AI Coach and Reveal; it surfaces one short guidance line at a time and opens a separate ask-AI input when tapped.
-    - Large shared notes canvas stays central in every mode so the user always works in one consistent solving surface.
-    - Below the notes canvas, the lower panel changes by mode: quiet helper surface in Solo, guided probing tray in AI Coach, structured answer tray in Reveal.
+    - The main body is one large answer area that stays central in every mode so the user always works in one consistent solving surface.
+    - AI guidance lives in the thin assistant header and separate ask-AI entry point, not inside the main answer surface.
     - In AI Coach: streaming chat starts with gentle opener, then back-and-forth probing/hints ("How would offline merges impact your chosen model? Any latency trade-offs?") + quick-reply chips ("Deeper probe", "Trade-offs?", "Next component", "Stuck").
     - Session state owned by the modal: `selectedMode`, `notesDraft`, `conversationSummary`, `updatedAt`.
-4. Bottom action bar is fixed with Skip | Save | Done, with Done taking the most space.
+4. Answer actions live inline beside the answer label as small right-aligned pills: Skip | Save | Done.
 5. Summary Page (brief & rewarding):
    - AI-generated completion percentage (e.g., "82% — strong partitioning, explore optimistic locking more").
    - Concise personalized feedback ("You nailed CRDT fit but hesitated on merge conflicts — next time push resolution strategies").

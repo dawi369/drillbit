@@ -369,7 +369,7 @@ export function createDefaultSettings(
   return {
     id: "default",
     focusPrompt:
-      "System design and architecture interview prep with strong trade-off analysis and minimal CRUD-style prompts.",
+      "System design and architecture interview prep focused on multi-step product and infrastructure problems. Emphasize user-facing goals, service boundaries, state and data flow, scaling bottlenecks, consistency trade-offs, rollout strategy, failure modes, and what should be validated next. Prefer rich design prompts over simple CRUD or isolated algorithm-style tasks, and include realistic constraints that force prioritization and discussion.",
     preferredDifficulty: "medium",
     preferredMode: "coach",
     defaultModel: process.env.DEFAULT_MODEL,
