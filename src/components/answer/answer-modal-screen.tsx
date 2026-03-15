@@ -1,7 +1,8 @@
 import { Stack, useLocalSearchParams } from "expo-router";
 import { Button, Input, Label, TextField } from "heroui-native";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Alert,
   Keyboard,
   Modal,
   Platform,
@@ -12,13 +13,32 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import {
-  ANSWER_MODAL_MODEL_OPTIONS,
-  ANSWER_MODAL_PREVIEW_CHALLENGE,
-  ANSWER_MODAL_PREVIEW_COACH_MESSAGES,
-} from "@/constants/answer-modal";
+import { ANSWER_MODAL_PREVIEW_CHALLENGE } from "@/constants/answer-modal";
 import { MODE_OPTIONS } from "@/constants/params";
+import {
+  generateCoachGuidance,
+  generateRevealAnswer,
+  summarizeChallengeSession,
+} from "@/lib/ai/prompt-runtime";
 import { cn } from "@/lib/cn";
+import {
+  completeChallenge,
+  ensureDefaultModels,
+  ensureDefaultSettings,
+  getChallengeById,
+  getChallengeSession,
+  listModels,
+  markChallengeInProgress,
+  selectModel,
+  skipChallenge,
+  upsertChallenge,
+  upsertChallengeSession,
+} from "@/lib/storage/repository";
+import type {
+  ChallengeRecord,
+  ChallengeSessionRecord,
+  ModelRecord,
+} from "@/lib/storage/types";
 import type { ChallengeMode } from "@/lib/widgets/types";
 
 function MetaPill({ label }: { label: string }) {
@@ -120,15 +140,17 @@ function ModePicker({
 }
 
 function ModelPicker({
+  models,
   selectedModel,
   onSelect,
 }: {
-  selectedModel: string;
-  onSelect: (model: string) => void;
+  models: ModelRecord[];
+  selectedModel?: string;
+  onSelect: (model: ModelRecord) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const selectedOption = ANSWER_MODAL_MODEL_OPTIONS.find(
-    (option) => option.value === selectedModel,
+  const selectedOption = models.find(
+    (option) => option.id === selectedModel,
   );
 
   return (
@@ -147,7 +169,7 @@ function ModelPicker({
             ellipsizeMode="tail"
             className="flex-1 text-[10px] font-semibold uppercase tracking-[1px] text-foreground"
           >
-            {selectedOption?.value ?? selectedModel}
+            {selectedOption?.label ?? "no model"}
           </Text>
           <Text className="text-[9px] text-muted">v</Text>
         </View>
@@ -167,33 +189,42 @@ function ModelPicker({
             <Text className="mb-3 text-sm font-semibold text-foreground">
               choose model
             </Text>
-            <View className="gap-2">
-              {ANSWER_MODAL_MODEL_OPTIONS.map((option) => (
+              <View className="gap-2">
+              {models.length === 0 ? (
+                <View className="rounded-2xl border border-border bg-surface-secondary px-4 py-3">
+                  <Text className="text-sm text-muted">no enabled models</Text>
+                </View>
+              ) : null}
+
+              {models.map((option) => (
                 <Pressable
-                  key={option.value}
+                  key={option.id}
                   className={cn(
                     "rounded-2xl border px-4 py-3",
-                    option.value === selectedModel
+                    option.id === selectedModel
                       ? "border-accent bg-accent/10"
                       : "border-border bg-surface-secondary",
                   )}
                   onPress={() => {
-                    onSelect(option.value);
+                    onSelect(option);
                     setIsOpen(false);
                   }}
                 >
                   <Text
                     className={cn(
                       "text-sm font-semibold",
-                      option.value === selectedModel
+                      option.id === selectedModel
                         ? "text-accent"
                         : "text-foreground",
                     )}
                   >
-                    {option.value}
+                    {option.label}
                   </Text>
-                  <Text className="mt-1 text-sm leading-6 text-muted">
-                    {option.description}
+                  <Text
+                    selectable
+                    className="mt-1 text-sm leading-6 text-muted"
+                  >
+                    {option.remoteId}
                   </Text>
                 </Pressable>
               ))}
@@ -238,9 +269,11 @@ function HeaderToggle({
 
 function AssistantHeader({
   mode,
+  guidance,
   onPress,
 }: {
   mode: ChallengeMode;
+  guidance?: string | null;
   onPress: () => void;
 }) {
   if (mode === "solo") {
@@ -259,9 +292,10 @@ function AssistantHeader({
         {mode === "coach" ? "ai coach" : "reveal"}
       </Text>
       <Text className="text-sm leading-6 text-foreground">
-        {mode === "coach"
-          ? "one gentle coaching sentence lives here at a time — tap to ask a clarifying question"
-          : "reveal will give one structured answer surface here — tap to inspect and ask follow-ups later"}
+        {guidance ??
+          (mode === "coach"
+            ? "one gentle coaching sentence lives here at a time — tap to ask a clarifying question"
+            : "reveal will give one structured answer surface here — tap to inspect and ask follow-ups later")}
       </Text>
     </Pressable>
   );
@@ -269,7 +303,7 @@ function AssistantHeader({
 
 export function AnswerModalScreen() {
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ mode?: string }>();
+  const params = useLocalSearchParams<{ mode?: string; challengeId?: string }>();
   const initialMode = useMemo<ChallengeMode>(() => {
     if (
       params.mode === "solo" ||
@@ -284,21 +318,71 @@ export function AnswerModalScreen() {
 
   const [selectedMode, setSelectedMode] = useState<ChallengeMode>(initialMode);
   const [notesDraft, setNotesDraft] = useState("");
-  const [, setConversationSummary] = useState("");
+  const [conversationSummary, setConversationSummary] = useState("");
   const [, setUpdatedAt] = useState(new Date().toISOString());
   const [isHeaderCollapsed, setHeaderCollapsed] = useState(false);
   const [isAssistantInputOpen, setAssistantInputOpen] = useState(false);
   const [assistantMessage, setAssistantMessage] = useState("");
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const [selectedModel, setSelectedModel] = useState<string>(
-    ANSWER_MODAL_MODEL_OPTIONS[0].value,
-  );
+  const [selectedModelId, setSelectedModelId] = useState<string | undefined>();
+  const [availableModels, setAvailableModels] = useState<ModelRecord[]>([]);
+  const [challenge, setChallenge] = useState<ChallengeRecord | null>(null);
+  const [assistantGuidance, setAssistantGuidance] = useState<string | null>(null);
+  const [revealAnswer, setRevealAnswer] = useState<string | null>(null);
+  const [assistantHistory, setAssistantHistory] = useState<
+    { id: string; role: "coach" | "you"; text: string }[]
+  >([]);
+  const [isAssistantLoading, setAssistantLoading] = useState(false);
   const assistantHistoryRef = useRef<ScrollView | null>(null);
+  const challengeId = params.challengeId ?? "preview-answer-challenge";
 
-  function updateTimestamp() {
-    setUpdatedAt(new Date().toISOString());
-  }
+  const persistSession = useCallback(async (overrides: Partial<ChallengeSessionRecord> = {}) => {
+    const nextUpdatedAt = overrides.updatedAt ?? new Date().toISOString();
+
+    await upsertChallengeSession({
+      challengeId,
+      selectedMode: overrides.selectedMode ?? selectedMode,
+      notesDraft: overrides.notesDraft ?? notesDraft,
+      conversationSummary: overrides.conversationSummary ?? conversationSummary,
+      updatedAt: nextUpdatedAt,
+    });
+  }, [challengeId, conversationSummary, notesDraft, selectedMode]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadScreenState() {
+      await ensureDefaultModels();
+      const [models, settings, existingChallenge, existingSession] = await Promise.all([
+        listModels({ includeDisabled: false }),
+        ensureDefaultSettings(),
+        getChallengeById(challengeId),
+        getChallengeSession(challengeId),
+      ]);
+
+      if (!isMounted) {
+        return;
+      }
+
+      setAvailableModels(models);
+      setSelectedModelId(settings.selectedModelId ?? models[0]?.id);
+      setChallenge(existingChallenge);
+
+      if (existingSession) {
+        setSelectedMode(existingSession.selectedMode ?? initialMode);
+        setNotesDraft(existingSession.notesDraft ?? "");
+        setConversationSummary(existingSession.conversationSummary ?? "");
+        setUpdatedAt(existingSession.updatedAt);
+      }
+    }
+
+    void loadScreenState();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [challengeId, initialMode]);
 
   useEffect(() => {
     const showEvent =
@@ -334,6 +418,111 @@ export function AnswerModalScreen() {
     return () => clearTimeout(timer);
   }, [isAssistantInputOpen]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    async function ensurePreviewChallengeExists() {
+      const existingChallenge = await getChallengeById(challengeId);
+      if (existingChallenge) {
+        return;
+      }
+
+      const createdChallenge: ChallengeRecord = {
+        id: challengeId,
+        title: ANSWER_MODAL_PREVIEW_CHALLENGE.title,
+        teaser: ANSWER_MODAL_PREVIEW_CHALLENGE.teaser,
+        topic: ANSWER_MODAL_PREVIEW_CHALLENGE.topic,
+        difficulty: ANSWER_MODAL_PREVIEW_CHALLENGE.difficulty,
+        lifecycle: "ready",
+        createdAt: new Date().toISOString(),
+        sourcePromptVersion: "preview-answer-modal",
+      };
+
+      await upsertChallenge(createdChallenge);
+
+      if (isMounted) {
+        setChallenge(createdChallenge);
+      }
+    }
+
+    void ensurePreviewChallengeExists();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [challengeId]);
+
+  useEffect(() => {
+    void markChallengeInProgress(challengeId, selectedMode);
+    void persistSession({ selectedMode });
+  }, [challengeId, persistSession, selectedMode]);
+
+  useEffect(() => {
+    if (selectedMode === "solo") {
+      setAssistantGuidance(null);
+      setRevealAnswer(null);
+      return;
+    }
+
+    let isMounted = true;
+
+    async function loadAssistantOutput() {
+      setAssistantLoading(true);
+
+      try {
+        if (selectedMode === "coach") {
+          const result = await generateCoachGuidance(challengeId);
+          if (!isMounted) {
+            return;
+          }
+
+          setAssistantGuidance(result.output.guidance);
+          setRevealAnswer(null);
+          setAssistantHistory((current) => {
+            if (current.some((message) => message.text === result.output.guidance)) {
+              return current;
+            }
+
+            return [
+              ...current,
+              {
+                id: `coach-${Date.now()}`,
+                role: "coach",
+                text: result.output.guidance,
+              },
+            ];
+          });
+        } else {
+          const result = await generateRevealAnswer(challengeId);
+          if (!isMounted) {
+            return;
+          }
+
+          setAssistantGuidance(result.output.guidance);
+          setRevealAnswer(result.output.answer);
+        }
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setAssistantGuidance(
+          error instanceof Error ? error.message : "assistant request failed",
+        );
+      } finally {
+        if (isMounted) {
+          setAssistantLoading(false);
+        }
+      }
+    }
+
+    void loadAssistantOutput();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [challengeId, selectedMode]);
+
   return (
     <>
       <Stack.Screen
@@ -353,14 +542,14 @@ export function AnswerModalScreen() {
             <View className="gap-1 pb-1">
               <View className="gap-1">
                 <Text className="text-lg font-semibold tracking-tight text-foreground">
-                  {ANSWER_MODAL_PREVIEW_CHALLENGE.title}
+                  {challenge?.title ?? ANSWER_MODAL_PREVIEW_CHALLENGE.title}
                 </Text>
                 <ScrollView
                   style={{ maxHeight: 120 }}
                   showsVerticalScrollIndicator={false}
                 >
                   <Text className="pr-2 text-sm leading-5 text-muted">
-                    {ANSWER_MODAL_PREVIEW_CHALLENGE.teaser}
+                    {challenge?.teaser ?? ANSWER_MODAL_PREVIEW_CHALLENGE.teaser}
                   </Text>
                 </ScrollView>
               </View>
@@ -372,8 +561,10 @@ export function AnswerModalScreen() {
           {!isHeaderCollapsed ? (
             <View className="items-center pb-1 pt-0.5">
               <View className="flex-row justify-center gap-2">
-                <MetaPill label={ANSWER_MODAL_PREVIEW_CHALLENGE.topic} />
-                <MetaPill label={ANSWER_MODAL_PREVIEW_CHALLENGE.difficulty} />
+                <MetaPill label={challenge?.topic ?? ANSWER_MODAL_PREVIEW_CHALLENGE.topic} />
+                <MetaPill
+                  label={challenge?.difficulty ?? ANSWER_MODAL_PREVIEW_CHALLENGE.difficulty}
+                />
               </View>
             </View>
           ) : null}
@@ -381,8 +572,12 @@ export function AnswerModalScreen() {
           <View className="flex-row items-center gap-2 pb-1">
             <View className="min-w-0 flex-1 items-start">
               <ModelPicker
-                selectedModel={selectedModel}
-                onSelect={(model) => setSelectedModel(model)}
+                models={availableModels}
+                selectedModel={selectedModelId}
+                onSelect={(model) => {
+                  setSelectedModelId(model.id);
+                  void selectModel(model.id);
+                }}
               />
             </View>
 
@@ -399,7 +594,6 @@ export function AnswerModalScreen() {
                 selectedMode={selectedMode}
                 onSelect={(mode) => {
                   setSelectedMode(mode);
-                  updateTimestamp();
                 }}
               />
             </View>
@@ -408,6 +602,7 @@ export function AnswerModalScreen() {
 
         <AssistantHeader
           mode={selectedMode}
+          guidance={assistantGuidance}
           onPress={() => {
             setAssistantInputOpen(true);
           }}
@@ -435,13 +630,36 @@ export function AnswerModalScreen() {
                   <View className="flex-1" />
                 </Pressable>
                 <View className="flex-row items-center gap-2">
-                  <Button size="sm" variant="ghost">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onPress={() => {
+                      void (async () => {
+                        await skipChallenge(challengeId);
+                        Alert.alert("challenge skipped", "This challenge was marked skipped.");
+                      })();
+                    }}
+                  >
                     <Button.Label>skip</Button.Label>
                   </Button>
                   <Button size="sm" variant="secondary">
                     <Button.Label>save</Button.Label>
                   </Button>
-                  <Button size="sm" variant="primary">
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    onPress={() => {
+                      void (async () => {
+                        await persistSession();
+                        await completeChallenge(challengeId);
+                        await summarizeChallengeSession(challengeId);
+                        Alert.alert(
+                          "challenge completed",
+                          "Session summary generated and saved.",
+                        );
+                      })();
+                    }}
+                  >
                     <Button.Label>done</Button.Label>
                   </Button>
                 </View>
@@ -455,7 +673,7 @@ export function AnswerModalScreen() {
                 value={notesDraft}
                 onChangeText={(value) => {
                   setNotesDraft(value);
-                  updateTimestamp();
+                  void persistSession({ notesDraft: value });
                 }}
                 scrollEnabled
                 className="flex-1 items-start rounded-[28px] border border-border bg-surface px-4 py-4"
@@ -463,7 +681,17 @@ export function AnswerModalScreen() {
               />
             </TextField>
 
-            {/* TODO: wire selectedMode, notesDraft, conversationSummary, updatedAt to ChallengeSessionRecord persistence */}
+            {selectedMode === "reveal" && revealAnswer ? (
+              <View className="rounded-[28px] border border-border bg-surface-secondary px-4 py-4">
+                <Text className="mb-2 text-xs font-medium uppercase tracking-[1.4px] text-muted">
+                  reveal answer
+                </Text>
+                <Text selectable className="text-sm leading-6 text-foreground">
+                  {revealAnswer}
+                </Text>
+              </View>
+            ) : null}
+
             {/* TODO: trigger coach inference only after meaningful note changes and under a cooldown instead of constant polling */}
             {/* TODO: save-for-later action should persist this session and remove it from the active flow until reopened */}
           </View>
@@ -484,7 +712,7 @@ export function AnswerModalScreen() {
             <View className="rounded-t-[28px] border border-border bg-background px-5 pb-safe-offset-4 pt-4">
               <View className="mb-3 gap-1">
                 <Text className="text-lg font-semibold text-foreground">
-                  ask the coach
+                  {selectedMode === "reveal" ? "ask about the reveal" : "ask the coach"}
                 </Text>
               </View>
 
@@ -499,10 +727,10 @@ export function AnswerModalScreen() {
                   }
                 }}
               >
-               <View className="gap-3">
-                  {ANSWER_MODAL_PREVIEW_COACH_MESSAGES.map((message) => (
-                    <View
-                      key={message.id}
+                <View className="gap-3">
+                   {assistantHistory.map((message) => (
+                     <View
+                       key={message.id}
                       className={cn(
                         "w-full",
                         message.role === "coach" ? "items-start" : "items-end",
@@ -539,16 +767,16 @@ export function AnswerModalScreen() {
                   multiline
                   numberOfLines={4}
                   placeholder="Ask a clarifying question about what you are working on..."
-                  value={assistantMessage}
-                  onChangeText={(value) => {
-                    setAssistantMessage(value);
-                    setConversationSummary(value);
-                    updateTimestamp();
-                  }}
-                  className="min-h-28 items-start py-4"
-                  textAlignVertical="top"
-                />
-              </TextField>
+                    value={assistantMessage}
+                    onChangeText={(value) => {
+                      setAssistantMessage(value);
+                      setConversationSummary(value);
+                      void persistSession({ conversationSummary: value });
+                    }}
+                   className="min-h-28 items-start py-4"
+                   textAlignVertical="top"
+                 />
+               </TextField>
 
               <View className="mt-4 flex-row gap-3">
                 <Button
@@ -561,9 +789,64 @@ export function AnswerModalScreen() {
                 <Button
                   className="flex-1"
                   variant="primary"
-                  onPress={() => setAssistantInputOpen(false)}
+                  onPress={() => {
+                    void (async () => {
+                      const trimmed = assistantMessage.trim();
+
+                      if (!trimmed) {
+                        setAssistantInputOpen(false);
+                        return;
+                      }
+
+                      setAssistantHistory((current) => [
+                        ...current,
+                        {
+                          id: `you-${Date.now()}`,
+                          role: "you",
+                          text: trimmed,
+                        },
+                      ]);
+                      setAssistantMessage("");
+                      setAssistantLoading(true);
+
+                      try {
+                        if (selectedMode === "reveal") {
+                          const result = await generateRevealAnswer(challengeId);
+                          setAssistantGuidance(result.output.guidance);
+                          setRevealAnswer(result.output.answer);
+                          setAssistantHistory((current) => [
+                            ...current,
+                            {
+                              id: `assistant-${Date.now()}`,
+                              role: "coach",
+                              text: result.output.guidance,
+                            },
+                          ]);
+                        } else {
+                          const result = await generateCoachGuidance(challengeId);
+                          setAssistantGuidance(result.output.guidance);
+                          setAssistantHistory((current) => [
+                            ...current,
+                            {
+                              id: `assistant-${Date.now()}`,
+                              role: "coach",
+                              text: result.output.guidance,
+                            },
+                          ]);
+                        }
+                      } catch (error) {
+                        Alert.alert(
+                          "assistant failed",
+                          error instanceof Error ? error.message : "Unknown error",
+                        );
+                      } finally {
+                        setAssistantLoading(false);
+                        setAssistantInputOpen(false);
+                      }
+                    })();
+                  }}
                 >
-                  <Button.Label>send later</Button.Label>
+                  <Button.Label>{isAssistantLoading ? "thinking..." : "send"}</Button.Label>
                 </Button>
               </View>
             </View>

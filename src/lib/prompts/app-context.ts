@@ -3,6 +3,7 @@ import {
   getChallengeById,
   getChallengeSession,
   getMostRecentResolvedChallenge,
+  getSelectedModel,
   listBlockedChallenges,
   listChallengeSummaries,
   listSummariesByTopic,
@@ -19,6 +20,7 @@ export async function buildAppContext({
   challengeId,
 }: BuildAppContextOptions): Promise<AppContext> {
   const settings = await ensureDefaultSettings();
+  const selectedModel = await getSelectedModel();
   const challenge = challengeId ? await getChallengeById(challengeId) : null;
   const session = challenge ? await getChallengeSession(challenge.id) : null;
   const recentSummaries = await listChallengeSummaries(6);
@@ -32,6 +34,7 @@ export async function buildAppContext({
   return {
     kind,
     settings,
+    selectedModel: selectedModel ?? undefined,
     challenge: challenge ?? undefined,
     session: session ?? undefined,
     runtime: {

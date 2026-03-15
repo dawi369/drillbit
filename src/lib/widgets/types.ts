@@ -33,7 +33,6 @@ export type Challenge = {
   topic: string;
   difficulty?: ChallengeDifficulty;
   lifecycle: ChallengeLifecycle;
-  mode?: ChallengeMode;
   createdAt?: string;
   startedAt?: string;
   completedAt?: string;

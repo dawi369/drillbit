@@ -14,7 +14,7 @@ becomes the primary daily touchpoint.
 - `heroui-native` + `uniwind` for the main app UI layer
 - `expo-sqlite`, `expo-secure-store`, `expo-updates`, `expo-haptics`
 - `zustand` for lightweight app state
-- OpenRouter as the default model provider
+- OpenRouter as the default model provider, with seeded qwen 3.5 flash selected by default
 - No custom deployed backend; app data stays local and network calls go directly to providers
 
 ## Notes
@@ -24,5 +24,5 @@ becomes the primary daily touchpoint.
 - Prefer native Expo and React Native capabilities before web or DOM-based fallbacks.
 - The initial widget scaffold lives in `src/widgets/drillbit-widget.tsx` and is wired through `app.json`.
 - Widget development requires a dev build or EAS build, not Expo Go.
-- The app architecture is local-only by default: SQLite/App Groups for app data, SecureStore for secrets, direct calls to OpenRouter and RevenueCat.
+- The app architecture is local-only by default: SQLite/App Groups for app data and the editable model catalog, SecureStore for secrets, direct calls to OpenRouter and RevenueCat.
 - Challenge history stays local, skipped items are deduped out of future prompts, and expired untouched challenges can be pruned.

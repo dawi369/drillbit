@@ -1,9 +1,21 @@
-import { useState } from "react";
+import { Button, Input, Label, TextField } from "heroui-native";
+import { useEffect, useState } from "react";
 import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 
+import { createCustomOpenRouterModel } from "@/constants/models";
+import { generateChallenge } from "@/lib/challenges/generate";
 import { buildPromptPreviewChain } from "@/lib/prompts/dev-preview";
 import { resetDatabase } from "@/lib/storage/database";
-import type { PromptKind } from "@/lib/storage/types";
+import {
+  ensureDefaultModels,
+  ensureDefaultSettings,
+  getSelectedModel,
+  listModels,
+  selectModel,
+  setModelEnabled,
+  upsertModel,
+} from "@/lib/storage/repository";
+import type { ModelRecord, PromptKind } from "@/lib/storage/types";
 
 type DevActionCardProps = {
   title: string;
@@ -56,6 +68,62 @@ function DevActionCard({
   );
 }
 
+function ModelRow({
+  model,
+  isSelected,
+  onSelect,
+  onDelete,
+}: {
+  model: ModelRecord;
+  isSelected: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <View
+      className={`gap-3 rounded-3xl border px-4 py-4 ${
+        isSelected
+          ? "border-accent bg-accent/10"
+          : "border-border bg-surface-secondary"
+      }`}
+    >
+      <View className="gap-1">
+        <View className="flex-row items-center justify-between gap-3">
+          <Text className="text-base font-semibold text-foreground">
+            {model.label}
+          </Text>
+          <View
+            className={`rounded-full px-2 py-1 ${
+              isSelected ? "bg-accent/20" : "bg-background"
+            }`}
+          >
+            <Text className="text-[10px] font-medium uppercase tracking-[1.2px] text-muted">
+              {isSelected ? "selected" : model.provider}
+            </Text>
+          </View>
+        </View>
+
+        <Text selectable className="text-sm leading-6 text-muted">
+          {model.remoteId}
+        </Text>
+
+        <Text className="text-xs leading-5 text-muted">
+          {model.isCustom ? "custom" : "seeded"}
+        </Text>
+      </View>
+
+      <View className="flex-row gap-3">
+        <Button className="flex-1" variant={isSelected ? "secondary" : "primary"} onPress={onSelect}>
+          <Button.Label>{isSelected ? "selected" : "select"}</Button.Label>
+        </Button>
+        <Button className="flex-1" variant="ghost" onPress={onDelete}>
+          <Button.Label>delete</Button.Label>
+        </Button>
+      </View>
+    </View>
+  );
+}
+
 export default function DevTabScreen() {
   const [activePreviewKind, setActivePreviewKind] = useState<PromptKind | null>(
     null,
@@ -69,6 +137,28 @@ export default function DevTabScreen() {
   const [renderedPromptPreview, setRenderedPromptPreview] = useState<
     string | null
   >(null);
+  const [models, setModels] = useState<ModelRecord[]>([]);
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
+  const [customModelInput, setCustomModelInput] = useState("");
+  const [modelStatus, setModelStatus] = useState<string | null>(null);
+  const [generatedChallengePreview, setGeneratedChallengePreview] = useState<
+    string | null
+  >(null);
+
+  async function refreshModels() {
+    await ensureDefaultModels();
+    const [storedModels, settings] = await Promise.all([
+      listModels({ includeDisabled: true }),
+      ensureDefaultSettings(),
+    ]);
+
+    setModels(storedModels);
+    setSelectedModelId(settings.selectedModelId ?? null);
+  }
+
+  useEffect(() => {
+    void refreshModels();
+  }, []);
 
   async function handleInspectPromptPipeline(kind: PromptKind) {
     const preview = await buildPromptPreviewChain(kind);
@@ -81,6 +171,35 @@ export default function DevTabScreen() {
         : "null",
     );
     setRenderedPromptPreview(preview.renderedPrompt ?? "null");
+  }
+
+  async function handleAddModel() {
+    const trimmed = customModelInput.trim();
+    if (!trimmed) {
+      setModelStatus("paste an openrouter model id first");
+      return;
+    }
+
+    const model = createCustomOpenRouterModel(trimmed);
+    await upsertModel(model);
+    await selectModel(model.id);
+    setCustomModelInput("");
+    setModelStatus(`added ${model.remoteId}`);
+    await refreshModels();
+  }
+
+  async function handleDeleteModel(model: ModelRecord) {
+    await setModelEnabled(model.id, false);
+    setModelStatus(`deleted ${model.remoteId}`);
+    await refreshModels();
+  }
+
+  async function handleSelectModel(model: ModelRecord) {
+    await selectModel(model.id);
+    const selectedModel = await getSelectedModel();
+    setSelectedModelId(selectedModel?.id ?? null);
+    setModelStatus(`selected ${model.remoteId}`);
+    await refreshModels();
   }
 
   if (!__DEV__) {
@@ -98,8 +217,8 @@ export default function DevTabScreen() {
           dev tools
         </Text>
         <Text className="text-sm leading-6 text-muted">
-          Local development actions for storage, widget testing, and future
-          challenge tooling.
+          Local development actions for storage, model management, widget
+          testing, and future challenge tooling.
         </Text>
       </View>
 
@@ -110,6 +229,13 @@ export default function DevTabScreen() {
         tone="danger"
         onPress={async () => {
           await resetDatabase();
+          setAppContextPreview(null);
+          setPromptContextPreview(null);
+          setRenderedPromptPreview(null);
+          setCustomModelInput("");
+          setModelStatus(null);
+          await refreshModels();
+          setGeneratedChallengePreview(null);
           Alert.alert(
             "database reset",
             "Local SQLite storage was wiped and recreated.",
@@ -117,11 +243,80 @@ export default function DevTabScreen() {
         }}
       />
 
+      <View className="gap-4 rounded-3xl border border-border bg-surface px-4 py-4">
+        <View className="gap-1">
+          <Text className="text-base font-semibold text-foreground">
+            manage models
+          </Text>
+          <Text className="text-sm leading-6 text-muted">
+            Paste an OpenRouter model id, add it to the available models, then
+            select or delete entries from the local catalog.
+          </Text>
+        </View>
+
+        <TextField>
+          <Label>openrouter model id</Label>
+          <Input
+            placeholder="qwen/qwen3.5-flash-02-23"
+            value={customModelInput}
+            onChangeText={setCustomModelInput}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </TextField>
+
+        <View className="flex-row gap-3">
+          <Button className="flex-1" variant="primary" onPress={() => void handleAddModel()}>
+            <Button.Label>add model</Button.Label>
+          </Button>
+          <Button className="flex-1" variant="ghost" onPress={() => void refreshModels()}>
+            <Button.Label>refresh</Button.Label>
+          </Button>
+        </View>
+
+        {modelStatus ? (
+          <Text className="text-sm text-accent">{modelStatus}</Text>
+        ) : null}
+
+        <View className="gap-3">
+          {models.length === 0 ? (
+            <View className="rounded-3xl border border-border bg-surface-secondary px-4 py-4">
+              <Text className="text-sm text-muted">no models saved yet</Text>
+            </View>
+          ) : null}
+
+          {models.map((model) => (
+            <ModelRow
+              key={model.id}
+              model={model}
+              isSelected={model.id === selectedModelId}
+              onSelect={() => {
+                void handleSelectModel(model);
+              }}
+              onDelete={() => {
+                void handleDeleteModel(model);
+              }}
+            />
+          ))}
+        </View>
+      </View>
+
       <DevActionCard
         title="generate challenge"
-        description="Create a fresh local challenge from the current params and settings."
-        actionLabel="todo: generate challenge"
-        todo
+        description="Create a fresh local challenge from the current params and selected model."
+        actionLabel="generate challenge"
+        onPress={async () => {
+          try {
+            const result = await generateChallenge();
+            setGeneratedChallengePreview(JSON.stringify(result.challenge, null, 2));
+            Alert.alert("challenge generated", result.challenge.title);
+          } catch (error) {
+            Alert.alert(
+              "generation failed",
+              error instanceof Error ? error.message : "Unknown error",
+            );
+          }
+        }}
       />
 
       <DevActionCard
@@ -223,6 +418,23 @@ export default function DevTabScreen() {
 
           <Text selectable className="text-xs leading-5 text-foreground">
             {renderedPromptPreview}
+          </Text>
+        </View>
+      ) : null}
+
+      {generatedChallengePreview ? (
+        <View className="gap-3 rounded-3xl border border-border bg-surface px-4 py-4">
+          <View className="gap-1">
+            <Text className="text-base font-semibold text-foreground">
+              generated challenge
+            </Text>
+            <Text className="text-sm leading-6 text-muted">
+              Latest locally saved challenge generated with the selected model.
+            </Text>
+          </View>
+
+          <Text selectable className="text-xs leading-5 text-foreground">
+            {generatedChallengePreview}
           </Text>
         </View>
       ) : null}

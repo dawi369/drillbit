@@ -10,6 +10,8 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaListener, SafeAreaProvider } from "react-native-safe-area-context";
 import { Uniwind } from "uniwind";
 
+import { initializePromptLibrary } from "@/lib/prompts/prompt-library";
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme !== "light";
@@ -18,6 +20,7 @@ export default function RootLayout() {
   useEffect(() => {
     Uniwind.setTheme(resolvedTheme);
     void SystemUI.setBackgroundColorAsync(isDark ? "#000000" : "#ffffff");
+    void initializePromptLibrary();
   }, [isDark, resolvedTheme]);
 
   return (

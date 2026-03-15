@@ -8,7 +8,6 @@ export const CREATE_CHALLENGES_TABLE_SQL = `
     topic TEXT NOT NULL,
     difficulty TEXT,
     lifecycle TEXT NOT NULL,
-    mode TEXT,
     skip_reason TEXT,
     created_at TEXT NOT NULL,
     started_at TEXT,
@@ -52,9 +51,22 @@ export const CREATE_SETTINGS_TABLE_SQL = `
     focus_prompt TEXT NOT NULL,
     preferred_difficulty TEXT,
     preferred_mode TEXT,
-    default_model TEXT,
+    selected_model_id TEXT,
     challenge_cadence_hours INTEGER,
     first_challenge_time_minutes INTEGER,
+    updated_at TEXT NOT NULL
+  );
+`;
+
+export const CREATE_MODELS_TABLE_SQL = `
+  CREATE TABLE IF NOT EXISTS models (
+    id TEXT PRIMARY KEY NOT NULL,
+    provider TEXT NOT NULL,
+    remote_id TEXT NOT NULL,
+    label TEXT NOT NULL,
+    is_enabled INTEGER NOT NULL,
+    is_custom INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
 `;
@@ -73,6 +85,8 @@ export const CREATE_INDEXES_SQL = [
   "CREATE INDEX IF NOT EXISTS idx_challenges_topic ON challenges (topic);",
   "CREATE INDEX IF NOT EXISTS idx_challenge_summaries_challenge_id ON challenge_summaries (challenge_id);",
   "CREATE INDEX IF NOT EXISTS idx_blocked_challenges_lifecycle ON blocked_challenges (source_lifecycle);",
+  "CREATE INDEX IF NOT EXISTS idx_models_provider ON models (provider);",
+  "CREATE INDEX IF NOT EXISTS idx_models_enabled ON models (is_enabled);",
 ];
 
 export const CREATE_ALL_TABLES_SQL = [
@@ -80,6 +94,7 @@ export const CREATE_ALL_TABLES_SQL = [
   CREATE_CHALLENGE_SUMMARIES_TABLE_SQL,
   CREATE_CHALLENGE_SESSIONS_TABLE_SQL,
   CREATE_SETTINGS_TABLE_SQL,
+  CREATE_MODELS_TABLE_SQL,
   CREATE_BLOCKED_CHALLENGES_TABLE_SQL,
   ...CREATE_INDEXES_SQL,
 ];

@@ -11,6 +11,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 
+import { createCustomOpenRouterModel } from "@/constants/models";
 import {
   CADENCE_OPTIONS,
   DIFFICULTY_OPTIONS,
@@ -19,12 +20,17 @@ import {
 import { cn } from "@/lib/cn";
 import {
   createDefaultSettings,
+  ensureDefaultModels,
   ensureDefaultSettings,
+  listModels,
   normalizeChallengeCadenceHours,
   normalizeFirstChallengeTimeMinutes,
+  selectModel,
+  setModelEnabled,
+  upsertModel,
   upsertSettings,
 } from "@/lib/storage/repository";
-import type { UserSettingsRecord } from "@/lib/storage/types";
+import type { ModelRecord, UserSettingsRecord } from "@/lib/storage/types";
 import {
   dateToTimeMinutes,
   formatTimeMinutes,
@@ -78,6 +84,52 @@ function ModeCard({
   );
 }
 
+function ModelCard({
+  model,
+  selected,
+  onSelect,
+  onDelete,
+}: {
+  model: ModelRecord;
+  selected: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <View
+      className={cn(
+        "gap-3 rounded-3xl border px-4 py-4",
+        selected
+          ? "border-accent bg-accent/10"
+          : "border-border bg-surface-secondary",
+      )}
+    >
+      <View className="gap-1">
+        <Text
+          className={cn(
+            "text-base font-semibold",
+            selected ? "text-accent" : "text-foreground",
+          )}
+        >
+          {model.label}
+        </Text>
+        <Text selectable className="text-sm leading-6 text-muted">
+          {model.remoteId}
+        </Text>
+      </View>
+
+      <View className="flex-row gap-3">
+        <Button className="flex-1" variant={selected ? "secondary" : "primary"} onPress={onSelect}>
+          <Button.Label>{selected ? "selected" : "select"}</Button.Label>
+        </Button>
+        <Button className="flex-1" variant="ghost" onPress={onDelete}>
+          <Button.Label>delete</Button.Label>
+        </Button>
+      </View>
+    </View>
+  );
+}
+
 export function ParamsScreen() {
   const initialDraft = useMemo(() => createDefaultSettings(), []);
   const [draft, setDraft] = useState<UserSettingsRecord>(initialDraft);
@@ -87,6 +139,15 @@ export function ParamsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
+  const [models, setModels] = useState<ModelRecord[]>([]);
+  const [customModelInput, setCustomModelInput] = useState("");
+  const [modelStatus, setModelStatus] = useState<string | null>(null);
+
+  async function refreshModels() {
+    await ensureDefaultModels();
+    const storedModels = await listModels({ includeDisabled: true });
+    setModels(storedModels);
+  }
 
   const firstChallengeTime =
     draft.firstChallengeTimeMinutes ??
@@ -103,7 +164,7 @@ export function ParamsScreen() {
     draft.focusPrompt !== savedSettings.focusPrompt ||
     draft.preferredDifficulty !== savedSettings.preferredDifficulty ||
     draft.preferredMode !== savedSettings.preferredMode ||
-    draft.defaultModel !== savedSettings.defaultModel ||
+    draft.selectedModelId !== savedSettings.selectedModelId ||
     draft.challengeCadenceHours !== savedSettings.challengeCadenceHours ||
     draft.firstChallengeTimeMinutes !== savedSettings.firstChallengeTimeMinutes;
 
@@ -111,7 +172,11 @@ export function ParamsScreen() {
     let isMounted = true;
 
     async function loadSettings() {
-      const settings = await ensureDefaultSettings();
+      await ensureDefaultModels();
+      const [settings, storedModels] = await Promise.all([
+        ensureDefaultSettings(),
+        listModels({ includeDisabled: true }),
+      ]);
 
       if (!isMounted) {
         return;
@@ -119,6 +184,7 @@ export function ParamsScreen() {
 
       setDraft(settings);
       setSavedSettings(settings);
+      setModels(storedModels);
       setIsLoading(false);
     }
 
@@ -160,6 +226,38 @@ export function ParamsScreen() {
     } finally {
       setIsSaving(false);
     }
+  }
+
+  async function handleAddModel() {
+    const trimmed = customModelInput.trim();
+    if (!trimmed) {
+      setModelStatus("paste an openrouter model id first");
+      return;
+    }
+
+    const model = createCustomOpenRouterModel(trimmed);
+    await upsertModel(model);
+    await selectModel(model.id);
+    setDraft((current) => ({ ...current, selectedModelId: model.id }));
+    setCustomModelInput("");
+    setModelStatus(`added ${model.remoteId}`);
+    await refreshModels();
+  }
+
+  async function handleSelectModel(model: ModelRecord) {
+    await selectModel(model.id);
+    setDraft((current) => ({ ...current, selectedModelId: model.id }));
+    setModelStatus(`selected ${model.remoteId}`);
+    await refreshModels();
+  }
+
+  async function handleDeleteModel(model: ModelRecord) {
+    await setModelEnabled(model.id, false);
+    const nextSettings = await ensureDefaultSettings();
+    setDraft(nextSettings);
+    setSavedSettings(nextSettings);
+    setModelStatus(`deleted ${model.remoteId}`);
+    await refreshModels();
   }
 
   return (
@@ -385,26 +483,68 @@ export function ParamsScreen() {
           <View className="gap-2">
             <Card.Title className="text-xl text-foreground">model</Card.Title>
             <Card.Description className="text-sm leading-6 text-muted">
-              OpenRouter stays first. We can add the real picker and BYOK
-              controls once the storage flow is wired.
+              OpenRouter stays first. The selected model id now lives in local
+              settings, backed by a local SQLite model catalog.
             </Card.Description>
           </View>
 
           <View className="rounded-3xl border border-border bg-surface-secondary px-4 py-4">
             <Text className="mb-1 text-xs font-medium uppercase tracking-[1.6px] text-muted">
-              Default model
+              selected model
             </Text>
             <Text
               selectable
               className="text-base font-semibold text-foreground"
             >
-              {draft.defaultModel ?? "not configured"}
+              {draft.selectedModelId ?? "not configured"}
             </Text>
           </View>
 
-          <Button variant="ghost" onPress={() => {}}>
-            <Button.Label>TODO: open model picker</Button.Label>
-          </Button>
+          <TextField>
+            <Label>add openrouter model id</Label>
+            <Input
+              placeholder="qwen/qwen3.5-flash-02-23"
+              value={customModelInput}
+              onChangeText={setCustomModelInput}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </TextField>
+
+          <View className="flex-row gap-3">
+            <Button className="flex-1" variant="primary" onPress={() => void handleAddModel()}>
+              <Button.Label>add model</Button.Label>
+            </Button>
+            <Button className="flex-1" variant="ghost" onPress={() => void refreshModels()}>
+              <Button.Label>refresh models</Button.Label>
+            </Button>
+          </View>
+
+          {modelStatus ? (
+            <Text className="text-sm text-accent">{modelStatus}</Text>
+          ) : null}
+
+          <View className="gap-3">
+            {models.length === 0 ? (
+              <View className="rounded-3xl border border-border bg-surface-secondary px-4 py-4">
+                <Text className="text-sm text-muted">no models available</Text>
+              </View>
+            ) : null}
+
+            {models.map((model) => (
+              <ModelCard
+                key={model.id}
+                model={model}
+                selected={draft.selectedModelId === model.id}
+                onSelect={() => {
+                  void handleSelectModel(model);
+                }}
+                onDelete={() => {
+                  void handleDeleteModel(model);
+                }}
+              />
+            ))}
+          </View>
         </Card.Body>
       </Card>
 
@@ -412,12 +552,11 @@ export function ParamsScreen() {
         <Card.Body className="gap-4">
           <View className="gap-2">
             <Card.Title className="text-lg text-foreground">
-              draft-only for now
+              local settings
             </Card.Title>
             <Card.Description className="text-sm leading-6 text-muted">
-              This screen is interactive and reflects the settings model, but it
-              is not persisted yet. We can wire save/load next after the UI
-              feels right.
+              This screen saves locally to SQLite. We can keep refining the
+              picker flows without changing the underlying settings shape.
             </Card.Description>
           </View>
 

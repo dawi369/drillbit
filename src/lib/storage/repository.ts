@@ -1,12 +1,18 @@
 import { getDatabase } from "@/lib/storage/database";
 import {
+  getDefaultSeedModelId,
+  SEEDED_MODELS,
+} from "@/constants/models";
+import {
   fromChallengeRow,
   fromChallengeSessionRow,
   fromChallengeSummaryRow,
+  fromModelRow,
   fromSettingsRow,
   toChallengeRow,
   toChallengeSessionRow,
   toChallengeSummaryRow,
+  toModelRow,
   toSettingsRow,
 } from "@/lib/storage/mappers";
 import type {
@@ -15,17 +21,23 @@ import type {
   ChallengeRecord,
   ChallengeSessionRecord,
   ChallengeSummaryRecord,
+  ModelRecord,
   UserSettingsRecord,
 } from "@/lib/storage/types";
 import {
   isValidChallengeCadenceHours,
   isValidFirstChallengeTimeMinutes,
 } from "@/lib/storage/types";
+import { getDefaultFocusPrompt } from "@/lib/prompts/prompt-library";
 import type { ChallengeLifecycle, ChallengeMode } from "@/lib/widgets/types";
 
 type ChallengeQueryOptions = {
   lifecycle?: ChallengeLifecycle;
   limit?: number;
+};
+
+type ModelQueryOptions = {
+  includeDisabled?: boolean;
 };
 
 function createNowIso() {
@@ -34,9 +46,8 @@ function createNowIso() {
 
 function createBlockedChallengeSummary(record: ChallengeRecord) {
   const difficulty = record.difficulty ? `${record.difficulty} ` : "";
-  const modeClause = record.mode ? ` intended for ${record.mode} mode` : "";
 
-  return `Do not repeat a ${difficulty}${record.topic} challenge about ${record.title.toLowerCase()} where the user must ${record.teaser.charAt(0).toLowerCase()}${record.teaser.slice(1)}${modeClause}.`.replace(
+  return `Do not repeat a ${difficulty}${record.topic} challenge about ${record.title.toLowerCase()} where the user must ${record.teaser.charAt(0).toLowerCase()}${record.teaser.slice(1)}.`.replace(
     /\s+/g,
     " ",
   );
@@ -68,16 +79,15 @@ export async function upsertChallenge(record: ChallengeRecord) {
   await db.runAsync(
     `
       INSERT INTO challenges (
-        id, title, teaser, topic, difficulty, lifecycle, mode, skip_reason,
+        id, title, teaser, topic, difficulty, lifecycle, skip_reason,
         created_at, started_at, completed_at, skipped_at, expires_at, source_model, source_prompt_version
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         title = excluded.title,
         teaser = excluded.teaser,
         topic = excluded.topic,
         difficulty = excluded.difficulty,
         lifecycle = excluded.lifecycle,
-        mode = excluded.mode,
         skip_reason = excluded.skip_reason,
         created_at = excluded.created_at,
         started_at = excluded.started_at,
@@ -93,7 +103,6 @@ export async function upsertChallenge(record: ChallengeRecord) {
     row.topic,
     row.difficulty,
     row.lifecycle,
-    row.mode,
     row.skip_reason,
     row.created_at,
     row.started_at,
@@ -329,14 +338,14 @@ export async function upsertSettings(record: UserSettingsRecord) {
   await db.runAsync(
     `
       INSERT INTO settings (
-        id, focus_prompt, preferred_difficulty, preferred_mode, default_model,
+        id, focus_prompt, preferred_difficulty, preferred_mode, selected_model_id,
         challenge_cadence_hours, first_challenge_time_minutes, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         focus_prompt = excluded.focus_prompt,
         preferred_difficulty = excluded.preferred_difficulty,
         preferred_mode = excluded.preferred_mode,
-        default_model = excluded.default_model,
+        selected_model_id = excluded.selected_model_id,
         challenge_cadence_hours = excluded.challenge_cadence_hours,
         first_challenge_time_minutes = excluded.first_challenge_time_minutes,
         updated_at = excluded.updated_at
@@ -345,7 +354,7 @@ export async function upsertSettings(record: UserSettingsRecord) {
     row.focus_prompt,
     row.preferred_difficulty,
     row.preferred_mode,
-    row.default_model,
+    row.selected_model_id,
     row.challenge_cadence_hours,
     row.first_challenge_time_minutes,
     row.updated_at,
@@ -363,16 +372,87 @@ export async function getSettings() {
   return rows[0] ? fromSettingsRow(rows[0]) : null;
 }
 
+export async function upsertModel(record: ModelRecord) {
+  const db = await getDatabase();
+  const row = toModelRow(record);
+
+  await db.runAsync(
+    `
+      INSERT INTO models (
+        id, provider, remote_id, label, is_enabled, is_custom, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        provider = excluded.provider,
+        remote_id = excluded.remote_id,
+        label = excluded.label,
+        is_enabled = excluded.is_enabled,
+        is_custom = excluded.is_custom,
+        updated_at = excluded.updated_at
+    `,
+    row.id,
+    row.provider,
+    row.remote_id,
+    row.label,
+    row.is_enabled,
+    row.is_custom,
+    row.created_at,
+    row.updated_at,
+  );
+
+  return record;
+}
+
+export async function listModels(options: ModelQueryOptions = {}) {
+  const db = await getDatabase();
+  const includeDisabled = options.includeDisabled ?? true;
+  const rows = includeDisabled
+    ? await db.getAllAsync<ReturnType<typeof toModelRow>>(
+        "SELECT * FROM models ORDER BY is_enabled DESC, provider ASC, is_custom DESC, label ASC",
+      )
+    : await db.getAllAsync<ReturnType<typeof toModelRow>>(
+        "SELECT * FROM models WHERE is_enabled = 1 ORDER BY provider ASC, is_custom DESC, label ASC",
+      );
+
+  return rows.map(fromModelRow);
+}
+
+export async function getModelById(id: string) {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<ReturnType<typeof toModelRow>>(
+    "SELECT * FROM models WHERE id = ? LIMIT 1",
+    id,
+  );
+
+  return rows[0] ? fromModelRow(rows[0]) : null;
+}
+
+export async function ensureDefaultModels() {
+  const existing = await listModels({ includeDisabled: true });
+  const existingById = new Set(existing.map((model) => model.id));
+  const modelsToSeed = [...SEEDED_MODELS];
+
+  for (const model of modelsToSeed) {
+    if (existingById.has(model.id)) {
+      continue;
+    }
+
+    await upsertModel(model);
+  }
+
+  return listModels();
+}
+
 export function createDefaultSettings(
   overrides: Partial<UserSettingsRecord> = {},
 ): UserSettingsRecord {
+  const defaultSeedModelId = getDefaultSeedModelId();
+
   return {
     id: "default",
-    focusPrompt:
-      "System design and architecture interview prep focused on multi-step product and infrastructure problems. Emphasize user-facing goals, service boundaries, state and data flow, scaling bottlenecks, consistency trade-offs, rollout strategy, failure modes, and what should be validated next. Prefer rich design prompts over simple CRUD or isolated algorithm-style tasks, and include realistic constraints that force prioritization and discussion.",
+    focusPrompt: getDefaultFocusPrompt(),
     preferredDifficulty: "medium",
     preferredMode: "coach",
-    defaultModel: process.env.DEFAULT_MODEL,
+    selectedModelId: defaultSeedModelId,
     challengeCadenceHours: 24,
     firstChallengeTimeMinutes: 9 * 60,
     updatedAt: createNowIso(),
@@ -403,14 +483,105 @@ export function normalizeFirstChallengeTimeMinutes(value: number) {
 }
 
 export async function ensureDefaultSettings() {
+  await ensureDefaultModels();
+
   const existing = await getSettings();
   if (existing) {
-    return existing;
+    if (existing.selectedModelId) {
+      return existing;
+    }
+
+    const defaultSeedModelId = getDefaultSeedModelId();
+
+    const nextSettings: UserSettingsRecord = {
+      ...existing,
+      selectedModelId: defaultSeedModelId,
+      updatedAt: createNowIso(),
+    };
+
+    await upsertSettings(nextSettings);
+    return nextSettings;
   }
 
   const defaults = createDefaultSettings();
   await upsertSettings(defaults);
   return defaults;
+}
+
+export async function getSelectedModel() {
+  const settings = await ensureDefaultSettings();
+
+  if (!settings.selectedModelId) {
+    return null;
+  }
+
+  const selectedModel = await getModelById(settings.selectedModelId);
+  if (!selectedModel?.isEnabled) {
+    return null;
+  }
+
+  return selectedModel;
+}
+
+export async function selectModel(modelId: string) {
+  const model = await getModelById(modelId);
+  if (!model || !model.isEnabled) {
+    return null;
+  }
+
+  const settings = await ensureDefaultSettings();
+  const nextSettings: UserSettingsRecord = {
+    ...settings,
+    selectedModelId: model.id,
+    updatedAt: createNowIso(),
+  };
+
+  await upsertSettings(nextSettings);
+  return model;
+}
+
+export async function setModelEnabled(modelId: string, isEnabled: boolean) {
+  const model = await getModelById(modelId);
+  if (!model) {
+    return null;
+  }
+
+  await upsertModel({
+    ...model,
+    isEnabled,
+    updatedAt: createNowIso(),
+  });
+
+  if (!isEnabled) {
+    const settings = await ensureDefaultSettings();
+    if (settings.selectedModelId === modelId) {
+      const fallbackModels = await listModels({ includeDisabled: false });
+      const fallbackModel = fallbackModels.find(
+        (fallbackCandidate) => fallbackCandidate.id !== modelId,
+      );
+
+      await upsertSettings({
+        ...settings,
+        selectedModelId: fallbackModel?.id,
+        updatedAt: createNowIso(),
+      });
+    }
+  }
+
+  return getModelById(modelId);
+}
+
+export async function getActiveModelCatalog() {
+  await ensureDefaultModels();
+  const [models, settings] = await Promise.all([
+    listModels({ includeDisabled: false }),
+    ensureDefaultSettings(),
+  ]);
+
+  return {
+    models,
+    selectedModelId: settings.selectedModelId,
+  };
 }
 
 export async function markChallengeInProgress(
@@ -425,8 +596,50 @@ export async function markChallengeInProgress(
   const nextRecord: ChallengeRecord = {
     ...challenge,
     lifecycle: "in_progress",
-    mode,
     startedAt: challenge.startedAt ?? createNowIso(),
+  };
+
+  await upsertChallenge(nextRecord);
+
+  await upsertChallengeSession({
+    challengeId,
+    selectedMode: mode,
+    updatedAt: createNowIso(),
+  });
+
+  return nextRecord;
+}
+
+export async function completeChallenge(challengeId: string) {
+  const challenge = await getChallengeById(challengeId);
+  if (!challenge) {
+    return null;
+  }
+
+  const now = createNowIso();
+  const nextRecord: ChallengeRecord = {
+    ...challenge,
+    lifecycle: "completed",
+    startedAt: challenge.startedAt ?? now,
+    completedAt: now,
+  };
+
+  await upsertChallenge(nextRecord);
+  return nextRecord;
+}
+
+export async function skipChallenge(challengeId: string) {
+  const challenge = await getChallengeById(challengeId);
+  if (!challenge) {
+    return null;
+  }
+
+  const now = createNowIso();
+  const nextRecord: ChallengeRecord = {
+    ...challenge,
+    lifecycle: "skipped",
+    skippedAt: now,
+    skipReason: "not_interested",
   };
 
   await upsertChallenge(nextRecord);

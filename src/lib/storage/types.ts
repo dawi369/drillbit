@@ -36,12 +36,30 @@ export type ChallengeSessionRecord = {
   updatedAt: string;
 };
 
+export type ModelProvider =
+  | "openrouter"
+  | "openai"
+  | "anthropic"
+  | "ollama"
+  | (string & {});
+
+export type ModelRecord = {
+  id: string;
+  provider: ModelProvider;
+  remoteId: string;
+  label: string;
+  isEnabled: boolean;
+  isCustom: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type UserSettingsRecord = {
   id: "default";
   focusPrompt: string;
   preferredDifficulty?: ChallengeDifficulty;
   preferredMode?: ChallengeMode;
-  defaultModel?: string;
+  selectedModelId?: string;
   challengeCadenceHours?: ChallengeCadenceHours;
   firstChallengeTimeMinutes?: number;
   updatedAt: string;
@@ -65,6 +83,7 @@ export type PromptKind = "generate" | "coach" | "reveal" | "summarize";
 export type AppContext = {
   kind: PromptKind;
   settings: UserSettingsRecord;
+  selectedModel?: ModelRecord;
   challenge?: ChallengeRecord;
   session?: ChallengeSessionRecord;
   runtime: {

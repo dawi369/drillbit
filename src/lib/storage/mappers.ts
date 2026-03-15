@@ -3,6 +3,8 @@ import type {
   ChallengeRecord,
   ChallengeSessionRecord,
   ChallengeSummaryRecord,
+  ModelProvider,
+  ModelRecord,
   UserSettingsRecord,
 } from "@/lib/storage/types";
 import type {
@@ -21,7 +23,6 @@ type ChallengeRow = {
   topic: string;
   difficulty: Nullable<ChallengeDifficulty>;
   lifecycle: ChallengeLifecycle;
-  mode: Nullable<ChallengeMode>;
   skip_reason: Nullable<ChallengeSkipReason>;
   created_at: string;
   started_at: Nullable<string>;
@@ -57,9 +58,20 @@ type SettingsRow = {
   focus_prompt: string;
   preferred_difficulty: Nullable<ChallengeDifficulty>;
   preferred_mode: Nullable<ChallengeMode>;
-  default_model: Nullable<string>;
+  selected_model_id: Nullable<string>;
   challenge_cadence_hours: Nullable<ChallengeCadenceHours>;
   first_challenge_time_minutes: Nullable<number>;
+  updated_at: string;
+};
+
+type ModelRow = {
+  id: string;
+  provider: ModelProvider;
+  remote_id: string;
+  label: string;
+  is_enabled: number;
+  is_custom: number;
+  created_at: string;
   updated_at: string;
 };
 
@@ -84,7 +96,6 @@ export function toChallengeRow(record: ChallengeRecord): ChallengeRow {
     topic: record.topic,
     difficulty: record.difficulty ?? null,
     lifecycle: record.lifecycle,
-    mode: record.mode ?? null,
     skip_reason: record.skipReason ?? null,
     created_at: record.createdAt,
     started_at: record.startedAt ?? null,
@@ -104,7 +115,6 @@ export function fromChallengeRow(row: ChallengeRow): ChallengeRecord {
     topic: row.topic,
     difficulty: undefinedIfNull(row.difficulty),
     lifecycle: row.lifecycle,
-    mode: undefinedIfNull(row.mode),
     skipReason: undefinedIfNull(row.skip_reason),
     createdAt: row.created_at,
     startedAt: undefinedIfNull(row.started_at),
@@ -170,7 +180,7 @@ export function toSettingsRow(record: UserSettingsRecord): SettingsRow {
     focus_prompt: record.focusPrompt,
     preferred_difficulty: record.preferredDifficulty ?? null,
     preferred_mode: record.preferredMode ?? null,
-    default_model: record.defaultModel ?? null,
+    selected_model_id: record.selectedModelId ?? null,
     challenge_cadence_hours: record.challengeCadenceHours ?? null,
     first_challenge_time_minutes: record.firstChallengeTimeMinutes ?? null,
     updated_at: record.updatedAt,
@@ -183,9 +193,35 @@ export function fromSettingsRow(row: SettingsRow): UserSettingsRecord {
     focusPrompt: row.focus_prompt,
     preferredDifficulty: undefinedIfNull(row.preferred_difficulty),
     preferredMode: undefinedIfNull(row.preferred_mode),
-    defaultModel: undefinedIfNull(row.default_model),
+    selectedModelId: undefinedIfNull(row.selected_model_id),
     challengeCadenceHours: undefinedIfNull(row.challenge_cadence_hours),
     firstChallengeTimeMinutes: undefinedIfNull(row.first_challenge_time_minutes),
+    updatedAt: row.updated_at,
+  };
+}
+
+export function toModelRow(record: ModelRecord): ModelRow {
+  return {
+    id: record.id,
+    provider: record.provider,
+    remote_id: record.remoteId,
+    label: record.label,
+    is_enabled: record.isEnabled ? 1 : 0,
+    is_custom: record.isCustom ? 1 : 0,
+    created_at: record.createdAt,
+    updated_at: record.updatedAt,
+  };
+}
+
+export function fromModelRow(row: ModelRow): ModelRecord {
+  return {
+    id: row.id,
+    provider: row.provider,
+    remoteId: row.remote_id,
+    label: row.label,
+    isEnabled: row.is_enabled === 1,
+    isCustom: row.is_custom === 1,
+    createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }

@@ -7,8 +7,6 @@ import type {
 } from "@/lib/storage/types";
 
 function createPreviewChallenge(kind: PromptKind): ChallengeRecord {
-  const mode = kind === "reveal" ? "reveal" : "coach";
-
   return {
     id: `dev-preview-${kind}`,
     title: "design a feature-flag platform",
@@ -16,7 +14,6 @@ function createPreviewChallenge(kind: PromptKind): ChallengeRecord {
     topic: "system design",
     difficulty: "medium",
     lifecycle: kind === "summarize" ? "completed" : "in_progress",
-    mode,
     createdAt: new Date().toISOString(),
     startedAt: new Date().toISOString(),
     completedAt: kind === "summarize" ? new Date().toISOString() : undefined,

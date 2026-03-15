@@ -16,8 +16,10 @@ Styling & UI
 → Composed with uniwind className props for a clean light/dark native UI
 
 State & Data
-• zustand – lightweight global state (focus prompt, model config, schedule)
+• zustand – lightweight global state where ephemeral UI state needs it
 • expo-sqlite + expo-widgets App Groups – rich local memory cards, challenge history, blocked exact-repeat summaries, and shared widget sync
+• expo-sqlite models table – editable local catalog of available models plus selected model id in settings
+• Challenge/session split – generated challenge content lives on challenge rows, while selected help mode and notes live on challenge sessions
 • expo-secure-store – OpenRouter API key / BYOK credentials
 • Scheduling model – first challenge time plus cadence values restricted to divisors of 24h
 
@@ -26,8 +28,10 @@ Architecture
 • Direct third-party calls only – OpenRouter for AI, RevenueCat for billing/subscription state
 
 LLM / AI Backend
-• OpenRouter – primary model provider (default from the start, strong reasoning models)
+• OpenRouter – primary model provider (default from the start, with qwen 3.5 flash as the seeded default)
 • BYOK support – user-configurable endpoint + key (local Ollama/MLX/CoreML or remote)
+• Bundled markdown prompt library – runtime system prompts and the default focus prompt load from bundled `.md` assets at app startup, then render with structured tags like `<focus_prompt>`, `<blocked_challenge_shapes>`, and `<task>`
+• Local model catalog – seeded starter models plus user-added model ids stored in SQLite, with soft deletion and one selected model id in settings
 
 Animations & Polish
 • react-native-reanimated – smooth expands, graph scrubbing, button haptics
