@@ -20,6 +20,7 @@ State & Data
 • expo-sqlite + expo-widgets App Groups – rich local memory cards, challenge history, blocked exact-repeat summaries, and shared widget sync
 • expo-sqlite models table – editable local catalog of available models plus selected model id in settings
 • Challenge/session split – generated challenge content lives on challenge rows, while selected help mode and notes live on challenge sessions
+• Active challenge flow – the app resolves one active challenge at a time by preferring `in_progress`, then the newest valid `ready`; ready rows get schedule-based `expiresAt` values and stale untouched rows fall out of the active path
 • expo-secure-store – OpenRouter API key / BYOK credentials
 • Scheduling model – first challenge time plus cadence values restricted to divisors of 24h
 

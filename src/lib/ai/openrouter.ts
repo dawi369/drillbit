@@ -1,3 +1,4 @@
+import Constants from "expo-constants";
 import * as SecureStore from "expo-secure-store";
 
 const OPENROUTER_API_KEY_KEY = "OPENROUTER_API_KEY";
@@ -20,7 +21,10 @@ type OpenRouterResponse = {
 
 export async function getOpenRouterApiKey() {
   const storedKey = await SecureStore.getItemAsync(OPENROUTER_API_KEY_KEY);
-  return storedKey ?? process.env.EXPO_PUBLIC_OPENROUTER_API_KEY ?? process.env.OPENROUTER_API_KEY ?? null;
+  const runtimeKey =
+    (Constants.expoConfig?.extra?.openRouterApiKey as string | undefined) ?? null;
+
+  return storedKey ?? runtimeKey;
 }
 
 export async function createOpenRouterChatCompletion({

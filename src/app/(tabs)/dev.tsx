@@ -9,6 +9,8 @@ import { resetDatabase } from "@/lib/storage/database";
 import {
   ensureDefaultModels,
   ensureDefaultSettings,
+  getChallengeSession,
+  getCurrentActiveChallenge,
   getSelectedModel,
   listModels,
   selectModel,
@@ -144,6 +146,9 @@ export default function DevTabScreen() {
   const [generatedChallengePreview, setGeneratedChallengePreview] = useState<
     string | null
   >(null);
+  const [activeChallengePreview, setActiveChallengePreview] = useState<string | null>(
+    null,
+  );
 
   async function refreshModels() {
     await ensureDefaultModels();
@@ -156,8 +161,27 @@ export default function DevTabScreen() {
     setSelectedModelId(settings.selectedModelId ?? null);
   }
 
+  async function refreshActiveChallengePreview() {
+    const activeChallenge = await getCurrentActiveChallenge();
+    const activeSession = activeChallenge
+      ? await getChallengeSession(activeChallenge.id)
+      : null;
+
+    setActiveChallengePreview(
+      JSON.stringify(
+        {
+          activeChallenge,
+          activeSession,
+        },
+        null,
+        2,
+      ),
+    );
+  }
+
   useEffect(() => {
     void refreshModels();
+    void refreshActiveChallengePreview();
   }, []);
 
   async function handleInspectPromptPipeline(kind: PromptKind) {
@@ -236,6 +260,7 @@ export default function DevTabScreen() {
           setModelStatus(null);
           await refreshModels();
           setGeneratedChallengePreview(null);
+          setActiveChallengePreview(null);
           Alert.alert(
             "database reset",
             "Local SQLite storage was wiped and recreated.",
@@ -309,6 +334,7 @@ export default function DevTabScreen() {
           try {
             const result = await generateChallenge();
             setGeneratedChallengePreview(JSON.stringify(result.challenge, null, 2));
+            await refreshActiveChallengePreview();
             Alert.alert("challenge generated", result.challenge.title);
           } catch (error) {
             Alert.alert(
@@ -316,6 +342,15 @@ export default function DevTabScreen() {
               error instanceof Error ? error.message : "Unknown error",
             );
           }
+        }}
+      />
+
+      <DevActionCard
+        title="inspect active challenge"
+        description="Show the single canonical active challenge and its session state as the app currently resolves it."
+        actionLabel="inspect active"
+        onPress={async () => {
+          await refreshActiveChallengePreview();
         }}
       />
 
@@ -435,6 +470,24 @@ export default function DevTabScreen() {
 
           <Text selectable className="text-xs leading-5 text-foreground">
             {generatedChallengePreview}
+          </Text>
+        </View>
+      ) : null}
+
+      {activeChallengePreview ? (
+        <View className="gap-3 rounded-3xl border border-border bg-surface px-4 py-4">
+          <View className="gap-1">
+            <Text className="text-base font-semibold text-foreground">
+              active challenge
+            </Text>
+            <Text className="text-sm leading-6 text-muted">
+              Canonical current challenge plus the persisted session used by the
+              answer modal.
+            </Text>
+          </View>
+
+          <Text selectable className="text-xs leading-5 text-foreground">
+            {activeChallengePreview}
           </Text>
         </View>
       ) : null}

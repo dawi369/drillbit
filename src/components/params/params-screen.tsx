@@ -22,9 +22,11 @@ import {
   createDefaultSettings,
   ensureDefaultModels,
   ensureDefaultSettings,
+  getCurrentActiveChallenge,
   listModels,
   normalizeChallengeCadenceHours,
   normalizeFirstChallengeTimeMinutes,
+  refreshReadyChallengeExpirations,
   selectModel,
   setModelEnabled,
   upsertModel,
@@ -142,6 +144,7 @@ export function ParamsScreen() {
   const [models, setModels] = useState<ModelRecord[]>([]);
   const [customModelInput, setCustomModelInput] = useState("");
   const [modelStatus, setModelStatus] = useState<string | null>(null);
+  const [activeChallengeId, setActiveChallengeId] = useState<string | null>(null);
 
   async function refreshModels() {
     await ensureDefaultModels();
@@ -177,6 +180,7 @@ export function ParamsScreen() {
         ensureDefaultSettings(),
         listModels({ includeDisabled: true }),
       ]);
+      const activeChallenge = await getCurrentActiveChallenge();
 
       if (!isMounted) {
         return;
@@ -185,6 +189,7 @@ export function ParamsScreen() {
       setDraft(settings);
       setSavedSettings(settings);
       setModels(storedModels);
+      setActiveChallengeId(activeChallenge?.id ?? null);
       setIsLoading(false);
     }
 
@@ -216,6 +221,7 @@ export function ParamsScreen() {
       };
 
       await upsertSettings(nextSettings);
+      await refreshReadyChallengeExpirations(nextSettings);
       setDraft(nextSettings);
       setSavedSettings(nextSettings);
       setSaveStatus("saved locally");
@@ -586,9 +592,27 @@ export function ParamsScreen() {
             </Button>
           </View>
 
-          <Link href={{ pathname: "/answer", params: { mode: draft.preferredMode ?? "coach" } }} asChild>
+          <Link
+            href={
+              activeChallengeId
+                ? {
+                    pathname: "/answer",
+                    params: {
+                      challengeId: activeChallengeId,
+                      mode: draft.preferredMode ?? "coach",
+                    },
+                  }
+                : {
+                    pathname: "/answer",
+                    params: { mode: draft.preferredMode ?? "coach" },
+                  }
+            }
+            asChild
+          >
             <Button variant="ghost">
-              <Button.Label>open temp answer modal</Button.Label>
+              <Button.Label>
+                {activeChallengeId ? "open active challenge" : "open answer modal"}
+              </Button.Label>
             </Button>
           </Link>
         </Card.Body>

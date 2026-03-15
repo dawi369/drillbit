@@ -28,11 +28,21 @@ export type ChallengeSummaryRecord = {
   generatedAt: string;
 };
 
+export type ChallengeConversationTurn = {
+  id: string;
+  role: "user" | "assistant";
+  mode: Extract<ChallengeMode, "coach" | "reveal">;
+  text: string;
+  answer?: string;
+  createdAt: string;
+};
+
 export type ChallengeSessionRecord = {
   challengeId: string;
   selectedMode?: ChallengeMode;
   notesDraft?: string;
   conversationSummary?: string;
+  conversationHistory: ChallengeConversationTurn[];
   updatedAt: string;
 };
 

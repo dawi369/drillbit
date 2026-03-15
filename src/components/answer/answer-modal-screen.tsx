@@ -13,7 +13,6 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { ANSWER_MODAL_PREVIEW_CHALLENGE } from "@/constants/answer-modal";
 import { MODE_OPTIONS } from "@/constants/params";
 import {
   generateCoachGuidance,
@@ -25,16 +24,18 @@ import {
   completeChallenge,
   ensureDefaultModels,
   ensureDefaultSettings,
+  getCurrentActiveChallenge,
   getChallengeById,
   getChallengeSession,
   listModels,
   markChallengeInProgress,
+  refreshReadyChallengeExpirations,
   selectModel,
   skipChallenge,
-  upsertChallenge,
   upsertChallengeSession,
 } from "@/lib/storage/repository";
 import type {
+  ChallengeConversationTurn,
   ChallengeRecord,
   ChallengeSessionRecord,
   ModelRecord,
@@ -333,47 +334,89 @@ export function AnswerModalScreen() {
   const [assistantHistory, setAssistantHistory] = useState<
     { id: string; role: "coach" | "you"; text: string }[]
   >([]);
+  const [conversationHistory, setConversationHistory] = useState<
+    ChallengeConversationTurn[]
+  >([]);
   const [isAssistantLoading, setAssistantLoading] = useState(false);
   const assistantHistoryRef = useRef<ScrollView | null>(null);
-  const challengeId = params.challengeId ?? "preview-answer-challenge";
+  const [resolvedChallengeId, setResolvedChallengeId] = useState<string | null>(
+    params.challengeId ?? null,
+  );
+
+  async function refreshResolvedChallenge() {
+    if (!resolvedChallengeId) {
+      const activeChallenge = await getCurrentActiveChallenge();
+      setChallenge(activeChallenge);
+      setResolvedChallengeId(activeChallenge?.id ?? null);
+      return activeChallenge;
+    }
+
+    const latestChallenge = await getChallengeById(resolvedChallengeId);
+    setChallenge(latestChallenge);
+    return latestChallenge;
+  }
+
+  function mapConversationHistoryToChat(history: ChallengeConversationTurn[]) {
+    return history.map((turn) => ({
+      id: turn.id,
+      role: turn.role === "assistant" ? ("coach" as const) : ("you" as const),
+      text: turn.text,
+    }));
+  }
 
   const persistSession = useCallback(async (overrides: Partial<ChallengeSessionRecord> = {}) => {
     const nextUpdatedAt = overrides.updatedAt ?? new Date().toISOString();
 
     await upsertChallengeSession({
-      challengeId,
+      challengeId: resolvedChallengeId ?? "",
       selectedMode: overrides.selectedMode ?? selectedMode,
       notesDraft: overrides.notesDraft ?? notesDraft,
       conversationSummary: overrides.conversationSummary ?? conversationSummary,
+      conversationHistory:
+        overrides.conversationHistory ?? conversationHistory,
       updatedAt: nextUpdatedAt,
     });
-  }, [challengeId, conversationSummary, notesDraft, selectedMode]);
+  }, [conversationHistory, conversationSummary, notesDraft, resolvedChallengeId, selectedMode]);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadScreenState() {
       await ensureDefaultModels();
+      const fallbackActiveChallenge = params.challengeId
+        ? null
+        : await getCurrentActiveChallenge();
+      const nextChallengeId = params.challengeId ?? fallbackActiveChallenge?.id ?? null;
+
       const [models, settings, existingChallenge, existingSession] = await Promise.all([
         listModels({ includeDisabled: false }),
         ensureDefaultSettings(),
-        getChallengeById(challengeId),
-        getChallengeSession(challengeId),
+        nextChallengeId ? getChallengeById(nextChallengeId) : Promise.resolve(null),
+        nextChallengeId ? getChallengeSession(nextChallengeId) : Promise.resolve(null),
       ]);
+      await refreshReadyChallengeExpirations(settings);
 
       if (!isMounted) {
         return;
       }
 
+      setResolvedChallengeId(nextChallengeId);
       setAvailableModels(models);
       setSelectedModelId(settings.selectedModelId ?? models[0]?.id);
-      setChallenge(existingChallenge);
+      setChallenge(existingChallenge ?? fallbackActiveChallenge);
 
       if (existingSession) {
         setSelectedMode(existingSession.selectedMode ?? initialMode);
         setNotesDraft(existingSession.notesDraft ?? "");
         setConversationSummary(existingSession.conversationSummary ?? "");
         setUpdatedAt(existingSession.updatedAt);
+        setConversationHistory(existingSession.conversationHistory);
+        setAssistantHistory(
+          mapConversationHistoryToChat(existingSession.conversationHistory),
+        );
+      } else {
+        setConversationHistory([]);
+        setAssistantHistory([]);
       }
     }
 
@@ -382,7 +425,7 @@ export function AnswerModalScreen() {
     return () => {
       isMounted = false;
     };
-  }, [challengeId, initialMode]);
+  }, [initialMode, params.challengeId]);
 
   useEffect(() => {
     const showEvent =
@@ -419,48 +462,22 @@ export function AnswerModalScreen() {
   }, [isAssistantInputOpen]);
 
   useEffect(() => {
-    let isMounted = true;
-
-    async function ensurePreviewChallengeExists() {
-      const existingChallenge = await getChallengeById(challengeId);
-      if (existingChallenge) {
-        return;
-      }
-
-      const createdChallenge: ChallengeRecord = {
-        id: challengeId,
-        title: ANSWER_MODAL_PREVIEW_CHALLENGE.title,
-        teaser: ANSWER_MODAL_PREVIEW_CHALLENGE.teaser,
-        topic: ANSWER_MODAL_PREVIEW_CHALLENGE.topic,
-        difficulty: ANSWER_MODAL_PREVIEW_CHALLENGE.difficulty,
-        lifecycle: "ready",
-        createdAt: new Date().toISOString(),
-        sourcePromptVersion: "preview-answer-modal",
-      };
-
-      await upsertChallenge(createdChallenge);
-
-      if (isMounted) {
-        setChallenge(createdChallenge);
-      }
+    if (!resolvedChallengeId) {
+      return;
     }
 
-    void ensurePreviewChallengeExists();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [challengeId]);
-
-  useEffect(() => {
-    void markChallengeInProgress(challengeId, selectedMode);
+    void markChallengeInProgress(resolvedChallengeId, selectedMode);
     void persistSession({ selectedMode });
-  }, [challengeId, persistSession, selectedMode]);
+  }, [persistSession, resolvedChallengeId, selectedMode]);
 
   useEffect(() => {
     if (selectedMode === "solo") {
       setAssistantGuidance(null);
       setRevealAnswer(null);
+      return;
+    }
+
+    if (!resolvedChallengeId) {
       return;
     }
 
@@ -471,7 +488,7 @@ export function AnswerModalScreen() {
 
       try {
         if (selectedMode === "coach") {
-          const result = await generateCoachGuidance(challengeId);
+          const result = await generateCoachGuidance(resolvedChallengeId!);
           if (!isMounted) {
             return;
           }
@@ -493,7 +510,7 @@ export function AnswerModalScreen() {
             ];
           });
         } else {
-          const result = await generateRevealAnswer(challengeId);
+          const result = await generateRevealAnswer(resolvedChallengeId!);
           if (!isMounted) {
             return;
           }
@@ -521,7 +538,7 @@ export function AnswerModalScreen() {
     return () => {
       isMounted = false;
     };
-  }, [challengeId, selectedMode]);
+  }, [resolvedChallengeId, selectedMode]);
 
   return (
     <>
@@ -542,14 +559,14 @@ export function AnswerModalScreen() {
             <View className="gap-1 pb-1">
               <View className="gap-1">
                 <Text className="text-lg font-semibold tracking-tight text-foreground">
-                  {challenge?.title ?? ANSWER_MODAL_PREVIEW_CHALLENGE.title}
+                  {challenge?.title ?? "no active challenge"}
                 </Text>
                 <ScrollView
                   style={{ maxHeight: 120 }}
                   showsVerticalScrollIndicator={false}
                 >
                   <Text className="pr-2 text-sm leading-5 text-muted">
-                    {challenge?.teaser ?? ANSWER_MODAL_PREVIEW_CHALLENGE.teaser}
+                    {challenge?.teaser ?? "Generate or resume a challenge to start working here."}
                   </Text>
                 </ScrollView>
               </View>
@@ -561,9 +578,9 @@ export function AnswerModalScreen() {
           {!isHeaderCollapsed ? (
             <View className="items-center pb-1 pt-0.5">
               <View className="flex-row justify-center gap-2">
-                <MetaPill label={challenge?.topic ?? ANSWER_MODAL_PREVIEW_CHALLENGE.topic} />
+                <MetaPill label={challenge?.topic ?? "no topic"} />
                 <MetaPill
-                  label={challenge?.difficulty ?? ANSWER_MODAL_PREVIEW_CHALLENGE.difficulty}
+                  label={challenge?.difficulty ?? "no difficulty"}
                 />
               </View>
             </View>
@@ -635,14 +652,42 @@ export function AnswerModalScreen() {
                     variant="ghost"
                     onPress={() => {
                       void (async () => {
-                        await skipChallenge(challengeId);
+                        if (!resolvedChallengeId) {
+                          Alert.alert("no active challenge", "Generate or resume a challenge first.");
+                          return;
+                        }
+
+                        await skipChallenge(resolvedChallengeId);
+                        await refreshResolvedChallenge();
                         Alert.alert("challenge skipped", "This challenge was marked skipped.");
                       })();
                     }}
+                    isDisabled={!resolvedChallengeId}
                   >
                     <Button.Label>skip</Button.Label>
                   </Button>
-                  <Button size="sm" variant="secondary">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onPress={() => {
+                      void (async () => {
+                        if (!resolvedChallengeId) {
+                          Alert.alert("no active challenge", "Generate or resume a challenge first.");
+                          return;
+                        }
+
+                        await persistSession();
+                        await markChallengeInProgress(resolvedChallengeId, selectedMode);
+                        await refreshResolvedChallenge();
+
+                        Alert.alert(
+                          "saved",
+                          "Your notes are saved. This challenge stays active right where you left it.",
+                        );
+                      })();
+                    }}
+                    isDisabled={!resolvedChallengeId}
+                  >
                     <Button.Label>save</Button.Label>
                   </Button>
                   <Button
@@ -650,15 +695,22 @@ export function AnswerModalScreen() {
                     variant="primary"
                     onPress={() => {
                       void (async () => {
+                        if (!resolvedChallengeId) {
+                          Alert.alert("no active challenge", "Generate or resume a challenge first.");
+                          return;
+                        }
+
                         await persistSession();
-                        await completeChallenge(challengeId);
-                        await summarizeChallengeSession(challengeId);
+                        await completeChallenge(resolvedChallengeId);
+                        await summarizeChallengeSession(resolvedChallengeId);
+                        await refreshResolvedChallenge();
                         Alert.alert(
                           "challenge completed",
                           "Session summary generated and saved.",
                         );
                       })();
                     }}
+                    isDisabled={!resolvedChallengeId}
                   >
                     <Button.Label>done</Button.Label>
                   </Button>
@@ -673,11 +725,14 @@ export function AnswerModalScreen() {
                 value={notesDraft}
                 onChangeText={(value) => {
                   setNotesDraft(value);
-                  void persistSession({ notesDraft: value });
+                  if (resolvedChallengeId) {
+                    void persistSession({ notesDraft: value });
+                  }
                 }}
                 scrollEnabled
                 className="flex-1 items-start rounded-[28px] border border-border bg-surface px-4 py-4"
                 textAlignVertical="top"
+                isDisabled={!resolvedChallengeId}
               />
             </TextField>
 
@@ -771,12 +826,15 @@ export function AnswerModalScreen() {
                     onChangeText={(value) => {
                       setAssistantMessage(value);
                       setConversationSummary(value);
-                      void persistSession({ conversationSummary: value });
+                      if (resolvedChallengeId) {
+                        void persistSession({ conversationSummary: value });
+                      }
                     }}
-                   className="min-h-28 items-start py-4"
-                   textAlignVertical="top"
-                 />
-               </TextField>
+                    className="min-h-28 items-start py-4"
+                    textAlignVertical="top"
+                    isDisabled={!resolvedChallengeId}
+                  />
+                </TextField>
 
               <View className="mt-4 flex-row gap-3">
                 <Button
@@ -811,28 +869,73 @@ export function AnswerModalScreen() {
 
                       try {
                         if (selectedMode === "reveal") {
-                          const result = await generateRevealAnswer(challengeId);
+                          if (!resolvedChallengeId) {
+                            setAssistantInputOpen(false);
+                            return;
+                          }
+
+                          const result = await generateRevealAnswer(resolvedChallengeId);
                           setAssistantGuidance(result.output.guidance);
                           setRevealAnswer(result.output.answer);
-                          setAssistantHistory((current) => [
-                            ...current,
+                          const assistantTurnId = `assistant-${Date.now()}`;
+                          const nextHistory: ChallengeConversationTurn[] = [
+                            ...conversationHistory,
                             {
-                              id: `assistant-${Date.now()}`,
-                              role: "coach",
-                              text: result.output.guidance,
+                              id: `user-${assistantTurnId}`,
+                              role: "user" as const,
+                              mode: "reveal" as const,
+                              text: trimmed,
+                              createdAt: new Date().toISOString(),
                             },
-                          ]);
+                            {
+                              id: assistantTurnId,
+                              role: "assistant" as const,
+                              mode: "reveal" as const,
+                              text: result.output.guidance,
+                              answer: result.output.answer,
+                              createdAt: new Date().toISOString(),
+                            },
+                          ];
+
+                          setConversationHistory(nextHistory);
+                          setAssistantHistory(mapConversationHistoryToChat(nextHistory));
+                          await persistSession({
+                            conversationSummary: trimmed,
+                            conversationHistory: nextHistory,
+                          });
                         } else {
-                          const result = await generateCoachGuidance(challengeId);
+                          if (!resolvedChallengeId) {
+                            setAssistantInputOpen(false);
+                            return;
+                          }
+
+                          const result = await generateCoachGuidance(resolvedChallengeId);
                           setAssistantGuidance(result.output.guidance);
-                          setAssistantHistory((current) => [
-                            ...current,
+                          const assistantTurnId = `assistant-${Date.now()}`;
+                          const nextHistory: ChallengeConversationTurn[] = [
+                            ...conversationHistory,
                             {
-                              id: `assistant-${Date.now()}`,
-                              role: "coach",
-                              text: result.output.guidance,
+                              id: `user-${assistantTurnId}`,
+                              role: "user" as const,
+                              mode: "coach" as const,
+                              text: trimmed,
+                              createdAt: new Date().toISOString(),
                             },
-                          ]);
+                            {
+                              id: assistantTurnId,
+                              role: "assistant" as const,
+                              mode: "coach" as const,
+                              text: result.output.guidance,
+                              createdAt: new Date().toISOString(),
+                            },
+                          ];
+
+                          setConversationHistory(nextHistory);
+                          setAssistantHistory(mapConversationHistoryToChat(nextHistory));
+                          await persistSession({
+                            conversationSummary: trimmed,
+                            conversationHistory: nextHistory,
+                          });
                         }
                       } catch (error) {
                         Alert.alert(
@@ -845,6 +948,7 @@ export function AnswerModalScreen() {
                       }
                     })();
                   }}
+                  isDisabled={!resolvedChallengeId}
                 >
                   <Button.Label>{isAssistantLoading ? "thinking..." : "send"}</Button.Label>
                 </Button>

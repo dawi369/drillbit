@@ -29,6 +29,7 @@ import {
   isValidFirstChallengeTimeMinutes,
 } from "@/lib/storage/types";
 import { getDefaultFocusPrompt } from "@/lib/prompts/prompt-library";
+import { getNextScheduledChallengeDate } from "@/lib/time";
 import type { ChallengeLifecycle, ChallengeMode } from "@/lib/widgets/types";
 
 type ChallengeQueryOptions = {
@@ -193,6 +194,39 @@ export async function getMostRecentResolvedChallenge() {
   return rows[0] ? fromChallengeRow(rows[0]) : null;
 }
 
+export async function getCurrentActiveChallenge(nowIso: string = createNowIso()) {
+  await pruneExpiredUnstartedChallenges(nowIso);
+
+  const db = await getDatabase();
+  const inProgressRows = await db.getAllAsync<ReturnType<typeof toChallengeRow>>(
+    `
+      SELECT *
+      FROM challenges
+      WHERE lifecycle = 'in_progress'
+      ORDER BY COALESCE(started_at, created_at) DESC
+      LIMIT 1
+    `,
+  );
+
+  if (inProgressRows[0]) {
+    return fromChallengeRow(inProgressRows[0]);
+  }
+
+  const readyRows = await db.getAllAsync<ReturnType<typeof toChallengeRow>>(
+    `
+      SELECT *
+      FROM challenges
+      WHERE lifecycle = 'ready'
+        AND (expires_at IS NULL OR expires_at > ?)
+      ORDER BY created_at DESC
+      LIMIT 1
+    `,
+    nowIso,
+  );
+
+  return readyRows[0] ? fromChallengeRow(readyRows[0]) : null;
+}
+
 export async function pruneExpiredUnstartedChallenges(
   nowIso: string = createNowIso(),
 ) {
@@ -210,6 +244,42 @@ export async function pruneExpiredUnstartedChallenges(
   );
 
   return result.changes;
+}
+
+export async function clearUnstartedReadyChallenges() {
+  const db = await getDatabase();
+
+  await db.runAsync(
+    `
+      DELETE FROM challenge_sessions
+      WHERE challenge_id IN (
+        SELECT id
+        FROM challenges
+        WHERE lifecycle = 'ready'
+          AND started_at IS NULL
+      )
+    `,
+  );
+
+  const result = await db.runAsync(
+    `
+      DELETE FROM challenges
+      WHERE lifecycle = 'ready'
+        AND started_at IS NULL
+    `,
+  );
+
+  return result.changes;
+}
+
+export function getChallengeExpirationIso(settings: UserSettingsRecord, from: Date = new Date()) {
+  const nextScheduledAt = getNextScheduledChallengeDate({
+    from,
+    firstChallengeTimeMinutes: settings.firstChallengeTimeMinutes ?? 9 * 60,
+    challengeCadenceHours: settings.challengeCadenceHours ?? 24,
+  });
+
+  return nextScheduledAt.toISOString();
 }
 
 export async function pruneSkippedChallenges(
@@ -303,18 +373,20 @@ export async function upsertChallengeSession(record: ChallengeSessionRecord) {
   await db.runAsync(
     `
       INSERT INTO challenge_sessions (
-        challenge_id, selected_mode, notes_draft, conversation_summary, updated_at
-      ) VALUES (?, ?, ?, ?, ?)
+        challenge_id, selected_mode, notes_draft, conversation_summary, conversation_history_json, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT(challenge_id) DO UPDATE SET
         selected_mode = excluded.selected_mode,
         notes_draft = excluded.notes_draft,
         conversation_summary = excluded.conversation_summary,
+        conversation_history_json = excluded.conversation_history_json,
         updated_at = excluded.updated_at
     `,
     row.challenge_id,
     row.selected_mode,
     row.notes_draft,
     row.conversation_summary,
+    row.conversation_history_json,
     row.updated_at,
   );
 
@@ -508,6 +580,22 @@ export async function ensureDefaultSettings() {
   return defaults;
 }
 
+export async function refreshReadyChallengeExpirations(settings: UserSettingsRecord) {
+  const db = await getDatabase();
+  const nextExpiresAt = getChallengeExpirationIso(settings);
+
+  const result = await db.runAsync(
+    `
+      UPDATE challenges
+      SET expires_at = ?
+      WHERE lifecycle = 'ready'
+    `,
+    nextExpiresAt,
+  );
+
+  return result.changes;
+}
+
 export async function getSelectedModel() {
   const settings = await ensureDefaultSettings();
 
@@ -604,6 +692,7 @@ export async function markChallengeInProgress(
   await upsertChallengeSession({
     challengeId,
     selectedMode: mode,
+    conversationHistory: [],
     updatedAt: createNowIso(),
   });
 

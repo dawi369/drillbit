@@ -77,6 +77,30 @@ function renderSection(tag: string, value: string) {
   return `<${tag}>\n${value}\n</${tag}>`;
 }
 
+function renderConversationHistory(
+  history: AppContext["session"] extends infer T
+    ? T extends { conversationHistory: infer H }
+      ? H extends { role: string; mode: string; text: string; answer?: string }[]
+        ? H
+        : never
+      : never
+    : never,
+) {
+  if (!history || history.length === 0) {
+    return renderSection("conversation_history", "none");
+  }
+
+  return renderSection(
+    "conversation_history",
+    history
+      .map((turn) => {
+        const answerPart = turn.answer ? `\n- answer: ${turn.answer}` : "";
+        return `- role: ${turn.role}\n- mode: ${turn.mode}\n- text: ${turn.text}${answerPart}`;
+      })
+      .join("\n\n"),
+  );
+}
+
 export function renderPrompt(promptContext: PromptContext) {
   const baseMemorySections = [
     renderSummaryList(
@@ -131,6 +155,9 @@ export function renderPrompt(promptContext: PromptContext) {
               `- selected mode: ${promptContext.session.selectedMode ?? "unspecified"}\n- notes draft: ${promptContext.session.notesDraft ?? "none"}\n- conversation summary: ${promptContext.session.conversationSummary ?? "none"}`,
             )
           : renderSection("session", "none"),
+        promptContext.session
+          ? renderConversationHistory(promptContext.session.conversationHistory)
+          : renderSection("conversation_history", "none"),
         ...baseMemorySections,
         renderSection(
           "task",
@@ -152,6 +179,9 @@ export function renderPrompt(promptContext: PromptContext) {
               `- selected mode: ${promptContext.session.selectedMode ?? "unspecified"}\n- notes draft: ${promptContext.session.notesDraft ?? "none"}\n- conversation summary: ${promptContext.session.conversationSummary ?? "none"}`,
             )
           : renderSection("session", "none"),
+        promptContext.session
+          ? renderConversationHistory(promptContext.session.conversationHistory)
+          : renderSection("conversation_history", "none"),
         ...baseMemorySections,
         renderSection(
           "task",

@@ -2,7 +2,11 @@ import { buildAppContext } from "@/lib/prompts/app-context";
 import { buildPromptContext, renderPrompt } from "@/lib/prompts/prompt-context";
 import { createOpenRouterChatCompletion } from "@/lib/ai/openrouter";
 import { parseGenerateChallengeOutput } from "@/lib/ai/prompt-output";
-import { upsertChallenge } from "@/lib/storage/repository";
+import {
+  clearUnstartedReadyChallenges,
+  getChallengeExpirationIso,
+  upsertChallenge,
+} from "@/lib/storage/repository";
 import type { ChallengeRecord } from "@/lib/storage/types";
 import type { ChallengeDifficulty } from "@/lib/widgets/types";
 
@@ -38,6 +42,7 @@ export async function generateChallenge() {
   });
 
   const parsed = parseGenerateChallengeOutput(responseText);
+  await clearUnstartedReadyChallenges();
 
   const now = new Date().toISOString();
   const record: ChallengeRecord = {
@@ -48,6 +53,7 @@ export async function generateChallenge() {
     difficulty: normalizeDifficulty(appContext.settings.preferredDifficulty),
     lifecycle: "ready",
     createdAt: now,
+    expiresAt: getChallengeExpirationIso(appContext.settings, new Date(now)),
     sourceModel: appContext.selectedModel.remoteId,
     sourcePromptVersion: "generate-v1",
   };

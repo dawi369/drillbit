@@ -1,5 +1,6 @@
 import type {
   ChallengeCadenceHours,
+  ChallengeConversationTurn,
   ChallengeRecord,
   ChallengeSessionRecord,
   ChallengeSummaryRecord,
@@ -50,6 +51,7 @@ type ChallengeSessionRow = {
   selected_mode: Nullable<ChallengeMode>;
   notes_draft: Nullable<string>;
   conversation_summary: Nullable<string>;
+  conversation_history_json: string;
   updated_at: string;
 };
 
@@ -86,6 +88,30 @@ export function serializeJsonArray(values: string[]) {
 export function parseJsonArray(value: string) {
   const parsed = JSON.parse(value) as unknown;
   return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+}
+
+function parseConversationHistory(value: string): ChallengeConversationTurn[] {
+  const parsed = JSON.parse(value) as unknown;
+
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+
+  return parsed.filter((item): item is ChallengeConversationTurn => {
+    if (!item || typeof item !== "object") {
+      return false;
+    }
+
+    const candidate = item as Partial<ChallengeConversationTurn>;
+
+    return (
+      typeof candidate.id === "string" &&
+      (candidate.role === "user" || candidate.role === "assistant") &&
+      (candidate.mode === "coach" || candidate.mode === "reveal") &&
+      typeof candidate.text === "string" &&
+      typeof candidate.createdAt === "string"
+    );
+  });
 }
 
 export function toChallengeRow(record: ChallengeRecord): ChallengeRow {
@@ -160,6 +186,7 @@ export function toChallengeSessionRow(record: ChallengeSessionRecord): Challenge
     selected_mode: record.selectedMode ?? null,
     notes_draft: record.notesDraft ?? null,
     conversation_summary: record.conversationSummary ?? null,
+    conversation_history_json: JSON.stringify(record.conversationHistory),
     updated_at: record.updatedAt,
   };
 }
@@ -170,6 +197,7 @@ export function fromChallengeSessionRow(row: ChallengeSessionRow): ChallengeSess
     selectedMode: undefinedIfNull(row.selected_mode),
     notesDraft: undefinedIfNull(row.notes_draft),
     conversationSummary: undefinedIfNull(row.conversation_summary),
+    conversationHistory: parseConversationHistory(row.conversation_history_json),
     updatedAt: row.updated_at,
   };
 }

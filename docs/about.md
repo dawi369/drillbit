@@ -39,6 +39,11 @@ Daily flow:
     - In AI Coach: streaming chat starts with gentle opener, then back-and-forth probing/hints ("How would offline merges impact your chosen model? Any latency trade-offs?") + quick-reply chips ("Deeper probe", "Trade-offs?", "Next component", "Stuck").
     - Session state owned by the modal: `selectedMode`, `notesDraft`, `conversationSummary`, `updatedAt`.
 4. Answer actions live inline beside the answer label as small right-aligned pills: Skip | Save | Done.
+   - There is at most one active challenge in the live app flow: prefer an `in_progress` challenge if one exists, otherwise the newest non-expired `ready` challenge.
+   - Generating a new challenge clears older untouched `ready` challenges so the active flow stays singular and predictable.
+   - Every fresh `ready` challenge gets an `expiresAt` based on the current schedule, and changing schedule settings refreshes expiry for still-untouched ready challenges.
+   - Completed and skipped challenges leave the active flow and become resolved memory, while untouched expired `ready` challenges may be pruned as stale.
+   - `save` means "keep this as my active in-progress challenge exactly where I left it"; it persists notes, mode, and assistant conversation history without resolving the challenge.
 5. Summary Page (brief & rewarding):
    - AI-generated completion percentage (e.g., "82% — strong partitioning, explore optimistic locking more").
    - Concise personalized feedback ("You nailed CRDT fit but hesitated on merge conflicts — next time push resolution strategies").

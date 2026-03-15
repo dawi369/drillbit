@@ -31,6 +31,25 @@ function createPreviewSession(kind: PromptKind): ChallengeSessionRecord {
       kind === "summarize"
         ? "User covered config storage, rollout percentages, and event logging but was weak on consistency and cache invalidation."
         : "User is midway through the challenge and has outlined the control plane and SDK responsibilities.",
+    conversationHistory:
+      kind === "generate" || kind === "summarize"
+        ? []
+        : [
+            {
+              id: `assistant-${kind}-1`,
+              role: "assistant",
+              mode: kind === "reveal" ? "reveal" : "coach",
+              text: "Start by separating the control plane from the data plane.",
+              createdAt: new Date().toISOString(),
+            },
+            {
+              id: `user-${kind}-1`,
+              role: "user",
+              mode: kind === "reveal" ? "reveal" : "coach",
+              text: "I think the control plane needs stronger consistency.",
+              createdAt: new Date().toISOString(),
+            },
+          ],
     updatedAt: new Date().toISOString(),
   };
 }
