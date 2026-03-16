@@ -1,5 +1,5 @@
-import { AnswerModalScreen } from "@/components/answer/answer-modal-screen";
+import { AnswerScreen } from "@/components/answer/answer-screen";
 
 export default function AnswerRoute() {
-  return <AnswerModalScreen />;
+  return <AnswerScreen />;
 }

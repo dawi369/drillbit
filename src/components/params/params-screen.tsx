@@ -1,5 +1,5 @@
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { Link } from "expo-router";
+import { useRouter } from "expo-router";
 import {
   Button,
   Card,
@@ -8,10 +8,12 @@ import {
   Label,
   TextField,
 } from "heroui-native";
-import { useEffect, useMemo, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 
 import { createCustomOpenRouterModel } from "@/constants/models";
+import { debugLog } from "@/lib/debug";
 import {
   CADENCE_OPTIONS,
   DIFFICULTY_OPTIONS,
@@ -133,6 +135,7 @@ function ModelCard({
 }
 
 export function ParamsScreen() {
+  const router = useRouter();
   const initialDraft = useMemo(() => createDefaultSettings(), []);
   const [draft, setDraft] = useState<UserSettingsRecord>(initialDraft);
   const [savedSettings, setSavedSettings] =
@@ -145,6 +148,24 @@ export function ParamsScreen() {
   const [customModelInput, setCustomModelInput] = useState("");
   const [modelStatus, setModelStatus] = useState<string | null>(null);
   const [activeChallengeId, setActiveChallengeId] = useState<string | null>(null);
+  const isOpeningAnswerRef = useRef(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      debugLog("params", "screen focused", {
+        activeChallengeId,
+        preferredMode: draft.preferredMode,
+      });
+      isOpeningAnswerRef.current = false;
+
+      return () => {
+        debugLog("params", "screen blurred", {
+          activeChallengeId,
+          preferredMode: draft.preferredMode,
+        });
+      };
+    }, [activeChallengeId, draft.preferredMode]),
+  );
 
   async function refreshModels() {
     await ensureDefaultModels();
@@ -186,6 +207,11 @@ export function ParamsScreen() {
         return;
       }
 
+      debugLog("params", "loaded settings and active challenge", {
+        activeChallengeId: activeChallenge?.id ?? null,
+        preferredMode: settings.preferredMode,
+      });
+
       setDraft(settings);
       setSavedSettings(settings);
       setModels(storedModels);
@@ -222,10 +248,12 @@ export function ParamsScreen() {
 
       await upsertSettings(nextSettings);
       await refreshReadyChallengeExpirations(nextSettings);
-      setDraft(nextSettings);
-      setSavedSettings(nextSettings);
-      setSaveStatus("saved locally");
-    } catch (error) {
+        setDraft(nextSettings);
+        setSavedSettings(nextSettings);
+        setSaveStatus("saved locally");
+        const activeChallenge = await getCurrentActiveChallenge();
+        setActiveChallengeId(activeChallenge?.id ?? null);
+      } catch (error) {
       setSaveStatus(
         error instanceof Error ? error.message : "failed to save settings",
       );
@@ -393,7 +421,7 @@ export function ParamsScreen() {
               preferred mode
             </Card.Title>
             <Card.Description className="text-sm leading-6 text-muted">
-              The widget and modal should both read from one shared default, so
+              The widget and answer screen should both read from one shared default, so
               there is only one mode preference to maintain.
             </Card.Description>
           </View>
@@ -592,29 +620,43 @@ export function ParamsScreen() {
             </Button>
           </View>
 
-          <Link
-            href={
-              activeChallengeId
-                ? {
-                    pathname: "/answer",
-                    params: {
-                      challengeId: activeChallengeId,
-                      mode: draft.preferredMode ?? "coach",
-                    },
-                  }
-                : {
-                    pathname: "/answer",
-                    params: { mode: draft.preferredMode ?? "coach" },
-                  }
-            }
-            asChild
+          <Button
+            variant="ghost"
+            onPress={() => {
+              if (isOpeningAnswerRef.current) {
+                debugLog("params", "blocked repeated answer open", {
+                  activeChallengeId,
+                });
+                return;
+              }
+
+              if (!activeChallengeId) {
+                debugLog("params", "cannot open answer without active challenge");
+                setSaveStatus("generate a challenge first, then open the active one");
+                return;
+              }
+
+              isOpeningAnswerRef.current = true;
+
+              debugLog("params", "navigating to answer", {
+                activeChallengeId,
+                mode: draft.preferredMode ?? "coach",
+                timestamp: Date.now(),
+              });
+
+              router.navigate({
+                pathname: "/answer",
+                params: {
+                  challengeId: activeChallengeId,
+                  mode: draft.preferredMode ?? "coach",
+                },
+              });
+            }}
           >
-            <Button variant="ghost">
-              <Button.Label>
-                {activeChallengeId ? "open active challenge" : "open answer modal"}
-              </Button.Label>
-            </Button>
-          </Link>
+            <Button.Label>
+              open active challenge
+            </Button.Label>
+          </Button>
         </Card.Body>
       </Card>
     </ScrollView>

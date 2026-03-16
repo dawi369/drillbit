@@ -1,5 +1,5 @@
 import { Asset } from "expo-asset";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 
 import generatePromptAsset from "@/content/prompts/generate.md";
 import coachPromptAsset from "@/content/prompts/coach.md";

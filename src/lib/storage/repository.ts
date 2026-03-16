@@ -689,10 +689,14 @@ export async function markChallengeInProgress(
 
   await upsertChallenge(nextRecord);
 
+  const existingSession = await getChallengeSession(challengeId);
+
   await upsertChallengeSession({
     challengeId,
     selectedMode: mode,
-    conversationHistory: [],
+    notesDraft: existingSession?.notesDraft,
+    conversationSummary: existingSession?.conversationSummary,
+    conversationHistory: existingSession?.conversationHistory ?? [],
     updatedAt: createNowIso(),
   });
 

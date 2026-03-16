@@ -482,7 +482,7 @@ export default function DevTabScreen() {
             </Text>
             <Text className="text-sm leading-6 text-muted">
               Canonical current challenge plus the persisted session used by the
-              answer modal.
+              answer screen.
             </Text>
           </View>
 
