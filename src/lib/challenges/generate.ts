@@ -55,7 +55,7 @@ export async function generateChallenge() {
     createdAt: now,
     expiresAt: getChallengeExpirationIso(appContext.settings, new Date(now)),
     sourceModel: appContext.selectedModel.remoteId,
-    sourcePromptVersion: "generate-v1",
+    sourcePromptVersion: "generate-v2",
   };
 
   await upsertChallenge(record);

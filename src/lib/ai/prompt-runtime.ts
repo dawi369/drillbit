@@ -7,9 +7,22 @@ import { createOpenRouterChatCompletion } from "@/lib/ai/openrouter";
 import { buildAppContext } from "@/lib/prompts/app-context";
 import { buildPromptContext, renderPrompt } from "@/lib/prompts/prompt-context";
 import { upsertChallengeSummary } from "@/lib/storage/repository";
+import type { CoachTriggerReason } from "@/lib/storage/types";
 
-async function runPromptKind(kind: "coach" | "reveal" | "summarize", challengeId: string) {
-  const appContext = await buildAppContext({ kind, challengeId });
+async function runPromptKind(
+  kind: "coach" | "reveal" | "summarize",
+  challengeId: string,
+  options?: {
+    coachTrigger?: CoachTriggerReason;
+    latestUserRequest?: string;
+  },
+) {
+  const appContext = await buildAppContext({
+    kind,
+    challengeId,
+    coachTrigger: options?.coachTrigger,
+    latestUserRequest: options?.latestUserRequest,
+  });
   const promptContext = buildPromptContext(appContext);
 
   if (!promptContext || !appContext.selectedModel) {
@@ -35,8 +48,14 @@ async function runPromptKind(kind: "coach" | "reveal" | "summarize", challengeId
   };
 }
 
-export async function generateCoachGuidance(challengeId: string) {
-  const result = await runPromptKind("coach", challengeId);
+export async function generateCoachGuidance(
+  challengeId: string,
+  options?: {
+    coachTrigger?: CoachTriggerReason;
+    latestUserRequest?: string;
+  },
+) {
+  const result = await runPromptKind("coach", challengeId, options);
 
   return {
     ...result,

@@ -37,6 +37,11 @@ export type ChallengeConversationTurn = {
   createdAt: string;
 };
 
+export type CoachTriggerReason =
+  | "auto_initial"
+  | "auto_after_progress"
+  | "manual_request";
+
 export type ChallengeSessionRecord = {
   challengeId: string;
   selectedMode?: ChallengeMode;
@@ -98,6 +103,8 @@ export type AppContext = {
   session?: ChallengeSessionRecord;
   runtime: {
     blockedChallenges: BlockedChallengeRecord[];
+    coachTrigger?: CoachTriggerReason;
+    latestUserRequest?: string;
   };
   memory: {
     recentSummaries: ChallengeSummaryRecord[];
@@ -118,6 +125,8 @@ export type PromptContext =
   | {
       kind: "coach";
       systemPrompt: string;
+      coachTrigger: CoachTriggerReason;
+      latestUserRequest?: string;
       focusPrompt: string;
       preferredDifficulty?: ChallengeDifficulty;
       challenge: ChallengeRecord;

@@ -24,6 +24,8 @@ export function buildPromptContext(appContext: AppContext): PromptContext | null
       return {
         kind: "coach",
         systemPrompt: getSystemPrompt("coach"),
+        coachTrigger: appContext.runtime.coachTrigger ?? "manual_request",
+        latestUserRequest: appContext.runtime.latestUserRequest,
         focusPrompt: appContext.settings.focusPrompt,
         preferredDifficulty: appContext.settings.preferredDifficulty,
         challenge: appContext.challenge,
@@ -140,6 +142,15 @@ export function renderPrompt(promptContext: PromptContext) {
     case "reveal":
       return [
         promptContext.systemPrompt,
+        promptContext.kind === "coach"
+          ? renderSection("coach_trigger", promptContext.coachTrigger)
+          : null,
+        promptContext.kind === "coach"
+          ? renderSection(
+              "latest_user_request",
+              promptContext.latestUserRequest ?? "none",
+            )
+          : null,
         renderSection("focus_prompt", promptContext.focusPrompt),
         renderSection(
           "preferred_difficulty",
@@ -162,10 +173,12 @@ export function renderPrompt(promptContext: PromptContext) {
         renderSection(
           "task",
           promptContext.kind === "coach"
-            ? "Respond as the coach with one strong next question or one compact hint."
+            ? "Respond as the coach with one very short hint or one short next-step question as strict JSON with key guidance."
             : "Reveal a strong structured answer for this challenge.",
         ),
-      ].join("\n\n");
+      ]
+        .filter(Boolean)
+        .join("\n\n");
     case "summarize":
       return [
         promptContext.systemPrompt,

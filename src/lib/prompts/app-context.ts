@@ -13,11 +13,15 @@ import type { AppContext, PromptKind } from "@/lib/storage/types";
 type BuildAppContextOptions = {
   kind: PromptKind;
   challengeId?: string;
+  coachTrigger?: AppContext["runtime"]["coachTrigger"];
+  latestUserRequest?: string;
 };
 
 export async function buildAppContext({
   kind,
   challengeId,
+  coachTrigger,
+  latestUserRequest,
 }: BuildAppContextOptions): Promise<AppContext> {
   const settings = await ensureDefaultSettings();
   const selectedModel = await getSelectedModel();
@@ -39,6 +43,8 @@ export async function buildAppContext({
     session: session ?? undefined,
     runtime: {
       blockedChallenges,
+      coachTrigger,
+      latestUserRequest,
     },
     memory: {
       recentSummaries,

@@ -45,6 +45,7 @@ import {
   upsertChallengeSession,
 } from "@/lib/storage/repository";
 import type {
+  CoachTriggerReason,
   ChallengeConversationTurn,
   ChallengeRecord,
   ChallengeSessionRecord,
@@ -319,6 +320,15 @@ function AssistantHeader({
   );
 }
 
+const AUTO_COACH_MIN_NOTES_CHARS = 180;
+const AUTO_COACH_MIN_NEW_CHARS = 80;
+const AUTO_COACH_IDLE_MS = 2500;
+const AUTO_COACH_COOLDOWN_MS = 15000;
+
+function normalizeCoachText(value: string) {
+  return value.trim().replace(/\s+/g, " ");
+}
+
 export function AnswerScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
@@ -357,6 +367,8 @@ export function AnswerScreen() {
   const [conversationHistory, setConversationHistory] = useState<
     ChallengeConversationTurn[]
   >([]);
+  const [lastAutoCoachAt, setLastAutoCoachAt] = useState<number | null>(null);
+  const [lastAutoCoachNotesSnapshot, setLastAutoCoachNotesSnapshot] = useState("");
   const [isAssistantLoading, setAssistantLoading] = useState(false);
   const [isChallengeLoading, setChallengeLoading] = useState(true);
   const [isHeaderTeaserOverflowing, setHeaderTeaserOverflowing] = useState(false);
@@ -428,6 +440,55 @@ export function AnswerScreen() {
       text: turn.text,
     }));
   }
+
+  const normalizedNotesDraft = useMemo(
+    () => normalizeCoachText(notesDraft),
+    [notesDraft],
+  );
+
+  const requestCoachGuidance = useCallback(
+    async ({
+      trigger,
+      latestUserRequest,
+      appendToHistory = false,
+    }: {
+      trigger: CoachTriggerReason;
+      latestUserRequest?: string;
+      appendToHistory?: boolean;
+    }) => {
+      if (!resolvedChallengeId) {
+        return null;
+      }
+
+      const result = await generateCoachGuidance(resolvedChallengeId, {
+        coachTrigger: trigger,
+        latestUserRequest,
+      });
+
+      setAssistantGuidance(result.output.guidance);
+      setRevealAnswer(null);
+
+      if (appendToHistory) {
+        setAssistantHistory((current) => {
+          if (current.some((message) => message.text === result.output.guidance)) {
+            return current;
+          }
+
+          return [
+            ...current,
+            {
+              id: `coach-${Date.now()}`,
+              role: "coach",
+              text: result.output.guidance,
+            },
+          ];
+        });
+      }
+
+      return result;
+    },
+    [resolvedChallengeId],
+  );
 
   const persistSession = useCallback(
     async (overrides: Partial<ChallengeSessionRecord> = {}) => {
@@ -542,7 +603,11 @@ export function AnswerScreen() {
 
     let isMounted = true;
 
-    async function loadAssistantOutput() {
+    async function loadRevealOutput() {
+      if (selectedMode !== "reveal") {
+        return;
+      }
+
       setAssistantLoading(true);
       debugLog("answer", "loading assistant output", {
         resolvedChallengeId,
@@ -550,45 +615,16 @@ export function AnswerScreen() {
       });
 
       try {
-        if (selectedMode === "coach") {
-          const result = await generateCoachGuidance(resolvedChallengeId!);
-          if (!isMounted) {
-            return;
-          }
-
-          setAssistantGuidance(result.output.guidance);
-          setRevealAnswer(null);
-          debugLog("answer", "loaded coach guidance", {
-            resolvedChallengeId,
-          });
-          setAssistantHistory((current) => {
-            if (
-              current.some((message) => message.text === result.output.guidance)
-            ) {
-              return current;
-            }
-
-            return [
-              ...current,
-              {
-                id: `coach-${Date.now()}`,
-                role: "coach",
-                text: result.output.guidance,
-              },
-            ];
-          });
-        } else {
-          const result = await generateRevealAnswer(resolvedChallengeId!);
-          if (!isMounted) {
-            return;
-          }
-
-          setAssistantGuidance(result.output.guidance);
-          setRevealAnswer(result.output.answer);
-          debugLog("answer", "loaded reveal answer", {
-            resolvedChallengeId,
-          });
+        const result = await generateRevealAnswer(resolvedChallengeId!);
+        if (!isMounted) {
+          return;
         }
+
+        setAssistantGuidance(result.output.guidance);
+        setRevealAnswer(result.output.answer);
+        debugLog("answer", "loaded reveal answer", {
+          resolvedChallengeId,
+        });
       } catch (error) {
         debugLog("answer", "assistant output failed", {
           resolvedChallengeId,
@@ -609,12 +645,99 @@ export function AnswerScreen() {
       }
     }
 
-    void loadAssistantOutput();
+    void loadRevealOutput();
 
     return () => {
       isMounted = false;
     };
   }, [challenge, resolvedChallengeId, selectedMode]);
+
+  useEffect(() => {
+    if (selectedMode !== "coach") {
+      return;
+    }
+
+    if (!resolvedChallengeId || !challenge || isAssistantLoading) {
+      return;
+    }
+
+    const noteLength = normalizedNotesDraft.length;
+    if (noteLength < AUTO_COACH_MIN_NOTES_CHARS) {
+      return;
+    }
+
+    const lastCoachTurn = [...conversationHistory]
+      .reverse()
+      .find((turn) => turn.role === "assistant" && turn.mode === "coach");
+    const trigger: CoachTriggerReason = lastCoachTurn
+      ? "auto_after_progress"
+      : "auto_initial";
+    const newCharsSinceLastSnapshot = Math.max(
+      0,
+      noteLength - lastAutoCoachNotesSnapshot.length,
+    );
+
+    if (
+      trigger === "auto_after_progress" &&
+      newCharsSinceLastSnapshot < AUTO_COACH_MIN_NEW_CHARS
+    ) {
+      return;
+    }
+
+    if (
+      lastAutoCoachAt != null &&
+      Date.now() - lastAutoCoachAt < AUTO_COACH_COOLDOWN_MS
+    ) {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      void (async () => {
+        setAssistantLoading(true);
+
+        try {
+          const result = await requestCoachGuidance({
+            trigger,
+            appendToHistory: true,
+          });
+
+          if (!result) {
+            return;
+          }
+
+          setLastAutoCoachAt(Date.now());
+          setLastAutoCoachNotesSnapshot(normalizedNotesDraft);
+          debugLog("answer", "loaded coach guidance", {
+            resolvedChallengeId,
+            trigger,
+          });
+        } catch (error) {
+          debugLog("answer", "assistant output failed", {
+            resolvedChallengeId,
+            selectedMode,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          setAssistantGuidance(
+            error instanceof Error ? error.message : "assistant request failed",
+          );
+        } finally {
+          setAssistantLoading(false);
+        }
+      })();
+    }, AUTO_COACH_IDLE_MS);
+
+    return () => clearTimeout(timeout);
+  }, [
+    challenge,
+    conversationHistory,
+    isAssistantLoading,
+    lastAutoCoachAt,
+    lastAutoCoachNotesSnapshot.length,
+    normalizedNotesDraft,
+    requestCoachGuidance,
+    resolvedChallengeId,
+    selectedMode,
+  ]);
 
   function handleToggleHeader() {
     setHeaderCollapsed((current) => !current);
@@ -799,7 +922,6 @@ export function AnswerScreen() {
             </View>
           ) : null}
 
-          {/* TODO: trigger coach inference only after meaningful note changes and under a cooldown instead of constant polling */}
           {/* TODO: save-for-later action should persist this session and remove it from the active flow until reopened */}
           </View>
         </KeyboardAwareScrollView>
@@ -967,9 +1089,15 @@ export function AnswerScreen() {
                           return;
                         }
 
-                        const result =
-                          await generateCoachGuidance(resolvedChallengeId);
-                        setAssistantGuidance(result.output.guidance);
+                        const result = await requestCoachGuidance({
+                          trigger: "manual_request",
+                          latestUserRequest: trimmed,
+                        });
+
+                        if (!result) {
+                          return;
+                        }
+
                         const assistantTurnId = `assistant-${Date.now()}`;
                         const nextHistory: ChallengeConversationTurn[] = [
                           ...conversationHistory,
