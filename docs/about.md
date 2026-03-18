@@ -10,9 +10,9 @@ AI-native with a local-first product shape and OpenRouter-first model access. Op
 
 Architecture note: drillbit ships with no custom deployed backend/API of its own. App data, challenge history, summaries, and personalization stay on-device. The only network calls are direct client calls to third-party services such as OpenRouter for model access and RevenueCat for subscriptions/billing.
 
-Runtime prompts are bundled with the app as markdown assets and loaded at startup. The default focus prompt comes from the same runtime prompt library unless the user has already saved their own focus prompt.
+Runtime prompts are bundled with the app as markdown assets and loaded at startup. Focus prompt starter presets come from that same runtime prompt library, while the saved focus prompt itself now defaults to blank until the user chooses or writes one.
 
-Users set their focus once (or tweak anytime) via a free-form prompt (e.g., "system design medium-hard: live collaboration tools, payment gateways, recommendation engines, URL shorteners; probe deeply on consistency, latency, partitioning; avoid basic CRUD and easy arrays"). The app maintains rich local memory to:
+Users set their focus once (or tweak anytime) via a free-form prompt, optionally starting from a bundled preset (e.g., "system design medium-hard: live collaboration tools, payment gateways, recommendation engines, URL shorteners; probe deeply on consistency, latency, partitioning; avoid basic CRUD and easy arrays"). The app maintains rich local memory to:
 
 - Avoid repeating exact challenges while still allowing fresh similar ones later.
 - Track struggles/weak areas (e.g., "consistency models: 3 fails").
@@ -23,7 +23,7 @@ Style: Pure X-inspired minimalism with both light and dark themes — crisp whit
 
 Implementation bias: native first wherever practical. Prefer Expo and React Native native capabilities, platform components, and device APIs before reaching for web-style abstractions. Use web-only or DOM-based fallbacks only when they unlock something clearly worth it.
 
-After one-time setup in the Params tab (focus prompt editor, explicit difficulty setting, OpenRouter-first model picker backed by a local editable model catalog with qwen 3.5 flash as the default, one shared preferred mode, first challenge time, and a cadence picker limited to divisors of 24h), users live almost entirely in the widget:
+After one-time setup in the Params tab (blank-by-default focus prompt editor with bundled starter presets, explicit difficulty setting, OpenRouter-first model picker backed by a local editable model catalog with qwen 3.5 flash as the default, one shared preferred mode, first challenge time, and a cadence picker limited to divisors of 24h), users live almost entirely in the widget:
 
 Daily flow:
 

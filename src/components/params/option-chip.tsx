@@ -12,8 +12,10 @@ export function OptionChip({ label, selected, onPress }: OptionChipProps) {
   return (
     <Pressable
       className={cn(
-        "rounded-2xl border px-4 py-3",
-        selected ? "border-accent bg-accent/10" : "border-border bg-surface-secondary",
+        "rounded-full border px-4 py-2.5",
+        selected
+          ? "border-accent bg-accent/10"
+          : "border-border/60 bg-transparent active:bg-surface-secondary/35",
       )}
       onPress={onPress}
     >

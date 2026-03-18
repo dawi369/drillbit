@@ -31,7 +31,7 @@ Architecture
 LLM / AI Backend
 • OpenRouter – primary model provider (default from the start, with qwen 3.5 flash as the seeded default)
 • BYOK support – user-configurable endpoint + key (local Ollama/MLX/CoreML or remote)
-• Bundled markdown prompt library – runtime system prompts and the default focus prompt load from bundled `.md` assets at app startup, then render with structured tags like `<focus_prompt>`, `<blocked_challenge_shapes>`, and `<task>`
+• Bundled markdown prompt library – runtime system prompts and focus prompt starter presets load from bundled `.md` assets at app startup, then render with structured tags like `<focus_prompt>`, `<blocked_challenge_shapes>`, and `<task>`
 • Local model catalog – seeded starter models plus user-added model ids stored in SQLite, with soft deletion and one selected model id in settings
 
 Animations & Polish

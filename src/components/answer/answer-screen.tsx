@@ -5,6 +5,7 @@ import {
   Label,
   Menu,
   Separator,
+  SubMenu,
   TextField,
 } from "heroui-native";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -69,6 +70,10 @@ function HeaderMenuButton({
   selectedModelId,
   onSelectMode,
   onSelectModel,
+  onSkip,
+  onSave,
+  onDone,
+  isActionDisabled,
 }: {
   challenge: ChallengeRecord | null;
   isChallengeLoading: boolean;
@@ -77,7 +82,16 @@ function HeaderMenuButton({
   selectedModelId?: string;
   onSelectMode: (mode: ChallengeMode) => void;
   onSelectModel: (model: ModelRecord) => void;
+  onSkip: () => void;
+  onSave: () => void;
+  onDone: () => void;
+  isActionDisabled: boolean;
 }) {
+  const selectedModel = availableModels.find((model) => model.id === selectedModelId);
+  const selectedModeOption = MODE_OPTIONS.find((option) => option.value === selectedMode);
+  const [isModeSubMenuOpen, setModeSubMenuOpen] = useState(false);
+  const [isModelSubMenuOpen, setModelSubMenuOpen] = useState(false);
+
   return (
     <Menu>
       <Menu.Trigger asChild>
@@ -94,7 +108,7 @@ function HeaderMenuButton({
           width={280}
         >
           <Menu.Label className="px-1 pb-1">challenge</Menu.Label>
-          <View className="flex-row flex-wrap gap-2 px-2 pb-3 pt-1">
+          <View className="flex-row flex-wrap justify-center gap-2 px-2 pb-3 pt-1">
             <MetaPill
               label={
                 isChallengeLoading
@@ -113,62 +127,119 @@ function HeaderMenuButton({
 
           <Separator className="mx-3 my-2 h-px opacity-100" />
 
-          <Menu.Label className="px-1 pb-1 pt-1">mode</Menu.Label>
-          <Menu.Group
-            selectionMode="single"
-            selectedKeys={new Set([selectedMode])}
-            onSelectionChange={(keys) => {
-              const nextMode = Array.from(keys)[0];
-              if (
-                nextMode === "solo" ||
-                nextMode === "coach" ||
-                nextMode === "reveal"
-              ) {
-                onSelectMode(nextMode);
+          <View style={{ zIndex: isModeSubMenuOpen ? 20 : 0 }}>
+          <SubMenu
+            isOpen={isModeSubMenuOpen}
+            onOpenChange={(open) => {
+              setModeSubMenuOpen(open);
+              if (open) {
+                setModelSubMenuOpen(false);
               }
             }}
           >
-            {MODE_OPTIONS.map((option) => (
-              <Menu.Item key={option.value} id={option.value}>
-                <Menu.ItemIndicator variant="dot" />
-                <View className="flex-1">
-                  <Menu.ItemTitle>{option.label}</Menu.ItemTitle>
-                  <Menu.ItemDescription>
-                    {option.description}
-                  </Menu.ItemDescription>
-                </View>
-              </Menu.Item>
-            ))}
-          </Menu.Group>
+            <SubMenu.Trigger textValue="mode">
+              <View className="flex-1">
+                <Text className="text-sm font-medium text-foreground">mode</Text>
+                <Text className="text-xs text-muted">
+                  {selectedModeOption?.label ?? selectedMode}
+                </Text>
+              </View>
+              <SubMenu.TriggerIndicator />
+            </SubMenu.Trigger>
+            <SubMenu.Content className="z-20">
+              <Menu.Group
+                selectionMode="single"
+                selectedKeys={new Set([selectedMode])}
+                onSelectionChange={(keys) => {
+                  const nextMode = Array.from(keys)[0];
+                  if (
+                    nextMode === "solo" ||
+                    nextMode === "coach" ||
+                    nextMode === "reveal"
+                  ) {
+                    onSelectMode(nextMode);
+                  }
+                }}
+              >
+                {MODE_OPTIONS.map((option) => (
+                  <Menu.Item key={option.value} id={option.value}>
+                    <Menu.ItemIndicator variant="dot" />
+                    <View className="flex-1">
+                      <Menu.ItemTitle>{option.label}</Menu.ItemTitle>
+                      <Menu.ItemDescription>
+                        {option.description}
+                      </Menu.ItemDescription>
+                    </View>
+                  </Menu.Item>
+                ))}
+              </Menu.Group>
+            </SubMenu.Content>
+          </SubMenu>
+          </View>
 
           <Separator className="mx-3 my-2 h-px opacity-100" />
 
-          <Menu.Label className="px-1 pb-1 pt-2">model</Menu.Label>
-          <Menu.Group
-            selectionMode="single"
-            selectedKeys={
-              selectedModelId ? new Set([selectedModelId]) : new Set()
-            }
-            onSelectionChange={(keys) => {
-              const nextModelId = Array.from(keys)[0];
-              const nextModel = availableModels.find(
-                (model) => model.id === nextModelId,
-              );
-              if (nextModel) {
-                onSelectModel(nextModel);
+          <View style={{ zIndex: isModelSubMenuOpen ? 20 : 0 }}>
+          <SubMenu
+            isOpen={isModelSubMenuOpen}
+            onOpenChange={(open) => {
+              setModelSubMenuOpen(open);
+              if (open) {
+                setModeSubMenuOpen(false);
               }
             }}
           >
-            {availableModels.map((model) => (
-              <Menu.Item key={model.id} id={model.id}>
-                <Menu.ItemIndicator variant="dot" />
-                <View className="flex-1">
-                  <Menu.ItemTitle>{model.label}</Menu.ItemTitle>
-                  <Menu.ItemDescription>{model.remoteId}</Menu.ItemDescription>
-                </View>
-              </Menu.Item>
-            ))}
-          </Menu.Group>
+            <SubMenu.Trigger textValue="models">
+              <View className="flex-1">
+                <Text className="text-sm font-medium text-foreground">models</Text>
+                <Text className="text-xs text-muted">
+                  {selectedModel?.label ?? "no model selected"}
+                </Text>
+              </View>
+              <SubMenu.TriggerIndicator />
+            </SubMenu.Trigger>
+            <SubMenu.Content className="z-20">
+              <Menu.Group
+                selectionMode="single"
+                selectedKeys={selectedModelId ? new Set([selectedModelId]) : new Set()}
+                onSelectionChange={(keys) => {
+                  const nextModelId = Array.from(keys)[0];
+                  const nextModel = availableModels.find(
+                    (model) => model.id === nextModelId,
+                  );
+                  if (nextModel) {
+                    onSelectModel(nextModel);
+                  }
+                }}
+              >
+                {availableModels.map((model) => (
+                  <Menu.Item key={model.id} id={model.id}>
+                    <Menu.ItemIndicator variant="dot" />
+                    <View className="flex-1">
+                      <Menu.ItemTitle>{model.label}</Menu.ItemTitle>
+                      <Menu.ItemDescription>{model.remoteId}</Menu.ItemDescription>
+                    </View>
+                  </Menu.Item>
+                ))}
+              </Menu.Group>
+            </SubMenu.Content>
+          </SubMenu>
+          </View>
+
+          <Separator className="mx-3 my-2 h-px opacity-100" />
+
+          <Menu.Label className="px-1 pb-1 pt-2">actions</Menu.Label>
+          <View className="flex-row flex-wrap justify-center gap-2 px-2 pb-2 pt-1">
+            <Button size="sm" variant="tertiary" onPress={onSkip} isDisabled={isActionDisabled}>
+              <Button.Label>skip</Button.Label>
+            </Button>
+            <Button size="sm" variant="secondary" onPress={onSave} isDisabled={isActionDisabled}>
+              <Button.Label>save</Button.Label>
+            </Button>
+            <Button size="sm" variant="primary" onPress={onDone} isDisabled={isActionDisabled}>
+              <Button.Label>done</Button.Label>
+            </Button>
+          </View>
 
           <Separator className="mx-3 my-2 h-px opacity-100" />
 
@@ -191,7 +262,7 @@ function HeaderToggle({
   onPress: () => void;
 }) {
   return (
-    <Pressable className="items-center px-3 py-3" onPress={onPress}>
+    <Pressable className="items-center px-2.5 py-1.5" onPress={onPress}>
       <View className="items-center gap-1">
         <View className="h-4 w-16 items-center justify-center">
           <View className="relative h-3 w-13">
@@ -549,6 +620,64 @@ export function AnswerScreen() {
     setHeaderCollapsed((current) => !current);
   }
 
+  function handleSkip() {
+    void (async () => {
+      if (!canInteractWithChallenge || !resolvedChallengeId) {
+        Alert.alert(
+          "no active challenge",
+          "Generate or resume a challenge first.",
+        );
+        return;
+      }
+
+      await skipChallenge(resolvedChallengeId);
+      await refreshResolvedChallenge();
+      Alert.alert("challenge skipped", "This challenge was marked skipped.");
+    })();
+  }
+
+  function handleSave() {
+    void (async () => {
+      if (!canInteractWithChallenge || !resolvedChallengeId) {
+        Alert.alert(
+          "no active challenge",
+          "Generate or resume a challenge first.",
+        );
+        return;
+      }
+
+      await persistSession();
+      await markChallengeInProgress(resolvedChallengeId, selectedMode);
+      await refreshResolvedChallenge();
+
+      Alert.alert(
+        "saved",
+        "Your notes are saved. This challenge stays active right where you left it.",
+      );
+    })();
+  }
+
+  function handleDone() {
+    void (async () => {
+      if (!canInteractWithChallenge || !resolvedChallengeId) {
+        Alert.alert(
+          "no active challenge",
+          "Generate or resume a challenge first.",
+        );
+        return;
+      }
+
+      await persistSession();
+      await completeChallenge(resolvedChallengeId);
+      await summarizeChallengeSession(resolvedChallengeId);
+      await refreshResolvedChallenge();
+      Alert.alert(
+        "challenge completed",
+        "Session summary generated and saved.",
+      );
+    })();
+  }
+
   return (
     <View className="flex-1 bg-background">
       <View
@@ -581,32 +710,11 @@ export function AnswerScreen() {
           </View>
         </Animated.View>
 
-        <View className="flex-row items-center gap-2 pb-1">
-          <View className="min-w-0 flex-1" />
-
-          <View className="shrink-0 items-center px-1">
-              <HeaderToggle
-                collapsed={isHeaderCollapsed}
-                onPress={handleToggleHeader}
-              />
-          </View>
-
-          <View className="min-w-0 flex-1 items-end">
-            <HeaderMenuButton
-              challenge={challenge}
-              isChallengeLoading={isChallengeLoading}
-              selectedMode={selectedMode}
-              availableModels={availableModels}
-              selectedModelId={selectedModelId}
-              onSelectMode={(mode) => {
-                setSelectedMode(mode);
-              }}
-              onSelectModel={(model) => {
-                setSelectedModelId(model.id);
-                void selectModel(model.id);
-              }}
-            />
-          </View>
+        <View className="flex-row items-center justify-center pb-1">
+          <HeaderToggle
+            collapsed={isHeaderCollapsed}
+            onPress={handleToggleHeader}
+          />
         </View>
       </View>
 
@@ -640,90 +748,25 @@ export function AnswerScreen() {
                 <Label>answer</Label>
                 <View className="flex-1" />
               </Pressable>
-              <View className="flex-row items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="tertiary"
-                  onPress={() => {
-                    void (async () => {
-                      if (!canInteractWithChallenge || !resolvedChallengeId) {
-                        Alert.alert(
-                          "no active challenge",
-                          "Generate or resume a challenge first.",
-                        );
-                        return;
-                      }
 
-                      await skipChallenge(resolvedChallengeId);
-                      await refreshResolvedChallenge();
-                      Alert.alert(
-                        "challenge skipped",
-                        "This challenge was marked skipped.",
-                      );
-                    })();
-                  }}
-                  isDisabled={!canInteractWithChallenge}
-                >
-                  <Button.Label>skip</Button.Label>
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onPress={() => {
-                    void (async () => {
-                      if (!canInteractWithChallenge || !resolvedChallengeId) {
-                        Alert.alert(
-                          "no active challenge",
-                          "Generate or resume a challenge first.",
-                        );
-                        return;
-                      }
-
-                      await persistSession();
-                      await markChallengeInProgress(
-                        resolvedChallengeId,
-                        selectedMode,
-                      );
-                      await refreshResolvedChallenge();
-
-                      Alert.alert(
-                        "saved",
-                        "Your notes are saved. This challenge stays active right where you left it.",
-                      );
-                    })();
-                  }}
-                  isDisabled={!canInteractWithChallenge}
-                >
-                  <Button.Label>save</Button.Label>
-                </Button>
-                <Button
-                  size="sm"
-                  variant="primary"
-                  onPress={() => {
-                    void (async () => {
-                      if (!canInteractWithChallenge || !resolvedChallengeId) {
-                        Alert.alert(
-                          "no active challenge",
-                          "Generate or resume a challenge first.",
-                        );
-                        return;
-                      }
-
-                      await persistSession();
-                      await completeChallenge(resolvedChallengeId);
-                      await summarizeChallengeSession(resolvedChallengeId);
-                      await refreshResolvedChallenge();
-                      Alert.alert(
-                        "challenge completed",
-                        "Session summary generated and saved.",
-                      );
-                    })();
-                  }}
-                  isDisabled={!canInteractWithChallenge}
-                >
-                  <Button.Label>done</Button.Label>
-                </Button>
-              </View>
+              <HeaderMenuButton
+                challenge={challenge}
+                isChallengeLoading={isChallengeLoading}
+                selectedMode={selectedMode}
+                availableModels={availableModels}
+                selectedModelId={selectedModelId}
+                onSelectMode={(mode) => {
+                  setSelectedMode(mode);
+                }}
+                onSelectModel={(model) => {
+                  setSelectedModelId(model.id);
+                  void selectModel(model.id);
+                }}
+                onSkip={handleSkip}
+                onSave={handleSave}
+                onDone={handleDone}
+                isActionDisabled={!canInteractWithChallenge}
+              />
             </View>
             <Input
               multiline

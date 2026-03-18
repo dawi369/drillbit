@@ -28,7 +28,6 @@ import {
   isValidChallengeCadenceHours,
   isValidFirstChallengeTimeMinutes,
 } from "@/lib/storage/types";
-import { getDefaultFocusPrompt } from "@/lib/prompts/prompt-library";
 import { getNextScheduledChallengeDate } from "@/lib/time";
 import type { ChallengeLifecycle, ChallengeMode } from "@/lib/widgets/types";
 
@@ -521,9 +520,9 @@ export function createDefaultSettings(
 
   return {
     id: "default",
-    focusPrompt: getDefaultFocusPrompt(),
+    focusPrompt: "",
     preferredDifficulty: "medium",
-    preferredMode: "coach",
+    preferredMode: "solo",
     selectedModelId: defaultSeedModelId,
     challengeCadenceHours: 24,
     firstChallengeTimeMinutes: 9 * 60,

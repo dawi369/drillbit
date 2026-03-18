@@ -1,0 +1,1 @@
+Backend engineering interview prep focused on APIs, data models, async workflows, reliability, performance, and operational trade-offs. Prefer prompts about service boundaries, storage choices, background jobs, failure handling, caching, throughput, and safe rollout decisions. Avoid shallow CRUD-only questions unless they open into deeper architectural or scaling discussion.

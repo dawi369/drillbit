@@ -1,0 +1,1 @@
+Algorithm and coding interview prep focused on medium-to-hard problem solving with clear reasoning, edge cases, and complexity trade-offs. Prefer prompts that reward decomposition, invariants, data structure choice, and communication of approach before code. Avoid obscure puzzle-style tricks unless they illuminate a broader pattern the user should learn.
