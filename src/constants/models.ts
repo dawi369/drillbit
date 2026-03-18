@@ -17,8 +17,9 @@ function createSeedModel(remoteId: string, label: string): ModelRecord {
 
 export const SEEDED_MODELS: ModelRecord[] = [
   createSeedModel("qwen/qwen3.5-flash-02-23", "qwen 3.5 flash"),
-  createSeedModel("openai/gpt-4.1", "gpt-4.1"),
-  createSeedModel("anthropic/claude-3.7-sonnet", "claude 3.7 sonnet"),
+  createSeedModel("deepseek/deepseek-v3.2", "deepseek v3.2"),
+  createSeedModel("google/gemini-2.5-flash", "gemini 2.5 flash"),
+  createSeedModel("openrouter/hunter-alpha", "hunter alpha"),
 ];
 
 export function getDefaultSeedModelId() {

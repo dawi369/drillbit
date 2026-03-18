@@ -14,8 +14,8 @@ export function OptionChip({ label, selected, onPress }: OptionChipProps) {
       className={cn(
         "rounded-full border px-4 py-2.5",
         selected
-          ? "border-accent bg-accent/10"
-          : "border-border/60 bg-transparent active:bg-surface-secondary/35",
+          ? "border-accent/45 bg-transparent"
+          : "border-border/60 bg-transparent active:bg-surface-secondary/18",
       )}
       onPress={onPress}
     >
