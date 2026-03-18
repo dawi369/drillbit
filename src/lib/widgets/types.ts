@@ -52,6 +52,7 @@ export type WidgetViewState =
   | {
       status: "ready";
       challenge: Challenge;
+      preferredMode?: ChallengeMode;
       title: string;
       detail: string;
       cta: string;
@@ -60,6 +61,7 @@ export type WidgetViewState =
   | {
       status: "in_progress";
       challenge: Challenge;
+      preferredMode?: ChallengeMode;
       title: string;
       detail: string;
       cta: string;
@@ -88,6 +90,7 @@ export function createPlaceholderWidgetState(): WidgetViewState {
     title: "System design warm-up",
     detail: "Design a feature-flag platform with safe rollout controls.",
     cta: "Open challenge",
+    preferredMode: "coach",
     challenge: {
       id: "placeholder-system-design-warmup",
       title: "System design warm-up",

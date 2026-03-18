@@ -6,6 +6,7 @@ import {
 } from "@/lib/storage/schema";
 
 let databasePromise: Promise<SQLiteDatabase> | null = null;
+let databaseInstance: SQLiteDatabase | null = null;
 
 async function createTables(db: SQLiteDatabase) {
   await db.withTransactionAsync(async () => {
@@ -20,6 +21,7 @@ export async function getDatabase() {
     databasePromise = openDatabaseAsync(DATABASE_NAME).then(async (db) => {
       await db.execAsync("PRAGMA foreign_keys = ON");
       await createTables(db);
+      databaseInstance = db;
       return db;
     });
   }
@@ -27,19 +29,18 @@ export async function getDatabase() {
   return databasePromise;
 }
 
-export async function initializeDatabase() {
-  return getDatabase();
-}
-
 export async function resetDatabase() {
-  const existing = await databasePromise;
+  const existing = databaseInstance ?? (databasePromise ? await databasePromise : null);
+
+  databaseInstance = null;
+  databasePromise = null;
 
   if (existing) {
     await existing.closeAsync();
   }
 
-  databasePromise = null;
+  await new Promise((resolve) => setTimeout(resolve, 50));
   await deleteDatabaseAsync(DATABASE_NAME);
 
-  return initializeDatabase();
+  return getDatabase();
 }

@@ -23,6 +23,7 @@ becomes the primary daily touchpoint.
 - Main app screens should use HeroUI Native components styled with Uniwind.
 - Prefer native Expo and React Native capabilities before web or DOM-based fallbacks.
 - The initial widget scaffold lives in `src/widgets/drillbit-widget.tsx` and is wired through `app.json`.
+- Widget snapshot state is now derived in app code and synced through `src/lib/widgets/state.ts` and `src/lib/widgets/sync.ts`.
 - Widget development requires a dev build or EAS build, not Expo Go.
 - The app architecture is local-only by default: SQLite/App Groups for app data and the editable model catalog, SecureStore for secrets, direct calls to OpenRouter and RevenueCat.
 - Challenge history stays local, skipped items are deduped out of future prompts, and expired untouched challenges can be pruned.

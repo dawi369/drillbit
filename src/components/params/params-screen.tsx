@@ -1,6 +1,6 @@
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Button, Dialog, Select, Separator, Tabs } from "heroui-native";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Pressable,
@@ -15,8 +15,11 @@ import {
   DIFFICULTY_OPTIONS,
   MODE_OPTIONS,
 } from "@/constants/params";
+import { SectionTabLabel } from "@/components/section-tab-label";
 import { cn } from "@/lib/cn";
+import { subscribeToModelsRefresh } from "@/lib/models-refresh";
 import { getFocusPromptPresets } from "@/lib/prompts/prompt-library";
+import { subscribeToSettingsRefresh } from "@/lib/settings-refresh";
 import {
   createDefaultSettings,
   ensureDefaultModels,
@@ -228,25 +231,6 @@ function FocusPresetChip({
         {label}
       </Text>
     </Pressable>
-  );
-}
-
-function ParamsTabLabel({
-  label,
-  selected,
-}: {
-  label: string;
-  selected: boolean;
-}) {
-  return (
-    <Tabs.Label
-      className={cn(
-        "text-[13px] font-medium tracking-tight",
-        selected ? "text-foreground" : "text-muted",
-      )}
-    >
-      {label}
-    </Tabs.Label>
   );
 }
 
@@ -476,10 +460,25 @@ export function ParamsScreen() {
       ? "unsaved changes"
       : (saveStatus ?? "all changes saved");
 
+  const loadSettings = useCallback(async () => {
+    await ensureDefaultModels();
+    const [settings, storedModels] = await Promise.all([
+      ensureDefaultSettings(),
+      listModels({ includeDisabled: true }),
+    ]);
+
+    setDraft((current) =>
+      isSaving || hasUnsavedChanges ? current : settings,
+    );
+    setSavedSettings(settings);
+    setModels(storedModels);
+    setIsLoading(false);
+  }, [hasUnsavedChanges, isSaving]);
+
   useEffect(() => {
     let isMounted = true;
 
-    async function loadSettings() {
+    void (async () => {
       await ensureDefaultModels();
       const [settings, storedModels] = await Promise.all([
         ensureDefaultSettings(),
@@ -494,14 +493,24 @@ export function ParamsScreen() {
       setSavedSettings(settings);
       setModels(storedModels);
       setIsLoading(false);
-    }
-
-    void loadSettings();
+    })();
 
     return () => {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    return subscribeToSettingsRefresh(() => {
+      void loadSettings();
+    });
+  }, [loadSettings]);
+
+  useEffect(() => {
+    return subscribeToModelsRefresh(() => {
+      void loadSettings();
+    });
+  }, [loadSettings]);
 
   useEffect(() => {
     Animated.timing(presetScrollCueOpacity, {
@@ -599,22 +608,22 @@ export function ParamsScreen() {
 
               <Tabs.Trigger value="focus">
                 {({ isSelected }) => (
-                  <ParamsTabLabel label="prompt" selected={isSelected} />
+                  <SectionTabLabel label="prompt" selected={isSelected} />
                 )}
               </Tabs.Trigger>
               <Tabs.Trigger value="challenge">
                 {({ isSelected }) => (
-                  <ParamsTabLabel label="challenge" selected={isSelected} />
+                  <SectionTabLabel label="challenge" selected={isSelected} />
                 )}
               </Tabs.Trigger>
               <Tabs.Trigger value="schedule">
                 {({ isSelected }) => (
-                  <ParamsTabLabel label="timing" selected={isSelected} />
+                  <SectionTabLabel label="timing" selected={isSelected} />
                 )}
               </Tabs.Trigger>
               <Tabs.Trigger value="save">
                 {({ isSelected }) => (
-                  <ParamsTabLabel label="save" selected={isSelected} />
+                  <SectionTabLabel label="save" selected={isSelected} />
                 )}
               </Tabs.Trigger>
             </Tabs.ScrollView>

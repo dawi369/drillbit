@@ -1,10 +1,15 @@
-import { Button, Input, Label, TextField } from "heroui-native";
-import { useEffect, useState } from "react";
-import { Alert, Pressable, ScrollView, Text, View } from "react-native";
+import { router } from "expo-router";
+import { Button, Input, Label, Separator, Tabs, TextField } from "heroui-native";
+import { useCallback, useEffect, useState } from "react";
+import { Alert, ScrollView, Text, View } from "react-native";
 
+import { SectionTabLabel } from "@/components/section-tab-label";
 import { createCustomOpenRouterModel } from "@/constants/models";
+import { subscribeToChallengeRefresh } from "@/lib/challenge-refresh";
+import { subscribeToModelsRefresh } from "@/lib/models-refresh";
 import { generateChallenge } from "@/lib/challenges/generate";
 import { buildPromptPreviewChain } from "@/lib/prompts/dev-preview";
+import { subscribeToSettingsRefresh } from "@/lib/settings-refresh";
 import { resetDatabase } from "@/lib/storage/database";
 import {
   ensureDefaultModels,
@@ -19,58 +24,87 @@ import {
 } from "@/lib/storage/repository";
 import type { ModelRecord, PromptKind } from "@/lib/storage/types";
 
-type DevActionCardProps = {
-  title: string;
-  description: string;
-  actionLabel: string;
-  onPress?: () => void | Promise<void>;
-  todo?: boolean;
-  tone?: "default" | "danger";
-};
-
-function DevActionCard({
+function SectionIntro({
   title,
   description,
-  actionLabel,
-  onPress,
-  todo = false,
-  tone = "default",
-}: DevActionCardProps) {
-  const buttonClassName =
-    tone === "danger"
-      ? "border-danger/20 bg-danger/10"
-      : "border-accent/20 bg-accent/10";
-
-  const labelClassName = tone === "danger" ? "text-danger" : "text-accent";
-
+}: {
+  title: string;
+  description: string;
+}) {
   return (
-    <View className="gap-3 rounded-3xl border border-border bg-surface px-4 py-4">
-      <View className="gap-1">
-        <Text className="text-base font-semibold text-foreground">{title}</Text>
-        <Text className="text-sm leading-6 text-muted">{description}</Text>
-      </View>
-
-      <Pressable
-        className={`rounded-2xl border px-3 py-3 ${buttonClassName}`}
-        disabled={!onPress || todo}
-        onPress={() => {
-          if (todo) {
-            Alert.alert("todo", "This dev action is not wired yet.");
-            return;
-          }
-
-          void onPress?.();
-        }}
-      >
-        <Text className={`text-sm font-medium ${labelClassName}`}>
-          {actionLabel}
-        </Text>
-      </Pressable>
+    <View className="gap-1 px-1 pb-3">
+      <Text className="text-[22px] font-semibold tracking-tight text-foreground">
+        {title}
+      </Text>
+      <Text className="text-sm leading-6 text-muted">{description}</Text>
     </View>
   );
 }
 
-function ModelRow({
+function Panel({ children }: { children: React.ReactNode }) {
+  return <View className="gap-1 px-1">{children}</View>;
+}
+
+function Row({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <View className="gap-2.5 py-5">
+      <View className="gap-1">
+        <Text className="text-[15px] font-semibold text-foreground">{title}</Text>
+        {description ? (
+          <Text className="text-sm leading-6 text-muted">{description}</Text>
+        ) : null}
+      </View>
+      {children}
+    </View>
+  );
+}
+
+function ActionRow({
+  title,
+  description,
+  actionLabel,
+  onPress,
+  tone = "default",
+  isDisabled = false,
+}: {
+  title: string;
+  description: string;
+  actionLabel: string;
+  onPress: () => void | Promise<void>;
+  tone?: "default" | "danger";
+  isDisabled?: boolean;
+}) {
+  return (
+    <View className="gap-2.5 py-5">
+      <View className="gap-1">
+        <Text className="text-[15px] font-semibold text-foreground">{title}</Text>
+        <Text className="text-sm leading-6 text-muted">{description}</Text>
+      </View>
+
+      <View className="flex-row">
+        <Button
+          variant={tone === "danger" ? "danger-soft" : "secondary"}
+          isDisabled={isDisabled}
+          onPress={() => {
+            void onPress();
+          }}
+        >
+          <Button.Label>{actionLabel}</Button.Label>
+        </Button>
+      </View>
+    </View>
+  );
+}
+
+function ModelListRow({
   model,
   isSelected,
   onSelect,
@@ -82,35 +116,22 @@ function ModelRow({
   onDelete: () => void;
 }) {
   return (
-    <View
-      className={`gap-3 rounded-3xl border px-4 py-4 ${
-        isSelected
-          ? "border-accent bg-accent/10"
-          : "border-border bg-surface-secondary"
-      }`}
-    >
-      <View className="gap-1">
-        <View className="flex-row items-center justify-between gap-3">
-          <Text className="text-base font-semibold text-foreground">
+    <View className="gap-2 py-4">
+      <View className="flex-row items-start justify-between gap-3">
+        <View className="min-w-0 flex-1 gap-1">
+          <Text className="text-[15px] font-semibold text-foreground">
             {model.label}
           </Text>
-          <View
-            className={`rounded-full px-2 py-1 ${
-              isSelected ? "bg-accent/20" : "bg-background"
-            }`}
-          >
-            <Text className="text-[10px] font-medium uppercase tracking-[1.2px] text-muted">
-              {isSelected ? "selected" : model.provider}
-            </Text>
-          </View>
+          <Text selectable className="text-sm leading-6 text-muted">
+            {model.remoteId}
+          </Text>
+          <Text className="text-xs leading-5 text-muted">
+            {model.isCustom ? "custom" : "seeded"}
+          </Text>
         </View>
 
-        <Text selectable className="text-sm leading-6 text-muted">
-          {model.remoteId}
-        </Text>
-
-        <Text className="text-xs leading-5 text-muted">
-          {model.isCustom ? "custom" : "seeded"}
+        <Text className="pt-0.5 text-[11px] font-medium uppercase tracking-[1.4px] text-muted">
+          {isSelected ? "selected" : model.provider}
         </Text>
       </View>
 
@@ -127,30 +148,20 @@ function ModelRow({
 }
 
 export default function DevTabScreen() {
-  const [activePreviewKind, setActivePreviewKind] = useState<PromptKind | null>(
-    null,
-  );
-  const [appContextPreview, setAppContextPreview] = useState<string | null>(
-    null,
-  );
-  const [promptContextPreview, setPromptContextPreview] = useState<
-    string | null
-  >(null);
-  const [renderedPromptPreview, setRenderedPromptPreview] = useState<
-    string | null
-  >(null);
+  const [activeTab, setActiveTab] = useState("actions");
+  const [activePreviewKind, setActivePreviewKind] = useState<PromptKind | null>(null);
+  const [appContextPreview, setAppContextPreview] = useState<string | null>(null);
+  const [promptContextPreview, setPromptContextPreview] = useState<string | null>(null);
+  const [renderedPromptPreview, setRenderedPromptPreview] = useState<string | null>(null);
   const [models, setModels] = useState<ModelRecord[]>([]);
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [customModelInput, setCustomModelInput] = useState("");
   const [modelStatus, setModelStatus] = useState<string | null>(null);
-  const [generatedChallengePreview, setGeneratedChallengePreview] = useState<
-    string | null
-  >(null);
-  const [activeChallengePreview, setActiveChallengePreview] = useState<string | null>(
-    null,
-  );
+  const [generatedChallengePreview, setGeneratedChallengePreview] = useState<string | null>(null);
+  const [activeChallengePreview, setActiveChallengePreview] = useState<string | null>(null);
+  const [activeChallengeId, setActiveChallengeId] = useState<string | null>(null);
 
-  async function refreshModels() {
+  const refreshModels = useCallback(async () => {
     await ensureDefaultModels();
     const [storedModels, settings] = await Promise.all([
       listModels({ includeDisabled: true }),
@@ -159,7 +170,7 @@ export default function DevTabScreen() {
 
     setModels(storedModels);
     setSelectedModelId(settings.selectedModelId ?? null);
-  }
+  }, []);
 
   async function refreshActiveChallengePreview() {
     const activeChallenge = await getCurrentActiveChallenge();
@@ -177,11 +188,30 @@ export default function DevTabScreen() {
         2,
       ),
     );
+    setActiveChallengeId(activeChallenge?.id ?? null);
   }
 
   useEffect(() => {
     void refreshModels();
     void refreshActiveChallengePreview();
+  }, [refreshModels]);
+
+  useEffect(() => {
+    return subscribeToModelsRefresh(() => {
+      void refreshModels();
+    });
+  }, [refreshModels]);
+
+  useEffect(() => {
+    return subscribeToSettingsRefresh(() => {
+      void refreshModels();
+    });
+  }, [refreshModels]);
+
+  useEffect(() => {
+    return subscribeToChallengeRefresh(() => {
+      void refreshActiveChallengePreview();
+    });
   }, []);
 
   async function handleInspectPromptPipeline(kind: PromptKind) {
@@ -190,11 +220,10 @@ export default function DevTabScreen() {
     setActivePreviewKind(kind);
     setAppContextPreview(JSON.stringify(preview.appContext, null, 2));
     setPromptContextPreview(
-      preview.promptContext
-        ? JSON.stringify(preview.promptContext, null, 2)
-        : "null",
+      preview.promptContext ? JSON.stringify(preview.promptContext, null, 2) : "null",
     );
     setRenderedPromptPreview(preview.renderedPrompt ?? "null");
+    setActiveTab("inspect");
   }
 
   async function handleAddModel() {
@@ -234,263 +263,279 @@ export default function DevTabScreen() {
     <ScrollView
       className="flex-1 bg-background"
       contentInsetAdjustmentBehavior="automatic"
-      contentContainerClassName="gap-4 px-5 pb-10 pt-6"
+      contentContainerClassName="gap-10 px-5 pb-safe-offset-10 pt-safe-offset-7"
     >
-      <View className="gap-1">
-        <Text className="text-3xl font-semibold tracking-tight text-foreground">
-          dev tools
+      <View className="gap-3">
+        <Text className="text-[40px] font-semibold tracking-tight text-foreground">
+          lab
         </Text>
-        <Text className="text-sm leading-6 text-muted">
-          Local development actions for storage, model management, widget
-          testing, and future challenge tooling.
+        <Text className="max-w-xl text-[15px] leading-6 text-muted">
+          Hidden developer tooling for local storage, model catalog work, and prompt inspection.
         </Text>
       </View>
 
-      <DevActionCard
-        title="wipe local sqlite"
-        description="Delete the local database and recreate empty tables for a clean development state."
-        actionLabel="reset database"
-        tone="danger"
-        onPress={async () => {
-          await resetDatabase();
-          setAppContextPreview(null);
-          setPromptContextPreview(null);
-          setRenderedPromptPreview(null);
-          setCustomModelInput("");
-          setModelStatus(null);
-          await refreshModels();
-          setGeneratedChallengePreview(null);
-          setActiveChallengePreview(null);
-          Alert.alert(
-            "database reset",
-            "Local SQLite storage was wiped and recreated.",
-          );
-        }}
-      />
+      <Tabs value={activeTab} onValueChange={setActiveTab} variant="secondary" className="gap-5">
+        <Tabs.List className="px-1">
+          <Tabs.ScrollView scrollAlign="center" contentContainerClassName="min-w-full justify-center gap-2">
+            <Tabs.Indicator />
+            <Tabs.Trigger value="actions">
+              {({ isSelected }) => <SectionTabLabel label="actions" selected={isSelected} />}
+            </Tabs.Trigger>
+            <Tabs.Trigger value="models">
+              {({ isSelected }) => <SectionTabLabel label="models" selected={isSelected} />}
+            </Tabs.Trigger>
+            <Tabs.Trigger value="inspect">
+              {({ isSelected }) => <SectionTabLabel label="inspect" selected={isSelected} />}
+            </Tabs.Trigger>
+          </Tabs.ScrollView>
+        </Tabs.List>
 
-      <View className="gap-4 rounded-3xl border border-border bg-surface px-4 py-4">
-        <View className="gap-1">
-          <Text className="text-base font-semibold text-foreground">
-            manage models
-          </Text>
-          <Text className="text-sm leading-6 text-muted">
-            Paste an OpenRouter model id, add it to the available models, then
-            select or delete entries from the local catalog.
-          </Text>
-        </View>
+        <Tabs.Content value="actions">
+          <Panel>
+            <SectionIntro
+              title="actions"
+              description="Reset local state, generate fresh data, and inspect the active challenge flow."
+            />
 
-        <TextField>
-          <Label>openrouter model id</Label>
-          <Input
-            placeholder="qwen/qwen3.5-flash-02-23"
-            value={customModelInput}
-            onChangeText={setCustomModelInput}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </TextField>
-
-        <View className="flex-row gap-3">
-          <Button className="flex-1" variant="primary" onPress={() => void handleAddModel()}>
-            <Button.Label>add model</Button.Label>
-          </Button>
-          <Button className="flex-1" variant="ghost" onPress={() => void refreshModels()}>
-            <Button.Label>refresh</Button.Label>
-          </Button>
-        </View>
-
-        {modelStatus ? (
-          <Text className="text-sm text-accent">{modelStatus}</Text>
-        ) : null}
-
-        <View className="gap-3">
-          {models.length === 0 ? (
-            <View className="rounded-3xl border border-border bg-surface-secondary px-4 py-4">
-              <Text className="text-sm text-muted">no models saved yet</Text>
-            </View>
-          ) : null}
-
-          {models.map((model) => (
-            <ModelRow
-              key={model.id}
-              model={model}
-              isSelected={model.id === selectedModelId}
-              onSelect={() => {
-                void handleSelectModel(model);
-              }}
-              onDelete={() => {
-                void handleDeleteModel(model);
+            <ActionRow
+              title="wipe local sqlite"
+              description="Delete the local database and recreate empty tables for a clean development state."
+              actionLabel="reset database"
+              tone="danger"
+              onPress={async () => {
+                await resetDatabase();
+                setAppContextPreview(null);
+                setPromptContextPreview(null);
+                setRenderedPromptPreview(null);
+                setCustomModelInput("");
+                setModelStatus(null);
+                await refreshModels();
+                setGeneratedChallengePreview(null);
+                await refreshActiveChallengePreview();
+                Alert.alert("database reset", "Local SQLite storage was wiped and recreated.");
               }}
             />
-          ))}
-        </View>
-      </View>
 
-      <DevActionCard
-        title="generate challenge"
-        description="Create a fresh local challenge from the current params and selected model."
-        actionLabel="generate challenge"
-        onPress={async () => {
-          try {
-            const result = await generateChallenge();
-            setGeneratedChallengePreview(JSON.stringify(result.challenge, null, 2));
-            await refreshActiveChallengePreview();
-            Alert.alert("challenge generated", result.challenge.title);
-          } catch (error) {
-            Alert.alert(
-              "generation failed",
-              error instanceof Error ? error.message : "Unknown error",
-            );
-          }
-        }}
-      />
+            <Separator className="opacity-35" />
 
-      <DevActionCard
-        title="inspect active challenge"
-        description="Show the single canonical active challenge and its session state as the app currently resolves it."
-        actionLabel="inspect active"
-        onPress={async () => {
-          await refreshActiveChallengePreview();
-        }}
-      />
+            <ActionRow
+              title="generate challenge"
+              description="Create a fresh local challenge from the current params and selected model."
+              actionLabel="generate challenge"
+              onPress={async () => {
+                try {
+                  const result = await generateChallenge();
+                  setGeneratedChallengePreview(JSON.stringify(result.challenge, null, 2));
+                  await refreshActiveChallengePreview();
+                } catch (error) {
+                  Alert.alert(
+                    "generation failed",
+                    error instanceof Error ? error.message : "Unknown error",
+                  );
+                }
+              }}
+            />
 
-      <DevActionCard
-        title="seed widget snapshot"
-        description="Push a placeholder or debug widget state into shared payload storage."
-        actionLabel="todo: seed widget"
-        todo
-      />
+            <Separator className="opacity-35" />
 
-      <DevActionCard
-        title="prune expired challenges"
-        description="Delete untouched expired challenges so similar prompts can be generated again."
-        actionLabel="todo: prune expired"
-        todo
-      />
+            <ActionRow
+              title="open answer"
+              description="Jump straight into the current active challenge on the answer screen."
+              actionLabel="open active challenge"
+              isDisabled={!activeChallengeId}
+              onPress={async () => {
+                if (!activeChallengeId) {
+                  return;
+                }
 
-      <DevActionCard
-        title="inspect generate pipeline"
-        description="Build the app context, prompt context, and final rendered prompt for a generate call."
-        actionLabel="inspect generate"
-        onPress={async () => {
-          await handleInspectPromptPipeline("generate");
-        }}
-      />
+                router.push({
+                  pathname: "/answer",
+                  params: {
+                    challengeId: activeChallengeId,
+                    mode: "solo",
+                  },
+                });
+              }}
+            />
 
-      <DevActionCard
-        title="inspect coach pipeline"
-        description="Preview the full context chain for an in-progress coach call using seeded dev challenge data."
-        actionLabel="inspect coach"
-        onPress={async () => {
-          await handleInspectPromptPipeline("coach");
-        }}
-      />
+            <Separator className="opacity-35" />
 
-      <DevActionCard
-        title="inspect reveal pipeline"
-        description="Preview the full context chain for a reveal call using seeded dev challenge data."
-        actionLabel="inspect reveal"
-        onPress={async () => {
-          await handleInspectPromptPipeline("reveal");
-        }}
-      />
+            <ActionRow
+              title="inspect active challenge"
+              description="Show the single canonical active challenge and the persisted session used by answer."
+              actionLabel="refresh active"
+              onPress={async () => {
+                await refreshActiveChallengePreview();
+                setActiveTab("inspect");
+              }}
+            />
 
-      <DevActionCard
-        title="inspect summarize pipeline"
-        description="Preview the full context chain for post-session summarization using seeded dev challenge data."
-        actionLabel="inspect summarize"
-        onPress={async () => {
-          await handleInspectPromptPipeline("summarize");
-        }}
-      />
+            {generatedChallengePreview ? (
+              <>
+                <Separator className="opacity-35" />
+                <Row
+                  title="generated challenge"
+                  description="Latest locally saved challenge generated from the current settings."
+                >
+                  <Text selectable className="text-xs leading-5 text-foreground">
+                    {generatedChallengePreview}
+                  </Text>
+                </Row>
+              </>
+            ) : null}
+          </Panel>
+        </Tabs.Content>
 
-      {appContextPreview ? (
-        <View className="gap-3 rounded-3xl border border-border bg-surface px-4 py-4">
-          <View className="gap-1">
-            <Text className="text-base font-semibold text-foreground">
-              app context preview
-            </Text>
-            <Text className="text-sm leading-6 text-muted">
-              Structured app-side context assembled for `{activePreviewKind}`.
-            </Text>
-          </View>
+        <Tabs.Content value="models">
+          <Panel>
+            <SectionIntro
+              title="models"
+              description="Manage the local model catalog used by generation and answer help."
+            />
 
-          <Text selectable className="text-xs leading-5 text-foreground">
-            {appContextPreview}
-          </Text>
-        </View>
-      ) : null}
+            <Row
+              title="add openrouter model"
+              description="Paste an OpenRouter model id to add it to the local catalog."
+            >
+              <TextField>
+                <Label>openrouter model id</Label>
+                <Input
+                  placeholder="qwen/qwen3.5-flash-02-23"
+                  value={customModelInput}
+                  onChangeText={setCustomModelInput}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </TextField>
 
-      {promptContextPreview ? (
-        <View className="gap-3 rounded-3xl border border-border bg-surface px-4 py-4">
-          <View className="gap-1">
-            <Text className="text-base font-semibold text-foreground">
-              prompt context preview
-            </Text>
-            <Text className="text-sm leading-6 text-muted">
-              AI-facing context filtered from the broader app context for `
-              {activePreviewKind}`.
-            </Text>
-          </View>
+              <View className="flex-row gap-3">
+                <Button className="flex-1" variant="primary" onPress={() => void handleAddModel()}>
+                  <Button.Label>add model</Button.Label>
+                </Button>
+                <Button className="flex-1" variant="ghost" onPress={() => void refreshModels()}>
+                  <Button.Label>refresh</Button.Label>
+                </Button>
+              </View>
 
-          <Text selectable className="text-xs leading-5 text-foreground">
-            {promptContextPreview}
-          </Text>
-        </View>
-      ) : null}
+              {modelStatus ? <Text className="text-sm text-accent">{modelStatus}</Text> : null}
+            </Row>
 
-      {renderedPromptPreview ? (
-        <View className="gap-3 rounded-3xl border border-border bg-surface px-4 py-4">
-          <View className="gap-1">
-            <Text className="text-base font-semibold text-foreground">
-              rendered prompt preview
-            </Text>
-            <Text className="text-sm leading-6 text-muted">
-              Final english prompt text built from the selected system prompt
-              and prompt context for `{activePreviewKind}`.
-            </Text>
-          </View>
+            <Separator className="opacity-35" />
 
-          <Text selectable className="text-xs leading-5 text-foreground">
-            {renderedPromptPreview}
-          </Text>
-        </View>
-      ) : null}
+            <Row
+              title="available models"
+              description="Select or soft-delete entries from the local catalog."
+            >
+              <View className="gap-0">
+                {models.length === 0 ? (
+                  <Text className="text-sm text-muted">no models saved yet</Text>
+                ) : null}
 
-      {generatedChallengePreview ? (
-        <View className="gap-3 rounded-3xl border border-border bg-surface px-4 py-4">
-          <View className="gap-1">
-            <Text className="text-base font-semibold text-foreground">
-              generated challenge
-            </Text>
-            <Text className="text-sm leading-6 text-muted">
-              Latest locally saved challenge generated with the selected model.
-            </Text>
-          </View>
+                {models.map((model, index) => (
+                  <View key={model.id}>
+                    <ModelListRow
+                      model={model}
+                      isSelected={model.id === selectedModelId}
+                      onSelect={() => {
+                        void handleSelectModel(model);
+                      }}
+                      onDelete={() => {
+                        void handleDeleteModel(model);
+                      }}
+                    />
+                    {index < models.length - 1 ? <Separator className="opacity-25" /> : null}
+                  </View>
+                ))}
+              </View>
+            </Row>
+          </Panel>
+        </Tabs.Content>
 
-          <Text selectable className="text-xs leading-5 text-foreground">
-            {generatedChallengePreview}
-          </Text>
-        </View>
-      ) : null}
+        <Tabs.Content value="inspect">
+          <Panel>
+            <SectionIntro
+              title="inspect"
+              description="Preview prompt pipelines and inspect active challenge state."
+            />
 
-      {activeChallengePreview ? (
-        <View className="gap-3 rounded-3xl border border-border bg-surface px-4 py-4">
-          <View className="gap-1">
-            <Text className="text-base font-semibold text-foreground">
-              active challenge
-            </Text>
-            <Text className="text-sm leading-6 text-muted">
-              Canonical current challenge plus the persisted session used by the
-              answer screen.
-            </Text>
-          </View>
+            <Row
+              title="prompt pipelines"
+              description="Build app context, prompt context, and rendered prompt for any supported prompt kind."
+            >
+              <View className="flex-row flex-wrap gap-3">
+                <Button variant="secondary" onPress={() => void handleInspectPromptPipeline("generate")}>
+                  <Button.Label>generate</Button.Label>
+                </Button>
+                <Button variant="secondary" onPress={() => void handleInspectPromptPipeline("coach")}>
+                  <Button.Label>coach</Button.Label>
+                </Button>
+                <Button variant="secondary" onPress={() => void handleInspectPromptPipeline("reveal")}>
+                  <Button.Label>reveal</Button.Label>
+                </Button>
+                <Button variant="secondary" onPress={() => void handleInspectPromptPipeline("summarize")}>
+                  <Button.Label>summarize</Button.Label>
+                </Button>
+              </View>
+            </Row>
 
-          <Text selectable className="text-xs leading-5 text-foreground">
-            {activeChallengePreview}
-          </Text>
-        </View>
-      ) : null}
+            {activeChallengePreview ? (
+              <>
+                <Separator className="opacity-35" />
+                <Row
+                  title="active challenge"
+                  description="Canonical current challenge plus persisted session state."
+                >
+                  <Text selectable className="text-xs leading-5 text-foreground">
+                    {activeChallengePreview}
+                  </Text>
+                </Row>
+              </>
+            ) : null}
+
+            {appContextPreview ? (
+              <>
+                <Separator className="opacity-35" />
+                <Row
+                  title="app context preview"
+                  description={`Structured app-side context for ${activePreviewKind}.`}
+                >
+                  <Text selectable className="text-xs leading-5 text-foreground">
+                    {appContextPreview}
+                  </Text>
+                </Row>
+              </>
+            ) : null}
+
+            {promptContextPreview ? (
+              <>
+                <Separator className="opacity-35" />
+                <Row
+                  title="prompt context preview"
+                  description={`AI-facing context filtered for ${activePreviewKind}.`}
+                >
+                  <Text selectable className="text-xs leading-5 text-foreground">
+                    {promptContextPreview}
+                  </Text>
+                </Row>
+              </>
+            ) : null}
+
+            {renderedPromptPreview ? (
+              <>
+                <Separator className="opacity-35" />
+                <Row
+                  title="rendered prompt preview"
+                  description={`Final prompt text built for ${activePreviewKind}.`}
+                >
+                  <Text selectable className="text-xs leading-5 text-foreground">
+                    {renderedPromptPreview}
+                  </Text>
+                </Row>
+              </>
+            ) : null}
+          </Panel>
+        </Tabs.Content>
+      </Tabs>
     </ScrollView>
   );
 }

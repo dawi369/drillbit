@@ -3,6 +3,11 @@ import {
   getDefaultSeedModelId,
   SEEDED_MODELS,
 } from "@/constants/models";
+import { notifyChallengeRefresh } from "@/lib/challenge-refresh";
+import { notifyMemoryRefresh } from "@/lib/memory-refresh";
+import { notifyModelsRefresh } from "@/lib/models-refresh";
+import { notifySettingsRefresh } from "@/lib/settings-refresh";
+import { syncWidgetState } from "@/lib/widgets/sync";
 import {
   fromChallengeRow,
   fromChallengeSessionRow,
@@ -21,6 +26,9 @@ import type {
   ChallengeRecord,
   ChallengeSessionRecord,
   ChallengeSummaryRecord,
+  MemoryChallengeSummaryRow,
+  MemoryOverview,
+  MemoryTopicRollup,
   ModelRecord,
   UserSettingsRecord,
 } from "@/lib/storage/types";
@@ -29,12 +37,7 @@ import {
   isValidFirstChallengeTimeMinutes,
 } from "@/lib/storage/types";
 import { getNextScheduledChallengeDate } from "@/lib/time";
-import type { ChallengeLifecycle, ChallengeMode } from "@/lib/widgets/types";
-
-type ChallengeQueryOptions = {
-  lifecycle?: ChallengeLifecycle;
-  limit?: number;
-};
+import type { ChallengeDifficulty, ChallengeMode } from "@/lib/widgets/types";
 
 type ModelQueryOptions = {
   includeDisabled?: boolean;
@@ -122,6 +125,9 @@ export async function upsertChallenge(record: ChallengeRecord) {
     });
   }
 
+  notifyChallengeRefresh();
+  void syncWidgetState();
+
   return record;
 }
 
@@ -133,24 +139,6 @@ export async function getChallengeById(id: string) {
   );
 
   return rows[0] ? fromChallengeRow(rows[0]) : null;
-}
-
-export async function listChallenges(options: ChallengeQueryOptions = {}) {
-  const db = await getDatabase();
-  const limit = options.limit ?? 50;
-
-  const rows = options.lifecycle
-    ? await db.getAllAsync<ReturnType<typeof toChallengeRow>>(
-        "SELECT * FROM challenges WHERE lifecycle = ? ORDER BY created_at DESC LIMIT ?",
-        options.lifecycle,
-        limit,
-      )
-    : await db.getAllAsync<ReturnType<typeof toChallengeRow>>(
-        "SELECT * FROM challenges ORDER BY created_at DESC LIMIT ?",
-        limit,
-      );
-
-  return rows.map(fromChallengeRow);
 }
 
 export async function listBlockedChallenges(limit: number = 365) {
@@ -334,6 +322,9 @@ export async function upsertChallengeSummary(record: ChallengeSummaryRecord) {
     row.generated_at,
   );
 
+  notifyMemoryRefresh();
+  void syncWidgetState();
+
   return record;
 }
 
@@ -365,6 +356,152 @@ export async function listSummariesByTopic(topic: string, limit: number = 10) {
   return rows.map(fromChallengeSummaryRow);
 }
 
+function getTopPatternValues(
+  summaries: ChallengeSummaryRecord[],
+  key: "strengths" | "weaknesses",
+  limit: number,
+) {
+  const counts = new Map<string, number>();
+
+  for (const summary of summaries) {
+    for (const value of summary[key]) {
+      counts.set(value, (counts.get(value) ?? 0) + 1);
+    }
+  }
+
+  return [...counts.entries()]
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .slice(0, limit)
+    .map(([value]) => value);
+}
+
+function getAverageCompletionScore(summaries: ChallengeSummaryRecord[]) {
+  const scored = summaries.filter(
+    (summary): summary is ChallengeSummaryRecord & { completionScore: number } =>
+      typeof summary.completionScore === "number",
+  );
+
+  if (scored.length === 0) {
+    return undefined;
+  }
+
+  const total = scored.reduce((sum, summary) => sum + summary.completionScore, 0);
+  return total / scored.length;
+}
+
+function normalizeChallengeDifficulty(
+  value: string | null | undefined,
+): ChallengeDifficulty | undefined {
+  if (value === "easy" || value === "medium" || value === "hard") {
+    return value;
+  }
+
+  return undefined;
+}
+
+async function getChallengeSummaryCount() {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<{ total: number }>(
+    "SELECT COUNT(*) AS total FROM challenge_summaries",
+  );
+
+  return rows[0]?.total ?? 0;
+}
+
+export async function listMemoryChallengeSummaries(
+  limit: number = 12,
+): Promise<MemoryChallengeSummaryRow[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<{
+    id: string;
+    challenge_id: string;
+    short_summary: string;
+    short_feedback: string;
+    strengths_json: string;
+    weaknesses_json: string;
+    tags_json: string;
+    completion_score: number | null;
+    generated_at: string;
+    challenge_title: string;
+    challenge_topic: string;
+    challenge_difficulty: string | null;
+  }>(
+    `
+      SELECT
+        s.id,
+        s.challenge_id,
+        s.short_summary,
+        s.short_feedback,
+        s.strengths_json,
+        s.weaknesses_json,
+        s.tags_json,
+        s.completion_score,
+        s.generated_at,
+        c.title AS challenge_title,
+        c.topic AS challenge_topic,
+        c.difficulty AS challenge_difficulty
+      FROM challenge_summaries s
+      INNER JOIN challenges c ON c.id = s.challenge_id
+      ORDER BY s.generated_at DESC
+      LIMIT ?
+    `,
+    limit,
+  );
+
+  return rows.map((row) => {
+    const summary = fromChallengeSummaryRow({
+      id: row.id,
+      challenge_id: row.challenge_id,
+      short_summary: row.short_summary,
+      short_feedback: row.short_feedback,
+      strengths_json: row.strengths_json,
+      weaknesses_json: row.weaknesses_json,
+      tags_json: row.tags_json,
+      completion_score: row.completion_score,
+      generated_at: row.generated_at,
+    });
+
+    return {
+      ...summary,
+      challengeTitle: row.challenge_title,
+      challengeTopic: row.challenge_topic,
+      challengeDifficulty: normalizeChallengeDifficulty(row.challenge_difficulty),
+    };
+  });
+}
+
+export async function getMemoryOverview(): Promise<MemoryOverview> {
+  const memorySummaries = await listMemoryChallengeSummaries(60);
+  const totalCompleted = await getChallengeSummaryCount();
+  const recentSessions = memorySummaries.slice(0, 10);
+
+  const topicMap = new Map<string, ChallengeSummaryRecord[]>();
+  for (const session of memorySummaries) {
+    const entries = topicMap.get(session.challengeTopic) ?? [];
+    entries.push(session);
+    topicMap.set(session.challengeTopic, entries);
+  }
+
+  const topicRollups: MemoryTopicRollup[] = [...topicMap.entries()]
+    .map(([topic, topicSummaries]) => ({
+      topic,
+      count: topicSummaries.length,
+      averageCompletionScore: getAverageCompletionScore(topicSummaries),
+      topStrengths: getTopPatternValues(topicSummaries, "strengths", 2),
+      topWeaknesses: getTopPatternValues(topicSummaries, "weaknesses", 2),
+    }))
+    .sort((left, right) => right.count - left.count || left.topic.localeCompare(right.topic));
+
+  return {
+    totalCompleted,
+    averageCompletionScore: getAverageCompletionScore(memorySummaries),
+    strongestPatterns: getTopPatternValues(memorySummaries, "strengths", 4),
+    weakestPatterns: getTopPatternValues(memorySummaries, "weaknesses", 4),
+    recentSessions,
+    topicRollups,
+  };
+}
+
 export async function upsertChallengeSession(record: ChallengeSessionRecord) {
   const db = await getDatabase();
   const row = toChallengeSessionRow(record);
@@ -388,6 +525,9 @@ export async function upsertChallengeSession(record: ChallengeSessionRecord) {
     row.conversation_history_json,
     row.updated_at,
   );
+
+  notifyChallengeRefresh();
+  void syncWidgetState();
 
   return record;
 }
@@ -431,6 +571,9 @@ export async function upsertSettings(record: UserSettingsRecord) {
     row.updated_at,
   );
 
+  notifySettingsRefresh();
+  void syncWidgetState();
+
   return record;
 }
 
@@ -469,6 +612,9 @@ export async function upsertModel(record: ModelRecord) {
     row.created_at,
     row.updated_at,
   );
+
+  notifyModelsRefresh();
+  void syncWidgetState();
 
   return record;
 }

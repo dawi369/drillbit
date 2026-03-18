@@ -19,7 +19,7 @@ export const APP_TABS = [
 
 export const DEV_TAB = {
   name: "dev",
-  label: "dev",
+  label: "lab",
   icon: {
     sf: "hammer",
     md: "construction",

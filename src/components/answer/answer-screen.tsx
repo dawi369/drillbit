@@ -8,7 +8,7 @@ import {
   SubMenu,
   TextField,
 } from "heroui-native";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Modal, Pressable, ScrollView, Text, View } from "react-native";
 import Animated, {
   Easing,
@@ -31,6 +31,8 @@ import {
 } from "@/lib/ai/prompt-runtime";
 import { cn } from "@/lib/cn";
 import { debugLog } from "@/lib/debug";
+import { subscribeToModelsRefresh } from "@/lib/models-refresh";
+import { subscribeToSettingsRefresh } from "@/lib/settings-refresh";
 import {
   completeChallenge,
   ensureDefaultModels,
@@ -90,8 +92,42 @@ function HeaderMenuButton({
 }) {
   const selectedModel = availableModels.find((model) => model.id === selectedModelId);
   const selectedModeOption = MODE_OPTIONS.find((option) => option.value === selectedMode);
-  const [isModeSubMenuOpen, setModeSubMenuOpen] = useState(false);
-  const [isModelSubMenuOpen, setModelSubMenuOpen] = useState(false);
+  const [openSubMenu, setOpenSubMenu] = useState<"mode" | "model" | null>(null);
+  const openSubMenuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (openSubMenuTimeoutRef.current) {
+        clearTimeout(openSubMenuTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  function handleSubMenuOpenChange(nextKey: "mode" | "model", open: boolean) {
+    if (!open) {
+      setOpenSubMenu((current) => (current === nextKey ? null : current));
+      return;
+    }
+
+    if (openSubMenu && openSubMenu !== nextKey) {
+      setOpenSubMenu(null);
+      if (openSubMenuTimeoutRef.current) {
+        clearTimeout(openSubMenuTimeoutRef.current);
+      }
+      openSubMenuTimeoutRef.current = setTimeout(() => {
+        setOpenSubMenu(nextKey);
+        openSubMenuTimeoutRef.current = null;
+      }, 40);
+      return;
+    }
+
+    if (openSubMenuTimeoutRef.current) {
+      clearTimeout(openSubMenuTimeoutRef.current);
+      openSubMenuTimeoutRef.current = null;
+    }
+
+    setOpenSubMenu(nextKey);
+  }
 
   return (
     <Menu>
@@ -128,103 +164,99 @@ function HeaderMenuButton({
 
           <Separator className="mx-3 my-2 h-px opacity-100" />
 
-          <View style={{ zIndex: isModeSubMenuOpen ? 20 : 0 }}>
-          <SubMenu
-            isOpen={isModeSubMenuOpen}
-            onOpenChange={(open) => {
-              setModeSubMenuOpen(open);
-              if (open) {
-                setModelSubMenuOpen(false);
-              }
-            }}
-          >
-            <SubMenu.Trigger textValue="mode">
-              <View className="flex-1">
-                <Text className="text-sm font-medium text-foreground">mode</Text>
-                <Text className="text-xs text-muted">
-                  {selectedModeOption?.label ?? selectedMode}
-                </Text>
-              </View>
-              <SubMenu.TriggerIndicator />
-            </SubMenu.Trigger>
-            <SubMenu.Content className="z-20">
-              <Menu.Group
-                selectionMode="single"
-                selectedKeys={new Set([selectedMode])}
-                onSelectionChange={(keys) => {
-                  const nextMode = Array.from(keys)[0];
-                  if (
-                    nextMode === "solo" ||
-                    nextMode === "coach" ||
-                    nextMode === "reveal"
-                  ) {
-                    onSelectMode(nextMode);
-                  }
-                }}
-              >
-                {MODE_OPTIONS.map((option) => (
-                  <Menu.Item key={option.value} id={option.value}>
-                    <Menu.ItemIndicator variant="dot" />
-                    <View className="flex-1">
-                      <Menu.ItemTitle>{option.label}</Menu.ItemTitle>
-                      <Menu.ItemDescription>
-                        {option.description}
-                      </Menu.ItemDescription>
-                    </View>
-                  </Menu.Item>
-                ))}
-              </Menu.Group>
-            </SubMenu.Content>
-          </SubMenu>
+          <View style={{ zIndex: openSubMenu === "mode" ? 20 : 0 }}>
+            <SubMenu
+              isOpen={openSubMenu === "mode"}
+              onOpenChange={(open) => {
+                handleSubMenuOpenChange("mode", open);
+              }}
+            >
+              <SubMenu.Trigger textValue="mode">
+                <View className="flex-1">
+                  <Text className="text-sm font-medium text-foreground">mode</Text>
+                  <Text className="text-xs text-muted">
+                    {selectedModeOption?.label ?? selectedMode}
+                  </Text>
+                </View>
+                <SubMenu.TriggerIndicator />
+              </SubMenu.Trigger>
+              <SubMenu.Content className="z-20">
+                <Menu.Group
+                  selectionMode="single"
+                  selectedKeys={new Set([selectedMode])}
+                  onSelectionChange={(keys) => {
+                    const nextMode = Array.from(keys)[0];
+                    if (
+                      nextMode === "solo" ||
+                      nextMode === "coach" ||
+                      nextMode === "reveal"
+                    ) {
+                      onSelectMode(nextMode);
+                      setOpenSubMenu(null);
+                    }
+                  }}
+                >
+                  {MODE_OPTIONS.map((option) => (
+                    <Menu.Item key={option.value} id={option.value}>
+                      <Menu.ItemIndicator variant="dot" />
+                      <View className="flex-1">
+                        <Menu.ItemTitle>{option.label}</Menu.ItemTitle>
+                        <Menu.ItemDescription>
+                          {option.description}
+                        </Menu.ItemDescription>
+                      </View>
+                    </Menu.Item>
+                  ))}
+                </Menu.Group>
+              </SubMenu.Content>
+            </SubMenu>
           </View>
 
           <Separator className="mx-3 my-2 h-px opacity-100" />
 
-          <View style={{ zIndex: isModelSubMenuOpen ? 20 : 0 }}>
-          <SubMenu
-            isOpen={isModelSubMenuOpen}
-            onOpenChange={(open) => {
-              setModelSubMenuOpen(open);
-              if (open) {
-                setModeSubMenuOpen(false);
-              }
-            }}
-          >
-            <SubMenu.Trigger textValue="models">
-              <View className="flex-1">
-                <Text className="text-sm font-medium text-foreground">models</Text>
-                <Text className="text-xs text-muted">
-                  {selectedModel?.label ?? "no model selected"}
-                </Text>
-              </View>
-              <SubMenu.TriggerIndicator />
-            </SubMenu.Trigger>
-            <SubMenu.Content className="z-20">
-              <Menu.Group
-                selectionMode="single"
-                selectedKeys={selectedModelId ? new Set([selectedModelId]) : new Set()}
-                onSelectionChange={(keys) => {
-                  const nextModelId = Array.from(keys)[0];
-                  const nextModel = availableModels.find(
-                    (model) => model.id === nextModelId,
-                  );
-                  if (nextModel) {
-                    onSelectModel(nextModel);
-                  }
-                }}
-              >
-                {availableModels.map((model) => (
-                  <Menu.Item key={model.id} id={model.id}>
-                    <Menu.ItemIndicator variant="dot" />
-                    <View className="flex-1">
-                      <Menu.ItemTitle>{model.label}</Menu.ItemTitle>
-                      <Menu.ItemDescription>{model.remoteId}</Menu.ItemDescription>
-                    </View>
-                  </Menu.Item>
-                ))}
-              </Menu.Group>
-            </SubMenu.Content>
-          </SubMenu>
+          <View style={{ zIndex: openSubMenu === "model" ? 20 : 0 }}>
+            <SubMenu
+              isOpen={openSubMenu === "model"}
+              onOpenChange={(open) => {
+                handleSubMenuOpenChange("model", open);
+              }}
+            >
+              <SubMenu.Trigger textValue="models">
+                <View className="flex-1">
+                  <Text className="text-sm font-medium text-foreground">models</Text>
+                  <Text className="text-xs text-muted">
+                    {selectedModel?.label ?? "no model selected"}
+                  </Text>
+                </View>
+                <SubMenu.TriggerIndicator />
+              </SubMenu.Trigger>
+              <SubMenu.Content className="z-20">
+                <Menu.Group
+                  selectionMode="single"
+                  selectedKeys={selectedModelId ? new Set([selectedModelId]) : new Set()}
+                  onSelectionChange={(keys) => {
+                    const nextModelId = Array.from(keys)[0];
+                    const nextModel = availableModels.find(
+                      (model) => model.id === nextModelId,
+                    );
+                    if (nextModel) {
+                      onSelectModel(nextModel);
+                      setOpenSubMenu(null);
+                    }
+                  }}
+                >
+                  {availableModels.map((model) => (
+                    <Menu.Item key={model.id} id={model.id}>
+                      <Menu.ItemIndicator variant="dot" />
+                      <View className="flex-1">
+                        <Menu.ItemTitle>{model.label}</Menu.ItemTitle>
+                        <Menu.ItemDescription>{model.remoteId}</Menu.ItemDescription>
+                      </View>
+                    </Menu.Item>
+                  ))}
+                </Menu.Group>
+              </SubMenu.Content>
+            </SubMenu>
           </View>
 
           <Separator className="mx-3 my-2 h-px opacity-100" />
@@ -245,7 +277,7 @@ function HeaderMenuButton({
           <Separator className="mx-3 my-2 h-px opacity-100" />
 
           <View className="items-center px-2 pt-1">
-            <Button size="sm" variant="tertiary" onPress={() => router.back()}>
+            <Button size="sm" variant="tertiary" onPress={() => router.replace("/(tabs)") }>
               <Button.Label>back to params</Button.Label>
             </Button>
           </View>
@@ -263,7 +295,7 @@ function HeaderToggle({
   onPress: () => void;
 }) {
   return (
-    <Pressable className="items-center px-2.5 py-1.5" onPress={onPress}>
+    <Pressable className="items-center px-3 py-[1.65]" onPress={onPress}>
       <View className="items-center gap-1">
         <View className="h-4 w-16 items-center justify-center">
           <View className="relative h-3 w-13">
@@ -418,13 +450,41 @@ export function AnswerScreen() {
     });
   }, [initialMode, params, resolvedChallengeId]);
 
+  const resetAnswerState = useCallback(
+    (nextMode: ChallengeMode = initialMode) => {
+      setChallenge(null);
+      setSelectedMode(nextMode);
+      setNotesDraft("");
+      setConversationSummary("");
+      setUpdatedAt(new Date().toISOString());
+      setConversationHistory([]);
+      setAssistantHistory([]);
+      setAssistantGuidance(null);
+      setRevealAnswer(null);
+      setLastAutoCoachAt(null);
+      setLastAutoCoachNotesSnapshot("");
+      setAssistantInputOpen(false);
+      setAssistantMessage("");
+    },
+    [initialMode],
+  );
+
+  function isActiveAnswerChallenge(record: ChallengeRecord | null | undefined) {
+    return record?.lifecycle === "ready" || record?.lifecycle === "in_progress";
+  }
+
   async function refreshResolvedChallenge() {
     if (!resolvedChallengeId) {
-      setChallenge(null);
+      resetAnswerState();
       return null;
     }
 
     const latestChallenge = await getChallengeById(resolvedChallengeId);
+    if (!isActiveAnswerChallenge(latestChallenge)) {
+      resetAnswerState();
+      return null;
+    }
+
     setChallenge(latestChallenge);
     return latestChallenge;
   }
@@ -514,18 +574,29 @@ export function AnswerScreen() {
     ],
   );
 
+  const loadModelState = useCallback(async () => {
+    await ensureDefaultModels();
+    const [models, settings] = await Promise.all([
+      listModels({ includeDisabled: false }),
+      ensureDefaultSettings(),
+    ]);
+
+    setAvailableModels(models);
+    setSelectedModelId(settings.selectedModelId ?? models[0]?.id);
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
 
     async function loadScreenState() {
-      await ensureDefaultModels();
       setChallengeLoading(true);
       debugLog("answer", "loading screen state", {
         resolvedChallengeId,
       });
 
-      const [models, settings, existingChallenge, existingSession] =
+      const [, models, settings, existingChallenge, existingSession] =
         await Promise.all([
+          ensureDefaultModels(),
           listModels({ includeDisabled: false }),
           ensureDefaultSettings(),
           resolvedChallengeId
@@ -550,6 +621,13 @@ export function AnswerScreen() {
 
       setAvailableModels(models);
       setSelectedModelId(settings.selectedModelId ?? models[0]?.id);
+
+      if (!isActiveAnswerChallenge(existingChallenge)) {
+        resetAnswerState();
+        setChallengeLoading(false);
+        return;
+      }
+
       setChallenge(existingChallenge);
 
       if (existingSession) {
@@ -562,8 +640,14 @@ export function AnswerScreen() {
           mapConversationHistoryToChat(existingSession.conversationHistory),
         );
       } else {
+        setSelectedMode(initialMode);
+        setNotesDraft("");
+        setConversationSummary("");
+        setUpdatedAt(new Date().toISOString());
         setConversationHistory([]);
         setAssistantHistory([]);
+        setAssistantGuidance(null);
+        setRevealAnswer(null);
       }
 
       setChallengeLoading(false);
@@ -574,7 +658,19 @@ export function AnswerScreen() {
     return () => {
       isMounted = false;
     };
-  }, [initialMode, resolvedChallengeId]);
+  }, [initialMode, resetAnswerState, resolvedChallengeId]);
+
+  useEffect(() => {
+    return subscribeToModelsRefresh(() => {
+      void loadModelState();
+    });
+  }, [loadModelState]);
+
+  useEffect(() => {
+    return subscribeToSettingsRefresh(() => {
+      void loadModelState();
+    });
+  }, [loadModelState]);
 
   useEffect(() => {
     if (!resolvedChallengeId || !challenge) {
@@ -754,8 +850,8 @@ export function AnswerScreen() {
       }
 
       await skipChallenge(resolvedChallengeId);
-      await refreshResolvedChallenge();
-      Alert.alert("challenge skipped", "This challenge was marked skipped.");
+      resetAnswerState();
+      router.replace("/(tabs)");
     })();
   }
 
@@ -792,12 +888,16 @@ export function AnswerScreen() {
 
       await persistSession();
       await completeChallenge(resolvedChallengeId);
-      await summarizeChallengeSession(resolvedChallengeId);
-      await refreshResolvedChallenge();
-      Alert.alert(
-        "challenge completed",
-        "Session summary generated and saved.",
-      );
+      resetAnswerState();
+      router.replace("/(tabs)");
+
+      void (async () => {
+        try {
+          await summarizeChallengeSession(resolvedChallengeId);
+        } catch (error) {
+          console.error("background summary failed", error);
+        }
+      })();
     })();
   }
 

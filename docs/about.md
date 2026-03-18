@@ -60,7 +60,7 @@ Memory stores every interaction as a rich card locally (SQLite + shared widget s
 - Similar challenges are still allowed later; repeat blocking targets exact prior challenge shapes, not the whole topic area.
 - Untouched expired challenges may be pruned entirely to save space and allow future similar prompts again.
 - Skipped challenge rows may be cleaned up after a retention window, while their blocked summaries remain preserved so exact skipped prompts do not return.
-- Accessible in Mem tab: thin progress graph (drag/scrub days, replay past sessions), accordion cards for deep review, bulk forget/re-enable.
+- Accessible in the memory tab: a lightweight overview with reserved graph space, repeated strengths and gaps, recent session summaries, and by-topic rollups. Richer graph scrubbing and deep review can layer on later.
 
 System prompt for every new problem generation and AI Coach response is dynamically constructed from:
 

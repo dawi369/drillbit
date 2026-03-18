@@ -2,7 +2,6 @@ import type {
   Challenge,
   ChallengeDifficulty,
   ChallengeMode,
-  ChallengeSkipReason,
   WidgetViewState,
 } from "@/lib/widgets/types";
 
@@ -93,6 +92,29 @@ export type BlockedChallengeRecord = {
   sourceLifecycle: "completed" | "skipped";
 };
 
+export type MemoryChallengeSummaryRow = ChallengeSummaryRecord & {
+  challengeTitle: string;
+  challengeTopic: string;
+  challengeDifficulty?: ChallengeDifficulty;
+};
+
+export type MemoryTopicRollup = {
+  topic: string;
+  count: number;
+  averageCompletionScore?: number;
+  topStrengths: string[];
+  topWeaknesses: string[];
+};
+
+export type MemoryOverview = {
+  totalCompleted: number;
+  averageCompletionScore?: number;
+  strongestPatterns: string[];
+  weakestPatterns: string[];
+  recentSessions: MemoryChallengeSummaryRow[];
+  topicRollups: MemoryTopicRollup[];
+};
+
 export type PromptKind = "generate" | "coach" | "reveal" | "summarize";
 
 export type AppContext = {
@@ -149,10 +171,6 @@ export type PromptContext =
       session?: ChallengeSessionRecord;
       memory: AppContext["memory"];
     };
-
-export type ChallengeLifecycleRow = ChallengeRecord["lifecycle"];
-export type ChallengeModeRow = ChallengeMode;
-export type ChallengeSkipReasonRow = ChallengeSkipReason;
 
 export function isValidChallengeCadenceHours(value: number): value is ChallengeCadenceHours {
   return ALLOWED_CHALLENGE_CADENCE_HOURS.includes(value as ChallengeCadenceHours);

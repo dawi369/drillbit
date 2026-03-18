@@ -13,6 +13,8 @@ import { Uniwind } from "uniwind";
 
 import { debugLog } from "@/lib/debug";
 import { initializePromptLibrary } from "@/lib/prompts/prompt-library";
+import { addDrillbitWidgetInteractionListener } from "@/lib/widgets/interaction";
+import { syncWidgetState } from "@/lib/widgets/sync";
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -31,6 +33,7 @@ export default function RootLayout() {
     Uniwind.setTheme(resolvedTheme);
     void SystemUI.setBackgroundColorAsync(isDark ? "#000000" : "#ffffff");
     void initializePromptLibrary();
+    void syncWidgetState();
   }, [isDark, resolvedTheme]);
 
   useEffect(() => {
@@ -39,6 +42,14 @@ export default function RootLayout() {
       segments,
     });
   }, [pathname, segments]);
+
+  useEffect(() => {
+    const subscription = addDrillbitWidgetInteractionListener();
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

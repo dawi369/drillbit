@@ -1,5 +1,5 @@
-import { BlankTabScreen } from "@/components/blank-tab-screen";
+import { MemoryScreen } from "@/components/memory/memory-screen";
 
 export default function MemoryTabScreen() {
-  return <BlankTabScreen />;
+  return <MemoryScreen />;
 }

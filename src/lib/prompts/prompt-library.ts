@@ -2,11 +2,11 @@ import { Asset } from "expo-asset";
 import * as FileSystem from "expo-file-system/legacy";
 
 import coachPromptAsset from "@/content/prompts/coach.md";
-import defaultFocusPromptAsset from "@/content/prompts/default-focus-prompt.md";
 import focusAlgorithmsPromptAsset from "@/content/prompts/focus-algorithms-prompt.md";
 import focusBackendPromptAsset from "@/content/prompts/focus-backend-prompt.md";
 import focusDebuggingPromptAsset from "@/content/prompts/focus-debugging-prompt.md";
 import focusFrontendPromptAsset from "@/content/prompts/focus-frontend-prompt.md";
+import focusSystemDesignPromptAsset from "@/content/prompts/focus-system-design-prompt.md";
 import generatePromptAsset from "@/content/prompts/generate.md";
 import revealPromptAsset from "@/content/prompts/reveal.md";
 import summarizePromptAsset from "@/content/prompts/summarize.md";
@@ -121,7 +121,7 @@ export async function initializePromptLibrary() {
           readMarkdownAsset(promptAssetMap.coach),
           readMarkdownAsset(promptAssetMap.reveal),
           readMarkdownAsset(promptAssetMap.summarize),
-          readMarkdownAsset(defaultFocusPromptAsset),
+          readMarkdownAsset(focusSystemDesignPromptAsset),
           readMarkdownAsset(focusAlgorithmsPromptAsset),
           readMarkdownAsset(focusFrontendPromptAsset),
           readMarkdownAsset(focusBackendPromptAsset),
@@ -191,8 +191,4 @@ export function getSystemPrompt(kind: PromptKind) {
 
 export function getFocusPromptPresets() {
   return cachedPromptLibrary?.focusPromptPresets ?? defaultPromptLibrary.focusPromptPresets;
-}
-
-export function getDefaultFocusPrompt() {
-  return getFocusPromptPresets()[0]?.prompt ?? "";
 }
