@@ -103,20 +103,57 @@ export function parseGenerateChallengeOutput(rawText: string): GeneratedChalleng
 }
 
 export function parseCoachOutput(rawText: string): CoachAssistantOutput {
-  const record = parseJsonRecord(rawText);
+  try {
+    const record = parseJsonRecord(rawText);
 
-  return {
-    guidance: readRequiredString(record, "guidance"),
-  };
+    return {
+      guidance: readRequiredString(record, "guidance"),
+    };
+  } catch {
+    const fallback = extractJsonText(rawText).trim();
+
+    if (!fallback) {
+      throw new Error("Model output field 'guidance' must be a non-empty string.");
+    }
+
+    return {
+      guidance: fallback,
+    };
+  }
 }
 
 export function parseRevealOutput(rawText: string): RevealAssistantOutput {
-  const record = parseJsonRecord(rawText);
+  try {
+    const record = parseJsonRecord(rawText);
 
-  return {
-    guidance: readRequiredString(record, "guidance"),
-    answer: readRequiredString(record, "answer"),
-  };
+    return {
+      guidance: readRequiredString(record, "guidance"),
+      answer: readRequiredString(record, "answer"),
+    };
+  } catch {
+    const jsonText = extractJsonText(rawText).trim();
+    const firstParagraphBreak = jsonText.indexOf("\n\n");
+    const firstLineBreak = jsonText.indexOf("\n");
+    const splitIndex =
+      firstParagraphBreak >= 0
+        ? firstParagraphBreak
+        : firstLineBreak >= 0
+          ? firstLineBreak
+          : -1;
+
+    const guidance =
+      splitIndex >= 0 ? jsonText.slice(0, splitIndex).trim() : jsonText.trim();
+    const answer = splitIndex >= 0 ? jsonText.slice(splitIndex).trim() : jsonText.trim();
+
+    if (!guidance || !answer) {
+      throw new Error("Model output field 'guidance' must be a non-empty string.");
+    }
+
+    return {
+      guidance,
+      answer,
+    };
+  }
 }
 
 export function parseSummarizeOutput(rawText: string): GeneratedChallengeSummary {

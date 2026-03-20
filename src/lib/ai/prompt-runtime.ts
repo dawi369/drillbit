@@ -3,7 +3,10 @@ import {
   parseRevealOutput,
   parseSummarizeOutput,
 } from "@/lib/ai/prompt-output";
-import { createOpenRouterChatCompletion } from "@/lib/ai/openrouter";
+import {
+  createOpenRouterChatCompletion,
+  streamOpenRouterChatCompletion,
+} from "@/lib/ai/openrouter";
 import { buildAppContext } from "@/lib/prompts/app-context";
 import { buildPromptContext, renderPrompt } from "@/lib/prompts/prompt-context";
 import { upsertChallengeSummary } from "@/lib/storage/repository";
@@ -63,12 +66,90 @@ export async function generateCoachGuidance(
   };
 }
 
+export async function streamCoachGuidance(
+  challengeId: string,
+  options?: {
+    coachTrigger?: CoachTriggerReason;
+    latestUserRequest?: string;
+    onTextDelta?: (textDelta: string) => void;
+  },
+) {
+  const appContext = await buildAppContext({
+    kind: "coach",
+    challengeId,
+    coachTrigger: options?.coachTrigger,
+    latestUserRequest: options?.latestUserRequest,
+  });
+  const promptContext = buildPromptContext(appContext);
+
+  if (!promptContext || !appContext.selectedModel) {
+    throw new Error("Unable to build coach prompt context.");
+  }
+
+  const renderedPrompt = renderPrompt(promptContext);
+  const rawResponse = await streamOpenRouterChatCompletion({
+    model: appContext.selectedModel.remoteId,
+    messages: [
+      {
+        role: "user",
+        content: renderedPrompt,
+      },
+    ],
+    onTextDelta: options?.onTextDelta,
+  });
+
+  return {
+    appContext,
+    promptContext,
+    renderedPrompt,
+    rawResponse,
+    output: parseCoachOutput(rawResponse),
+  };
+}
+
 export async function generateRevealAnswer(challengeId: string) {
   const result = await runPromptKind("reveal", challengeId);
 
   return {
     ...result,
     output: parseRevealOutput(result.rawResponse),
+  };
+}
+
+export async function streamRevealAnswer(
+  challengeId: string,
+  options?: {
+    onTextDelta?: (textDelta: string) => void;
+  },
+) {
+  const appContext = await buildAppContext({
+    kind: "reveal",
+    challengeId,
+  });
+  const promptContext = buildPromptContext(appContext);
+
+  if (!promptContext || !appContext.selectedModel) {
+    throw new Error("Unable to build reveal prompt context.");
+  }
+
+  const renderedPrompt = renderPrompt(promptContext);
+  const rawResponse = await streamOpenRouterChatCompletion({
+    model: appContext.selectedModel.remoteId,
+    messages: [
+      {
+        role: "user",
+        content: renderedPrompt,
+      },
+    ],
+    onTextDelta: options?.onTextDelta,
+  });
+
+  return {
+    appContext,
+    promptContext,
+    renderedPrompt,
+    rawResponse,
+    output: parseRevealOutput(rawResponse),
   };
 }
 
