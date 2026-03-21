@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { Alert } from "react-native";
 
 import { streamRevealAnswer } from "@/lib/ai/prompt-runtime";
+import { getRevealPreviewText } from "@/components/answer/use-assistant-field-state";
 import type { ChallengeConversationTurn } from "@/lib/storage/types";
 
 type CommitAssistantTurn = (args: {
@@ -38,6 +39,7 @@ export function useAnswerActions({
     trigger: "manual_request" | "auto_initial" | "auto_after_progress";
     latestUserRequest?: string;
     appendToHistory?: boolean;
+    onPartialGuidance?: (partialText: string) => void;
   }) => Promise<{ output: { guidance: string } } | null>;
   persistSession: (overrides?: {
     conversationSummary?: string;
@@ -79,6 +81,7 @@ export function useAnswerActions({
           text: trimmed,
         },
       ]);
+      const streamingAssistantId = `assistant-stream-${Date.now()}`;
       setAssistantMessage("");
       setAssistantLoading(true);
 
@@ -90,11 +93,30 @@ export function useAnswerActions({
 
           revealField.begin();
           let streamedText = "";
+          setAssistantHistory((current) => [
+            ...current,
+            {
+              id: streamingAssistantId,
+              role: "coach" as const,
+              text: "",
+            },
+          ]);
 
           const result = await streamRevealAnswer(resolvedChallengeId, {
             onTextDelta: (textDelta) => {
               streamedText += textDelta;
               revealField.streamRevealDraft(streamedText);
+              const previewText = getRevealPreviewText(streamedText);
+              setAssistantHistory((current) =>
+                current.map((message) =>
+                  message.id === streamingAssistantId
+                    ? {
+                        ...message,
+                        text: previewText,
+                      }
+                    : message,
+                ),
+              );
             },
           });
           revealField.finish(result.output.guidance, result.output.answer);
@@ -119,9 +141,30 @@ export function useAnswerActions({
           return;
         }
 
+        setAssistantHistory((current) => [
+          ...current,
+          {
+            id: streamingAssistantId,
+            role: "coach" as const,
+            text: "",
+          },
+        ]);
+
         const result = await requestCoachGuidance({
           trigger: "manual_request",
           latestUserRequest: trimmed,
+          onPartialGuidance: (partialText: string) => {
+            setAssistantHistory((current) =>
+              current.map((message) =>
+                message.id === streamingAssistantId
+                  ? {
+                      ...message,
+                      text: partialText,
+                    }
+                  : message,
+              ),
+            );
+          },
         });
 
         if (!result) {

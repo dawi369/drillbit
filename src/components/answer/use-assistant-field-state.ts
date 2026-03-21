@@ -27,6 +27,11 @@ function extractRevealDraft(rawText: string) {
   };
 }
 
+export function getRevealPreviewText(rawText: string) {
+  const draft = extractRevealDraft(rawText);
+  return draft.guidance ?? rawText.trim();
+}
+
 export function useAssistantFieldState() {
   const [status, setStatus] = useState<AssistantFieldStatus>("idle");
   const [text, setText] = useState<string | null>(null);

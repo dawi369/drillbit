@@ -1,11 +1,25 @@
-import { BottomSheet, Button, Input, Label, TextField } from "heroui-native";
-import { BottomSheetScrollView } from "@gorhom/bottom-sheet";
-import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
-import { Text, View, useWindowDimensions } from "react-native";
+import { BottomSheet, Button } from "heroui-native";
+import {
+  BottomSheetScrollView,
+  BottomSheetTextInput,
+  BottomSheetView,
+  type BottomSheetScrollViewMethods,
+} from "@gorhom/bottom-sheet";
+import { useEffect, useRef } from "react";
+import {
+  Keyboard,
+  Platform,
+  Text,
+  View,
+  useColorScheme,
+  useWindowDimensions,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
-  Extrapolation,
-  interpolate,
+  Easing,
   useAnimatedStyle,
+  useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
 
 import { cn } from "@/lib/cn";
@@ -37,10 +51,6 @@ function MessageBubble({
   );
 }
 
-function EmbeddedSection({ children }: { children: React.ReactNode }) {
-  return <View className="rounded-[24px] bg-surface-secondary/10 px-2 py-2">{children}</View>;
-}
-
 export function AssistantSheet({
   visible,
   mode,
@@ -67,28 +77,56 @@ export function AssistantSheet({
     mode === "reveal"
       ? "Follow the full answer, inspect trade-offs, and ask for sharper revisions."
       : "Keep a lightweight coaching thread with your latest hint and follow-up questions.";
-  const { height, progress } = useReanimatedKeyboardAnimation();
+  const historyScrollRef = useRef<BottomSheetScrollViewMethods | null>(null);
+  const insets = useSafeAreaInsets();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
   const { height: windowHeight } = useWindowDimensions();
+  const canSend = canInteractWithChallenge && assistantMessage.trim().length > 0 && !isAssistantLoading;
+  const keyboardLift = useSharedValue(0);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      historyScrollRef.current?.scrollToEnd({ animated: true });
+    }, 40);
+
+    return () => clearTimeout(timeout);
+  }, [assistantHistory]);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const showSubscription = Keyboard.addListener(showEvent, (event) => {
+      const lift = Math.min(event.endCoordinates.height * 0.92, windowHeight * 0.42);
+      keyboardLift.value = withTiming(lift, {
+        duration: 280,
+        easing: Easing.out(Easing.cubic),
+      });
+    });
+
+    const hideSubscription = Keyboard.addListener(hideEvent, () => {
+      keyboardLift.value = withTiming(0, {
+        duration: 260,
+        easing: Easing.out(Easing.cubic),
+      });
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [keyboardLift, windowHeight]);
 
   const liftedContentStyle = useAnimatedStyle(() => {
-    const keyboardHeight = Math.abs(height.value);
-    const maxLift = windowHeight * 0.28;
-    const liftDistance = Math.min(keyboardHeight, maxLift);
-    const translateY = interpolate(
-      progress.value,
-      [0, 1],
-      [0, -liftDistance],
-      Extrapolation.CLAMP,
-    );
-
     return {
       transform: [
         {
-          translateY,
+          translateY: -keyboardLift.value,
         },
       ],
     };
-  }, [height, progress, windowHeight]);
+  }, [keyboardLift]);
 
   return (
     <BottomSheet isOpen={visible} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -98,76 +136,93 @@ export function AssistantSheet({
           index={0}
           snapPoints={["86%"]}
           enableDynamicSizing={false}
-          keyboardBehavior="interactive"
-          keyboardBlurBehavior="restore"
-          android_keyboardInputMode="adjustResize"
+          keyboardBehavior="extend"
+          keyboardBlurBehavior="none"
+          android_keyboardInputMode="adjustPan"
+          enableContentPanningGesture={false}
+          backgroundClassName="rounded-t-[32px] bg-background"
+          contentContainerClassName="pt-3"
         >
-          <Animated.View
-            className="gap-5 rounded-t-[32px] border border-border/45 bg-background px-5 pb-safe-offset-5 pt-4"
-            style={liftedContentStyle}
+          <BottomSheetView
+            className="flex-1"
+            style={{
+              minHeight: 0,
+              paddingHorizontal: 20,
+              paddingBottom: Math.max(insets.bottom, 12) + 12,
+            }}
           >
-            <View className="gap-1">
-              <BottomSheet.Title className="text-xl font-semibold tracking-tight text-foreground">
+            <View className="gap-1 px-1">
+              <Text className="text-xl font-semibold tracking-tight text-foreground">
                 {title}
-              </BottomSheet.Title>
-              <BottomSheet.Description className="text-sm leading-6 text-muted">
-                {description}
-              </BottomSheet.Description>
+              </Text>
+              <Text className="text-sm leading-6 text-muted">{description}</Text>
             </View>
 
-            <EmbeddedSection>
-              <BottomSheetScrollView
-                className="max-h-[360px]"
-                contentContainerClassName="gap-3 px-4 py-4"
-                showsVerticalScrollIndicator={false}
-              >
-                {assistantHistory.length > 0 ? (
-                  assistantHistory.map((message) => (
-                    <MessageBubble key={message.id} role={message.role} text={message.text} />
-                  ))
-                ) : (
-                  <View className="rounded-[20px] border border-dashed border-border/40 bg-background/70 px-4 py-4">
-                    <Text className="text-sm leading-6 text-muted">
-                      {mode === "reveal"
-                        ? "Ask for alternatives, better phrasing, or a clearer final answer shape."
-                        : "Ask for the next hint, pressure test your approach, or request a more direct nudge."}
-                    </Text>
+            <View className="mt-4 flex-1 overflow-hidden">
+              <Animated.View style={liftedContentStyle} className="flex-1">
+                <BottomSheetScrollView
+                  ref={historyScrollRef}
+                  style={{ flex: 1, minHeight: 0 }}
+                  contentContainerClassName="gap-3 px-1 pb-4"
+                  showsVerticalScrollIndicator
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {assistantHistory.length > 0 ? (
+                    assistantHistory.map((message) => (
+                      <MessageBubble key={message.id} role={message.role} text={message.text} />
+                    ))
+                  ) : (
+                    <View className="rounded-[20px] bg-surface-secondary/10 px-4 py-4">
+                      <Text className="text-sm leading-6 text-muted">
+                        {mode === "reveal"
+                          ? "Ask for alternatives, better phrasing, or a clearer final answer shape."
+                          : "Ask for the next hint, pressure test your approach, or request a more direct nudge."}
+                      </Text>
+                    </View>
+                  )}
+                </BottomSheetScrollView>
+
+                <View
+                  className="mt-3 rounded-[28px] border border-border/40 bg-surface-secondary/10 px-3 py-3"
+                  style={{ marginBottom: 3 }}
+                >
+                  <BottomSheetTextInput
+                    multiline
+                    numberOfLines={5}
+                    placeholder="Ask a follow-up..."
+                    placeholderTextColor={isDark ? "rgba(226,232,240,0.48)" : "rgba(15,23,42,0.42)"}
+                    value={assistantMessage}
+                    onChangeText={onChangeMessage}
+                    style={{
+                      minHeight: 104,
+                      maxHeight: 176,
+                      color: isDark ? "#f8fafc" : "#0f172a",
+                      paddingHorizontal: 12,
+                      paddingTop: 10,
+                      paddingBottom: 48,
+                      paddingRight: 88,
+                      fontSize: 16,
+                      lineHeight: 22,
+                      textAlignVertical: "top",
+                    }}
+                    scrollEnabled
+                    editable={canInteractWithChallenge}
+                  />
+
+                  <View className="absolute bottom-3 right-3">
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      onPress={onSubmit}
+                      isDisabled={!canSend}
+                    >
+                      <Button.Label>{isAssistantLoading ? "wait" : "send"}</Button.Label>
+                    </Button>
                   </View>
-                )}
-              </BottomSheetScrollView>
-            </EmbeddedSection>
-
-            <EmbeddedSection>
-              <TextField>
-                <Label>clarifying question</Label>
-                <Input
-                  multiline
-                  numberOfLines={8}
-                  placeholder="Ask a clarifying question about what you are working on..."
-                  value={assistantMessage}
-                  onChangeText={onChangeMessage}
-                  className="max-h-[220px] min-h-44 items-start py-4"
-                  textAlignVertical="top"
-                  scrollEnabled
-                  isDisabled={!canInteractWithChallenge}
-                />
-              </TextField>
-            </EmbeddedSection>
-
-            <View className="flex-row gap-3">
-              <Button className="flex-1" variant="secondary" onPress={onClose}>
-                <Button.Label>close</Button.Label>
-              </Button>
-              <Button
-                className="flex-1"
-                variant="primary"
-                onPress={onSubmit}
-                isDisabled={!canInteractWithChallenge}
-              >
-                <Button.Label>{isAssistantLoading ? "thinking..." : "send"}</Button.Label>
-              </Button>
+                </View>
+              </Animated.View>
             </View>
-          </Animated.View>
+          </BottomSheetView>
         </BottomSheet.Content>
       </BottomSheet.Portal>
     </BottomSheet>

@@ -293,10 +293,12 @@ export function AnswerScreen() {
       trigger,
       latestUserRequest,
       appendToHistory = false,
+      onPartialGuidance,
     }: {
       trigger: CoachTriggerReason;
       latestUserRequest?: string;
       appendToHistory?: boolean;
+      onPartialGuidance?: (partialText: string) => void;
     }) => {
       if (!resolvedChallengeId) {
         return null;
@@ -311,6 +313,7 @@ export function AnswerScreen() {
         onTextDelta: (textDelta) => {
           streamedText += textDelta;
           coachField.streamText(streamedText);
+          onPartialGuidance?.(streamedText);
         },
       });
 
