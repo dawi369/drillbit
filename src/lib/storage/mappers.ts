@@ -50,7 +50,8 @@ type ChallengeSessionRow = {
   challenge_id: string;
   selected_mode: Nullable<ChallengeMode>;
   notes_draft: Nullable<string>;
-  conversation_summary: Nullable<string>;
+  assistant_draft?: Nullable<string>;
+  conversation_summary?: Nullable<string>;
   conversation_history_json: string;
   updated_at: string;
 };
@@ -185,7 +186,7 @@ export function toChallengeSessionRow(record: ChallengeSessionRecord): Challenge
     challenge_id: record.challengeId,
     selected_mode: record.selectedMode ?? null,
     notes_draft: record.notesDraft ?? null,
-    conversation_summary: record.conversationSummary ?? null,
+    assistant_draft: record.assistantDraft ?? null,
     conversation_history_json: JSON.stringify(record.conversationHistory),
     updated_at: record.updatedAt,
   };
@@ -196,7 +197,7 @@ export function fromChallengeSessionRow(row: ChallengeSessionRow): ChallengeSess
     challengeId: row.challenge_id,
     selectedMode: undefinedIfNull(row.selected_mode),
     notesDraft: undefinedIfNull(row.notes_draft),
-    conversationSummary: undefinedIfNull(row.conversation_summary),
+    assistantDraft: undefinedIfNull(row.assistant_draft ?? row.conversation_summary ?? null),
     conversationHistory: parseConversationHistory(row.conversation_history_json),
     updatedAt: row.updated_at,
   };

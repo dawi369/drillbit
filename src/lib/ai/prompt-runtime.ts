@@ -119,12 +119,14 @@ export async function generateRevealAnswer(challengeId: string) {
 export async function streamRevealAnswer(
   challengeId: string,
   options?: {
+    latestUserRequest?: string;
     onTextDelta?: (textDelta: string) => void;
   },
 ) {
   const appContext = await buildAppContext({
     kind: "reveal",
     challengeId,
+    latestUserRequest: options?.latestUserRequest,
   });
   const promptContext = buildPromptContext(appContext);
 

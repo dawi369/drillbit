@@ -45,7 +45,7 @@ export type ChallengeSessionRecord = {
   challengeId: string;
   selectedMode?: ChallengeMode;
   notesDraft?: string;
-  conversationSummary?: string;
+  assistantDraft?: string;
   conversationHistory: ChallengeConversationTurn[];
   updatedAt: string;
 };
@@ -158,6 +158,7 @@ export type PromptContext =
   | {
       kind: "reveal";
       systemPrompt: string;
+      latestUserRequest?: string;
       focusPrompt: string;
       preferredDifficulty?: ChallengeDifficulty;
       challenge: ChallengeRecord;

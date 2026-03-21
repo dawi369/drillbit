@@ -44,6 +44,7 @@ export function buildPromptContext(appContext: AppContext): PromptContext | null
       return {
         kind: "reveal",
         systemPrompt: getSystemPrompt("reveal"),
+        latestUserRequest: appContext.runtime.latestUserRequest,
         focusPrompt: appContext.settings.focusPrompt,
         preferredDifficulty: appContext.settings.preferredDifficulty,
         challenge: appContext.challenge,
@@ -77,6 +78,19 @@ function renderSummaryList(title: string, items: string[]) {
 
 function renderSection(tag: string, value: string) {
   return `<${tag}>\n${value}\n</${tag}>`;
+}
+
+function filterConversationHistoryByMode(
+  history: AppContext["session"] extends infer T
+    ? T extends { conversationHistory: infer H }
+      ? H extends { role: string; mode: string; text: string; answer?: string }[]
+        ? H
+        : never
+      : never
+    : never,
+  mode: "coach" | "reveal",
+) {
+  return history.filter((turn) => turn.mode === mode);
 }
 
 function renderConversationHistory(
@@ -140,15 +154,19 @@ export function renderPrompt(promptContext: PromptContext) {
       ].join("\n\n");
     case "coach":
     case "reveal":
+      const modeHistory = promptContext.session
+        ? filterConversationHistoryByMode(promptContext.session.conversationHistory, promptContext.kind)
+        : [];
+
       return [
         promptContext.systemPrompt,
         promptContext.kind === "coach"
           ? renderSection("coach_trigger", promptContext.coachTrigger)
           : null,
-        promptContext.kind === "coach"
+        promptContext.latestUserRequest
           ? renderSection(
               "latest_user_request",
-              promptContext.latestUserRequest ?? "none",
+              promptContext.latestUserRequest,
             )
           : null,
         renderSection("focus_prompt", promptContext.focusPrompt),
@@ -163,12 +181,10 @@ export function renderPrompt(promptContext: PromptContext) {
         promptContext.session
           ? renderSection(
               "session",
-              `- selected mode: ${promptContext.session.selectedMode ?? "unspecified"}\n- notes draft: ${promptContext.session.notesDraft ?? "none"}\n- conversation summary: ${promptContext.session.conversationSummary ?? "none"}`,
+              `- selected mode: ${promptContext.session.selectedMode ?? "unspecified"}\n- notes draft: ${promptContext.session.notesDraft ?? "none"}\n- assistant draft: ${promptContext.session.assistantDraft ?? "none"}`,
             )
           : renderSection("session", "none"),
-        promptContext.session
-          ? renderConversationHistory(promptContext.session.conversationHistory)
-          : renderSection("conversation_history", "none"),
+        renderConversationHistory(modeHistory),
         ...baseMemorySections,
         renderSection(
           "task",
@@ -189,7 +205,7 @@ export function renderPrompt(promptContext: PromptContext) {
         promptContext.session
           ? renderSection(
               "session",
-              `- selected mode: ${promptContext.session.selectedMode ?? "unspecified"}\n- notes draft: ${promptContext.session.notesDraft ?? "none"}\n- conversation summary: ${promptContext.session.conversationSummary ?? "none"}`,
+              `- selected mode: ${promptContext.session.selectedMode ?? "unspecified"}\n- notes draft: ${promptContext.session.notesDraft ?? "none"}\n- assistant draft: ${promptContext.session.assistantDraft ?? "none"}`,
             )
           : renderSection("session", "none"),
         promptContext.session

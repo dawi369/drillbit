@@ -39,7 +39,7 @@ export const CREATE_CHALLENGE_SESSIONS_TABLE_SQL = `
     challenge_id TEXT PRIMARY KEY NOT NULL,
     selected_mode TEXT,
     notes_draft TEXT,
-    conversation_summary TEXT,
+    assistant_draft TEXT,
     conversation_history_json TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     FOREIGN KEY (challenge_id) REFERENCES challenges (id) ON DELETE CASCADE

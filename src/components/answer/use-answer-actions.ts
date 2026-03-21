@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { Alert } from "react-native";
 
+import type { AssistantChatMessage } from "@/components/answer/assistant-history";
 import { streamRevealAnswer } from "@/lib/ai/prompt-runtime";
 import { getRevealPreviewText } from "@/components/answer/use-assistant-field-state";
 import type { ChallengeConversationTurn } from "@/lib/storage/types";
@@ -23,12 +24,15 @@ export function useAnswerActions({
   persistSession,
   setAssistantHistory,
   setConversationHistory,
-  setAssistantLoading,
+  setCoachLoading,
+  setRevealLoading,
   setAssistantMessage,
   mapConversationHistoryToChat,
   commitAssistantTurn,
   coachField,
   revealField,
+  beginRevealRequest,
+  isRevealRequestCurrent,
 }: {
   assistantMessage: string;
   canInteractWithChallenge: boolean;
@@ -42,18 +46,17 @@ export function useAnswerActions({
     onPartialGuidance?: (partialText: string) => void;
   }) => Promise<{ output: { guidance: string } } | null>;
   persistSession: (overrides?: {
-    conversationSummary?: string;
+    assistantDraft?: string;
     conversationHistory?: ChallengeConversationTurn[];
   }) => Promise<void>;
-  setAssistantHistory: React.Dispatch<
-    React.SetStateAction<{ id: string; role: "coach" | "you"; text: string }[]>
-  >;
+  setAssistantHistory: React.Dispatch<React.SetStateAction<AssistantChatMessage[]>>;
   setConversationHistory: React.Dispatch<React.SetStateAction<ChallengeConversationTurn[]>>;
-  setAssistantLoading: (value: boolean) => void;
+  setCoachLoading: (value: boolean) => void;
+  setRevealLoading: (value: boolean) => void;
   setAssistantMessage: (value: string) => void;
   mapConversationHistoryToChat: (
     history: ChallengeConversationTurn[],
-  ) => { id: string; role: "coach" | "you"; text: string }[];
+  ) => AssistantChatMessage[];
   commitAssistantTurn: CommitAssistantTurn;
   coachField: {
     fail: (message: string) => void;
@@ -64,6 +67,8 @@ export function useAnswerActions({
     finish: (value: string, nextAnswer?: string | null) => void;
     fail: (message: string) => void;
   };
+  beginRevealRequest: () => number;
+  isRevealRequestCurrent: (requestId: number) => boolean;
 }) {
   const handleAssistantSubmit = useCallback(() => {
     void (async () => {
@@ -73,17 +78,28 @@ export function useAnswerActions({
         return;
       }
 
+      const submittedAt = Date.now();
+      const userMessageId = `you-${submittedAt}`;
+      const streamingAssistantId = `assistant-stream-${submittedAt}`;
+      const assistantRole = selectedMode === "reveal" ? ("reveal" as const) : ("coach" as const);
+
       setAssistantHistory((current) => [
         ...current,
         {
-          id: `you-${Date.now()}`,
+          id: userMessageId,
           role: "you" as const,
           text: trimmed,
         },
+        {
+          id: streamingAssistantId,
+          role: assistantRole,
+          text: "",
+          isStreaming: true,
+        },
       ]);
-      const streamingAssistantId = `assistant-stream-${Date.now()}`;
+
       setAssistantMessage("");
-      setAssistantLoading(true);
+      let revealRequestId: number | null = null;
 
       try {
         if (selectedMode === "reveal") {
@@ -91,19 +107,19 @@ export function useAnswerActions({
             return;
           }
 
+          const requestId = beginRevealRequest();
+          revealRequestId = requestId;
+          setRevealLoading(true);
           revealField.begin();
           let streamedText = "";
-          setAssistantHistory((current) => [
-            ...current,
-            {
-              id: streamingAssistantId,
-              role: "coach" as const,
-              text: "",
-            },
-          ]);
 
           const result = await streamRevealAnswer(resolvedChallengeId, {
+            latestUserRequest: trimmed,
             onTextDelta: (textDelta) => {
+              if (!isRevealRequestCurrent(requestId)) {
+                return;
+              }
+
               streamedText += textDelta;
               revealField.streamRevealDraft(streamedText);
               const previewText = getRevealPreviewText(streamedText);
@@ -113,12 +129,18 @@ export function useAnswerActions({
                     ? {
                         ...message,
                         text: previewText,
+                        isStreaming: true,
                       }
                     : message,
                 ),
               );
             },
           });
+
+          if (!isRevealRequestCurrent(requestId)) {
+            return;
+          }
+
           revealField.finish(result.output.guidance, result.output.answer);
           const nextHistory = commitAssistantTurn({
             currentHistory: conversationHistory,
@@ -130,10 +152,7 @@ export function useAnswerActions({
 
           setConversationHistory(nextHistory);
           setAssistantHistory(mapConversationHistoryToChat(nextHistory));
-          await persistSession({
-            conversationSummary: trimmed,
-            conversationHistory: nextHistory,
-          });
+          await persistSession({ assistantDraft: "", conversationHistory: nextHistory });
           return;
         }
 
@@ -141,15 +160,7 @@ export function useAnswerActions({
           return;
         }
 
-        setAssistantHistory((current) => [
-          ...current,
-          {
-            id: streamingAssistantId,
-            role: "coach" as const,
-            text: "",
-          },
-        ]);
-
+        setCoachLoading(true);
         const result = await requestCoachGuidance({
           trigger: "manual_request",
           latestUserRequest: trimmed,
@@ -160,6 +171,7 @@ export function useAnswerActions({
                   ? {
                       ...message,
                       text: partialText,
+                      isStreaming: true,
                     }
                   : message,
               ),
@@ -180,30 +192,59 @@ export function useAnswerActions({
 
         setConversationHistory(nextHistory);
         setAssistantHistory(mapConversationHistoryToChat(nextHistory));
-        await persistSession({
-          conversationSummary: trimmed,
-          conversationHistory: nextHistory,
-        });
+        await persistSession({ assistantDraft: "", conversationHistory: nextHistory });
       } catch (error) {
-        if (selectedMode === "coach") {
-          coachField.fail(error instanceof Error ? error.message : "assistant request failed");
-        } else if (selectedMode === "reveal") {
-          revealField.fail(error instanceof Error ? error.message : "assistant request failed");
+        const errorMessage =
+          error instanceof Error ? error.message : "assistant request failed";
+
+        if (
+          selectedMode === "reveal" &&
+          revealRequestId != null &&
+          !isRevealRequestCurrent(revealRequestId)
+        ) {
+          return;
         }
-        Alert.alert(
-          "assistant failed",
-          error instanceof Error ? error.message : "Unknown error",
+
+        setAssistantHistory((current) =>
+          current.map((message) =>
+            message.id === streamingAssistantId
+              ? {
+                  ...message,
+                  text: errorMessage,
+                  isStreaming: false,
+                }
+              : message,
+          ),
         );
+
+        if (selectedMode === "coach") {
+          coachField.fail(errorMessage);
+        } else if (selectedMode === "reveal") {
+          if (revealRequestId != null && isRevealRequestCurrent(revealRequestId)) {
+            revealField.fail(errorMessage);
+          }
+        }
+        Alert.alert("assistant failed", errorMessage);
       } finally {
-        setAssistantLoading(false);
+        if (selectedMode === "coach") {
+          setCoachLoading(false);
+        } else if (
+          selectedMode === "reveal" &&
+          revealRequestId != null &&
+          isRevealRequestCurrent(revealRequestId)
+        ) {
+          setRevealLoading(false);
+        }
       }
     })();
   }, [
     assistantMessage,
+    beginRevealRequest,
     canInteractWithChallenge,
     coachField,
     commitAssistantTurn,
     conversationHistory,
+    isRevealRequestCurrent,
     mapConversationHistoryToChat,
     persistSession,
     requestCoachGuidance,
@@ -211,9 +252,10 @@ export function useAnswerActions({
     revealField,
     selectedMode,
     setAssistantHistory,
-    setAssistantLoading,
+    setCoachLoading,
     setAssistantMessage,
     setConversationHistory,
+    setRevealLoading,
   ]);
 
   return {

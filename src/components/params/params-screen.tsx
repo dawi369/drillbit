@@ -125,7 +125,7 @@ function PickerRow({
   title: string;
   description: string;
   value: string;
-  onPress: () => void;
+  onPress?: () => void;
 }) {
   return (
     <Pressable className="px-0 py-3" onPress={onPress}>
@@ -270,7 +270,6 @@ function ModelPickerSelect({
           title="selected model"
           description={selectedModel?.remoteId ?? "No model selected yet."}
           value={selectedModel?.label ?? "choose model"}
-          onPress={() => {}}
         />
       </Select.Trigger>
 

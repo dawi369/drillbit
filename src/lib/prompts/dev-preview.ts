@@ -27,7 +27,7 @@ function createPreviewSession(kind: PromptKind): ChallengeSessionRecord {
     selectedMode: kind === "reveal" ? "reveal" : "coach",
     notesDraft:
       "Need to reason about rule propagation, segment evaluation, caching, and safe rollback paths.",
-    conversationSummary:
+    assistantDraft:
       kind === "summarize"
         ? "User covered config storage, rollout percentages, and event logging but was weak on consistency and cache invalidation."
         : "User is midway through the challenge and has outlined the control plane and SDK responsibilities.",

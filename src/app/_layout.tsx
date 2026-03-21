@@ -26,6 +26,7 @@ export default function RootLayout() {
   useEffect(() => {
     LogBox.ignoreLogs([
       "Sending `onAnimatedValueUpdate` with no listeners registered.",
+      "could not find view or tag",
     ]);
   }, []);
 

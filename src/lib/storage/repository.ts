@@ -502,32 +502,37 @@ export async function getMemoryOverview(): Promise<MemoryOverview> {
   };
 }
 
-export async function upsertChallengeSession(record: ChallengeSessionRecord) {
+export async function upsertChallengeSession(
+  record: ChallengeSessionRecord,
+  options?: { broadcast?: boolean },
+) {
   const db = await getDatabase();
   const row = toChallengeSessionRow(record);
 
   await db.runAsync(
     `
       INSERT INTO challenge_sessions (
-        challenge_id, selected_mode, notes_draft, conversation_summary, conversation_history_json, updated_at
+        challenge_id, selected_mode, notes_draft, assistant_draft, conversation_history_json, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT(challenge_id) DO UPDATE SET
         selected_mode = excluded.selected_mode,
         notes_draft = excluded.notes_draft,
-        conversation_summary = excluded.conversation_summary,
+        assistant_draft = excluded.assistant_draft,
         conversation_history_json = excluded.conversation_history_json,
         updated_at = excluded.updated_at
     `,
     row.challenge_id,
     row.selected_mode,
     row.notes_draft,
-    row.conversation_summary,
+    row.assistant_draft ?? null,
     row.conversation_history_json,
     row.updated_at,
   );
 
-  notifyChallengeRefresh();
-  void syncWidgetState();
+  if (options?.broadcast !== false) {
+    notifyChallengeRefresh();
+    void syncWidgetState();
+  }
 
   return record;
 }
@@ -833,17 +838,6 @@ export async function markChallengeInProgress(
   };
 
   await upsertChallenge(nextRecord);
-
-  const existingSession = await getChallengeSession(challengeId);
-
-  await upsertChallengeSession({
-    challengeId,
-    selectedMode: mode,
-    notesDraft: existingSession?.notesDraft,
-    conversationSummary: existingSession?.conversationSummary,
-    conversationHistory: existingSession?.conversationHistory ?? [],
-    updatedAt: createNowIso(),
-  });
 
   return nextRecord;
 }

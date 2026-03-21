@@ -37,7 +37,7 @@ Daily flow:
     - The main body is one large answer area that stays central in every mode so the user always works in one consistent solving surface.
     - AI guidance lives in the thin assistant header and separate ask-AI entry point, not inside the main answer surface.
     - In AI Coach: no hint appears immediately on mode switch. The coach waits until the user has written enough substance or explicitly asks for help, then responds with one short directional hint at a time, using prior hints and follow-ups as context instead of repeating itself verbatim.
-    - Session state owned by the modal: `selectedMode`, `notesDraft`, `conversationSummary`, `updatedAt`.
+    - Session state owned by the modal: `selectedMode`, `notesDraft`, `assistantDraft`, `updatedAt`.
 4. Answer actions live inline beside the answer label as small right-aligned pills: Skip | Save | Done.
    - There is at most one active challenge in the live app flow: prefer an `in_progress` challenge if one exists, otherwise the newest non-expired `ready` challenge.
    - Generating a new challenge clears older untouched `ready` challenges so the active flow stays singular and predictable.
