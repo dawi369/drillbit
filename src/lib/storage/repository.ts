@@ -338,6 +338,24 @@ export async function listChallengeSummaries(limit: number = 20) {
   return rows.map(fromChallengeSummaryRow);
 }
 
+export async function listCompletedChallengesMissingSummary(limit: number = 10) {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<ReturnType<typeof toChallengeRow>>(
+    `
+      SELECT c.*
+      FROM challenges c
+      LEFT JOIN challenge_summaries s ON s.challenge_id = c.id
+      WHERE c.lifecycle = 'completed'
+        AND s.challenge_id IS NULL
+      ORDER BY COALESCE(c.completed_at, c.created_at) DESC
+      LIMIT ?
+    `,
+    limit,
+  );
+
+  return rows.map(fromChallengeRow);
+}
+
 export async function listSummariesByTopic(topic: string, limit: number = 10) {
   const db = await getDatabase();
   const rows = await db.getAllAsync<ReturnType<typeof toChallengeSummaryRow>>(
@@ -554,13 +572,14 @@ export async function upsertSettings(record: UserSettingsRecord) {
   await db.runAsync(
     `
       INSERT INTO settings (
-        id, focus_prompt, preferred_difficulty, preferred_mode, selected_model_id,
+        id, focus_prompt, preferred_difficulty, preferred_mode, notifications_enabled, selected_model_id,
         challenge_cadence_hours, first_challenge_time_minutes, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         focus_prompt = excluded.focus_prompt,
         preferred_difficulty = excluded.preferred_difficulty,
         preferred_mode = excluded.preferred_mode,
+        notifications_enabled = excluded.notifications_enabled,
         selected_model_id = excluded.selected_model_id,
         challenge_cadence_hours = excluded.challenge_cadence_hours,
         first_challenge_time_minutes = excluded.first_challenge_time_minutes,
@@ -570,6 +589,7 @@ export async function upsertSettings(record: UserSettingsRecord) {
     row.focus_prompt,
     row.preferred_difficulty,
     row.preferred_mode,
+    row.notifications_enabled,
     row.selected_model_id,
     row.challenge_cadence_hours,
     row.first_challenge_time_minutes,
@@ -674,6 +694,7 @@ export function createDefaultSettings(
     focusPrompt: "",
     preferredDifficulty: "medium",
     preferredMode: "solo",
+    notificationsEnabled: false,
     selectedModelId: defaultSeedModelId,
     challengeCadenceHours: 24,
     firstChallengeTimeMinutes: 9 * 60,

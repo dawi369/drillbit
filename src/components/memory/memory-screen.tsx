@@ -6,21 +6,18 @@ import { ScrollView, Text, View } from "react-native";
 
 import { SectionTabLabel } from "@/components/section-tab-label";
 import { cn } from "@/lib/cn";
+import {
+  formatCompletionScore,
+  getCompletionScoreBarPercent,
+} from "@/lib/memory";
 import { subscribeToMemoryRefresh } from "@/lib/memory-refresh";
+import { retryMissingChallengeSummaries } from "@/lib/memory-sync";
 import { getMemoryOverview } from "@/lib/storage/repository";
 import type {
   MemoryChallengeSummaryRow,
   MemoryOverview,
   MemoryTopicRollup,
 } from "@/lib/storage/types";
-
-function formatScore(score?: number) {
-  if (typeof score !== "number") {
-    return "-";
-  }
-
-  return `${Math.round(score)}%`;
-}
 
 function formatSessionDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, {
@@ -95,8 +92,7 @@ function MetricChip({ label, value }: { label: string; value: string }) {
 
 function GraphPlaceholder({ overview }: { overview: MemoryOverview }) {
   const bars = overview.recentSessions.slice(0, 7).map((session) => {
-    const score = typeof session.completionScore === "number" ? session.completionScore : 32;
-    return Math.max(20, Math.min(100, Math.round(score)));
+    return getCompletionScoreBarPercent(session.completionScore);
   });
 
   while (bars.length < 7) {
@@ -192,8 +188,8 @@ function SessionRow({ session }: { session: MemoryChallengeSummaryRow }) {
         </View>
 
         <View className="items-end gap-1 pt-0.5">
-          <Text className="text-sm font-semibold text-foreground">
-            {formatScore(session.completionScore)}
+            <Text className="text-sm font-semibold text-foreground">
+            {formatCompletionScore(session.completionScore)}
           </Text>
           <Text className="text-[11px] font-medium uppercase tracking-[1.3px] text-muted">
             {formatSessionDate(session.generatedAt)}
@@ -215,11 +211,11 @@ function TopicRollupRow({ rollup }: { rollup: MemoryTopicRollup }) {
             {rollup.topic}
           </Text>
           <Text className="text-sm leading-6 text-muted">
-            {rollup.count} {rollup.count === 1 ? "session" : "sessions"}
+          {rollup.count} {rollup.count === 1 ? "session" : "sessions"}
           </Text>
         </View>
         <Text className="pt-0.5 text-sm font-semibold text-foreground">
-          {formatScore(rollup.averageCompletionScore)}
+          {formatCompletionScore(rollup.averageCompletionScore)}
         </Text>
       </View>
 
@@ -283,6 +279,7 @@ export function MemoryScreen() {
   }, []);
 
   useEffect(() => {
+    void retryMissingChallengeSummaries();
     void loadOverview();
   }, [loadOverview]);
 
@@ -294,6 +291,7 @@ export function MemoryScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      void retryMissingChallengeSummaries();
       void loadOverview(true);
     }, [loadOverview]),
   );
@@ -359,7 +357,7 @@ export function MemoryScreen() {
                     <MetricChip label="completed" value={String(overview.totalCompleted)} />
                     <MetricChip
                       label="average score"
-                      value={formatScore(overview.averageCompletionScore)}
+                      value={formatCompletionScore(overview.averageCompletionScore)}
                     />
                   </View>
                 </Surface>

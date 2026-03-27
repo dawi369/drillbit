@@ -61,6 +61,7 @@ type SettingsRow = {
   focus_prompt: string;
   preferred_difficulty: Nullable<ChallengeDifficulty>;
   preferred_mode: Nullable<ChallengeMode>;
+  notifications_enabled: Nullable<number>;
   selected_model_id: Nullable<string>;
   challenge_cadence_hours: Nullable<ChallengeCadenceHours>;
   first_challenge_time_minutes: Nullable<number>;
@@ -209,6 +210,12 @@ export function toSettingsRow(record: UserSettingsRecord): SettingsRow {
     focus_prompt: record.focusPrompt,
     preferred_difficulty: record.preferredDifficulty ?? null,
     preferred_mode: record.preferredMode ?? null,
+    notifications_enabled:
+      typeof record.notificationsEnabled === "boolean"
+        ? record.notificationsEnabled
+          ? 1
+          : 0
+        : null,
     selected_model_id: record.selectedModelId ?? null,
     challenge_cadence_hours: record.challengeCadenceHours ?? null,
     first_challenge_time_minutes: record.firstChallengeTimeMinutes ?? null,
@@ -222,6 +229,8 @@ export function fromSettingsRow(row: SettingsRow): UserSettingsRecord {
     focusPrompt: row.focus_prompt,
     preferredDifficulty: undefinedIfNull(row.preferred_difficulty),
     preferredMode: undefinedIfNull(row.preferred_mode),
+    notificationsEnabled:
+      row.notifications_enabled == null ? undefined : row.notifications_enabled === 1,
     selectedModelId: undefinedIfNull(row.selected_model_id),
     challengeCadenceHours: undefinedIfNull(row.challenge_cadence_hours),
     firstChallengeTimeMinutes: undefinedIfNull(row.first_challenge_time_minutes),

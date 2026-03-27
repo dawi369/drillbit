@@ -52,6 +52,7 @@ export const CREATE_SETTINGS_TABLE_SQL = `
     focus_prompt TEXT NOT NULL,
     preferred_difficulty TEXT,
     preferred_mode TEXT,
+    notifications_enabled INTEGER,
     selected_model_id TEXT,
     challenge_cadence_hours INTEGER,
     first_challenge_time_minutes INTEGER,

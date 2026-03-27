@@ -14,8 +14,10 @@ type PersistSessionOptions = {
 
 type DraftSnapshot = {
   challengeId: string | null;
+  selectedMode: ChallengeMode;
   notesDraft: string;
   assistantDraft: string;
+  conversationHistory: ChallengeConversationTurn[];
 };
 
 export function useChallengeSessionPersistence({
@@ -33,16 +35,81 @@ export function useChallengeSessionPersistence({
 }) {
   const lastPersistedDraftsRef = useRef<DraftSnapshot>({
     challengeId: resolvedChallengeId,
+    selectedMode,
     notesDraft: "",
     assistantDraft: "",
+    conversationHistory: [],
   });
+  const latestSnapshotRef = useRef<DraftSnapshot>({
+    challengeId: resolvedChallengeId,
+    selectedMode,
+    notesDraft,
+    assistantDraft,
+    conversationHistory,
+  });
+  const persistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const persistSnapshot = useCallback(
+    async (
+      snapshot: DraftSnapshot,
+      overrides: Partial<ChallengeSessionRecord> = {},
+      options?: PersistSessionOptions,
+    ) => {
+      if (!snapshot.challengeId) {
+        return;
+      }
+
+      const nextUpdatedAt = overrides.updatedAt ?? new Date().toISOString();
+      const nextNotesDraft = overrides.notesDraft ?? snapshot.notesDraft;
+      const nextAssistantDraft = overrides.assistantDraft ?? snapshot.assistantDraft;
+      const nextConversationHistory =
+        overrides.conversationHistory ?? snapshot.conversationHistory;
+
+      debugLog("session", "persisting challenge session", {
+        challengeId: snapshot.challengeId,
+        broadcast: options?.broadcast ?? true,
+        hasConversationHistoryOverride: Boolean(overrides.conversationHistory),
+        selectedMode: overrides.selectedMode ?? snapshot.selectedMode,
+      });
+
+      await upsertChallengeSession(
+        {
+          challengeId: snapshot.challengeId,
+          selectedMode: overrides.selectedMode ?? snapshot.selectedMode,
+          notesDraft: nextNotesDraft,
+          assistantDraft: nextAssistantDraft,
+          conversationHistory: nextConversationHistory,
+          updatedAt: nextUpdatedAt,
+        },
+        options,
+      );
+
+      lastPersistedDraftsRef.current = {
+        challengeId: snapshot.challengeId,
+        selectedMode: overrides.selectedMode ?? snapshot.selectedMode,
+        notesDraft: nextNotesDraft,
+        assistantDraft: nextAssistantDraft,
+        conversationHistory: nextConversationHistory,
+      };
+    },
+    [],
+  );
 
   const syncPersistedDraftSnapshot = useCallback(
-    (snapshot?: { notesDraft?: string; assistantDraft?: string }) => {
+    (snapshot?: {
+      selectedMode?: ChallengeMode;
+      notesDraft?: string;
+      assistantDraft?: string;
+      conversationHistory?: ChallengeConversationTurn[];
+    }) => {
       lastPersistedDraftsRef.current = {
         challengeId: resolvedChallengeId,
+        selectedMode:
+          snapshot?.selectedMode ?? latestSnapshotRef.current.selectedMode,
         notesDraft: snapshot?.notesDraft ?? "",
         assistantDraft: snapshot?.assistantDraft ?? "",
+        conversationHistory:
+          snapshot?.conversationHistory ?? latestSnapshotRef.current.conversationHistory,
       };
     },
     [resolvedChallengeId],
@@ -53,37 +120,61 @@ export function useChallengeSessionPersistence({
       overrides: Partial<ChallengeSessionRecord> = {},
       options?: PersistSessionOptions,
     ) => {
-      const nextUpdatedAt = overrides.updatedAt ?? new Date().toISOString();
-      const nextNotesDraft = overrides.notesDraft ?? notesDraft;
-      const nextAssistantDraft = overrides.assistantDraft ?? assistantDraft;
-
-      debugLog("session", "persisting challenge session", {
-        challengeId: resolvedChallengeId,
-        broadcast: options?.broadcast ?? true,
-        hasConversationHistoryOverride: Boolean(overrides.conversationHistory),
-        selectedMode: overrides.selectedMode ?? selectedMode,
-      });
-
-      await upsertChallengeSession(
+      await persistSnapshot(
         {
-          challengeId: resolvedChallengeId ?? "",
-          selectedMode: overrides.selectedMode ?? selectedMode,
-          notesDraft: nextNotesDraft,
-          assistantDraft: nextAssistantDraft,
-          conversationHistory: overrides.conversationHistory ?? conversationHistory,
-          updatedAt: nextUpdatedAt,
+          challengeId: resolvedChallengeId,
+          selectedMode,
+          notesDraft,
+          assistantDraft,
+          conversationHistory,
         },
+        overrides,
         options,
       );
-
-      lastPersistedDraftsRef.current = {
-        challengeId: resolvedChallengeId,
-        notesDraft: nextNotesDraft,
-        assistantDraft: nextAssistantDraft,
-      };
     },
-    [assistantDraft, conversationHistory, notesDraft, resolvedChallengeId, selectedMode],
+    [
+      assistantDraft,
+      conversationHistory,
+      notesDraft,
+      persistSnapshot,
+      resolvedChallengeId,
+      selectedMode,
+    ],
   );
+
+  useEffect(() => {
+    latestSnapshotRef.current = {
+      challengeId: resolvedChallengeId,
+      selectedMode,
+      notesDraft,
+      assistantDraft,
+      conversationHistory,
+    };
+  }, [assistantDraft, conversationHistory, notesDraft, resolvedChallengeId, selectedMode]);
+
+  useEffect(() => {
+    return () => {
+      const snapshot = latestSnapshotRef.current;
+      const lastPersistedDrafts = lastPersistedDraftsRef.current;
+      const hasUnflushedDrafts =
+        snapshot.challengeId === lastPersistedDrafts.challengeId &&
+        snapshot.challengeId != null &&
+        (snapshot.notesDraft !== lastPersistedDrafts.notesDraft ||
+          snapshot.assistantDraft !== lastPersistedDrafts.assistantDraft ||
+          snapshot.selectedMode !== lastPersistedDrafts.selectedMode ||
+          snapshot.conversationHistory !== lastPersistedDrafts.conversationHistory);
+
+      if (!hasUnflushedDrafts) {
+        return;
+      }
+
+      debugLog("session", "flushing session snapshot before challenge switch", {
+        challengeId: snapshot.challengeId,
+      });
+
+      void persistSnapshot(snapshot, {}, { broadcast: false });
+    };
+  }, [persistSnapshot, resolvedChallengeId]);
 
   useEffect(() => {
     if (!resolvedChallengeId) {
@@ -100,23 +191,62 @@ export function useChallengeSessionPersistence({
       return;
     }
 
-    const timeout = setTimeout(() => {
+    if (persistTimeoutRef.current) {
+      clearTimeout(persistTimeoutRef.current);
+    }
+
+    persistTimeoutRef.current = setTimeout(() => {
       debugLog("session", "persisting draft snapshot", {
         challengeId: resolvedChallengeId,
         notesLength: notesDraft.length,
         assistantLength: assistantDraft.length,
       });
-      void persistSession(
+      void persistSnapshot(
+        latestSnapshotRef.current,
         {
           notesDraft,
           assistantDraft,
         },
         { broadcast: false },
       );
+      persistTimeoutRef.current = null;
     }, 400);
 
-    return () => clearTimeout(timeout);
-  }, [assistantDraft, notesDraft, persistSession, resolvedChallengeId]);
+    return () => {
+      if (persistTimeoutRef.current) {
+        clearTimeout(persistTimeoutRef.current);
+        persistTimeoutRef.current = null;
+      }
+    };
+  }, [assistantDraft, notesDraft, persistSnapshot, resolvedChallengeId]);
+
+  useEffect(() => {
+    return () => {
+      if (persistTimeoutRef.current) {
+        clearTimeout(persistTimeoutRef.current);
+        persistTimeoutRef.current = null;
+      }
+
+      const snapshot = latestSnapshotRef.current;
+      const lastPersistedDrafts = lastPersistedDraftsRef.current;
+      const hasUnflushedDrafts =
+        snapshot.challengeId === lastPersistedDrafts.challengeId &&
+        (snapshot.notesDraft !== lastPersistedDrafts.notesDraft ||
+          snapshot.assistantDraft !== lastPersistedDrafts.assistantDraft ||
+          snapshot.selectedMode !== lastPersistedDrafts.selectedMode ||
+          snapshot.conversationHistory !== lastPersistedDrafts.conversationHistory);
+
+      if (!hasUnflushedDrafts) {
+        return;
+      }
+
+      debugLog("session", "flushing session snapshot during cleanup", {
+        challengeId: snapshot.challengeId,
+      });
+
+      void persistSnapshot(snapshot, {}, { broadcast: false });
+    };
+  }, [persistSnapshot]);
 
   return {
     persistSession,

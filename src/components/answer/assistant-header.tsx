@@ -56,7 +56,7 @@ function getAssistantFallbackCopy(
   }
 
   return mode === "coach"
-    ? "one gentle coaching sentence lives here at a time — tap to ask a clarifying question"
+    ? "coach will activate once you have types enough to show your direction"
     : "reveal will give one structured answer surface here — tap to inspect and ask follow-ups later";
 }
 
@@ -117,8 +117,7 @@ export function AssistantHeader({
   return (
     <Pressable
       className={cn(
-        "border-b border-border px-5 py-3",
-        mode === "coach" ? "bg-accent/10" : "bg-surface-secondary",
+        "border-b border-border bg-surface-secondary px-5 py-3",
       )}
       onPress={onPress}
     >

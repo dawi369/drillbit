@@ -1,6 +1,5 @@
 import { router } from "expo-router";
 import { Button, Menu, Separator, SubMenu } from "heroui-native";
-import { useEffect, useRef, useState } from "react";
 import { Text, View } from "react-native";
 
 import { MODE_OPTIONS } from "@/constants/params";
@@ -44,42 +43,6 @@ export function HeaderMenuButton({
 }) {
   const selectedModel = availableModels.find((model) => model.id === selectedModelId);
   const selectedModeOption = MODE_OPTIONS.find((option) => option.value === selectedMode);
-  const [openSubMenu, setOpenSubMenu] = useState<"mode" | "model" | null>(null);
-  const openSubMenuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (openSubMenuTimeoutRef.current) {
-        clearTimeout(openSubMenuTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  function handleSubMenuOpenChange(nextKey: "mode" | "model", open: boolean) {
-    if (!open) {
-      setOpenSubMenu((current) => (current === nextKey ? null : current));
-      return;
-    }
-
-    if (openSubMenu && openSubMenu !== nextKey) {
-      setOpenSubMenu(null);
-      if (openSubMenuTimeoutRef.current) {
-        clearTimeout(openSubMenuTimeoutRef.current);
-      }
-      openSubMenuTimeoutRef.current = setTimeout(() => {
-        setOpenSubMenu(nextKey);
-        openSubMenuTimeoutRef.current = null;
-      }, 40);
-      return;
-    }
-
-    if (openSubMenuTimeoutRef.current) {
-      clearTimeout(openSubMenuTimeoutRef.current);
-      openSubMenuTimeoutRef.current = null;
-    }
-
-    setOpenSubMenu(nextKey);
-  }
 
   return (
     <Menu>
@@ -105,13 +68,8 @@ export function HeaderMenuButton({
 
           <Separator className="mx-3 my-2 h-px opacity-100" />
 
-          <View style={{ zIndex: openSubMenu === "mode" ? 20 : 0 }}>
-            <SubMenu
-              isOpen={openSubMenu === "mode"}
-              onOpenChange={(open) => {
-                handleSubMenuOpenChange("mode", open);
-              }}
-            >
+          <View>
+            <SubMenu>
               <SubMenu.Trigger textValue="mode">
                 <View className="flex-1">
                   <Text className="text-sm font-medium text-foreground">mode</Text>
@@ -129,7 +87,6 @@ export function HeaderMenuButton({
                     const nextMode = Array.from(keys)[0];
                     if (nextMode === "solo" || nextMode === "coach" || nextMode === "reveal") {
                       onSelectMode(nextMode);
-                      setOpenSubMenu(null);
                     }
                   }}
                 >
@@ -149,13 +106,8 @@ export function HeaderMenuButton({
 
           <Separator className="mx-3 my-2 h-px opacity-100" />
 
-          <View style={{ zIndex: openSubMenu === "model" ? 20 : 0 }}>
-            <SubMenu
-              isOpen={openSubMenu === "model"}
-              onOpenChange={(open) => {
-                handleSubMenuOpenChange("model", open);
-              }}
-            >
+          <View>
+            <SubMenu>
               <SubMenu.Trigger textValue="models">
                 <View className="flex-1">
                   <Text className="text-sm font-medium text-foreground">models</Text>
@@ -174,7 +126,6 @@ export function HeaderMenuButton({
                     const nextModel = availableModels.find((model) => model.id === nextModelId);
                     if (nextModel) {
                       onSelectModel(nextModel);
-                      setOpenSubMenu(null);
                     }
                   }}
                 >

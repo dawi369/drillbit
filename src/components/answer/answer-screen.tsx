@@ -121,7 +121,7 @@ export function AnswerScreen() {
     return null;
   }, [params.mode]);
   
-  const [selectedMode, setSelectedMode] = useState<ChallengeMode>(routeMode ?? "coach");
+  const [selectedMode, setSelectedMode] = useState<ChallengeMode>(routeMode ?? "solo");
   const [notesDraft, setNotesDraft] = useState("");
   const [assistantDraft, setAssistantDraft] = useState("");
   const [, setUpdatedAt] = useState(new Date().toISOString());
@@ -185,7 +185,7 @@ export function AnswerScreen() {
   }, [params, resolvedChallengeId, routeMode]);
 
   const resetAnswerState = useCallback(
-    (nextMode: ChallengeMode = routeMode ?? "coach") => {
+    (nextMode: ChallengeMode = routeMode ?? "solo") => {
       setChallenge(null);
       setSelectedMode(nextMode);
       setNotesDraft("");
@@ -198,7 +198,7 @@ export function AnswerScreen() {
       setAssistantInputOpen(false);
       setAssistantMessage("");
     },
-    [coachField, revealField, routeMode],
+    [coachField.reset, revealField.reset, routeMode],
   );
 
   const normalizedNotesDraft = useMemo(
@@ -248,8 +248,8 @@ export function AnswerScreen() {
     resolvedChallengeId,
     routeMode,
     resetAnswerState,
-    coachField,
-    revealField,
+    resetCoachField: coachField.reset,
+    resetRevealField: revealField.reset,
     syncPersistedDraftSnapshot,
     setSelectedMode,
     setNotesDraft,
@@ -290,6 +290,13 @@ export function AnswerScreen() {
   }, [invalidateCoachRequest, invalidateRevealRequest, selectedMode]);
 
   useEffect(() => {
+    invalidateCoachRequest();
+    invalidateRevealRequest();
+    setCoachLoading(false);
+    setRevealLoading(false);
+  }, [invalidateCoachRequest, invalidateRevealRequest, resolvedChallengeId]);
+
+  useEffect(() => {
     if (selectedMode === "solo") {
       setAssistantHistory([]);
       return;
@@ -303,13 +310,16 @@ export function AnswerScreen() {
       return;
     }
 
-    debugLog("answer", "marking challenge in progress", {
-      resolvedChallengeId,
-      selectedMode,
-    });
+    if (challenge.lifecycle !== "in_progress") {
+      debugLog("answer", "marking challenge in progress", {
+        resolvedChallengeId,
+        selectedMode,
+      });
 
-    void markChallengeInProgress(resolvedChallengeId, selectedMode);
-    void persistSession({ selectedMode });
+      void markChallengeInProgress(resolvedChallengeId, selectedMode);
+    }
+
+    void persistSession({ selectedMode }, { broadcast: false });
   }, [challenge, persistSession, resolvedChallengeId, selectedMode]);
 
   useRevealOutput({

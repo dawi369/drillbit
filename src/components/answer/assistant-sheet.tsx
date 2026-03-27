@@ -140,7 +140,8 @@ export function AssistantSheet({
   const lastHistoryEntryRef = useRef<string | null>(null);
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSheetVisibleRef = useRef(visible);
-  const historyCardHeight = Math.min(Math.max(windowHeight * 0.36, 220), 340);
+  const isKeyboardOpenRef = useRef(false);
+  const historyCardHeight = Math.min(Math.max(windowHeight * 0.42, 252), 392);
 
   const scheduleScrollToEnd = useCallback((animated: boolean) => {
     if (!isSheetVisibleRef.current) {
@@ -176,9 +177,12 @@ export function AssistantSheet({
   useEffect(() => {
     isSheetVisibleRef.current = visible;
 
-    if (!visible && scrollTimeoutRef.current) {
-      clearTimeout(scrollTimeoutRef.current);
-      scrollTimeoutRef.current = null;
+    if (!visible) {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+        scrollTimeoutRef.current = null;
+      }
+
       Keyboard.dismiss();
       keyboardLift.value = 0;
     }
@@ -217,6 +221,10 @@ export function AssistantSheet({
       return;
     }
 
+    if (!appendedNewEntry && isKeyboardOpenRef.current) {
+      return;
+    }
+
     scheduleScrollToEnd(appendedNewEntry);
   }, [assistantHistory, scheduleScrollToEnd, visible]);
 
@@ -225,6 +233,7 @@ export function AssistantSheet({
     const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
 
     const showSubscription = Keyboard.addListener(showEvent, (event) => {
+      isKeyboardOpenRef.current = true;
       const lift = Math.min(event.endCoordinates.height * 0.72, windowHeight * 0.34);
       keyboardLift.value = withTiming(lift, {
         duration: 280,
@@ -233,6 +242,7 @@ export function AssistantSheet({
     });
 
     const hideSubscription = Keyboard.addListener(hideEvent, () => {
+      isKeyboardOpenRef.current = false;
       keyboardLift.value = withTiming(0, {
         duration: 240,
         easing: Easing.out(Easing.cubic),

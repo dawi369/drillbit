@@ -149,7 +149,7 @@ export function renderPrompt(promptContext: PromptContext) {
         ...baseMemorySections,
         renderSection(
           "task",
-          "Generate one unique interview challenge as strict JSON with keys title, teaser, and topic.",
+          "Generate one unique, concrete interview challenge as strict JSON with keys title, teaser, and topic. The teaser should make the central task explicit and include specific constraints or failure pressure, not a vague topic prompt.",
         ),
       ].join("\n\n");
     case "coach":
@@ -189,7 +189,7 @@ export function renderPrompt(promptContext: PromptContext) {
         renderSection(
           "task",
           promptContext.kind === "coach"
-            ? "Respond as the coach with one very short hint or one short next-step question as strict JSON with key guidance."
+            ? "Respond as the coach with one short, concrete next step as strict JSON with key guidance. Prefer naming one exact decision, failure path, boundary, metric, or request flow to examine next."
             : "Reveal a strong structured answer for this challenge.",
         ),
       ]

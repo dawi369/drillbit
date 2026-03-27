@@ -26,8 +26,8 @@ export function useAnswerScreenState({
   resolvedChallengeId,
   routeMode,
   resetAnswerState,
-  coachField,
-  revealField,
+  resetCoachField,
+  resetRevealField,
   syncPersistedDraftSnapshot,
   setSelectedMode,
   setNotesDraft,
@@ -39,15 +39,13 @@ export function useAnswerScreenState({
   resolvedChallengeId: string | null;
   routeMode: ChallengeMode | null;
   resetAnswerState: (nextMode?: ChallengeMode) => void;
-  coachField: {
-    reset: (nextStatus?: "idle" | "thinking" | "streaming" | "done" | "error") => void;
-  };
-  revealField: {
-    reset: (nextStatus?: "idle" | "thinking" | "streaming" | "done" | "error") => void;
-  };
+  resetCoachField: (nextStatus?: "idle" | "thinking" | "streaming" | "done" | "error") => void;
+  resetRevealField: (nextStatus?: "idle" | "thinking" | "streaming" | "done" | "error") => void;
   syncPersistedDraftSnapshot: (snapshot?: {
+    selectedMode?: ChallengeMode;
     notesDraft?: string;
     assistantDraft?: string;
+    conversationHistory?: ChallengeConversationTurn[];
   }) => void;
   setSelectedMode: React.Dispatch<React.SetStateAction<ChallengeMode>>;
   setNotesDraft: React.Dispatch<React.SetStateAction<string>>;
@@ -135,7 +133,7 @@ export function useAnswerScreenState({
 
       if (existingSession) {
         setSelectedMode(
-          existingSession.selectedMode ?? settings.preferredMode ?? routeMode ?? "coach",
+          routeMode ?? existingSession.selectedMode ?? settings.preferredMode ?? "solo",
         );
         setNotesDraft(existingSession.notesDraft ?? "");
         setAssistantDraft(existingSession.assistantDraft ?? "");
@@ -143,19 +141,25 @@ export function useAnswerScreenState({
         setUpdatedAt(existingSession.updatedAt);
         setConversationHistory(existingSession.conversationHistory);
         syncPersistedDraftSnapshot({
+          selectedMode:
+            routeMode ?? existingSession.selectedMode ?? settings.preferredMode ?? "solo",
           notesDraft: existingSession.notesDraft,
           assistantDraft: existingSession.assistantDraft,
+          conversationHistory: existingSession.conversationHistory,
         });
       } else {
-        setSelectedMode(settings.preferredMode ?? routeMode ?? "coach");
+        setSelectedMode(routeMode ?? settings.preferredMode ?? "solo");
         setNotesDraft("");
         setAssistantDraft("");
         setAssistantMessage("");
         setUpdatedAt(new Date().toISOString());
         setConversationHistory([]);
-        syncPersistedDraftSnapshot();
-        coachField.reset();
-        revealField.reset();
+        syncPersistedDraftSnapshot({
+          selectedMode: routeMode ?? settings.preferredMode ?? "solo",
+          conversationHistory: [],
+        });
+        resetCoachField();
+        resetRevealField();
       }
 
       setChallengeLoading(false);
@@ -167,10 +171,10 @@ export function useAnswerScreenState({
       isMounted = false;
     };
   }, [
-    coachField,
     resolvedChallengeId,
+    resetCoachField,
     resetAnswerState,
-    revealField,
+    resetRevealField,
     routeMode,
     setAssistantDraft,
     setAssistantMessage,

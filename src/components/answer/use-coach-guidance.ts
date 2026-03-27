@@ -7,8 +7,8 @@ import type {
   CoachTriggerReason,
 } from "@/lib/storage/types";
 
-const AUTO_COACH_MIN_NOTES_CHARS = 180;
-const AUTO_COACH_MIN_NEW_CHARS = 80;
+const AUTO_COACH_MIN_NOTES_CHARS = 126;
+const AUTO_COACH_MIN_NEW_CHARS = 56;
 const AUTO_COACH_IDLE_MS = 2500;
 const AUTO_COACH_COOLDOWN_MS = 15000;
 

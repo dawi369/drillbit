@@ -17,6 +17,7 @@ import {
 } from "@/constants/params";
 import { SectionTabLabel } from "@/components/section-tab-label";
 import { cn } from "@/lib/cn";
+import { syncChallengeNotifications } from "@/lib/notifications";
 import { subscribeToModelsRefresh } from "@/lib/models-refresh";
 import { getFocusPromptPresets } from "@/lib/prompts/prompt-library";
 import { subscribeToSettingsRefresh } from "@/lib/settings-refresh";
@@ -449,6 +450,7 @@ export function ParamsScreen() {
     draft.focusPrompt !== savedSettings.focusPrompt ||
     draft.preferredDifficulty !== savedSettings.preferredDifficulty ||
     draft.preferredMode !== savedSettings.preferredMode ||
+    draft.notificationsEnabled !== savedSettings.notificationsEnabled ||
     draft.selectedModelId !== savedSettings.selectedModelId ||
     draft.challengeCadenceHours !== savedSettings.challengeCadenceHours ||
     draft.firstChallengeTimeMinutes !== savedSettings.firstChallengeTimeMinutes;
@@ -557,12 +559,24 @@ export function ParamsScreen() {
         ),
         updatedAt: new Date().toISOString(),
       };
+      const requestedNotifications = nextSettings.notificationsEnabled === true;
 
       await upsertSettings(nextSettings);
       await refreshReadyChallengeExpirations(nextSettings);
+      const notificationResult = await syncChallengeNotifications({
+        requestPermissionsIfNeeded: requestedNotifications,
+      });
+      if (requestedNotifications && !notificationResult.permissionGranted) {
+        nextSettings.notificationsEnabled = false;
+        await upsertSettings(nextSettings);
+      }
       setDraft(nextSettings);
       setSavedSettings(nextSettings);
-      setSaveStatus("saved locally");
+      setSaveStatus(
+        requestedNotifications && !notificationResult.permissionGranted
+          ? "saved, but notifications were not allowed"
+          : "saved locally",
+      );
     } catch (error) {
       setSaveStatus(
         error instanceof Error ? error.message : "failed to save settings",
@@ -877,6 +891,38 @@ export function ParamsScreen() {
                       }));
                     }}
                   />
+                </Row>
+
+                <Separator className="opacity-35" />
+
+                <Row
+                  title="daily reminder"
+                  description="One quiet notification at your first challenge time. It does not notify on every cadence slot."
+                >
+                  <View className="gap-0 pt-1">
+                    <SelectableRow
+                      title="on"
+                      description="A single reminder each day at the first challenge time."
+                      selected={draft.notificationsEnabled === true}
+                      onPress={() =>
+                        setDraft((current) => ({
+                          ...current,
+                          notificationsEnabled: true,
+                        }))
+                      }
+                    />
+                    <SelectableRow
+                      title="off"
+                      description="No local notifications from drillbit."
+                      selected={draft.notificationsEnabled !== true}
+                      onPress={() =>
+                        setDraft((current) => ({
+                          ...current,
+                          notificationsEnabled: false,
+                        }))
+                      }
+                    />
+                  </View>
                 </Row>
               </View>
             </Tabs.Content>

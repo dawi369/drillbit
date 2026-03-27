@@ -73,6 +73,7 @@ export type UserSettingsRecord = {
   focusPrompt: string;
   preferredDifficulty?: ChallengeDifficulty;
   preferredMode?: ChallengeMode;
+  notificationsEnabled?: boolean;
   selectedModelId?: string;
   challengeCadenceHours?: ChallengeCadenceHours;
   firstChallengeTimeMinutes?: number;

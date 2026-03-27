@@ -32,21 +32,34 @@ export function getNextScheduledChallengeDate({
 }) {
   const cadenceMinutes = challengeCadenceHours * 60;
   const dayStart = new Date(from);
-
   dayStart.setHours(0, 0, 0, 0);
 
-  const baseSlot = new Date(dayStart);
-  baseSlot.setMinutes(firstChallengeTimeMinutes, 0, 0);
+  const candidateMinutes: number[] = [];
+  for (
+    let totalMinutes = firstChallengeTimeMinutes;
+    totalMinutes < 24 * 60;
+    totalMinutes += cadenceMinutes
+  ) {
+    candidateMinutes.push(totalMinutes);
+  }
 
-  const slotsToCheck = Math.ceil((48 * 60) / cadenceMinutes) + 2;
+  if (candidateMinutes.length === 0) {
+    const fallback = new Date(dayStart);
+    fallback.setMinutes(firstChallengeTimeMinutes, 0, 0);
+    return fallback > from ? fallback : new Date(fallback.getTime() + 24 * 60 * 60_000);
+  }
 
-  for (let index = 0; index < slotsToCheck; index += 1) {
-    const candidate = new Date(baseSlot.getTime() + index * cadenceMinutes * 60_000);
+  for (const totalMinutes of candidateMinutes) {
+    const candidate = new Date(dayStart);
+    candidate.setMinutes(totalMinutes, 0, 0);
 
     if (candidate > from) {
       return candidate;
     }
   }
 
-  return new Date(from.getTime() + cadenceMinutes * 60_000);
+  const nextDayFirstSlot = new Date(dayStart);
+  nextDayFirstSlot.setDate(nextDayFirstSlot.getDate() + 1);
+  nextDayFirstSlot.setMinutes(candidateMinutes[0], 0, 0);
+  return nextDayFirstSlot;
 }

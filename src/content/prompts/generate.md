@@ -38,6 +38,7 @@ Return one JSON object only, with exactly these keys:
 - The challenge should contain enough tension to reward prioritization, not just feature listing.
 - The challenge should match the user's focus even when that focus is narrower than default system design behavior.
 - The challenge should be clearly different from blocked challenge shapes, even if the broad topic overlaps.
+- The best teaser names a concrete objective, a concrete environment, and 2-4 concrete constraints or failure pressures.
 </quality_bar>
 
 <generation_rules>
@@ -46,6 +47,9 @@ Return one JSON object only, with exactly these keys:
 - If the focus is broad, choose one sharp sub-problem instead of staying vague.
 - If the focus is narrow, obey it and do not drift back to generic system design.
 - Add realistic constraints that force judgment: scale, latency, reliability, consistency, safety, accessibility, failure handling, rollout risk, or ambiguity.
+- Make the central task explicit. The user should know what they are being asked to design, debug, reason about, or implement after one read.
+- Prefer one hard edge over many soft ones: one consistency boundary, one stale-state problem, one operational failure, one UI conflict, one tricky algorithmic invariant.
+- A strong teaser usually reads like `Design/debug/reason about X for Y, where Z constraints make the naive answer fail.`
 - Keep the teaser self-contained. The candidate should understand the assignment without extra explanation.
 - Do not mention the app, the prompt tags, or the existence of prior summaries.
 - Do not ask multiple unrelated questions in one teaser.
@@ -69,6 +73,7 @@ Return one JSON object only, with exactly these keys:
 - Too repetitive: same shape as a blocked challenge with different nouns
 - Too toy-like: small CRUD dashboard prompts when the focus asks for architecture or debugging depth
 - Wrong steering: generic distributed systems output when the focus clearly asks for frontend or algorithms
+- Too under-specified: a teaser that names a domain but not the exact pressure, failure mode, or decision that makes the interview interesting
 </bad_outputs>
 
 <decision_process>

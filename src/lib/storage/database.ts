@@ -29,6 +29,22 @@ async function createTables(db: SQLiteDatabase) {
         "UPDATE challenge_sessions SET assistant_draft = conversation_summary WHERE assistant_draft IS NULL",
       );
     }
+
+    const settingsColumns = await db.getAllAsync<{ name: string }>(
+      "PRAGMA table_info(settings)",
+    );
+    const hasNotificationsEnabledColumn = settingsColumns.some(
+      (column) => column.name === "notifications_enabled",
+    );
+
+    if (!hasNotificationsEnabledColumn) {
+      await db.execAsync(
+        "ALTER TABLE settings ADD COLUMN notifications_enabled INTEGER",
+      );
+      await db.execAsync(
+        "UPDATE settings SET notifications_enabled = 0 WHERE notifications_enabled IS NULL",
+      );
+    }
   });
 }
 
