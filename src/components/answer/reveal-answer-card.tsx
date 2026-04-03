@@ -28,10 +28,10 @@ export function RevealAnswerCard({
 
   return (
     <Animated.View
-      className="rounded-[28px] border border-border bg-surface-secondary px-4 py-4"
+      className="rounded-[var(--radius)] border border-border bg-surface-secondary px-4 py-4"
       style={animatedStyle}
     >
-      <Text className="mb-2 text-xs font-medium uppercase tracking-[1.4px] text-muted">
+      <Text className="mb-2 text-xs font-medium uppercase tracking-[1px] text-muted">
         reveal answer
       </Text>
       <Text selectable className="text-sm leading-6 text-foreground">

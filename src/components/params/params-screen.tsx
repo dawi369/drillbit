@@ -57,7 +57,7 @@ function PanelIntro({
 }) {
   return (
     <View className="gap-1 px-1 pb-3">
-      <Text className="text-[22px] font-semibold tracking-tight text-foreground">
+      <Text className="text-2xl font-semibold tracking-tight text-foreground">
         {title}
       </Text>
       <Text className="text-sm leading-6 text-muted">{description}</Text>
@@ -68,10 +68,10 @@ function PanelIntro({
 function PageHeader() {
   return (
     <View className="gap-3">
-      <Text className="text-[40px] font-semibold tracking-tight text-foreground">
+      <Text className="text-4xl font-semibold tracking-tight text-foreground">
         params
       </Text>
-      <Text className="max-w-xl text-[15px] leading-6 text-muted">
+      <Text className="max-w-xl text-base leading-6 text-muted">
         Tune you focus prompt, default help level, model, and schedule for new
         challenges.
       </Text>
@@ -93,9 +93,9 @@ function Row({
   valueSelectable?: boolean;
 }) {
   return (
-    <View className="gap-2.5 py-5">
+    <View className="gap-3 py-6">
       <View className="gap-1">
-        <Text className="text-[15px] font-semibold text-foreground">
+        <Text className="text-base font-semibold text-foreground">
           {title}
         </Text>
         {description ? (
@@ -132,7 +132,7 @@ function PickerRow({
     <Pressable className="px-0 py-3" onPress={onPress}>
       <View className="flex-row items-start justify-between gap-3">
         <View className="min-w-0 flex-1 gap-1">
-          <Text className="text-[15px] font-semibold text-foreground">
+          <Text className="text-base font-semibold text-foreground">
             {title}
           </Text>
           <Text className="text-sm leading-6 text-muted">{description}</Text>
@@ -145,7 +145,7 @@ function PickerRow({
           >
             {value}
           </Text>
-          <Text className="text-xs font-medium uppercase tracking-[1.4px] text-muted">
+          <Text className="text-xs font-medium uppercase tracking-[1px] text-muted">
             choose
           </Text>
         </View>
@@ -168,7 +168,7 @@ function SelectableRow({
   return (
     <Pressable
       className={cn(
-        "flex-row items-start gap-3 rounded-[18px] px-2 py-3",
+        "flex-row items-start gap-3 rounded-[var(--radius)] px-3 py-3",
         selected
           ? "bg-transparent"
           : "bg-transparent active:bg-surface-secondary/18",
@@ -192,7 +192,7 @@ function SelectableRow({
             {title}
           </Text>
           {selected ? (
-            <Text className="text-[11px] font-semibold uppercase tracking-[1.4px] text-accent/80">
+            <Text className="text-xs font-semibold uppercase tracking-[1px] text-accent/80">
               selected
             </Text>
           ) : null}
@@ -216,7 +216,7 @@ function FocusPresetChip({
   return (
     <Pressable
       className={cn(
-        "rounded-full border px-4 py-2.5",
+        "h-10 items-center justify-center rounded-[var(--radius)] border px-4",
         selected
           ? "border-border/70 bg-surface-secondary/26"
           : "border-border/50 bg-transparent active:bg-surface-secondary/24",
@@ -275,13 +275,13 @@ function ModelPickerSelect({
       </Select.Trigger>
 
       <Select.Portal>
-        <Select.Overlay className="bg-black/20" />
+        <Select.Overlay className="bg-foreground/20" />
         <Select.Content
           presentation="bottom-sheet"
           snapPoints={["52%"]}
           contentContainerClassName="px-5 pb-safe-offset-6 pt-1"
         >
-          <Select.ListLabel className="mb-2 text-[11px] font-semibold uppercase tracking-[1.4px] text-muted">
+          <Select.ListLabel className="mb-2 text-xs font-semibold uppercase tracking-[1px] text-muted">
             choose model
           </Select.ListLabel>
           {models.map((model, index) => (
@@ -292,7 +292,7 @@ function ModelPickerSelect({
                 className="px-0 py-4"
               >
                 <View className="flex-1">
-                  <Select.ItemLabel className="text-[15px] font-semibold text-foreground" />
+                  <Select.ItemLabel className="text-base font-semibold text-foreground" />
                   <Select.ItemDescription className="pt-0.5 text-sm leading-6 text-muted">
                     {model.remoteId}
                   </Select.ItemDescription>
@@ -370,7 +370,7 @@ function CompactCadenceDialog({
               >
                 {selectedOption.label}
               </Text>
-              <Text className="text-xs font-medium uppercase tracking-[1.4px] text-muted">
+              <Text className="text-xs font-medium uppercase tracking-[1px] text-muted">
                 change
               </Text>
             </View>
@@ -385,7 +385,7 @@ function CompactCadenceDialog({
           classNames={{
             wrapper: "px-6",
             content:
-              "rounded-[28px] border border-border/50 bg-background px-4 py-4",
+              "rounded-[var(--radius)] border border-border/50 bg-background px-4 py-4",
           }}
         >
           <Select.ListLabel>cadence</Select.ListLabel>
@@ -675,7 +675,7 @@ export function ParamsScreen() {
                         offsetX: nativeEvent.contentOffset.x,
                       }));
                     }}
-                    contentContainerClassName="gap-2.5 pr-10"
+                    contentContainerClassName="gap-3 pr-12"
                   >
                     {focusPromptPresets.map((preset) => (
                       <FocusPresetChip
@@ -706,7 +706,7 @@ export function ParamsScreen() {
                 <View className="border-t border-border/40 pt-4">
                   <View className="mb-3 flex-row items-start justify-between gap-3">
                     <View className="min-w-0 flex-1 gap-1">
-                      <Text className="text-xs font-semibold uppercase tracking-[1.4px] text-muted">
+                      <Text className="text-xs font-semibold uppercase tracking-[1px] text-muted">
                         focus prompt
                       </Text>
                       <Text className="text-sm font-medium text-foreground">
@@ -715,7 +715,7 @@ export function ParamsScreen() {
                     </View>
 
                     <View className="items-end gap-1">
-                      <Text className="text-xs font-medium uppercase tracking-[1.4px] text-muted">
+                      <Text className="text-xs font-medium uppercase tracking-[1px] text-muted">
                         {focusPromptCharacterCount > 0
                           ? `${focusPromptCharacterCount} chars`
                           : "set this before generating"}
@@ -751,7 +751,7 @@ export function ParamsScreen() {
                       }));
                       setPendingPresetId(null);
                     }}
-                    className="py-3 text-base leading-7 text-foreground"
+                    className="rounded-[var(--radius)] border border-border bg-surface px-4 py-3 text-base leading-6 text-foreground"
                     placeholderTextColorClassName="accent-muted"
                     style={{ height: FOCUS_EDITOR_HEIGHT }}
                   />
@@ -976,7 +976,7 @@ export function ParamsScreen() {
       >
         <Dialog.Portal>
           <Dialog.Overlay />
-          <Dialog.Content className="mx-6 rounded-[28px] border border-border/60 bg-background px-5 py-5">
+          <Dialog.Content className="mx-6 rounded-[var(--radius)] border border-border/60 bg-background px-5 py-5">
             <View className="gap-4">
               <View className="gap-1">
                 <Dialog.Title className="text-xl font-semibold tracking-tight text-foreground">

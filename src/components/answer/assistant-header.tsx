@@ -121,11 +121,11 @@ export function AssistantHeader({
       )}
       onPress={onPress}
     >
-      <Text className="mb-1 text-xs font-medium uppercase tracking-[1.6px] text-muted">
+      <Text className="mb-1 text-xs font-medium uppercase tracking-[1px] text-muted">
         {mode === "coach" ? "ai coach" : "reveal"}
       </Text>
       {statusLabel ? (
-        <Text className="mb-1 text-[10px] font-medium uppercase tracking-[1.4px] text-muted">
+        <Text className="mb-1 text-xs font-medium uppercase tracking-[1px] text-muted">
           {statusLabel}
         </Text>
       ) : null}

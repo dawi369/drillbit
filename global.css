@@ -6,7 +6,7 @@
 
 @theme {
   --radius: 0.625rem;
-  --field-radius: 1rem;
+  --field-radius: 0.625rem;
   --field-border-width: 1px;
 }
 

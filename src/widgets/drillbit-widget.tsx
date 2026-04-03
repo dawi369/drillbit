@@ -20,6 +20,7 @@ import {
   type ChallengeMode,
   type WidgetViewState,
 } from "@/lib/widgets/types";
+import { APP_THEME_COLORS } from "@/constants/theme";
 import {
   createWidgetAnswerTarget,
   createWidgetTabTarget,
@@ -32,11 +33,11 @@ export type DrillbitWidgetProps = WidgetViewState;
 function getWidgetPadding(widgetFamily: WidgetFamily) {
   switch (widgetFamily) {
     case "systemLarge":
-      return 18;
+      return 24;
     case "systemMedium":
-      return 16;
+      return 20;
     default:
-      return 14;
+      return 16;
   }
 }
 
@@ -48,19 +49,31 @@ function DrillbitWidgetLayout(
 
   const paddingValue = getWidgetPadding(environment.widgetFamily);
   const secondaryColor =
-    environment.colorScheme === "dark" ? "#8b98a5" : "#536471";
-  const titleColor = environment.colorScheme === "dark" ? "#f5f7fa" : "#0f1419";
-  const tertiaryColor = environment.colorScheme === "dark" ? "#5f6c77" : "#8899a6";
-  const eyebrow =
-    props.status === "in_progress"
-      ? "in progress"
-      : props.status === "awaiting_next"
-        ? "awaiting next"
-        : props.status === "unconfigured"
-          ? "setup"
-          : props.status === "error"
-            ? "attention"
-          : "ready";
+    environment.colorScheme === "dark"
+      ? APP_THEME_COLORS.darkTextSecondary
+      : APP_THEME_COLORS.lightTextSecondary;
+  const titleColor =
+    environment.colorScheme === "dark"
+      ? APP_THEME_COLORS.darkTextPrimary
+      : APP_THEME_COLORS.lightTextPrimary;
+  const tertiaryColor =
+    environment.colorScheme === "dark"
+      ? APP_THEME_COLORS.darkTextTertiary
+      : APP_THEME_COLORS.lightTextTertiary;
+  const eyebrow = (() => {
+    switch (props.status) {
+      case "in_progress":
+        return "in progress";
+      case "awaiting_next":
+        return "awaiting next";
+      case "unconfigured":
+        return "setup";
+      case "error":
+        return "attention";
+      default:
+        return "ready";
+    }
+  })();
 
   const defaultMode =
     props.status === "ready" || props.status === "in_progress"
@@ -90,7 +103,7 @@ function DrillbitWidgetLayout(
         modifiers={[
           buttonStyle("borderedProminent"),
           controlSize(environment.widgetFamily === "systemSmall" ? "small" : "regular"),
-          tint("#1d9bf0"),
+          tint(APP_THEME_COLORS.accent),
         ]}
       />
     );
@@ -106,19 +119,31 @@ function DrillbitWidgetLayout(
         <Button
           label="solo"
           target={getModeTarget("solo")}
-          modifiers={[buttonStyle("bordered"), controlSize("small"), tint("#1d9bf0")]}
+          modifiers={[
+            buttonStyle("bordered"),
+            controlSize("small"),
+            tint(APP_THEME_COLORS.accent),
+          ]}
         />
         <Spacer />
         <Button
           label="coach"
           target={getModeTarget("coach")}
-          modifiers={[buttonStyle("bordered"), controlSize("small"), tint("#1d9bf0")]}
+          modifiers={[
+            buttonStyle("bordered"),
+            controlSize("small"),
+            tint(APP_THEME_COLORS.accent),
+          ]}
         />
         <Spacer />
         <Button
           label="reveal"
           target={getModeTarget("reveal")}
-          modifiers={[buttonStyle("bordered"), controlSize("small"), tint("#1d9bf0")]}
+          modifiers={[
+            buttonStyle("bordered"),
+            controlSize("small"),
+            tint(APP_THEME_COLORS.accent),
+          ]}
         />
       </HStack>
     );
@@ -130,7 +155,7 @@ function DrillbitWidgetLayout(
         <Text
           modifiers={[
             font({ size: 12, weight: "semibold" }),
-            foregroundStyle("#1d9bf0"),
+            foregroundStyle(APP_THEME_COLORS.accent),
           ]}
         >
           drillbit
@@ -151,7 +176,7 @@ function DrillbitWidgetLayout(
       <VStack>
         <Text
           modifiers={[
-            font({ size: 18, weight: "bold" }),
+            font({ size: 20, weight: "bold" }),
             foregroundStyle(titleColor),
             lineLimit(environment.widgetFamily === "systemSmall" ? 2 : 3),
           ]}
@@ -160,7 +185,7 @@ function DrillbitWidgetLayout(
         </Text>
         <Text
           modifiers={[
-            font({ size: 13 }),
+            font({ size: 14 }),
             foregroundStyle(secondaryColor),
             lineLimit(environment.widgetFamily === "systemLarge" ? 4 : 3),
             multilineTextAlignment("leading"),

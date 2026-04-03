@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
+import { resolveAnswerMode } from "@/components/answer/answer-flow";
 import { debugLog } from "@/lib/debug";
 import { subscribeToModelsRefresh } from "@/lib/models-refresh";
 import { subscribeToSettingsRefresh } from "@/lib/settings-refresh";
@@ -33,7 +34,6 @@ export function useAnswerScreenState({
   setNotesDraft,
   setAssistantDraft,
   setAssistantMessage,
-  setUpdatedAt,
   setConversationHistory,
 }: {
   resolvedChallengeId: string | null;
@@ -51,7 +51,6 @@ export function useAnswerScreenState({
   setNotesDraft: React.Dispatch<React.SetStateAction<string>>;
   setAssistantDraft: React.Dispatch<React.SetStateAction<string>>;
   setAssistantMessage: React.Dispatch<React.SetStateAction<string>>;
-  setUpdatedAt: React.Dispatch<React.SetStateAction<string>>;
   setConversationHistory: React.Dispatch<React.SetStateAction<ChallengeConversationTurn[]>>;
 }) {
   const [availableModels, setAvailableModels] = useState<ModelRecord[]>([]);
@@ -133,29 +132,42 @@ export function useAnswerScreenState({
 
       if (existingSession) {
         setSelectedMode(
-          routeMode ?? existingSession.selectedMode ?? settings.preferredMode ?? "solo",
+          resolveAnswerMode({
+            routeMode,
+            sessionMode: existingSession.selectedMode,
+            preferredMode: settings.preferredMode,
+          }),
         );
         setNotesDraft(existingSession.notesDraft ?? "");
         setAssistantDraft(existingSession.assistantDraft ?? "");
         setAssistantMessage(existingSession.assistantDraft ?? "");
-        setUpdatedAt(existingSession.updatedAt);
         setConversationHistory(existingSession.conversationHistory);
         syncPersistedDraftSnapshot({
-          selectedMode:
-            routeMode ?? existingSession.selectedMode ?? settings.preferredMode ?? "solo",
+          selectedMode: resolveAnswerMode({
+            routeMode,
+            sessionMode: existingSession.selectedMode,
+            preferredMode: settings.preferredMode,
+          }),
           notesDraft: existingSession.notesDraft,
           assistantDraft: existingSession.assistantDraft,
           conversationHistory: existingSession.conversationHistory,
         });
       } else {
-        setSelectedMode(routeMode ?? settings.preferredMode ?? "solo");
+        setSelectedMode(
+          resolveAnswerMode({
+            routeMode,
+            preferredMode: settings.preferredMode,
+          }),
+        );
         setNotesDraft("");
         setAssistantDraft("");
         setAssistantMessage("");
-        setUpdatedAt(new Date().toISOString());
         setConversationHistory([]);
         syncPersistedDraftSnapshot({
-          selectedMode: routeMode ?? settings.preferredMode ?? "solo",
+          selectedMode: resolveAnswerMode({
+            routeMode,
+            preferredMode: settings.preferredMode,
+          }),
           conversationHistory: [],
         });
         resetCoachField();
@@ -181,7 +193,6 @@ export function useAnswerScreenState({
     setConversationHistory,
     setNotesDraft,
     setSelectedMode,
-    setUpdatedAt,
     syncPersistedDraftSnapshot,
   ]);
 

@@ -6,12 +6,13 @@ import { StatusBar } from "expo-status-bar";
 import * as SystemUI from "expo-system-ui";
 import { HeroUINativeProvider } from "heroui-native";
 import { useEffect } from "react";
-import { LogBox, useColorScheme } from "react-native";
+import { LogBox, useColorScheme, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaListener, SafeAreaProvider } from "react-native-safe-area-context";
 import { Uniwind } from "uniwind";
 
+import { APP_THEME_COLORS } from "@/constants/theme";
 import { debugLog } from "@/lib/debug";
 import { retryMissingChallengeSummaries } from "@/lib/memory-sync";
 import { syncChallengeNotifications, handleNotificationOpen } from "@/lib/notifications";
@@ -66,7 +67,9 @@ export default function RootLayout() {
 
   useEffect(() => {
     Uniwind.setTheme(resolvedTheme);
-    void SystemUI.setBackgroundColorAsync(isDark ? "#000000" : "#ffffff");
+    void SystemUI.setBackgroundColorAsync(
+      isDark ? APP_THEME_COLORS.darkBackground : APP_THEME_COLORS.lightBackground,
+    );
     void initializePromptLibrary();
     void syncWidgetState();
     void retryMissingChallengeSummaries();
@@ -133,22 +136,24 @@ export default function RootLayout() {
         >
           <KeyboardProvider preload={false}>
             <HeroUINativeProvider config={{ devInfo: { stylingPrinciples: false } }}>
-              <StatusBar style={isDark ? "light" : "dark"} />
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: { backgroundColor: isDark ? "#000000" : "#ffffff" },
-                }}
-              >
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen
-                  name="answer"
-                  options={{
+              <View className="flex-1 bg-background">
+                <StatusBar style={isDark ? "light" : "dark"} />
+                <Stack
+                  screenOptions={{
                     headerShown: false,
-                    contentStyle: { backgroundColor: isDark ? "#000000" : "#ffffff" },
+                    contentStyle: { backgroundColor: "transparent" },
                   }}
-                />
-              </Stack>
+                >
+                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                  <Stack.Screen
+                    name="answer"
+                    options={{
+                      headerShown: false,
+                      contentStyle: { backgroundColor: "transparent" },
+                    }}
+                  />
+                </Stack>
+              </View>
             </HeroUINativeProvider>
           </KeyboardProvider>
         </SafeAreaListener>

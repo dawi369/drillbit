@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 
+import { hasSessionSnapshotChanges } from "@/components/answer/answer-flow";
 import { debugLog } from "@/lib/debug";
 import { upsertChallengeSession } from "@/lib/storage/repository";
 import type {
@@ -156,13 +157,10 @@ export function useChallengeSessionPersistence({
     return () => {
       const snapshot = latestSnapshotRef.current;
       const lastPersistedDrafts = lastPersistedDraftsRef.current;
-      const hasUnflushedDrafts =
-        snapshot.challengeId === lastPersistedDrafts.challengeId &&
-        snapshot.challengeId != null &&
-        (snapshot.notesDraft !== lastPersistedDrafts.notesDraft ||
-          snapshot.assistantDraft !== lastPersistedDrafts.assistantDraft ||
-          snapshot.selectedMode !== lastPersistedDrafts.selectedMode ||
-          snapshot.conversationHistory !== lastPersistedDrafts.conversationHistory);
+      const hasUnflushedDrafts = hasSessionSnapshotChanges(
+        snapshot,
+        lastPersistedDrafts,
+      );
 
       if (!hasUnflushedDrafts) {
         return;
@@ -229,12 +227,10 @@ export function useChallengeSessionPersistence({
 
       const snapshot = latestSnapshotRef.current;
       const lastPersistedDrafts = lastPersistedDraftsRef.current;
-      const hasUnflushedDrafts =
-        snapshot.challengeId === lastPersistedDrafts.challengeId &&
-        (snapshot.notesDraft !== lastPersistedDrafts.notesDraft ||
-          snapshot.assistantDraft !== lastPersistedDrafts.assistantDraft ||
-          snapshot.selectedMode !== lastPersistedDrafts.selectedMode ||
-          snapshot.conversationHistory !== lastPersistedDrafts.conversationHistory);
+      const hasUnflushedDrafts = hasSessionSnapshotChanges(
+        snapshot,
+        lastPersistedDrafts,
+      );
 
       if (!hasUnflushedDrafts) {
         return;

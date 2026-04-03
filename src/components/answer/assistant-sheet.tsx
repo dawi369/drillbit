@@ -28,6 +28,7 @@ import Animated, {
 } from "react-native-reanimated";
 
 import type { AssistantChatMessage, AssistantChatRole } from "@/components/answer/assistant-history";
+import { APP_THEME_COLORS } from "@/constants/theme";
 import { cn } from "@/lib/cn";
 import type { ChallengeMode } from "@/lib/widgets/types";
 
@@ -44,7 +45,7 @@ function MessageBubble({
     <View className={cn("w-full", role === "you" ? "items-end" : "items-start")}>
       <View
         className={cn(
-          "max-w-[85%] rounded-[24px] border px-4 py-3",
+          "max-w-[85%] rounded-[var(--radius)] border px-4 py-3",
           role === "you"
             ? "border-border bg-surface-secondary"
             : role === "coach"
@@ -52,7 +53,7 @@ function MessageBubble({
             : "border-border/50 bg-surface-secondary/10",
         )}
       >
-        <Text className="mb-1 text-[10px] font-medium uppercase tracking-[1.2px] text-muted">
+        <Text className="mb-1 text-xs font-medium uppercase tracking-[1px] text-muted">
           {role}
         </Text>
         {text.trim().length > 0 ? (
@@ -262,7 +263,7 @@ export function AssistantSheet({
   return (
     <BottomSheet isOpen={visible} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <BottomSheet.Portal>
-        <BottomSheet.Overlay className="bg-black/18" />
+        <BottomSheet.Overlay className="bg-foreground/15" />
         <BottomSheet.Content
           index={0}
           snapPoints={["86%"]}
@@ -271,7 +272,7 @@ export function AssistantSheet({
           keyboardBlurBehavior="none"
           android_keyboardInputMode="adjustPan"
           enableContentPanningGesture={false}
-          backgroundClassName="rounded-t-[32px] bg-background"
+          backgroundClassName="rounded-t-[var(--radius)] bg-background"
           contentContainerClassName="pt-3"
         >
           <BottomSheetView
@@ -292,7 +293,7 @@ export function AssistantSheet({
 
               <View className="flex-1 justify-between gap-4">
                 <View
-                  className="overflow-hidden rounded-[28px] border border-border/40 bg-surface-secondary/10"
+                  className="overflow-hidden rounded-[var(--radius)] border border-border/40 bg-surface-secondary/10"
                   style={{ height: historyCardHeight }}
                 >
                   <View className="flex-1 overflow-hidden px-3 py-3" style={{ minHeight: 0 }}>
@@ -319,7 +320,7 @@ export function AssistantSheet({
                           />
                         ))
                       ) : (
-                        <View className="rounded-[20px] bg-background px-4 py-4">
+                        <View className="rounded-[var(--radius)] bg-background px-4 py-4">
                           <Text className="text-sm leading-6 text-muted">
                             {mode === "reveal"
                               ? "Ask for alternatives, better phrasing, or a clearer final answer shape."
@@ -333,26 +334,32 @@ export function AssistantSheet({
 
                 <View>
                   <View
-                    className="rounded-[28px] border border-border/40 bg-surface-secondary/10 px-3 py-3"
+                    className="rounded-[var(--radius)] border border-border/40 bg-surface-secondary/10 px-4 py-4"
                     style={{ marginBottom: 3 }}
                   >
                     <BottomSheetTextInput
                       multiline
                       numberOfLines={5}
                       placeholder="Ask a follow-up..."
-                      placeholderTextColor={isDark ? "rgba(226,232,240,0.48)" : "rgba(15,23,42,0.42)"}
+                      placeholderTextColor={
+                        isDark
+                          ? APP_THEME_COLORS.darkOverlayInput
+                          : APP_THEME_COLORS.lightOverlayInput
+                      }
                       value={assistantMessage}
                       onChangeText={onChangeMessage}
                       style={{
                         minHeight: 104,
                         maxHeight: 176,
-                        color: isDark ? "#f8fafc" : "#0f172a",
+                        color: isDark
+                          ? APP_THEME_COLORS.darkTextPrimary
+                          : APP_THEME_COLORS.lightTextPrimary,
                         paddingHorizontal: 12,
-                        paddingTop: 10,
+                        paddingTop: 12,
                         paddingBottom: 48,
                         paddingRight: 88,
                         fontSize: 16,
-                        lineHeight: 22,
+                        lineHeight: 24,
                         textAlignVertical: "top",
                       }}
                       scrollEnabled

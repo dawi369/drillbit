@@ -1,16 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import {
+  AUTO_COACH_IDLE_MS,
+  getAutoCoachTriggerReason,
+} from "@/components/answer/answer-flow";
 import { streamCoachGuidance } from "@/lib/ai/prompt-runtime";
 import { debugLog } from "@/lib/debug";
 import type {
   ChallengeConversationTurn,
   CoachTriggerReason,
 } from "@/lib/storage/types";
-
-const AUTO_COACH_MIN_NOTES_CHARS = 126;
-const AUTO_COACH_MIN_NEW_CHARS = 56;
-const AUTO_COACH_IDLE_MS = 2500;
-const AUTO_COACH_COOLDOWN_MS = 15000;
 
 type CommitAssistantTurn = (args: {
   currentHistory: ChallengeConversationTurn[];
@@ -167,33 +166,18 @@ export function useCoachGuidance({
       return;
     }
 
-    const noteLength = normalizedNotesDraft.length;
-    if (noteLength < AUTO_COACH_MIN_NOTES_CHARS) {
-      return;
-    }
+    const trigger = getAutoCoachTriggerReason({
+      selectedMode,
+      resolvedChallengeId,
+      hasChallenge,
+      isCoachLoading,
+      normalizedNotesDraft,
+      conversationHistory,
+      lastAutoCoachAt,
+      lastAutoCoachNotesSnapshot,
+    });
 
-    const lastCoachTurn = [...conversationHistory]
-      .reverse()
-      .find((turn) => turn.role === "assistant" && turn.mode === "coach");
-    const trigger: CoachTriggerReason = lastCoachTurn
-      ? "auto_after_progress"
-      : "auto_initial";
-    const newCharsSinceLastSnapshot = Math.max(
-      0,
-      noteLength - lastAutoCoachNotesSnapshot.length,
-    );
-
-    if (
-      trigger === "auto_after_progress" &&
-      newCharsSinceLastSnapshot < AUTO_COACH_MIN_NEW_CHARS
-    ) {
-      return;
-    }
-
-    if (
-      lastAutoCoachAt != null &&
-      Date.now() - lastAutoCoachAt < AUTO_COACH_COOLDOWN_MS
-    ) {
+    if (!trigger) {
       return;
     }
 

@@ -30,10 +30,10 @@ function PageHeader() {
   return (
     <View className="flex-row items-start justify-between gap-4">
       <View className="min-w-0 flex-1 gap-2">
-        <Text className="text-[40px] font-semibold tracking-tight text-foreground">
+        <Text className="text-4xl font-semibold tracking-tight text-foreground">
           memory
         </Text>
-        <Text className="max-w-xl text-[15px] leading-6 text-muted">
+        <Text className="max-w-xl text-base leading-6 text-muted">
           A lightweight replay of what keeps repeating, where you are strong,
           and what still needs more reps.
         </Text>
@@ -46,7 +46,7 @@ function Surface({ children, className }: PropsWithChildren<{ className?: string
   return (
     <View
       className={cn(
-        "rounded-[28px] border border-border/45 bg-surface-secondary/10 px-5 py-5",
+        "rounded-[var(--radius)] border border-border/45 bg-surface-secondary/10 px-5 py-5",
         className,
       )}
     >
@@ -66,10 +66,10 @@ function SectionHeading({
 }) {
   return (
     <View className="gap-1 pb-4">
-      <Text className="text-[11px] font-semibold uppercase tracking-[1.5px] text-muted">
+      <Text className="text-xs font-semibold uppercase tracking-[1px] text-muted">
         {eyebrow}
       </Text>
-      <Text className="text-[22px] font-semibold tracking-tight text-foreground">
+      <Text className="text-2xl font-semibold tracking-tight text-foreground">
         {title}
       </Text>
       <Text className="text-sm leading-6 text-muted">{description}</Text>
@@ -79,11 +79,11 @@ function SectionHeading({
 
 function MetricChip({ label, value }: { label: string; value: string }) {
   return (
-    <View className="min-w-[120px] flex-1 gap-1 rounded-[22px] border border-border/40 bg-background/65 px-4 py-4">
-      <Text className="text-[11px] font-semibold uppercase tracking-[1.4px] text-muted">
+    <View className="min-w-32 flex-1 gap-1 rounded-[var(--radius)] border border-border/40 bg-background/65 px-4 py-4">
+      <Text className="text-xs font-semibold uppercase tracking-[1px] text-muted">
         {label}
       </Text>
-      <Text className="text-[24px] font-semibold tracking-tight text-foreground">
+      <Text className="text-3xl font-semibold tracking-tight text-foreground">
         {value}
       </Text>
     </View>
@@ -107,7 +107,7 @@ function GraphPlaceholder({ overview }: { overview: MemoryOverview }) {
         description="Reserved space for the upcoming memory graph. For now it keeps a quick visual pulse of recent sessions."
       />
 
-      <View className="rounded-[24px] border border-dashed border-border/45 bg-background/55 px-4 py-5">
+      <View className="rounded-[var(--radius)] border border-dashed border-border/45 bg-background/55 px-4 py-5">
         <View className="h-[180px] flex-row items-end gap-3">
           {bars.map((height, index) => (
             <View key={`memory-bar-${index}`} className="min-w-0 flex-1 items-center gap-3">
@@ -117,7 +117,7 @@ function GraphPlaceholder({ overview }: { overview: MemoryOverview }) {
                   style={{ height: `${height}%` }}
                 />
               </View>
-              <Text className="text-[11px] font-medium uppercase tracking-[1.2px] text-muted">
+              <Text className="text-xs font-medium uppercase tracking-[1px] text-muted">
                 d{index + 1}
               </Text>
             </View>
@@ -142,22 +142,22 @@ function PatternList({
   return (
     <Surface className="flex-1 gap-4">
       <View className="gap-1">
-        <Text className="text-[18px] font-semibold tracking-tight text-foreground">
+        <Text className="text-xl font-semibold tracking-tight text-foreground">
           {title}
         </Text>
         <Text className="text-sm leading-6 text-muted">{description}</Text>
       </View>
 
-      <View className="gap-2.5">
+      <View className="gap-3">
         {items.length > 0 ? (
           items.map((item) => (
             <View
               key={`${tone}-${item}`}
               className={cn(
-                "rounded-[20px] border px-4 py-3",
+                "rounded-[var(--radius)] border px-4 py-3",
                 tone === "strength"
-                  ? "border-emerald-500/20 bg-emerald-500/8"
-                  : "border-amber-500/20 bg-amber-500/8",
+                  ? "border-success/20 bg-success/10"
+                  : "border-warning/20 bg-warning/10",
               )}
             >
               <Text className="text-sm leading-6 text-foreground">{item}</Text>
@@ -175,10 +175,10 @@ function PatternList({
 
 function SessionRow({ session }: { session: MemoryChallengeSummaryRow }) {
   return (
-    <View className="gap-2 rounded-[22px] border border-border/35 bg-background/60 px-4 py-4">
+    <View className="gap-2 rounded-[var(--radius)] border border-border/35 bg-background/60 px-4 py-4">
       <View className="flex-row items-start justify-between gap-3">
         <View className="min-w-0 flex-1 gap-1">
-          <Text className="text-[15px] font-semibold text-foreground">
+          <Text className="text-base font-semibold text-foreground">
             {session.challengeTitle}
           </Text>
           <Text className="text-sm leading-6 text-muted">
@@ -188,10 +188,10 @@ function SessionRow({ session }: { session: MemoryChallengeSummaryRow }) {
         </View>
 
         <View className="items-end gap-1 pt-0.5">
-            <Text className="text-sm font-semibold text-foreground">
+          <Text className="text-sm font-semibold text-foreground">
             {formatCompletionScore(session.completionScore)}
           </Text>
-          <Text className="text-[11px] font-medium uppercase tracking-[1.3px] text-muted">
+          <Text className="text-xs font-medium uppercase tracking-[1px] text-muted">
             {formatSessionDate(session.generatedAt)}
           </Text>
         </View>
@@ -204,14 +204,14 @@ function SessionRow({ session }: { session: MemoryChallengeSummaryRow }) {
 
 function TopicRollupRow({ rollup }: { rollup: MemoryTopicRollup }) {
   return (
-    <View className="gap-3 rounded-[22px] border border-border/35 bg-background/60 px-4 py-4">
+    <View className="gap-3 rounded-[var(--radius)] border border-border/35 bg-background/60 px-4 py-4">
       <View className="flex-row items-start justify-between gap-3">
         <View className="min-w-0 flex-1 gap-1">
-          <Text className="text-[15px] font-semibold text-foreground">
+          <Text className="text-base font-semibold text-foreground">
             {rollup.topic}
           </Text>
           <Text className="text-sm leading-6 text-muted">
-          {rollup.count} {rollup.count === 1 ? "session" : "sessions"}
+            {rollup.count} {rollup.count === 1 ? "session" : "sessions"}
           </Text>
         </View>
         <Text className="pt-0.5 text-sm font-semibold text-foreground">
@@ -220,7 +220,7 @@ function TopicRollupRow({ rollup }: { rollup: MemoryTopicRollup }) {
       </View>
 
       <View className="gap-2">
-        <Text className="text-[11px] font-semibold uppercase tracking-[1.3px] text-muted">
+        <Text className="text-xs font-semibold uppercase tracking-[1px] text-muted">
           top strengths
         </Text>
         <Text className="text-sm leading-6 text-foreground">
@@ -229,7 +229,7 @@ function TopicRollupRow({ rollup }: { rollup: MemoryTopicRollup }) {
       </View>
 
       <View className="gap-2">
-        <Text className="text-[11px] font-semibold uppercase tracking-[1.3px] text-muted">
+        <Text className="text-xs font-semibold uppercase tracking-[1px] text-muted">
           top gaps
         </Text>
         <Text className="text-sm leading-6 text-foreground">
@@ -243,7 +243,7 @@ function TopicRollupRow({ rollup }: { rollup: MemoryTopicRollup }) {
 function EmptyMemoryState() {
   return (
     <Surface className="gap-3">
-      <Text className="text-[22px] font-semibold tracking-tight text-foreground">
+      <Text className="text-2xl font-semibold tracking-tight text-foreground">
         Nothing here yet
       </Text>
       <Text className="text-sm leading-6 text-muted">

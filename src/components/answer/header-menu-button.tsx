@@ -8,8 +8,8 @@ import type { ChallengeMode } from "@/lib/widgets/types";
 
 function MetaPill({ label }: { label: string }) {
   return (
-    <View className="rounded-full border border-border bg-surface-secondary px-2 py-0.5">
-      <Text className="text-[10px] font-medium uppercase tracking-[1px] text-foreground">
+    <View className="rounded-[var(--radius)] border border-border bg-surface-secondary px-2 py-1">
+      <Text className="text-xs font-medium uppercase tracking-[1px] text-foreground">
         {label}
       </Text>
     </View>

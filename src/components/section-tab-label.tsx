@@ -12,7 +12,7 @@ export function SectionTabLabel({
   return (
     <Tabs.Label
       className={cn(
-        "text-[15px] font-medium tracking-tight",
+        "text-sm font-medium tracking-tight",
         selected ? "text-foreground" : "text-muted",
       )}
     >

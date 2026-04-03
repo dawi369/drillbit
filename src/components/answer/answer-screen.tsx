@@ -1,34 +1,23 @@
 import { useLocalSearchParams } from "expo-router";
 import { Input, Label, TextField } from "heroui-native";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Keyboard, Pressable, ScrollView, Text, View } from "react-native";
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import {
-  AssistantHeader,
-} from "@/components/answer/assistant-header";
-import {
-  getLatestAssistantMessage,
-  mapConversationHistoryToChat,
-  type AssistantChatMessage,
-} from "@/components/answer/assistant-history";
+import { AssistantHeader } from "@/components/answer/assistant-header";
 import { HeaderMenuButton } from "@/components/answer/header-menu-button";
 import { RevealAnswerCard } from "@/components/answer/reveal-answer-card";
 import { AssistantSheet } from "@/components/answer/assistant-sheet";
-import { useAnswerActions } from "@/components/answer/use-answer-actions";
-import { useAnswerScreenState } from "@/components/answer/use-answer-screen-state";
-import { useCoachGuidance } from "@/components/answer/use-coach-guidance";
-import { useAnswerCompletionActions } from "@/components/answer/use-answer-completion-actions";
-import { useAssistantFieldState } from "@/components/answer/use-assistant-field-state";
-import { useChallengeSessionPersistence } from "@/components/answer/use-challenge-session-persistence";
-import { useRevealOutput } from "@/components/answer/use-reveal-output";
+import { useAnswerController } from "@/components/answer/use-answer-controller";
 import { cn } from "@/lib/cn";
 import { debugLog } from "@/lib/debug";
-import { markChallengeInProgress, selectModel } from "@/lib/storage/repository";
-import type { ChallengeConversationTurn } from "@/lib/storage/types";
-import type { ChallengeMode } from "@/lib/widgets/types";
 
 function HeaderToggle({
   collapsed,
@@ -38,19 +27,19 @@ function HeaderToggle({
   onPress: () => void;
 }) {
   return (
-    <Pressable className="items-center px-3 py-[1.65]" onPress={onPress}>
+    <Pressable className="items-center px-3 py-1" onPress={onPress}>
       <View className="items-center gap-1">
         <View className="h-4 w-16 items-center justify-center">
-          <View className="relative h-3 w-13">
+          <View className="relative h-3 w-12">
             <View
               className={cn(
-                "absolute left-1 top-1 h-[2px] w-6 rounded-full bg-border",
+                "absolute left-1 top-1 h-0.5 w-5 rounded-full bg-border",
                 collapsed ? "rotate-12" : "-rotate-12",
               )}
             />
             <View
               className={cn(
-                "absolute right-1 top-1 h-[2px] w-6 rounded-full bg-border",
+                "absolute right-1 top-1 h-0.5 w-5 rounded-full bg-border",
                 collapsed ? "-rotate-12" : "rotate-12",
               )}
             />
@@ -61,85 +50,49 @@ function HeaderToggle({
   );
 }
 
-function commitAssistantTurn({
-  currentHistory,
-  mode,
-  userText,
-  assistantText,
-  assistantAnswer,
-}: {
-  currentHistory: ChallengeConversationTurn[];
-  mode: Extract<ChallengeMode, "coach" | "reveal">;
-  userText?: string;
-  assistantText: string;
-  assistantAnswer?: string;
-}) {
-  const assistantTurnId = `assistant-${Date.now()}`;
-  const nextHistory = [...currentHistory];
-
-  if (userText) {
-    nextHistory.push({
-      id: `user-${assistantTurnId}`,
-      role: "user",
-      mode,
-      text: userText,
-      createdAt: new Date().toISOString(),
-    });
-  }
-
-  nextHistory.push({
-    id: assistantTurnId,
-    role: "assistant",
-    mode,
-    text: assistantText,
-    answer: assistantAnswer,
-    createdAt: new Date().toISOString(),
-  });
-
-  return nextHistory;
-}
-
-function normalizeCoachText(value: string) {
-  return value.trim().replace(/\s+/g, " ");
-}
-
 export function AnswerScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
     mode?: string;
     challengeId?: string;
   }>();
-  const routeMode = useMemo<ChallengeMode | null>(() => {
-    if (
-      params.mode === "solo" ||
-      params.mode === "coach" ||
-      params.mode === "reveal"
-    ) {
-      return params.mode;
-    }
-
-    return null;
-  }, [params.mode]);
-  
-  const [selectedMode, setSelectedMode] = useState<ChallengeMode>(routeMode ?? "solo");
-  const [notesDraft, setNotesDraft] = useState("");
-  const [assistantDraft, setAssistantDraft] = useState("");
-  const [, setUpdatedAt] = useState(new Date().toISOString());
+  const resolvedRouteMode = params.mode === "solo" || params.mode === "coach" || params.mode === "reveal"
+    ? params.mode
+    : null;
+  const resolvedChallengeId = params.challengeId ?? null;
   const [isHeaderCollapsed, setHeaderCollapsed] = useState(false);
   const [isAssistantInputOpen, setAssistantInputOpen] = useState(false);
-  const [assistantMessage, setAssistantMessage] = useState("");
-  const coachField = useAssistantFieldState();
-  const revealField = useAssistantFieldState();
-  const [assistantHistory, setAssistantHistory] = useState<AssistantChatMessage[]>([]);
-  const [conversationHistory, setConversationHistory] = useState<
-    ChallengeConversationTurn[]
-  >([]);
-  const [isCoachLoading, setCoachLoading] = useState(false);
-  const [isRevealLoading, setRevealLoading] = useState(false);
   const [isHeaderTeaserOverflowing, setHeaderTeaserOverflowing] = useState(false);
-  const resolvedChallengeId = params.challengeId ?? null;
   const headerProgress = useSharedValue(isHeaderCollapsed ? 0 : 1);
-  const revealRequestIdRef = useRef(0);
+
+  const {
+    assistantGuidance,
+    assistantHistory,
+    assistantMessage,
+    assistantStatus,
+    availableModels,
+    canInteractWithChallenge,
+    challenge,
+    handleAssistantSubmit,
+    handleDone,
+    handleSave,
+    handleSelectModel,
+    handleSkip,
+    isAssistantLoading,
+    isChallengeLoading,
+    latestAssistantMessage,
+    notesDraft,
+    revealAnswer,
+    selectedMode,
+    selectedModelId,
+    setAssistantDraft,
+    setAssistantMessage,
+    setNotesDraft,
+    setSelectedMode,
+  } = useAnswerController({
+    resolvedChallengeId,
+    routeMode: resolvedRouteMode,
+  });
 
   useEffect(() => {
     headerProgress.value = withTiming(isHeaderCollapsed ? 0 : 1, {
@@ -150,7 +103,7 @@ export function AnswerScreen() {
 
   const headerAnimatedStyle = useAnimatedStyle(() => ({
     opacity: headerProgress.value,
-    maxHeight: 180 * headerProgress.value,
+    maxHeight: 176 * headerProgress.value,
     transform: [
       {
         translateY: (1 - headerProgress.value) * -8,
@@ -162,7 +115,7 @@ export function AnswerScreen() {
     debugLog("answer", "mounted", {
       params,
       resolvedChallengeId,
-      routeMode,
+      routeMode: resolvedRouteMode,
       timestamp: Date.now(),
     });
 
@@ -180,216 +133,13 @@ export function AnswerScreen() {
     debugLog("answer", "params changed", {
       params,
       resolvedChallengeId,
-      routeMode,
+      routeMode: resolvedRouteMode,
     });
-  }, [params, resolvedChallengeId, routeMode]);
-
-  const resetAnswerState = useCallback(
-    (nextMode: ChallengeMode = routeMode ?? "solo") => {
-      setChallenge(null);
-      setSelectedMode(nextMode);
-      setNotesDraft("");
-      setAssistantDraft("");
-      setUpdatedAt(new Date().toISOString());
-      setConversationHistory([]);
-      setAssistantHistory([]);
-      coachField.reset(nextMode === "coach" ? "idle" : "done");
-      revealField.reset(nextMode === "reveal" ? "idle" : "done");
-      setAssistantInputOpen(false);
-      setAssistantMessage("");
-    },
-    [coachField.reset, revealField.reset, routeMode],
-  );
-
-  const normalizedNotesDraft = useMemo(
-    () => normalizeCoachText(notesDraft),
-    [notesDraft],
-  );
-
-  const assistantThreadMode = selectedMode === "reveal" ? "reveal" : "coach";
-  const isAssistantLoading =
-    selectedMode === "coach"
-      ? isCoachLoading
-      : selectedMode === "reveal"
-        ? isRevealLoading
-        : false;
-
-  const beginRevealRequest = useCallback(() => {
-    revealRequestIdRef.current += 1;
-    return revealRequestIdRef.current;
-  }, []);
-
-  const invalidateRevealRequest = useCallback(() => {
-    revealRequestIdRef.current += 1;
-  }, []);
-
-  const isRevealRequestCurrent = useCallback(
-    (requestId: number) => revealRequestIdRef.current === requestId,
-    [],
-  );
-
-  const { persistSession, syncPersistedDraftSnapshot } = useChallengeSessionPersistence({
-    resolvedChallengeId,
-    selectedMode,
-    notesDraft,
-    assistantDraft,
-    conversationHistory,
-  });
-
-  const {
-    availableModels,
-    challenge,
-    isChallengeLoading,
-    refreshResolvedChallenge,
-    selectedModelId,
-    setChallenge,
-    setSelectedModelId,
-  } = useAnswerScreenState({
-    resolvedChallengeId,
-    routeMode,
-    resetAnswerState,
-    resetCoachField: coachField.reset,
-    resetRevealField: revealField.reset,
-    syncPersistedDraftSnapshot,
-    setSelectedMode,
-    setNotesDraft,
-    setAssistantDraft,
-    setAssistantMessage,
-    setUpdatedAt,
-    setConversationHistory,
-  });
-
-  const canInteractWithChallenge = Boolean(
-    resolvedChallengeId && challenge && !isChallengeLoading,
-  );
-
-  const { invalidateCoachRequest, requestCoachGuidance } = useCoachGuidance({
-    selectedMode,
-    resolvedChallengeId,
-    hasChallenge: Boolean(challenge),
-    normalizedNotesDraft,
-    conversationHistory,
-    isCoachLoading,
-    coachField,
-    setCoachLoading,
-    setConversationHistory,
-    commitAssistantTurn,
-    persistSession,
-  });
-
-  useEffect(() => {
-    if (selectedMode !== "coach") {
-      invalidateCoachRequest();
-      setCoachLoading(false);
-    }
-
-    if (selectedMode !== "reveal") {
-      invalidateRevealRequest();
-      setRevealLoading(false);
-    }
-  }, [invalidateCoachRequest, invalidateRevealRequest, selectedMode]);
-
-  useEffect(() => {
-    invalidateCoachRequest();
-    invalidateRevealRequest();
-    setCoachLoading(false);
-    setRevealLoading(false);
-  }, [invalidateCoachRequest, invalidateRevealRequest, resolvedChallengeId]);
-
-  useEffect(() => {
-    if (selectedMode === "solo") {
-      setAssistantHistory([]);
-      return;
-    }
-
-    setAssistantHistory(mapConversationHistoryToChat(conversationHistory, assistantThreadMode));
-  }, [assistantThreadMode, conversationHistory, selectedMode]);
-
-  useEffect(() => {
-    if (!resolvedChallengeId || !challenge) {
-      return;
-    }
-
-    if (challenge.lifecycle !== "in_progress") {
-      debugLog("answer", "marking challenge in progress", {
-        resolvedChallengeId,
-        selectedMode,
-      });
-
-      void markChallengeInProgress(resolvedChallengeId, selectedMode);
-    }
-
-    void persistSession({ selectedMode }, { broadcast: false });
-  }, [challenge, persistSession, resolvedChallengeId, selectedMode]);
-
-  useRevealOutput({
-    selectedMode,
-    resolvedChallengeId,
-    hasChallenge: Boolean(challenge),
-    conversationHistory,
-    revealField,
-    isRevealLoading,
-    setRevealLoading,
-    setConversationHistory,
-    commitAssistantTurn,
-    persistSession,
-    beginRevealRequest,
-    isRevealRequestCurrent,
-  });
+  }, [params, resolvedChallengeId, resolvedRouteMode]);
 
   function handleToggleHeader() {
     setHeaderCollapsed((current) => !current);
   }
-
-  const { handleSkip, handleSave, handleDone } = useAnswerCompletionActions({
-    canInteractWithChallenge,
-    resolvedChallengeId,
-    selectedMode,
-    persistSession: () => persistSession(),
-    refreshResolvedChallenge,
-    resetAnswerState,
-  });
-
-  const { handleAssistantSubmit } = useAnswerActions({
-    assistantMessage,
-    canInteractWithChallenge,
-    resolvedChallengeId,
-    selectedMode,
-    conversationHistory,
-    requestCoachGuidance,
-    persistSession,
-    setAssistantHistory,
-    setConversationHistory,
-    setCoachLoading,
-    setRevealLoading,
-    setAssistantMessage,
-    mapConversationHistoryToChat: (history) =>
-      mapConversationHistoryToChat(history, assistantThreadMode),
-    commitAssistantTurn,
-    coachField,
-    revealField,
-    beginRevealRequest,
-    isRevealRequestCurrent,
-  });
-
-  const latestAssistantMessage = useMemo(
-    () => getLatestAssistantMessage(assistantHistory, assistantThreadMode),
-    [assistantHistory, assistantThreadMode],
-  );
-
-  const assistantGuidance =
-    selectedMode === "coach"
-      ? coachField.text
-      : selectedMode === "reveal"
-        ? revealField.text
-        : null;
-
-  const assistantStatus =
-    selectedMode === "coach"
-      ? coachField.status
-      : selectedMode === "reveal"
-        ? revealField.status
-        : undefined;
 
   function handleOpenAssistantInput() {
     Keyboard.dismiss();
@@ -405,7 +155,7 @@ export function AnswerScreen() {
         <Animated.View className="overflow-hidden" style={headerAnimatedStyle}>
           <View className="gap-1 pb-1">
             <View className="gap-1">
-              <Text className="text-lg font-semibold tracking-tight text-foreground">
+              <Text className="text-xl font-semibold tracking-tight text-foreground">
                 {isChallengeLoading
                   ? "loading challenge..."
                   : (challenge?.title ?? "no active challenge")}
@@ -417,7 +167,7 @@ export function AnswerScreen() {
                   setHeaderTeaserOverflowing(contentHeight > 120);
                 }}
               >
-                <Text className="pr-2 text-sm leading-5 text-muted">
+                <Text className="pr-2 text-sm leading-6 text-muted">
                   {isChallengeLoading
                     ? ""
                     : (challenge?.teaser ??
@@ -458,7 +208,7 @@ export function AnswerScreen() {
         >
           <View className="flex-1 gap-4">
             <TextField className="flex-1">
-              <View className="mb-1 mt-[-4px] flex-row items-center justify-between gap-3 px-1">
+              <View className="mb-1 flex-row items-center justify-between gap-3 px-1">
                 <View className="flex-1 flex-row items-center">
                   <Label>answer</Label>
                   <View className="flex-1" />
@@ -474,8 +224,7 @@ export function AnswerScreen() {
                     setSelectedMode(mode);
                   }}
                   onSelectModel={(model) => {
-                    setSelectedModelId(model.id);
-                    void selectModel(model.id);
+                    handleSelectModel(model.id);
                   }}
                   onSkip={handleSkip}
                   onSave={handleSave}
@@ -492,17 +241,15 @@ export function AnswerScreen() {
                 value={notesDraft}
                 onChangeText={setNotesDraft}
                 scrollEnabled
-                className="flex-1 items-start rounded-[28px] border border-border bg-surface px-4 py-4"
+                className="flex-1 items-start rounded-[var(--radius)] border border-border bg-surface px-4 py-4"
                 textAlignVertical="top"
                 isDisabled={!canInteractWithChallenge}
               />
             </TextField>
 
-            {selectedMode === "reveal" && revealField.answer ? (
-              <RevealAnswerCard answer={revealField.answer} visible />
+            {selectedMode === "reveal" && revealAnswer ? (
+              <RevealAnswerCard answer={revealAnswer} visible />
             ) : null}
-
-            {/* TODO: save-for-later action should persist this session and remove it from the active flow until reopened */}
           </View>
         </KeyboardAwareScrollView>
       </View>
@@ -516,9 +263,8 @@ export function AnswerScreen() {
         canInteractWithChallenge={canInteractWithChallenge}
         onClose={() => setAssistantInputOpen(false)}
         onChangeMessage={(value: string) => {
-          const nextValue = value;
-          setAssistantMessage(nextValue);
-          setAssistantDraft(nextValue);
+          setAssistantMessage(value);
+          setAssistantDraft(value);
         }}
         onSubmit={handleAssistantSubmit}
       />

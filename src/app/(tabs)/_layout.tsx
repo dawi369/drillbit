@@ -2,6 +2,7 @@ import { NativeTabs } from "expo-router/unstable-native-tabs";
 import { useEffect } from "react";
 
 import { APP_TABS, DEV_TAB } from "@/constants/tabs";
+import { APP_THEME_COLORS } from "@/constants/theme";
 import { debugLog } from "@/lib/debug";
 
 export default function TabsLayout() {
@@ -16,7 +17,7 @@ export default function TabsLayout() {
   }, []);
 
   return (
-    <NativeTabs tintColor="#1d9bf0">
+    <NativeTabs tintColor={APP_THEME_COLORS.accent}>
       {tabs.map((tab) => (
         <NativeTabs.Trigger key={tab.name} name={tab.name}>
           <NativeTabs.Trigger.Icon sf={tab.icon.sf} md={tab.icon.md} />
