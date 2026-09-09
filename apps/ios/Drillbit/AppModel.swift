@@ -13,6 +13,9 @@ import WidgetKit
   var presented: Challenge?
   var error: String?
   var busy = false
+  var preparationFailure: String?
+  var failedPreparation: PreparationInput?
+  var failedPreparationSource: Challenge?
   var saveStatus = ""
   var conflict: Challenge?
   var hasPendingWrites = false
@@ -136,30 +139,48 @@ import WidgetKit
     }
   }
   func generate(_ preparation: PreparationInput? = nil) async {
-    guard !busy else { return }
-    busy = true
-    defer { busy = false }
-    await perform {
-      if fixture {
-        seedFixture()
-        return
-      }
-      await sync()
-      if hasPendingWrites {
-        throw APIError(
-          code: "sync_pending",
-          message: "Connect and sync your saved answer before starting another challenge.",
-          status: 0)
-      }
-      let result: GenerationResponse = try await api.send(
-        "challenges", method: "POST", body: preparation, command: UUID().uuidString)
-      if let challenge = result.challenge {
-        bootstrap?.challenge = challenge
-      } else if let id = result.id {
-        try await waitForJob(id)
-      }
-      await refresh()
+    await perform { _ = try await generateForPreview(preparation) }
+  }
+  func generateForPreview(_ preparation: PreparationInput? = nil) async throws -> Challenge {
+    guard !busy, let account = bootstrap?.account.id else {
+      throw APIError(code: "busy", message: "A question is already being prepared.", status: 409)
     }
+    busy = true
+    preparationFailure = nil
+    failedPreparation = nil
+    failedPreparationSource = nil
+    defer { busy = false }
+    if fixture {
+      try await Task.sleep(for: .seconds(2))
+      guard bootstrap?.account.id == account else { throw CancellationError() }
+      #if DEBUG
+      if ProcessInfo.processInfo.arguments.contains("--fixture-generation-failure") {
+        throw APIError(code: "generation_failed", message: "Question preparation failed. Your previous question is safe.", status: 503)
+      }
+      #endif
+      let challenge = Challenge(engineeringLevel: preparation?.engineeringLevel ?? settings.selectedLevel,
+        id: UUID().uuidString, lifecycle: "ready", title: "Design a reliable job queue",
+        prompt: "Design a reliable job queue. Explain retries, ordering, and how failures are handled.",
+        topic: preparation?.focus ?? settings.focus, session: SessionDraft(answer: "", revision: 0))
+      bootstrap?.challenge = challenge
+      return challenge
+    }
+    await sync()
+    guard bootstrap?.account.id == account else { throw CancellationError() }
+    if hasPendingWrites {
+      throw APIError(code: "sync_pending", message: "Connect and sync your saved answer before starting another challenge.", status: 0)
+    }
+    let result: GenerationResponse = try await api.send("challenges", method: "POST", body: preparation, command: UUID().uuidString)
+    let challenge: Challenge
+    if let existing = result.challenge { challenge = existing }
+    else if let id = result.id {
+      try await waitForJob(id)
+      guard bootstrap?.account.id == account else { throw CancellationError() }
+      challenge = try await api.send("challenges/" + id)
+    } else { throw APIError(code: "missing_question", message: "The question is not available yet. Check Today shortly.", status: 0) }
+    guard bootstrap?.account.id == account else { throw CancellationError() }
+    await refresh()
+    return challenge
   }
   func waitForJob(_ id: String) async throws {
     for _ in 0..<45 {
@@ -176,21 +197,34 @@ import WidgetKit
       code: "job_pending", message: "Still preparing. You can leave and return later.", status: 0)
   }
   func open(_ challenge: Challenge) async {
-    await perform {
-      var loaded = challenge
-      if !fixture {
-        do { loaded = try await api.send("challenges/\(challenge.id)") } catch {
-          if challenge.session == nil { throw error }
-        }
-      }
-      if let account = bootstrap?.account.id {
-        _ = try await disk.load(account: account, challenge: loaded)
-      }
-      presented = loaded
-      if loaded.lifecycle == "ready", !fixture {
-        let _: Challenge = try await api.send("challenges/\(challenge.id)/start", method: "POST")
+    await perform { presented = try await openForPreview(challenge) }
+  }
+  func openForPreview(_ challenge: Challenge) async throws -> Challenge {
+    let account = bootstrap?.account.id
+    var loaded = challenge
+    if !fixture {
+      do { loaded = try await api.send("challenges/\(challenge.id)") } catch {
+        if challenge.session == nil { throw error }
       }
     }
+    guard bootstrap?.account.id == account else { throw CancellationError() }
+    if let account {
+      _ = try await disk.load(account: account, challenge: loaded)
+    }
+    guard bootstrap?.account.id == account else { throw CancellationError() }
+    if loaded.lifecycle == "ready" {
+      #if DEBUG
+      if fixture && ProcessInfo.processInfo.arguments.contains("--fixture-start-failure") {
+        throw APIError(code: "start_failed", message: "Could not start. Try again.", status: 503)
+      }
+      #endif
+      if !fixture { loaded = try await api.send("challenges/\(challenge.id)/start", method: "POST") }
+      else { loaded.lifecycle = "in_progress" }
+    }
+    guard loaded.isActive else { throw APIError(code: "inactive", message: "This session is no longer available to start.", status: 409) }
+    guard bootstrap?.account.id == account else { throw CancellationError() }
+    bootstrap?.challenge = loaded
+    return loaded
   }
   func localAnswer(_ challenge: Challenge) async -> String {
     guard let account = bootstrap?.account.id else { return challenge.session?.answer ?? "" }
@@ -366,6 +400,9 @@ import WidgetKit
     WidgetCenter.shared.reloadAllTimelines()
     UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
     bootstrap = nil
+    preparationFailure = nil
+    failedPreparation = nil
+    failedPreparationSource = nil
     presented = nil
     memory = MemoryResponse(sessions: [], patterns: [])
   }
@@ -375,12 +412,17 @@ import WidgetKit
     if ProcessInfo.processInfo.arguments.contains("--fixture-onboarding") { settings.onboardingComplete = false }
     if ProcessInfo.processInfo.arguments.contains("--fixture-long-focus") { settings.focus = "Distributed backend systems, database performance, cache consistency, and safe cross-team migrations" }
     #endif
-    let challenge = Challenge(
+    var challenge = Challenge(
       id: "11111111-1111-4111-8111-111111111111", lifecycle: "ready",
       title: "Design a feature-flag control plane",
       prompt:
         "Design a feature-flag platform that supports staged rollouts, low-latency evaluation, audit trails and emergency rollback. How would you keep evaluation available when the control plane is unreachable?",
       topic: "System design", session: SessionDraft(answer: "", revision: 0), turns: [])
+    #if DEBUG
+    if ProcessInfo.processInfo.arguments.contains("--fixture-long-question") {
+      challenge.prompt = String(repeating: "Describe the trade-offs, retry boundaries, and operational failure handling. State your assumptions and explain the consequences.\n\n", count: 18)
+    }
+    #endif
     #if DEBUG
     if ProcessInfo.processInfo.arguments.contains("--fixture-dashboard") {
       let recent = Challenge(difficulty: "easy", id: "recent", lifecycle: "completed", title: "Design a reliable job queue", prompt: "", topic: "Backend", completedAt: "2026-09-09T10:30:00Z")

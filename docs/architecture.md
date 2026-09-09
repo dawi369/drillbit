@@ -11,7 +11,8 @@ flowchart TD
   Auth[Apple / Google / GitHub sign-in] --> Invite[Invite]
   Invite --> Setup[Focus and engineering level]
   Setup --> Today[Today]
-  Today --> Practice[Practice editor]
+  Today --> PreviewQuestion[Question preview]
+  PreviewQuestion -->|Start| Practice[Practice editor]
   Today --> Prepare[Focus / kind / engineering level]
   Prepare --> Today
   Practice --> Help[Help: explicit actions]
@@ -98,3 +99,15 @@ The native timezone list stores IANA identifiers, includes saved/device zones an
 When no question is active or generating, Today shows Completed, Last 7 days, the latest completed session title with its recorded engineering level and localized completion date/time, and New question. `/v1/memory` adds optional `statistics` with `completed`, `lastSevenDays` and `asOf`; counts are account-scoped across all completed challenges, independent of the 100-session history page. Last 7 days is a rolling 168-hour window at `asOf`. Older cached payloads show unavailable counts rather than inferred totals, and snapshots older than five minutes show their update time. Accessibility text sizes stack the metrics vertically. Existing active-question navigation is unchanged.
 
 Last-session metadata uses the level captured on that question, never the current settings. Legacy sessions map recorded Easy/Medium/Hard to Junior/Mid-level/Senior. Records missing both fields show Level not recorded. Absent or invalid completion dates are omitted.
+
+## New-question brief
+
+Preparation uses shared focus presets (including the user's current custom focus), target-level and format pickers, a visible optional request and Prepare question. Each presentation initializes from global focus/level with auto format and empty request. Local selections never update Settings or persist as subsequent defaults. Prepare generates a preview; Start still begins the attempt. Review's Practise this next opens the same sheet with removable source feedback and a link to session details. The server's existing follow-up snapshot now includes bounded submitted answer and delivery/capture facts alongside adoption history; generation is instructed not to infer mastery or change the requested level from recent history.
+
+## Persistent Today and question previews
+
+Today always renders activity counts and latest-session metadata. A separate compact area renders generation status or the ready/in-progress question title, topic, recorded level and Preview/Resume action. Full prompts are absent from Today. Native scrolling and bottom safe-area padding keep actions reachable above tabs.
+
+QuestionFlow coordinates preparation and preview inside one sheet. Explicit preparation shows loading then the exact generated question in that sheet. Close preserves the question/job; backgrounding dismisses the flow and never reopens it. Scheduled/background results only update Today. Preview body scrolls independently of a safe-area-inset Start/Choose another footer. Start errors remain inline; the editor is presented after server Start succeeds and the sheet has dismissed. Resume retains offline draft recovery. Account checks prevent late results being presented under another account.
+
+Existing generation/detail/Start APIs and ready-question replacement semantics are reused. Local failures preserve the submitted brief for Review preparation; unresolved backend jobs retain existing job reconciliation. No schema or public API change. This supersedes the earlier Today full-question layout and per-question cache defaults.

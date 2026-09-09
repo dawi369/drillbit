@@ -117,7 +117,7 @@ Scheduled questions follow the same preview/start flow. They do not start attemp
 
 ### Preparation sheet
 
-The subsequent [Prepare council recommendation](prepare-vision.md) proposes a smaller practice brief and explicit review-origin continuity. It is documented for discussion and is not yet implemented.
+The subsequent [Prepare council recommendation](prepare-vision.md) proposes a smaller practice brief and explicit review-origin continuity. The practice brief and explicit review continuation are implemented; the user refinement makes topic/level selections temporary and the optional request field always visible.
 
 The first view contains **Focus**, **Question kind** and **Prepare question**. Remember values. Put difficulty and a one-off instruction under More options. Do not put assistance, audio configuration, billing, timers or every profile field into this form.
 

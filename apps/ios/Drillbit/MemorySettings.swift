@@ -272,7 +272,7 @@ struct FocusView: View {
   var body: some View {
     Form {
       Section("Start with a focus") {
-        ForEach(["System design", "Backend", "Frontend", "Debugging", "Algorithms"], id: \.self) {
+        ForEach(PracticeFocus.choices, id: \.self) {
           focus in
           Button {
             model.settings.focus = focus

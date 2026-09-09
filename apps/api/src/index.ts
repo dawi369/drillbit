@@ -258,9 +258,12 @@ app.post("/v1/challenges", async (c) => {
     followUp = {
       question: present(await ownedChallenge(c.env, a, preparation.followUpId)),
       reflection: previous.reflection,
+      answer: typeof previous.session?.answer === "string" ? previous.session.answer.slice(0, 12000) : undefined,
       assistance: previous.help.map((h) => ({
         kind: h.kind,
         status: h.status,
+        deliveries: h.deliveries,
+        capture: h.capture,
       })),
       adoptions: previous.adoptions,
     };

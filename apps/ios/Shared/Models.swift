@@ -278,3 +278,7 @@ struct CompanionUpdate: Codable {
 func reminderComponents(minutes: Int, timezone: String) -> DateComponents {
   DateComponents(calendar: Calendar(identifier: .gregorian), timeZone: TimeZone(identifier: timezone), hour: minutes / 60, minute: minutes % 60)
 }
+
+enum PracticeFocus {
+  static let choices = ["System design", "Backend", "Frontend", "Debugging", "Algorithms"]
+}

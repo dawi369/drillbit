@@ -648,66 +648,87 @@ struct PracticeOptions: View {
 }
 struct PreparationView: View {
   var model: AppModel
+  var source: Challenge? = nil
+  var onSubmitted: () -> Void = {}
+  var submit: ((PreparationInput) -> Void)? = nil
+  var recovery: PreparationInput? = nil
   @State private var focus = ""
   @State private var kind = "auto"
   @State private var engineeringLevel = "mid"
   @State private var instruction = ""
+  @State private var includeSource = true
+  @State private var initialized = false
   @Environment(\.dismiss) private var dismiss
+  private var focuses: [String] {
+    var values = PracticeFocus.choices
+    if !model.settings.focus.isEmpty && !values.contains(model.settings.focus) { values.append(model.settings.focus) }
+    if let recovery, !values.contains(recovery.focus) { values.append(recovery.focus) }
+    return values
+  }
   var body: some View {
     Form {
-      Section("What would you like to practise?") {
-        TextField("Focus", text: $focus, axis: .vertical).lineLimit(2...5)
-        Picker("Question", selection: $kind) {
-          Text("Auto").tag("auto")
+      Section {
+        Picker("Topic", selection: $focus) {
+          ForEach(focuses, id: \.self) { Text($0).tag($0) }
+        }.accessibilityIdentifier("prepareTopic")
+        Picker("Target level", selection: $engineeringLevel) {
+          ForEach(EngineeringLevel.choices, id: \.0) { Text($0.1).tag($0.0) }
+        }.accessibilityIdentifier("prepareLevel")
+        Picker("Format", selection: $kind) {
+          Text("Choose for me").tag("auto")
           Text("Explain").tag("explain")
           Text("Design").tag("design")
         }
       }
-      Section {
-        DisclosureGroup("More options") {
-          Picker("Engineering level", selection: $engineeringLevel) {
-            ForEach(EngineeringLevel.choices, id: \.0) { Text($0.1).tag($0.0) }
-          }
-          TextField("Just for this question", text: $instruction, axis: .vertical).lineLimit(2...4)
+      if includeSource, let source, let reflection = source.reflection {
+        Section("Building on your last session") {
+          Text(reflection.improve).font(.subheadline)
+          NavigationLink(source.title) { SessionDetailView(model: model, initial: source) }
+          Button("Remove") { includeSource = false }
         }
+      }
+      Section {
+        TextField("Any custom instructions? (optional)", text: $instruction, axis: .vertical)
+          .lineLimit(2...4).accessibilityLabel("Optional request")
       }
       Section {
         Button("Prepare question") {
           let input = PreparationInput(
-            focus: focus, kind: kind, difficulty: model.settings.difficulty, engineeringLevel: engineeringLevel,
-            replaceId: model.bootstrap?.challenge?.id, instruction: instruction)
-          dismiss()
-          Task {
-            var remembered = input
-            remembered.replaceId = nil
-            remembered.instruction = ""
-            remembered.followUpId = nil
-            if let data = try? JSONEncoder().encode(remembered) {
-              try? await model.disk.cache(
-                key: "preparation:" + (model.bootstrap?.account.id ?? ""), data: data)
-            }
-            await model.generate(input)
+            focus: focus, kind: kind, difficulty: model.settings.difficulty,
+            engineeringLevel: engineeringLevel,
+            replaceId: model.bootstrap?.challenge?.lifecycle == "ready" ? model.bootstrap?.challenge?.id : nil,
+            instruction: instruction,
+            followUpId: includeSource && source?.reflection != nil ? source?.id : nil)
+          if let submit { submit(input) }
+          else {
+            dismiss()
+            onSubmitted()
+            Task { await model.generate(input) }
           }
-        }.disabled(focus.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.busy)
+        }.buttonStyle(PracticeButtonStyle())
+          .accessibilityIdentifier("submitPreparation")
+          .listRowBackground(Color.clear)
+          .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+          .disabled(focus.isEmpty || model.busy)
       } footer: {
-        if model.bootstrap?.challenge != nil {
+        if model.bootstrap?.challenge?.lifecycle == "ready" {
           Text("Your current question stays until the new one is ready.")
         }
       }
-    }.navigationTitle("Prepare").navigationBarTitleDisplayMode(.inline).toolbar {
+    }.navigationTitle("New question").navigationBarTitleDisplayMode(.inline).toolbar {
       Button("Cancel") { dismiss() }
     }
-    .task {
+    .onAppear {
+      guard !initialized else { return }
+      initialized = true
       focus = model.settings.focus
       engineeringLevel = model.settings.selectedLevel
-      if !model.fixture,
-        let data = try? await model.disk.cached(
-          key: "preparation:" + (model.bootstrap?.account.id ?? "")),
-        let remembered = try? JSONDecoder().decode(PreparationInput.self, from: data)
-      {
-        focus = remembered.focus
-        kind = remembered.kind
-        engineeringLevel = remembered.engineeringLevel ?? EngineeringLevel.legacy(remembered.difficulty)
+      if let recovery {
+        focus = recovery.focus
+        engineeringLevel = recovery.engineeringLevel ?? EngineeringLevel.legacy(recovery.difficulty)
+        kind = recovery.kind
+        instruction = recovery.instruction
+        includeSource = recovery.followUpId != nil
       }
     }
   }

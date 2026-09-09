@@ -107,66 +107,156 @@ struct LocalRecoveryView: View {
 }
 struct TodayView: View {
   @Bindable var model: AppModel
-  @State private var preparing = false
+  @State private var flow: QuestionFlowEntry?
+  @State private var started: Challenge?
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 24) {
+        PracticeOverview(memory: model.memory)
+        Divider()
         if let challenge = model.bootstrap?.challenge {
-          Text(challenge.topic).font(.subheadline).foregroundStyle(.secondary)
-          Text(challenge.title).font(.title.weight(.semibold))
-          Text(challenge.prompt).font(.body).lineSpacing(4)
-          Button(challenge.lifecycle == "in_progress" ? "Resume" : "Start") {
-            Task { await model.open(challenge) }
-          }.buttonStyle(PracticeButtonStyle()).accessibilityIdentifier(
-            "startPractice")
-          if challenge.lifecycle == "ready" {
-            Button("Choose another question") { preparing = true }.disabled(model.busy)
+          VStack(alignment: .leading, spacing: 12) {
+            Text(challenge.lifecycle == "in_progress" ? "In progress" : "Ready to practise")
+              .font(.caption).foregroundStyle(.secondary)
+            Text(challenge.title).font(.headline).lineLimit(2)
+            Text("\(challenge.topic) · \(challenge.levelLabel)").font(.subheadline).foregroundStyle(.secondary)
+            Button(challenge.lifecycle == "in_progress" ? "Resume" : "Preview question") {
+              if challenge.lifecycle == "in_progress" { Task { await model.open(challenge) } }
+              else { flow = QuestionFlowEntry(challenge: challenge) }
+            }.buttonStyle(PracticeButtonStyle()).accessibilityIdentifier("startPractice")
           }
-          if model.busy { ProgressView("Preparing another question") }
-        } else if model.busy
-          || model.bootstrap?.jobs.contains(where: {
-            $0.kind == "generate" && ["pending", "running"].contains($0.status)
-          }) == true
-        {
-          VStack(alignment: .leading, spacing: 16) {
-            Text("A question worth thinking about").font(.title).redacted(reason: .placeholder)
-            Text("Preparing your next practice session.").foregroundStyle(.secondary)
-            ProgressView()
-          }
-        } else {
-          PracticeOverview(memory: model.memory)
-          Button("New question") { preparing = true }
-            .buttonStyle(PracticeButtonStyle())
+        } else if !model.busy {
+          Button("Prepare question") { flow = QuestionFlowEntry() }.buttonStyle(PracticeButtonStyle())
         }
-        ForEach(model.bootstrap?.jobs.filter { $0.status == "failed" && $0.kind != "help" } ?? []) {
-          job in
+        if model.busy || model.bootstrap?.jobs.contains(where: { $0.kind == "generate" && ["pending", "running"].contains($0.status) }) == true {
+          ProgressView("Preparing your question…").font(.subheadline)
+        }
+        if let failure = model.preparationFailure {
+          Text(failure).font(.subheadline).foregroundStyle(.secondary)
+          Button("Review preparation") { flow = QuestionFlowEntry(recovery: model.failedPreparation, source: model.failedPreparationSource) }
+        }
+        ForEach(model.bootstrap?.jobs.filter { $0.status == "failed" && $0.kind != "help" } ?? []) { job in
           VStack(alignment: .leading, spacing: 8) {
-            Label(
-              job.error ?? "Preparation could not finish.", systemImage: "exclamationmark.circle"
-            ).foregroundStyle(AppPalette.destructive)
+            Text(job.error ?? "Preparation could not finish.").foregroundStyle(.secondary)
             Button("Retry") { Task { await model.retry(job) } }
           }
         }
       }.frame(maxWidth: 640, alignment: .leading).padding(24)
-    }.navigationTitle("Today").navigationBarTitleDisplayMode(.inline).refreshable {
-      await model.refresh()
-    }
-    .sheet(isPresented: $preparing) {
-      NavigationStack { PreparationView(model: model) }
-    }
-    .task {
-      while !Task.isCancelled {
-        try? await Task.sleep(for: .seconds(4))
-        if model.bootstrap?.jobs.contains(where: { ["pending", "running"].contains($0.status) })
-          == true
-        {
-          await model.refresh()
+    }.safeAreaPadding(.bottom, 24)
+      .navigationTitle("Today").navigationBarTitleDisplayMode(.inline)
+      .refreshable { await model.refresh() }
+      .sheet(item: $flow, onDismiss: {
+        if let started { model.presented = started; self.started = nil }
+      }) { entry in
+        QuestionFlow(model: model, initial: entry.challenge, source: entry.source, recovery: entry.recovery, onStart: { started = $0 })
+      }
+      .task {
+        while !Task.isCancelled {
+          try? await Task.sleep(for: .seconds(4))
+          if model.bootstrap?.jobs.contains(where: { ["pending", "running"].contains($0.status) }) == true { await model.refresh() }
         }
       }
+  }
+}
+struct QuestionFlowEntry: Identifiable {
+  let id = UUID()
+  var challenge: Challenge? = nil
+  var recovery: PreparationInput? = nil
+  var source: Challenge? = nil
+}
+struct QuestionFlow: View {
+  @Bindable var model: AppModel
+  var initial: Challenge? = nil
+  var source: Challenge? = nil
+  var recovery: PreparationInput? = nil
+  var onStart: (Challenge) -> Void
+  @State private var showingPreview = false
+  @State private var question: Challenge?
+  @State private var loading = false
+  @State private var starting = false
+  @State private var failure: String?
+  @State private var retryInput: PreparationInput?
+  @State private var account: String?
+  @State private var visible = true
+  @State private var initialized = false
+  @Environment(\.dismiss) private var dismiss
+  @Environment(\.scenePhase) private var scenePhase
+  var body: some View {
+    NavigationStack {
+      if showingPreview {
+        ScrollView {
+          VStack(alignment: .leading, spacing: 16) {
+            if loading { ProgressView("Preparing your question…") }
+            else if let question {
+              Text("\(question.topic) · \(question.levelLabel)").font(.subheadline).foregroundStyle(.secondary)
+              Text(question.title).font(.title2.weight(.semibold))
+              Text(question.prompt).frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled)
+            }
+            if let failure {
+              Text(failure).foregroundStyle(.secondary)
+              Button("Back to preparation") { showingPreview = false }
+            }
+          }.frame(maxWidth: .infinity, alignment: .leading).padding(24)
+        }.safeAreaInset(edge: .bottom) {
+          if let question, !loading {
+            VStack(spacing: 12) {
+              Button(question.lifecycle == "in_progress" ? "Resume" : "Start practice") {
+                starting = true
+                Task {
+                  do {
+                    let opened = try await model.openForPreview(question)
+                    if visible, scenePhase == .active, account == model.bootstrap?.account.id { onStart(opened); dismiss() }
+                  } catch { failure = error.localizedDescription }
+                  starting = false
+                }
+              }.buttonStyle(PracticeButtonStyle()).disabled(starting)
+                .accessibilityIdentifier("previewStart")
+              if question.lifecycle == "ready" {
+                Button("Choose another question") { showingPreview = false; failure = nil }.disabled(starting)
+              }
+            }.padding(16).background(AppPalette.background)
+          }
+        }.navigationTitle("Question preview").navigationBarTitleDisplayMode(.inline)
+          .toolbar { Button("Close") { dismiss() } }
+      } else {
+        PreparationView(model: model, source: source, submit: { input in
+          showingPreview = true
+          loading = true
+          question = nil
+          failure = nil
+          let capturedAccount = model.bootstrap?.account.id
+          Task {
+            do {
+              let result = try await model.generateForPreview(input)
+              guard capturedAccount == model.bootstrap?.account.id else { return }
+              question = result
+            } catch {
+              guard capturedAccount == model.bootstrap?.account.id else { return }
+              failure = error.localizedDescription
+              model.preparationFailure = error.localizedDescription
+              model.failedPreparation = input
+              model.failedPreparationSource = source
+              retryInput = input
+            }
+            loading = false
+          }
+        }, recovery: retryInput ?? recovery)
+      }
+    }.onAppear {
+      visible = true
+      guard !initialized else { return }
+      initialized = true
+      account = model.bootstrap?.account.id
+      if let initial { question = initial; showingPreview = true }
     }
+    .onDisappear { visible = false }
+    .onChange(of: scenePhase) { _, phase in if phase == .background { visible = false; dismiss() } }
+    .onChange(of: model.bootstrap?.account.id) { _, value in if value != account { dismiss() } }
   }
 }
 struct ReflectionView: View {
+  @State private var preparingFollowUp = false
+  @State private var startedFollowUp: Challenge?
   var model: AppModel
   var initial: Challenge
   @State private var current: Challenge?
@@ -190,17 +280,17 @@ struct ReflectionView: View {
           model.presented = nil
           Task { await model.refresh() }
         }.buttonStyle(PracticeButtonStyle())
-        Button("Practise a similar question") {
-          model.presented = nil
-          Task {
-            await model.generate(
-              PreparationInput(
-                focus: initial.topic, kind: "auto", difficulty: model.settings.difficulty, engineeringLevel: model.settings.selectedLevel,
-                followUpId: initial.id))
-          }
-        }.buttonStyle(PracticeButtonStyle(secondary: true))
+        if (current ?? initial).reflection != nil {
+          Button("Practise this next") { preparingFollowUp = true }
+            .buttonStyle(PracticeButtonStyle(secondary: true))
+        }
       }.padding(24)
     }.navigationTitle("Reflection").navigationBarBackButtonHidden()
+      .sheet(isPresented: $preparingFollowUp, onDismiss: {
+        if let startedFollowUp { model.presented = startedFollowUp; self.startedFollowUp = nil }
+      }) {
+        QuestionFlow(model: model, source: current ?? initial, onStart: { startedFollowUp = $0 })
+      }
       .task {
         guard !model.fixture else { return }
         for _ in 0..<45 {

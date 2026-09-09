@@ -1,6 +1,6 @@
 # Prepare: a short practice brief
 
-Status: council recommendation, not implemented. September 9, 2026. This revises the proposed preparation experience; current shipped behavior remains described in architecture/acceptance.
+Status: native practice brief implemented with the user refinements below; broader recovery/learning acceptance remains incremental. September 9, 2026. This revises the proposed preparation experience; current shipped behavior remains described in architecture/acceptance.
 
 ## Decision
 
@@ -10,13 +10,15 @@ Prepare should help someone choose one useful question, not configure an AI gene
 
 Title: **New question**. Toolbar: **Cancel**.
 
+User refinement: Topic uses the same preset dropdown as Settings (plus the current custom focus), and all selections are temporary for this question. Every fresh presentation starts from global topic/level and automatic format. The optional request is always visible with placeholder text; there is no Add a request disclosure.
+
 One compact native Form group:
 
 - **Topic**: editable natural-language focus, prefilled from existing preferences. No autofocus or keyboard until tapped.
 - **Target level**: Intern, Junior, Mid-level, Senior, Staff, Principal. Visible and user-selected; not a proficiency assessment.
 - **Format**: Choose for me, Explain, Design. Preserve the existing auto/explain/design wire values.
 
-A lightweight **Add a request** disclosure exposes **Anything to include?** This applies to one question and starts empty on subsequent preparations. No persistent instructional paragraph.
+A visible optional text field shows **Anything to include? (optional)** as its placeholder. This applies to one question and starts empty on subsequent preparations. No persistent instructional paragraph.
 
 One prominent **Prepare question** button, outside the input group. Use the existing primary button style, system fonts/colors, 4-point spacing and native controls. Use the existing sheet/navigation coordinator. Allow scrolling at accessibility sizes; preserve full accessible values and keyboard-safe access to the action.
 
@@ -28,7 +30,7 @@ Question preview → Start → user reasoning → one consequential feedback poi
 
 Example: a notification-service answer misses retry bounds. A follow-up might ask about bounded retries in a payment worker. It should require applying the principle, not copy the preceding question or provide its solution.
 
-Regular entry from Today uses remembered topic/format and the user's target level. Settings remain the authority for the default level; a per-question override does not silently update account settings. Opening, editing, restoring and cancelling Prepare never calls the model.
+Regular entry from Today uses the global topic/level and Choose for me format, without restoring per-question overrides. Settings remain the authority for the default level; a per-question override does not silently update account settings. Opening, editing, restoring and cancelling Prepare never calls the model.
 
 When a completed review has feedback, **Practise this next** opens this same sheet with a removable context block:
 
@@ -47,7 +49,7 @@ On submission, fetch the owned source again and require completed state plus a u
 
 The server-side follow-up snapshot should carry bounded frozen answer evidence, the selected improvement, and conservative delivery/adoption evidence. Generated, shown, adopted and uncertain exposure remain distinct. Recent history is useful for avoiding repetition; skipped questions and assisted answers must not become claims of mastery or reasons to change level.
 
-Submission returns to Today with real preparation status. Preserve the prior ready question until replacement succeeds. Retain the submitted brief for errors and idempotent recovery; Retry must reconcile the existing job before explicitly creating a replacement for a definitively failed job. A running attempt remains Resume, never silently replaceable.
+Explicit submission stays in a coordinated Question preview sheet with real preparation status; Close returns to the persistent Today dashboard. Preserve the prior ready question until replacement succeeds. Retain the submitted brief for errors and idempotent recovery; Retry must reconcile the existing job before explicitly creating a replacement for a definitively failed job. A running attempt remains Resume, never silently replaceable.
 
 ## Acceptance
 
