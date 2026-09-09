@@ -14,7 +14,7 @@ The native companion replaces the help-menu-first workspace. The answer remains 
 
 Tap the companion to open the existing help sheet. It contains current guidance, manual help, a natural question field, pause/dismiss controls and Earlier help. Stale results are labelled “Earlier draft or context” and are excluded from the current thought. Guided additionally offers a starting paragraph, an alternative, a full example and an optional plan of at most three decisions. Selecting a plan decision changes user focus; it does not mark a checklist complete. Model-suggested focus, user focus and committed discussion remain separate data.
 
-Generated writing uses preview → append/replace → server revision check → undo. Discussion never silently edits the answer. Speak remains visibly disabled. Keyboard dictation remains available through iOS.
+Generated writing uses preview → append/replace → server revision check → undo. Discussion never silently edits the answer. Live voice is a disabled waveform button at the bottom left of the practice workspace, aligned with the mode and save-status row. The former Answer with section is removed from Practice options. Keyboard dictation remains available through iOS.
 
 ## Appearance and accessibility
 

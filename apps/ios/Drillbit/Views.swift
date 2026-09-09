@@ -45,7 +45,7 @@ struct RootView: View {
       NavigationStack { SettingsView(model: model) }.interactiveDismissDisabled()
     }
     .fullScreenCover(item: $model.presented) { challenge in
-      NavigationStack { PracticeView(model: model, challenge: challenge) }
+      NavigationStack { InterviewView(model: model, challenge: challenge) }
     }
     .sheet(item: $model.conflict) { challenge in
       NavigationStack {
@@ -129,7 +129,7 @@ struct TodayView: View {
           Button("Prepare question") { flow = QuestionFlowEntry() }.buttonStyle(PracticeButtonStyle())
         }
         if model.busy || model.bootstrap?.jobs.contains(where: { $0.kind == "generate" && ["pending", "running"].contains($0.status) }) == true {
-          ProgressView("Preparing your question…").font(.subheadline)
+          LoadingStatus("Preparing your question…")
         }
         if let failure = model.preparationFailure {
           Text(failure).font(.subheadline).foregroundStyle(.secondary)
@@ -184,23 +184,33 @@ struct QuestionFlow: View {
   var body: some View {
     NavigationStack {
       if showingPreview {
-        ScrollView {
-          VStack(alignment: .leading, spacing: 16) {
-            if loading { ProgressView("Preparing your question…") }
-            else if let question {
-              Text("\(question.topic) · \(question.levelLabel)").font(.subheadline).foregroundStyle(.secondary)
-              Text(question.title).font(.title2.weight(.semibold))
-              Text(question.prompt).frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled)
-            }
-            if let failure {
-              Text(failure).foregroundStyle(.secondary)
-              Button("Back to preparation") { showingPreview = false }
-            }
-          }.frame(maxWidth: .infinity, alignment: .leading).padding(24)
+        Group {
+          if loading {
+            LoadingStatus("Preparing your question…")
+              .frame(maxWidth: .infinity, maxHeight: .infinity)
+          } else {
+            ScrollView {
+              VStack(alignment: .leading, spacing: 16) {
+                if let question {
+                  Text(question.title).font(.title2.weight(.semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+                  Text(question.prompt)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled).accessibilityIdentifier("previewPrompt")
+                }
+                if let failure {
+                  Text(failure).foregroundStyle(.secondary)
+                  Button("Back to preparation") { showingPreview = false }
+                }
+              }.frame(maxWidth: .infinity, alignment: .leading).padding(24)
+            }.frame(maxWidth: .infinity, maxHeight: .infinity)
+              .accessibilityIdentifier("questionPreviewScroll")
+          }
         }.safeAreaInset(edge: .bottom) {
           if let question, !loading {
             VStack(spacing: 12) {
-              Button(question.lifecycle == "in_progress" ? "Resume" : "Start practice") {
+              Button(question.lifecycle == "in_progress" ? "Resume" : "Start interview") {
                 starting = true
                 Task {
                   do {
@@ -344,7 +354,7 @@ struct ExampleView: View {
           Text("Pitfalls").font(.headline)
           ForEach(answer.pitfalls, id: \.self) { Text($0) }
         } else if loading {
-          ProgressView("Preparing an example")
+          LoadingStatus("Preparing an example")
         } else {
           Text("See one possible answer. Your own answer will stay unchanged.")
           Button("Reveal example") {

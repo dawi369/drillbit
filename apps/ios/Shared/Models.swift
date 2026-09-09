@@ -51,6 +51,8 @@ struct RequestStatus: Codable, Sendable {
   var status: String
 }
 struct Challenge: Codable, Identifiable, Sendable {
+  var interviewStyle: InterviewStyle?
+  var interview: InterviewState?
   var engineeringLevel: String?
   var difficulty: String?
   var levelLabel: String {
@@ -222,6 +224,7 @@ struct AdoptionInput: Codable, Sendable {
   var revision: Int
 }
 struct PreparationInput: Codable {
+  var interviewStyle: InterviewStyle? = nil
   var focus: String
   var kind: String
   var difficulty: String
@@ -281,4 +284,50 @@ func reminderComponents(minutes: Int, timezone: String) -> DateComponents {
 
 enum PracticeFocus {
   static let choices = ["System design", "Backend", "Frontend", "Debugging", "Algorithms"]
+}
+
+enum InterviewStyle: String, CaseIterable, Codable, Identifiable, Sendable {
+  case quick, standard, inDepth = "in_depth"
+  var id: String { rawValue }
+  var title: String { switch self { case .quick: "Quick"; case .standard: "Standard"; case .inDepth: "In-depth" } }
+  var explanation: String { switch self {
+    case .quick: "One question and a focused follow-up."
+    case .standard: "Explore your approach and its trade-offs."
+    case .inDepth: "More follow-ups that challenge your assumptions."
+  } }
+}
+struct InterviewResponse: Codable, Sendable {
+  var outcome: String
+  var text: String
+}
+struct InterviewTurn: Codable, Identifiable, Sendable {
+  var id: String
+  var ordinal: Int
+  var kind: String
+  var prompt: String
+  var text: String
+  var createdAt: String
+  var jobId: String
+  var status: String
+  var error: String?
+  var result: InterviewResponse?
+  var pending: Bool { ["pending", "running"].contains(status) }
+}
+struct InterviewState: Codable, Sendable {
+  var style: InterviewStyle = .standard
+  var prompt: String
+  var wrapUp: Bool = false
+  var turns: [InterviewTurn] = []
+}
+struct InterviewInput: Codable, Sendable {
+  var promptId: String = "original"
+  var kind: String
+  var revision: Int
+  var text: String = ""
+}
+
+struct PendingInterviewCommand: Codable, Sendable {
+  var command: String
+  var input: InterviewInput
+  var retryTurn: String?
 }

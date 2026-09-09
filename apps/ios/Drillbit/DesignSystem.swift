@@ -30,3 +30,16 @@ struct PracticeButtonStyle: ButtonStyle {
       .hoverEffect(.highlight)
   }
 }
+
+struct LoadingStatus: View {
+  let message: String
+  init(_ message: String) { self.message = message }
+  var body: some View {
+    VStack(spacing: 12) {
+      ProgressView().accessibilityHidden(true)
+      Text(message).font(.subheadline).foregroundStyle(.secondary)
+        .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+    }.frame(maxWidth: .infinity).padding(24)
+      .accessibilityElement(children: .combine)
+  }
+}

@@ -4,6 +4,10 @@ Product council consensus · 9 September 2026
 
 **Status:** product direction endorsed by the user, with the tone and deferred-Speak decisions below added on 9 September 2026. This is not an implementation or release claim. [Architecture](architecture.md) describes the implemented baseline; [acceptance](acceptance.md) records verified behavior and remaining release gates.
 
+### Latest revision: Interview room
+
+The user approved the [interviewer council direction](interviewer-council.md): one interviewer, explicit Share answer, and Interview style (Quick / Standard / In-depth). It supersedes the mode-based native interaction below. The durable implementation and compatibility boundaries are recorded in [architecture](architecture.md#interview-room--9-september-2026).
+
 ### Latest revision: ambient Coach and collaborative Guided
 
 The [companion council revision](companion-vision.md) is the next implementation specification. It supersedes this document's earlier manual-only invocation rule: Solo has no assistant surface; Coach may offer contextual nudges after meaningful progress and a pause; explicitly selecting Guided begins one collaboration request. Restoring a mode or opening a sheet does not regenerate. All ownership, adoption and completion protections remain. This revision is a plan, not a claim that the current explicit-help UI already behaves this way.

@@ -1,3 +1,4 @@
+import { interviewFor } from "./interview";
 import { contextFor, receiptStatements } from "./companion";
 import { receiptSchema } from "./companion-contract";
 import type { z } from "zod";
@@ -122,6 +123,7 @@ export async function detail(env: Env, account: string, id: string) {
     ]);
   return {
     ...present(row),
+    interview: await interviewFor(env, account, id),
     companion: await contextFor(env, account, id),
     automaticCompanion: env.COMPANION_AUTO_ENABLED === "true",
     help: help.results.map((h: any) => ({
@@ -215,7 +217,7 @@ export async function complete(
   const challenge = await ownedChallenge(env, account, id);
   if (challenge.lifecycle === "completed" && challenge.command_id === command)
     return;
-  if (!answer.trim())
+  if (!answer.trim() && !(await env.DB.prepare("SELECT id FROM interview_turns WHERE challenge_id=? AND kind='answer' LIMIT 1").bind(id).first()))
     throw new Fault("empty_answer", 400, "Write an answer before finishing.");
   const now = timestamp();
   await env.DB.batch([
@@ -230,7 +232,7 @@ export async function complete(
       `INSERT OR IGNORE INTO jobs(id,account_id,challenge_id,kind,input,created_at,updated_at) SELECT ?,account_id,id,'summarize',?,?,? FROM challenges WHERE id=? AND command_id=? AND lifecycle='completed'`,
     ).bind(command, JSON.stringify({ settings }), now, now, id, command),
     env.DB.prepare(
-      "UPDATE jobs SET status='cancelled',updated_at=? WHERE challenge_id=? AND kind IN ('help','reveal') AND status IN ('pending','running') AND EXISTS(SELECT 1 FROM challenges WHERE id=? AND command_id=? AND lifecycle='completed')",
+      "UPDATE jobs SET status='cancelled',updated_at=? WHERE challenge_id=? AND kind IN ('help','reveal','interview') AND status IN ('pending','running') AND EXISTS(SELECT 1 FROM challenges WHERE id=? AND command_id=? AND lifecycle='completed')",
     ).bind(now, id, id, command),
     env.DB.prepare(
       "UPDATE requests SET status='cancelled',updated_at=? WHERE challenge_id=? AND status='running' AND EXISTS(SELECT 1 FROM challenges WHERE id=? AND command_id=? AND lifecycle='completed')",
@@ -239,6 +241,7 @@ export async function complete(
       `INSERT OR IGNORE INTO completion_context(challenge_id,data)
       SELECT c.id,json_object(
         'question',json(c.data),
+        'interview',json((SELECT json_group_array(json_object('kind',t.kind,'prompt',t.prompt,'answer',t.text,'result',json(t.result),'delivery','unknown')) FROM (SELECT * FROM interview_turns WHERE challenge_id=c.id ORDER BY ordinal) t)),
         'session',json_object('answer',s.answer,'revision',s.revision),
         'help',json((SELECT json_group_array(json_object('id',j.id,'kind',json_extract(j.input,'$.action.kind'),'status',j.status,'body',json_extract(h.data,'$.body'),'suggestedAnswer',json_extract(h.data,'$.suggestedAnswer'))) FROM jobs j LEFT JOIN help_results h ON h.id=j.id WHERE j.challenge_id=c.id AND j.kind='help')),
         'turns',json((SELECT json_group_array(json_object('role',t.role,'text',t.text)) FROM turns t WHERE t.challenge_id=c.id)),

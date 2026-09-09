@@ -24,6 +24,7 @@
 		ADA43CF08FADFB23365A14E8 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01713294F3436278FCEE46B6 /* Models.swift */; };
 		AE7741A51A7892B3DB5B5C08 /* SharedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8049B9471B01CBFBD8C80764 /* SharedStore.swift */; };
 		B60776186F24C169754719F2 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDE151C29EEC1990D2C7E840 /* DesignSystem.swift */; };
+		B81F6A3B13FB0CFA73CFCFED /* InterviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92066D96F6C016361FF268E4 /* InterviewView.swift */; };
 		D090F4FDF85CBD331AA6CAB7 /* DrillbitWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 150BB0656D2594F45A3E045B /* DrillbitWidget.swift */; };
 		D8B1269DC65D854F474432E6 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8E06A264C65F45E7AD14AD1 /* AppModel.swift */; };
 		E4DF89EDCDE360281E583E6A /* DrillbitWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 9A2B037FAEC89AAC90414A59 /* DrillbitWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -83,6 +84,7 @@
 		7ED772ACFEBFA6EBE9753089 /* ContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContractTests.swift; sourceTree = "<group>"; };
 		8049B9471B01CBFBD8C80764 /* SharedStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedStore.swift; sourceTree = "<group>"; };
 		90A5D549D2FB1410F6D6B59B /* DrillbitTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = DrillbitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		92066D96F6C016361FF268E4 /* InterviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterviewView.swift; sourceTree = "<group>"; };
 		9A2B037FAEC89AAC90414A59 /* DrillbitWidget.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = DrillbitWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		9A7106218805AC5263A12438 /* Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persistence.swift; sourceTree = "<group>"; };
 		A193915AEBBE5F30D2A8AECA /* CompanionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionCoordinator.swift; sourceTree = "<group>"; };
@@ -143,6 +145,7 @@
 				FDE151C29EEC1990D2C7E840 /* DesignSystem.swift */,
 				DAD863FB5DA9BAE45F86B3AB /* DrillbitApp.swift */,
 				F7FE2F3D17D6A2010A948002 /* HelpView.swift */,
+				92066D96F6C016361FF268E4 /* InterviewView.swift */,
 				BCE2282A43B33A17D93AF4C6 /* MemorySettings.swift */,
 				9A7106218805AC5263A12438 /* Persistence.swift */,
 				CCDB9D254A54D86DF356AC77 /* PracticeCompanion.swift */,
@@ -358,6 +361,7 @@
 				B60776186F24C169754719F2 /* DesignSystem.swift in Sources */,
 				3D1A1EB693F960C1596B0D8F /* DrillbitApp.swift in Sources */,
 				0EEA0D0A8C2A9562B674EAB4 /* HelpView.swift in Sources */,
+				B81F6A3B13FB0CFA73CFCFED /* InterviewView.swift in Sources */,
 				14D473381FCB4038B04FA534 /* MemorySettings.swift in Sources */,
 				ADA43CF08FADFB23365A14E8 /* Models.swift in Sources */,
 				3D0DACC7801A3CCC832A9840 /* Persistence.swift in Sources */,

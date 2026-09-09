@@ -111,6 +111,7 @@ export function normalizeSettings(value: unknown): Settings {
   return { ...settings, engineeringLevel: settings.engineeringLevel ?? levelForDifficulty(settings.difficulty) };
 }
 export const generationSchema = z.object({
+  interviewStyle: z.enum(["quick", "standard", "in_depth"]).optional(),
   focus: z.string().trim().min(1).max(4000).optional(),
   kind: z.enum(["auto", "explain", "design"]).default("auto"),
   engineeringLevel: engineeringLevelSchema.optional(),

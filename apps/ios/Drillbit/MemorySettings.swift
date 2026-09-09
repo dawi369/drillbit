@@ -122,7 +122,10 @@ struct SessionDetailView: View {
       VStack(alignment: .leading, spacing: 24) {
         Text(challenge.title).font(.title.weight(.semibold))
         Text(challenge.prompt).foregroundStyle(.secondary)
-        if let answer = challenge.session?.answer {
+        if let interview = challenge.interview, !interview.turns.isEmpty {
+          NavigationLink("Interview conversation") { InterviewConversation(state: interview) }
+        }
+        if let answer = challenge.session?.answer, !answer.isEmpty {
           Text("Your answer").font(.headline)
           Text(answer).textSelection(.enabled)
           ShareLink("Copy or share answer", item: answer)
@@ -400,6 +403,7 @@ struct AssistanceSummary: View {
       !(challenge.adoptions ?? []).isEmpty
         ? "Practised with an assisted draft"
         : (challenge.help ?? []).contains(where: { $0.body != nil })
+          || (challenge.interview?.turns ?? []).contains(where: { ["hint", "example"].contains($0.kind) })
           || !(challenge.turns ?? []).isEmpty || challenge.example != nil
           ? "Practised with help" : "No help used"
     )

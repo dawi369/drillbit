@@ -1,3 +1,4 @@
+import { interviewInputSchema, requestInterview, retryInterview } from "./interview";
 import { updateContext, receive } from "./companion";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
@@ -340,6 +341,8 @@ app.post("/v1/jobs/:id/cancel", async (c) => {
 app.get("/v1/challenges/:id", async (c) =>
   c.json(await detail(c.env, c.get("account").id, c.req.param("id"))),
 );
+app.post("/v1/challenges/:id/interview", async c => c.json(await requestInterview(c.env,c.get("account").id,c.req.param("id"),requireCommand(c.req.header("Idempotency-Key")),interviewInputSchema.parse(await c.req.json())),202));
+app.post("/v1/challenges/:id/interview/:turn/retry", async c => c.json(await retryInterview(c.env,c.get("account").id,c.req.param("id"),c.req.param("turn"),requireCommand(c.req.header("Idempotency-Key"))),202));
 app.post("/v1/challenges/:id/start", async (c) => {
   const a = c.get("account").id,
     id = c.req.param("id");
@@ -446,7 +449,7 @@ app.post("/v1/jobs/:id/retry", async (c) => {
     )
       .bind(c.req.param("id"), a)
       .first<Job>();
-  if (!old || old.status !== "failed" || old.kind === "help")
+  if (!old || old.status !== "failed" || ["help", "interview"].includes(old.kind))
     throw new Fault("not_retryable", 409, "This operation cannot be retried.");
   const id = requireCommand(c.req.header("Idempotency-Key"));
   await consumeUsage(c.env, a, old.kind, old.kind === "summarize" ? 20 : 10);

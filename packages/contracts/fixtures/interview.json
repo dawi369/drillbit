@@ -1,0 +1,22 @@
+{
+  "style": "standard",
+  "prompt": "What happens when a worker crashes?",
+  "wrapUp": false,
+  "turns": [
+    {
+      "id": "turn-1",
+      "ordinal": 0,
+      "kind": "answer",
+      "prompt": "Design a queue.",
+      "text": "Use durable jobs and retries.",
+      "createdAt": "2026-09-09T18:00:00Z",
+      "jobId": "turn-1",
+      "status": "completed",
+      "error": null,
+      "result": {
+        "outcome": "follow_up",
+        "text": "What happens when a worker crashes?"
+      }
+    }
+  ]
+}

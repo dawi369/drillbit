@@ -64,7 +64,7 @@ struct LocalDraft: Sendable {
         revision: challenge.session?.revision ?? 0)
     if existing == nil {
       modelContext.insert(value)
-    } else if value.pendingKind.isEmpty, let remote = challenge.session {
+    } else if value.pendingKind.isEmpty, let remote = challenge.session, remote.revision >= value.revision {
       value.answer = remote.answer
       value.serverAnswer = remote.answer
       value.revision = remote.revision

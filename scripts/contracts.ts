@@ -5,6 +5,8 @@ const definitions = Object.fromEntries(
   Object.entries(wire).map(([name, schema]) => [name, z.toJSONSchema(schema)]),
 );
 const operations: [string, string, string, string?][] = [
+  ["post", "challenges/{id}/interview", "Commit an answer or request clarification/help without advancing the answer", "InterviewInput"],
+  ["post", "challenges/{id}/interview/{turn}/retry", "Retry a failed interviewer response without resubmitting the answer"],
   [
     "put",
     "challenges/{id}/companion",
@@ -76,6 +78,8 @@ const operations: [string, string, string, string?][] = [
   ["get", "widget", "Read minimal widget snapshot using device token"],
 ];
 const responseNames: Record<string, string> = {
+  "post challenges/{id}/interview": "InterviewState",
+  "post challenges/{id}/interview/{turn}/retry": "InterviewState",
   "put challenges/{id}/companion": "Companion",
   "post challenges/{id}/deliveries": "OK",
   "post challenges/{id}/help": "Job",
@@ -106,6 +110,8 @@ const responseNames: Record<string, string> = {
   "get widget": "Widget",
 };
 const idempotent = new Set([
+  "post challenges/{id}/interview",
+  "post challenges/{id}/interview/{turn}/retry",
   "put challenges/{id}/companion",
   "post challenges/{id}/help",
   "post challenges/{id}/adopt",
@@ -128,6 +134,7 @@ for (const [method, path, summary, schema] of operations) {
     summary,
     operationId: method + "_" + path.replace(/[^a-z]/g, "_"),
     parameters: [
+      ...(path.includes("{turn}") ? [{ name: "turn", in: "path", required: true, schema: { type: "string" } }] : []),
       ...(path === "sessions"
         ? ["cursor", "q"].map((name) => ({
             name,

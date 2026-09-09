@@ -1,3 +1,4 @@
+import { interviewSchemaFor, normalizeInterviewResult, interviewWrapUp } from "./interview";
 import { interventionFor } from "./companion-contract";
 import {
   WorkflowEntrypoint,
@@ -65,6 +66,8 @@ export async function runJob(env: Env, id: string) {
     action?: { kind: string };
     context?: unknown;
     instruction?: string;
+    interviewStyle?: string;
+    turnId?: string;
     followUp?: unknown;
   }>(job.input);
   input.settings = normalizeSettings(input.settings);
@@ -124,6 +127,7 @@ export async function runJob(env: Env, id: string) {
           promptVersion: "practice-v2",
           difficulty: input.settings.difficulty,
           engineeringLevel: input.settings.engineeringLevel,
+          interviewStyle: input.interviewStyle ?? "standard",
         }),
         now,
         input.availableAt ?? now,
@@ -140,6 +144,16 @@ export async function runJob(env: Env, id: string) {
     return;
   }
   if (!job.challenge_id) return;
+  if (job.kind === "interview") {
+    const output = interviewWrapUp(input.context, input.action?.kind ?? "answer") ?? normalizeInterviewResult(await structured(env,job.account_id,input.settings,"interview",{...input.context as object, action: input.action},interviewSchemaFor(input.action?.kind ?? "answer")));
+    const isAnswer = ["answer","continue"].includes(input.action?.kind ?? "");
+    if ((isAnswer && output.outcome === "reply") || (!isAnswer && output.outcome !== "reply")) throw new Error("Invalid interview outcome");
+    await env.DB.batch([
+      env.DB.prepare("UPDATE interview_turns SET result=? WHERE id=? AND job_id=? AND result IS NULL AND EXISTS(SELECT 1 FROM jobs j JOIN challenges c ON c.id=j.challenge_id JOIN accounts a ON a.id=j.account_id WHERE j.id=? AND j.status='running' AND c.lifecycle='in_progress' AND a.status='active')").bind(JSON.stringify(output),input.turnId,id,id),
+      env.DB.prepare("UPDATE jobs SET status='completed',updated_at=? WHERE id=? AND status='running' AND EXISTS(SELECT 1 FROM interview_turns WHERE job_id=? AND result IS NOT NULL)").bind(timestamp(),id,id),
+    ]);
+    return;
+  }
   if (job.kind === "help") {
     const current = await detail(env, job.account_id, job.challenge_id);
     if (!["ready", "in_progress"].includes(current.lifecycle)) {
@@ -232,7 +246,7 @@ export class PracticeWorkflow extends WorkflowEntrypoint<
         "execute",
         {
           retries: {
-            limit: kind?.kind === "help" ? 0 : 2,
+            limit: ["help", "interview"].includes(kind?.kind ?? "") ? 0 : 2,
             delay: "10 seconds",
             backoff: "exponential",
           },

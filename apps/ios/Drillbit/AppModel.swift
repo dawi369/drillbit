@@ -151,6 +151,11 @@ import WidgetKit
     failedPreparationSource = nil
     defer { busy = false }
     if fixture {
+      #if DEBUG
+      if ProcessInfo.processInfo.arguments.contains("--fixture-slow-generation") {
+        try await Task.sleep(for: .seconds(6))
+      }
+      #endif
       try await Task.sleep(for: .seconds(2))
       guard bootstrap?.account.id == account else { throw CancellationError() }
       #if DEBUG
@@ -158,7 +163,7 @@ import WidgetKit
         throw APIError(code: "generation_failed", message: "Question preparation failed. Your previous question is safe.", status: 503)
       }
       #endif
-      let challenge = Challenge(engineeringLevel: preparation?.engineeringLevel ?? settings.selectedLevel,
+      let challenge = Challenge(interviewStyle: preparation?.interviewStyle ?? .standard, engineeringLevel: preparation?.engineeringLevel ?? settings.selectedLevel,
         id: UUID().uuidString, lifecycle: "ready", title: "Design a reliable job queue",
         prompt: "Design a reliable job queue. Explain retries, ordering, and how failures are handled.",
         topic: preparation?.focus ?? settings.focus, session: SessionDraft(answer: "", revision: 0))

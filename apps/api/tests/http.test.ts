@@ -295,3 +295,15 @@ it("counts all completed practice independently of the 100-session page and acco
   expect(body.statistics).toMatchObject({completed:105,lastSevenDays:3});
   expect(wire.Memory.safeParse(body).success).toBe(true);
 });
+it("serves revision-checked interview turns through the authenticated public contract",async()=>{
+ const subject=crypto.randomUUID(),a=await accountFor(bindings,subject),id=crypto.randomUUID();
+ await bindings.DB.prepare("UPDATE accounts SET status='active' WHERE id=?").bind(a.id).run();
+ await bindings.DB.prepare("INSERT INTO challenges(id,account_id,lifecycle,data,created_at,available_at) VALUES(?,?,'in_progress',?,'now','now')").bind(id,a.id,JSON.stringify({title:"Queue",prompt:"Design a queue.",topic:"Backend"})).run();
+ await bindings.DB.prepare("INSERT INTO sessions(challenge_id,answer,revision,updated_at) VALUES(?,'Durable jobs',0,'now')").bind(id).run();
+ const cmd=crypto.randomUUID(),input={kind:"answer",revision:0,text:"Durable jobs"};
+ const response=await request(`challenges/${id}/interview`,subject,"POST",input,cmd);
+ expect(response.status).toBe(202);expect(wire.InterviewState.safeParse(await response.json()).success).toBe(true);
+ const replay=await request(`challenges/${id}/interview`,subject,"POST",input,cmd);expect(replay.status).toBe(202);
+ const missing=await request(`challenges/${id}/interview`,subject,"POST",input);expect(missing.status).toBe(400);
+ const fixture=await import("../../../packages/contracts/fixtures/interview.json");expect(wire.InterviewState.safeParse(fixture.default).success).toBe(true);
+});

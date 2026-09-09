@@ -2,6 +2,11 @@
 export function boundedContext(input: unknown, limit = 40000): unknown {
   const source = input as Record<string, unknown>;
   const result = { ...source };
+  if (Array.isArray(result.interview)) result.interview = [...result.interview];
+  else if (result.interview && typeof result.interview === "object") {
+    const interview = result.interview as Record<string, unknown>;
+    result.interview = { ...interview, turns: Array.isArray(interview.turns) ? [...interview.turns] : [] };
+  }
   if ("example" in result) {
     result.exampleViewed = Boolean(result.example);
     delete result.example;
@@ -44,6 +49,13 @@ export function boundedContext(input: unknown, limit = 40000): unknown {
   }
   if (Array.isArray(result.turns)) result.turns = result.turns.slice(-6);
   while (JSON.stringify(result).length > limit) {
+    const interview = result.interview as { turns?: unknown[] } | undefined;
+    const history = Array.isArray(result.interview) ? result.interview : interview?.turns;
+    if (history && history.length > 1) {
+      history.shift();
+      result.omittedInterviewTurns = Number(result.omittedInterviewTurns ?? 0) + 1;
+      continue;
+    }
     if (Array.isArray(result.recent) && result.recent.length) {
       result.recent.pop();
       continue;

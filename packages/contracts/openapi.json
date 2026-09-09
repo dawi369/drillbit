@@ -10,6 +10,280 @@
     }
   ],
   "paths": {
+    "/v1/challenges/{id}/interview": {
+      "post": {
+        "summary": "Commit an answer or request clarification/help without advancing the answer",
+        "operationId": "post_challenges__id__interview",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "required": true,
+            "in": "header",
+            "description": "Required for generation, draft writes, completion, assistance, retries and deletion of an account.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InterviewInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewState"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Durable operation accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewState"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invite required or account unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not owned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision or lifecycle conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid invitation or provider credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Usage limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Provider temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/challenges/{id}/interview/{turn}/retry": {
+      "post": {
+        "summary": "Retry a failed interviewer response without resubmitting the answer",
+        "operationId": "post_challenges__id__interview__turn__retry",
+        "parameters": [
+          {
+            "name": "turn",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "required": true,
+            "in": "header",
+            "description": "Required for generation, draft writes, completion, assistance, retries and deletion of an account.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewState"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Durable operation accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewState"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invite required or account unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not owned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision or lifecycle conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid invitation or provider credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Usage limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Provider temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/challenges/{id}/companion": {
       "put": {
         "summary": "Update revision-checked companion context",
@@ -3800,10 +4074,173 @@
         ],
         "additionalProperties": false
       },
+      "InterviewInput": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "answer",
+              "clarification",
+              "hint",
+              "example",
+              "continue"
+            ]
+          },
+          "promptId": {
+            "default": "original",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "text": {
+            "default": "",
+            "type": "string",
+            "maxLength": 20000
+          }
+        },
+        "required": [
+          "kind",
+          "promptId",
+          "revision",
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "InterviewState": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "style": {
+            "type": "string",
+            "enum": [
+              "quick",
+              "standard",
+              "in_depth"
+            ]
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "wrapUp": {
+            "type": "boolean"
+          },
+          "turns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "ordinal": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "answer",
+                    "clarification",
+                    "hint",
+                    "example",
+                    "continue"
+                  ]
+                },
+                "prompt": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "jobId": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "error": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "result": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "outcome": {
+                          "type": "string",
+                          "enum": [
+                            "follow_up",
+                            "reply",
+                            "wrap_up"
+                          ]
+                        },
+                        "text": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2400
+                        }
+                      },
+                      "required": [
+                        "outcome",
+                        "text"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "ordinal",
+                "kind",
+                "prompt",
+                "text",
+                "createdAt",
+                "jobId",
+                "status",
+                "result"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "style",
+          "prompt",
+          "wrapUp",
+          "turns"
+        ],
+        "additionalProperties": false
+      },
       "PreparationInput": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "interviewStyle": {
+            "type": "string",
+            "enum": [
+              "quick",
+              "standard",
+              "in_depth"
+            ]
+          },
           "focus": {
             "type": "string",
             "minLength": 1,
@@ -3968,6 +4405,129 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 80
+          },
+          "interviewStyle": {
+            "type": "string",
+            "enum": [
+              "quick",
+              "standard",
+              "in_depth"
+            ]
+          },
+          "interview": {
+            "type": "object",
+            "properties": {
+              "style": {
+                "type": "string",
+                "enum": [
+                  "quick",
+                  "standard",
+                  "in_depth"
+                ]
+              },
+              "prompt": {
+                "type": "string"
+              },
+              "wrapUp": {
+                "type": "boolean"
+              },
+              "turns": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "ordinal": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "answer",
+                        "clarification",
+                        "hint",
+                        "example",
+                        "continue"
+                      ]
+                    },
+                    "prompt": {
+                      "type": "string"
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "jobId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "result": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "outcome": {
+                              "type": "string",
+                              "enum": [
+                                "follow_up",
+                                "reply",
+                                "wrap_up"
+                              ]
+                            },
+                            "text": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 2400
+                            }
+                          },
+                          "required": [
+                            "outcome",
+                            "text"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "ordinal",
+                    "kind",
+                    "prompt",
+                    "text",
+                    "createdAt",
+                    "jobId",
+                    "status",
+                    "result"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "style",
+              "prompt",
+              "wrapUp",
+              "turns"
+            ],
+            "additionalProperties": false
           },
           "difficulty": {
             "type": "string",
@@ -4868,6 +5428,129 @@
                     "minLength": 1,
                     "maxLength": 80
                   },
+                  "interviewStyle": {
+                    "type": "string",
+                    "enum": [
+                      "quick",
+                      "standard",
+                      "in_depth"
+                    ]
+                  },
+                  "interview": {
+                    "type": "object",
+                    "properties": {
+                      "style": {
+                        "type": "string",
+                        "enum": [
+                          "quick",
+                          "standard",
+                          "in_depth"
+                        ]
+                      },
+                      "prompt": {
+                        "type": "string"
+                      },
+                      "wrapUp": {
+                        "type": "boolean"
+                      },
+                      "turns": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "ordinal": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "answer",
+                                "clarification",
+                                "hint",
+                                "example",
+                                "continue"
+                              ]
+                            },
+                            "prompt": {
+                              "type": "string"
+                            },
+                            "text": {
+                              "type": "string"
+                            },
+                            "createdAt": {
+                              "type": "string"
+                            },
+                            "jobId": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "type": "string"
+                            },
+                            "error": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "result": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "outcome": {
+                                      "type": "string",
+                                      "enum": [
+                                        "follow_up",
+                                        "reply",
+                                        "wrap_up"
+                                      ]
+                                    },
+                                    "text": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 2400
+                                    }
+                                  },
+                                  "required": [
+                                    "outcome",
+                                    "text"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "ordinal",
+                            "kind",
+                            "prompt",
+                            "text",
+                            "createdAt",
+                            "jobId",
+                            "status",
+                            "result"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "style",
+                      "prompt",
+                      "wrapUp",
+                      "turns"
+                    ],
+                    "additionalProperties": false
+                  },
                   "difficulty": {
                     "type": "string",
                     "enum": [
@@ -5512,6 +6195,129 @@
                     "minLength": 1,
                     "maxLength": 80
                   },
+                  "interviewStyle": {
+                    "type": "string",
+                    "enum": [
+                      "quick",
+                      "standard",
+                      "in_depth"
+                    ]
+                  },
+                  "interview": {
+                    "type": "object",
+                    "properties": {
+                      "style": {
+                        "type": "string",
+                        "enum": [
+                          "quick",
+                          "standard",
+                          "in_depth"
+                        ]
+                      },
+                      "prompt": {
+                        "type": "string"
+                      },
+                      "wrapUp": {
+                        "type": "boolean"
+                      },
+                      "turns": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "ordinal": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "answer",
+                                "clarification",
+                                "hint",
+                                "example",
+                                "continue"
+                              ]
+                            },
+                            "prompt": {
+                              "type": "string"
+                            },
+                            "text": {
+                              "type": "string"
+                            },
+                            "createdAt": {
+                              "type": "string"
+                            },
+                            "jobId": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "type": "string"
+                            },
+                            "error": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "result": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "outcome": {
+                                      "type": "string",
+                                      "enum": [
+                                        "follow_up",
+                                        "reply",
+                                        "wrap_up"
+                                      ]
+                                    },
+                                    "text": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 2400
+                                    }
+                                  },
+                                  "required": [
+                                    "outcome",
+                                    "text"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "ordinal",
+                            "kind",
+                            "prompt",
+                            "text",
+                            "createdAt",
+                            "jobId",
+                            "status",
+                            "result"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "style",
+                      "prompt",
+                      "wrapUp",
+                      "turns"
+                    ],
+                    "additionalProperties": false
+                  },
                   "difficulty": {
                     "type": "string",
                     "enum": [
@@ -6138,6 +6944,129 @@
                   "minLength": 1,
                   "maxLength": 80
                 },
+                "interviewStyle": {
+                  "type": "string",
+                  "enum": [
+                    "quick",
+                    "standard",
+                    "in_depth"
+                  ]
+                },
+                "interview": {
+                  "type": "object",
+                  "properties": {
+                    "style": {
+                      "type": "string",
+                      "enum": [
+                        "quick",
+                        "standard",
+                        "in_depth"
+                      ]
+                    },
+                    "prompt": {
+                      "type": "string"
+                    },
+                    "wrapUp": {
+                      "type": "boolean"
+                    },
+                    "turns": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "ordinal": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "answer",
+                              "clarification",
+                              "hint",
+                              "example",
+                              "continue"
+                            ]
+                          },
+                          "prompt": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string"
+                          },
+                          "jobId": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "error": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "result": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "outcome": {
+                                    "type": "string",
+                                    "enum": [
+                                      "follow_up",
+                                      "reply",
+                                      "wrap_up"
+                                    ]
+                                  },
+                                  "text": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 2400
+                                  }
+                                },
+                                "required": [
+                                  "outcome",
+                                  "text"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "ordinal",
+                          "kind",
+                          "prompt",
+                          "text",
+                          "createdAt",
+                          "jobId",
+                          "status",
+                          "result"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "style",
+                    "prompt",
+                    "wrapUp",
+                    "turns"
+                  ],
+                  "additionalProperties": false
+                },
                 "difficulty": {
                   "type": "string",
                   "enum": [
@@ -6684,6 +7613,129 @@
                   "type": "string",
                   "minLength": 1,
                   "maxLength": 80
+                },
+                "interviewStyle": {
+                  "type": "string",
+                  "enum": [
+                    "quick",
+                    "standard",
+                    "in_depth"
+                  ]
+                },
+                "interview": {
+                  "type": "object",
+                  "properties": {
+                    "style": {
+                      "type": "string",
+                      "enum": [
+                        "quick",
+                        "standard",
+                        "in_depth"
+                      ]
+                    },
+                    "prompt": {
+                      "type": "string"
+                    },
+                    "wrapUp": {
+                      "type": "boolean"
+                    },
+                    "turns": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "ordinal": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "answer",
+                              "clarification",
+                              "hint",
+                              "example",
+                              "continue"
+                            ]
+                          },
+                          "prompt": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string"
+                          },
+                          "jobId": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "error": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "result": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "outcome": {
+                                    "type": "string",
+                                    "enum": [
+                                      "follow_up",
+                                      "reply",
+                                      "wrap_up"
+                                    ]
+                                  },
+                                  "text": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 2400
+                                  }
+                                },
+                                "required": [
+                                  "outcome",
+                                  "text"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "ordinal",
+                          "kind",
+                          "prompt",
+                          "text",
+                          "createdAt",
+                          "jobId",
+                          "status",
+                          "result"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "style",
+                    "prompt",
+                    "wrapUp",
+                    "turns"
+                  ],
+                  "additionalProperties": false
                 },
                 "difficulty": {
                   "type": "string",
@@ -7248,6 +8300,129 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 80
+                  },
+                  "interviewStyle": {
+                    "type": "string",
+                    "enum": [
+                      "quick",
+                      "standard",
+                      "in_depth"
+                    ]
+                  },
+                  "interview": {
+                    "type": "object",
+                    "properties": {
+                      "style": {
+                        "type": "string",
+                        "enum": [
+                          "quick",
+                          "standard",
+                          "in_depth"
+                        ]
+                      },
+                      "prompt": {
+                        "type": "string"
+                      },
+                      "wrapUp": {
+                        "type": "boolean"
+                      },
+                      "turns": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "ordinal": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "answer",
+                                "clarification",
+                                "hint",
+                                "example",
+                                "continue"
+                              ]
+                            },
+                            "prompt": {
+                              "type": "string"
+                            },
+                            "text": {
+                              "type": "string"
+                            },
+                            "createdAt": {
+                              "type": "string"
+                            },
+                            "jobId": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "type": "string"
+                            },
+                            "error": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "result": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "outcome": {
+                                      "type": "string",
+                                      "enum": [
+                                        "follow_up",
+                                        "reply",
+                                        "wrap_up"
+                                      ]
+                                    },
+                                    "text": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 2400
+                                    }
+                                  },
+                                  "required": [
+                                    "outcome",
+                                    "text"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "ordinal",
+                            "kind",
+                            "prompt",
+                            "text",
+                            "createdAt",
+                            "jobId",
+                            "status",
+                            "result"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "style",
+                      "prompt",
+                      "wrapUp",
+                      "turns"
+                    ],
+                    "additionalProperties": false
                   },
                   "difficulty": {
                     "type": "string",

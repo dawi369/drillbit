@@ -515,7 +515,19 @@ struct PracticeView: View {
       if practice.mode != .solo {
         CompanionPanel(practice: practice) { sheet = .help }
       }
-      HStack {
+      HStack(spacing: 16) {
+        Button {} label: {
+          Image(systemName: "waveform")
+            .font(.body.weight(.medium))
+            .foregroundStyle(.tertiary)
+            .frame(width: 44, height: 44)
+            .background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .disabled(true)
+        .accessibilityLabel("Live voice")
+        .accessibilityValue("In development")
+        .accessibilityIdentifier("liveVoice")
         Menu {
           ForEach(AssistanceMode.allCases) { mode in Button(mode.rawValue) { practice.select(mode) }
           }
@@ -634,12 +646,6 @@ struct PracticeOptions: View {
         }
         Text(practice.mode.explanation).foregroundStyle(.secondary)
       }
-      Section("Answer with") {
-        Label("Write", systemImage: "keyboard")
-        Button("Speak — In development", systemImage: "waveform") {}.disabled(true)
-        Text("Live voice is being built. You can still dictate with your keyboard.").font(.footnote)
-          .foregroundStyle(.secondary)
-      }
       Section { Button("Skip challenge", role: .destructive, action: skip) }
     }.navigationTitle("Practice options").navigationBarTitleDisplayMode(.inline).toolbar {
       Button("Done") { dismiss() }
@@ -656,6 +662,7 @@ struct PreparationView: View {
   @State private var kind = "auto"
   @State private var engineeringLevel = "mid"
   @State private var instruction = ""
+  @State private var interviewStyle = InterviewStyle.standard
   @State private var includeSource = true
   @State private var initialized = false
   @Environment(\.dismiss) private var dismiss
@@ -688,13 +695,20 @@ struct PreparationView: View {
         }
       }
       Section {
+        NavigationLink {
+          InterviewStylePicker(selection: $interviewStyle)
+        } label: {
+          LabeledContent("Interview style", value: interviewStyle.title)
+        }.accessibilityIdentifier("interviewStyle")
+      }
+      Section {
         TextField("Any custom instructions? (optional)", text: $instruction, axis: .vertical)
           .lineLimit(2...4).accessibilityLabel("Optional request")
       }
       Section {
         Button("Prepare question") {
           let input = PreparationInput(
-            focus: focus, kind: kind, difficulty: model.settings.difficulty,
+            interviewStyle: interviewStyle, focus: focus, kind: kind, difficulty: model.settings.difficulty,
             engineeringLevel: engineeringLevel,
             replaceId: model.bootstrap?.challenge?.lifecycle == "ready" ? model.bootstrap?.challenge?.id : nil,
             instruction: instruction,
@@ -724,6 +738,7 @@ struct PreparationView: View {
       focus = model.settings.focus
       engineeringLevel = model.settings.selectedLevel
       if let recovery {
+        interviewStyle = recovery.interviewStyle ?? .standard
         focus = recovery.focus
         engineeringLevel = recovery.engineeringLevel ?? EngineeringLevel.legacy(recovery.difficulty)
         kind = recovery.kind

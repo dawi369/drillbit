@@ -131,3 +131,7 @@ Assistant MK1 (`6801853827`, `com.dawi369.assistantmk1`) was removed from active
 On 9 September 2026 the compatible settings backend deployed successfully as `1d798d23-25d4-457d-a36e-a68b2e6a9ecf`. Health returned 200 and unauthenticated bootstrap 401. No D1 migration is needed: level fields are additive in existing JSON records, with legacy normalization on read/job execution.
 
 Signed Release version `2.0.0` build `2` archived to `/tmp/drillbit-testflight/Drillbit-build2.xcarchive` and uploaded successfully using the existing internal-only export options. Live App Store Connect verification: processing **Complete**, build **Testing / Internal**, assigned to **Owner Testing** with one invitation. Build ID: `0936344e-6e1c-4826-a725-036c153038e4`. The build retains iOS 26 minimum and development services. See the settings section of [acceptance](acceptance.md) for verification and remaining device/prompt limits.
+
+## Interview development rollout — 9 September 2026
+
+D1 backup precedes additive migration `0006_interview.sql`. Development Worker `43ca2338-28c9-486b-8e36-04ca2b1c5db4` supports ordered interview turns and response retries while retaining older clients. Final signed native distribution was simulator-only. A synthetic live workflow completed; its isolated account/data was removed. Interview jobs have no automatic inference retries; users retry the response while the original answer remains committed. Keep the additive table when rolling back compatible Worker code. The new client requires interview-capable backend endpoints.

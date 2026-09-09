@@ -1,3 +1,4 @@
+import { interviewInputSchema, interviewResultSchema, interviewStyleSchema } from "../../apps/api/src/interview";
 import {
   captureSchema,
   companionUpdateSchema,
@@ -42,7 +43,13 @@ const companion = z.object({
   digest: z.string(),
   cycle: z.string(),
 });
+const interview = z.object({
+  style: interviewStyleSchema, prompt: z.string(), wrapUp: z.boolean(),
+  turns: z.array(z.object({ id: z.string(), ordinal: z.number().int(), kind: z.enum(["answer","clarification","hint","example","continue"]), prompt: z.string(), text: z.string(), createdAt: z.string(), jobId: z.string(), status: z.string(), error: z.string().nullable().optional(), result: interviewResultSchema.nullable() })),
+});
 const challenge = challengeSchema.extend({
+  interviewStyle: interviewStyleSchema.optional(),
+  interview: interview.optional(),
   difficulty: z.enum(["easy", "medium", "hard"]).optional(),
   engineeringLevel: engineeringLevelSchema.optional(),
   id: z.string(),
@@ -118,6 +125,8 @@ export const wire = {
   HelpInput: helpInputSchema,
   HelpOutput: helpOutputSchema,
   AdoptionInput: adoptionSchema,
+  InterviewInput: interviewInputSchema,
+  InterviewState: interview,
   PreparationInput: generationSchema,
   ChallengeContent: challengeSchema,
   QuestionSpecification: questionSpecificationSchema,
