@@ -1,29 +1,26 @@
-# drillbit
+# Drillbit
 
-Minimal, widget-first interview prep for software engineers.
+A native iPhone practice space for software engineering interviews: one question, room to think, a coach when useful, and a short reflection worth keeping.
 
-The product direction is centered on system design, distributed systems, trade-offs,
-and high-level verbal reasoning instead of code-first drilling. The app is
-OpenRouter-first, supports both light and dark themes, and is built so the widget
-becomes the primary daily touchpoint.
+- **iOS 26+ / SwiftUI** — Today, Memory, full-screen practice, keyboard dictation, WidgetKit and local reminders.
+- **Independent backend** — Cloudflare Workers, D1 and Workflows; Clerk authentication; managed or encrypted OpenRouter BYOK.
+- **Recoverable work** — SwiftData drafts and outbox, revision-checked cloud writes, durable completion and explicit conflicts.
+- **Android-ready boundary** — versioned HTTP/OpenAPI; future Kotlin UI consumes the same service.
 
-## Current foundation
+## Development
 
-- Expo SDK 55 with `expo-router`
-- `expo-widgets` and `expo-dev-client` for widget-ready native builds
-- `heroui-native` + `uniwind` for the main app UI layer
-- `expo-sqlite`, `expo-secure-store`, `expo-updates`, `expo-haptics`
-- `zustand` for lightweight app state
-- OpenRouter as the default model provider, with seeded qwen 3.5 flash selected by default
-- No custom deployed backend; app data stays local and network calls go directly to providers
+```sh
+bun install --frozen-lockfile
+bun run typecheck
+bun run test
+bun run contracts
+bun run ios:generate
+swift test --package-path apps/ios -j 2
+open apps/ios/Drillbit.xcodeproj
+```
 
-## Notes
+Configure Clerk, Apple capabilities and server secrets using [operations](docs/operations.md). Local configuration files are ignored. Never put provider secrets in an iOS build. `--fixtures` is a Debug-only simulator launch argument for an isolated sample practice session.
 
-- Widgets should stay on `@expo/ui` primitives only.
-- Main app screens should use HeroUI Native components styled with Uniwind.
-- Prefer native Expo and React Native capabilities before web or DOM-based fallbacks.
-- The initial widget scaffold lives in `src/widgets/drillbit-widget.tsx` and is wired through `app.json`.
-- Widget snapshot state is now derived in app code and synced through `src/lib/widgets/state.ts` and `src/lib/widgets/sync.ts`.
-- Widget development requires a dev build or EAS build, not Expo Go.
-- The app architecture is local-only by default: SQLite/App Groups for app data and the editable model catalog, SecureStore for secrets, direct calls to OpenRouter and RevenueCat.
-- Challenge history stays local, skipped items are deduped out of future prompts, and expired untouched challenges can be pruned.
+[Product vision](docs/product-vision.md) · [Architecture](docs/architecture.md) · [Operations and deployment](docs/operations.md) · [Verification and release gates](docs/acceptance.md) · [HTTP contract](packages/contracts/openapi.json)
+
+The former Expo application is preserved under `legacy/expo`, outside all new build targets. This checkout is a native rebuild under verification, not a signed TestFlight release.

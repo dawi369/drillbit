@@ -1,0 +1,99 @@
+name: Drillbit
+options:
+  bundleIdPrefix: dawi
+  deploymentTarget:
+    iOS: '26.0'
+settings:
+  base:
+    SWIFT_VERSION: '6.0'
+    TARGETED_DEVICE_FAMILY: '1'
+    MARKETING_VERSION: '2.0.0'
+    CURRENT_PROJECT_VERSION: '2'
+    GENERATE_INFOPLIST_FILE: YES
+    SWIFT_STRICT_CONCURRENCY: complete
+packages:
+  Clerk:
+    url: https://github.com/clerk/clerk-ios.git
+    revision: 02f98f89a19b6c079517c9aae07df7edd0e600e5
+targets:
+  Drillbit:
+    type: application
+    platform: iOS
+    sources: [Drillbit, Shared]
+    configFiles:
+      Debug: Config/Defaults.xcconfig
+      Release: Config/Defaults.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dawi.drillbit
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: 1
+    info:
+      path: Config/AppInfo.plist
+      properties:
+        CFBundleDisplayName: Drillbit
+        APIBaseURL: $(API_BASE_URL)
+        ClerkPublishableKey: $(CLERK_PUBLISHABLE_KEY)
+        SharedKeychainGroup: $(AppIdentifierPrefix)dawi.drillbit.shared
+        CFBundleURLTypes:
+          - CFBundleURLSchemes: [drillbit, dawi.drillbit]
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIBackgroundModes: [fetch]
+        BGTaskSchedulerPermittedIdentifiers: [dawi.drillbit.refresh]
+        ITSAppUsesNonExemptEncryption: false
+    entitlements:
+      path: Config/App.entitlements
+      properties:
+        com.apple.security.application-groups: [group.dawi.drillbit]
+        com.apple.developer.applesignin: [Default]
+        keychain-access-groups: [$(AppIdentifierPrefix)dawi.drillbit, $(AppIdentifierPrefix)dawi.drillbit.shared]
+    dependencies:
+      - package: Clerk
+        product: ClerkKit
+      - target: DrillbitWidget
+  DrillbitWidget:
+    type: app-extension
+    platform: iOS
+    sources: [DrillbitWidget, Shared]
+    configFiles:
+      Debug: Config/Defaults.xcconfig
+      Release: Config/Defaults.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dawi.drillbit.widget
+    info:
+      path: Config/WidgetInfo.plist
+      properties:
+        CFBundleDisplayName: Drillbit
+        SharedKeychainGroup: $(AppIdentifierPrefix)dawi.drillbit.shared
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: Config/Widget.entitlements
+      properties:
+        com.apple.security.application-groups: [group.dawi.drillbit]
+        keychain-access-groups: [$(AppIdentifierPrefix)dawi.drillbit.shared]
+  DrillbitTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [Tests]
+    dependencies:
+      - target: Drillbit
+  DrillbitUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    settings:
+      base:
+        DEVELOPMENT_TEAM: 7M4NDAAP73
+        CODE_SIGN_STYLE: Automatic
+    dependencies:
+      - target: Drillbit
+schemes:
+  Drillbit:
+    build:
+      targets:
+        Drillbit: all
+    test:
+      targets: [DrillbitTests, DrillbitUITests]

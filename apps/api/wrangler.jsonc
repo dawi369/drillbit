@@ -1,0 +1,40 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "drillbit-api-development",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-09-06",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "CLERK_ISSUER": "https://trusting-finch-496.clerk.accounts.dev",
+    "MODEL_ID": "google/gemini-3.1-flash-lite",
+    "MANAGED_AI_ENABLED": "true",
+    "COMPANION_AUTO_ENABLED": "true",
+    "CREDENTIAL_KEY_VERSION": "1",
+    "CLERK_AUDIENCE": "drillbit"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "drillbit-development",
+      "database_id": "872d5aed-a356-4b2b-a479-aa3042478aee",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "workflows": [
+    {
+      "binding": "JOBS",
+      "name": "drillbit-jobs-development",
+      "class_name": "PracticeWorkflow"
+    }
+  ],
+  "triggers": {
+    "crons": [
+      "*/5 * * * *"
+    ]
+  }
+}

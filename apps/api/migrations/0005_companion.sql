@@ -1,0 +1,6 @@
+CREATE TABLE companion_context (challenge_id TEXT PRIMARY KEY REFERENCES challenges(id) ON DELETE CASCADE, revision INTEGER NOT NULL DEFAULT 0, mode TEXT NOT NULL DEFAULT 'solo', mode_epoch INTEGER NOT NULL DEFAULT 0, paused INTEGER NOT NULL DEFAULT 0, selected_focus TEXT, decisions TEXT NOT NULL DEFAULT '[]', automatic_count INTEGER NOT NULL DEFAULT 0, last_automatic_at TEXT, answer_digest TEXT NOT NULL DEFAULT '', interaction_cycle INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE companion_commands (id TEXT PRIMARY KEY, challenge_id TEXT NOT NULL REFERENCES challenges(id) ON DELETE CASCADE, input TEXT NOT NULL);
+CREATE TABLE companion_requests (id TEXT PRIMARY KEY REFERENCES jobs(id) ON DELETE CASCADE, challenge_id TEXT NOT NULL REFERENCES challenges(id) ON DELETE CASCADE, trigger TEXT NOT NULL, cycle TEXT NOT NULL, snapshot TEXT NOT NULL);
+CREATE UNIQUE INDEX companion_cycle ON companion_requests(challenge_id,cycle) WHERE trigger IN ('change','pause');
+CREATE TABLE companion_receipts (id TEXT PRIMARY KEY, challenge_id TEXT NOT NULL REFERENCES challenges(id) ON DELETE CASCADE, help_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE, disposition TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE INDEX companion_receipt_history ON companion_receipts(challenge_id,created_at);

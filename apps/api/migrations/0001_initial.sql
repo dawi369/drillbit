@@ -1,0 +1,23 @@
+PRAGMA foreign_keys = ON;
+CREATE TABLE accounts (id TEXT PRIMARY KEY, subject TEXT NOT NULL UNIQUE, status TEXT NOT NULL DEFAULT 'invited', last_seen TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE TABLE invites (hash TEXT PRIMARY KEY, redeemed_by TEXT UNIQUE REFERENCES accounts(id), created_at TEXT NOT NULL);
+CREATE TABLE settings (account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE, data TEXT NOT NULL, next_due TEXT NOT NULL);
+CREATE INDEX due_settings ON settings(next_due);
+CREATE TABLE challenges (id TEXT PRIMARY KEY, account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, lifecycle TEXT NOT NULL CHECK(lifecycle IN ('prepared','ready','in_progress','completed','skipped','expired')), data TEXT NOT NULL, created_at TEXT NOT NULL, available_at TEXT NOT NULL, completed_at TEXT, command_id TEXT);
+CREATE UNIQUE INDEX one_active ON challenges(account_id) WHERE lifecycle IN ('ready','in_progress');
+CREATE INDEX challenge_history ON challenges(account_id, created_at DESC);
+CREATE TABLE sessions (challenge_id TEXT PRIMARY KEY REFERENCES challenges(id) ON DELETE CASCADE, answer TEXT NOT NULL DEFAULT '', revision INTEGER NOT NULL DEFAULT 0, command_id TEXT, updated_at TEXT NOT NULL);
+CREATE TABLE turns (id TEXT PRIMARY KEY, challenge_id TEXT NOT NULL REFERENCES challenges(id) ON DELETE CASCADE, request_id TEXT NOT NULL, role TEXT NOT NULL, text TEXT NOT NULL, state TEXT NOT NULL, answer_revision INTEGER NOT NULL, created_at TEXT NOT NULL);
+CREATE INDEX turn_history ON turns(challenge_id,created_at);
+CREATE TABLE reflections (challenge_id TEXT PRIMARY KEY REFERENCES challenges(id) ON DELETE CASCADE, data TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE TABLE examples (challenge_id TEXT PRIMARY KEY REFERENCES challenges(id) ON DELETE CASCADE, data TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE TABLE jobs (id TEXT PRIMARY KEY, account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, challenge_id TEXT REFERENCES challenges(id) ON DELETE CASCADE, kind TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', input TEXT NOT NULL, error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(account_id,kind,id));
+CREATE INDEX pending_jobs ON jobs(status,created_at);
+CREATE TABLE credentials (id TEXT PRIMARY KEY, account_id TEXT NOT NULL UNIQUE REFERENCES accounts(id) ON DELETE CASCADE, ciphertext TEXT NOT NULL, key_version TEXT NOT NULL, suffix TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE TABLE devices (id TEXT PRIMARY KEY, account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, token_hash TEXT NOT NULL UNIQUE, expires_at TEXT NOT NULL);
+CREATE TABLE usage (account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, day TEXT NOT NULL, kind TEXT NOT NULL, count INTEGER NOT NULL, PRIMARY KEY(account_id,day,kind));
+CREATE TABLE requests (id TEXT PRIMARY KEY, account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, challenge_id TEXT NOT NULL REFERENCES challenges(id) ON DELETE CASCADE, status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE UNIQUE INDEX one_stream ON requests(account_id) WHERE status='running';
+
+CREATE UNIQUE INDEX one_generation ON jobs(account_id) WHERE kind='generate' AND status IN ('pending','running');
+CREATE UNIQUE INDEX one_scheduled_job ON jobs(account_id,json_extract(input,'$.availableAt')) WHERE kind='generate' AND json_extract(input,'$.availableAt') IS NOT NULL;

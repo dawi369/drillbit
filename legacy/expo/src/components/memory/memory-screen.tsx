@@ -1,0 +1,474 @@
+import { useFocusEffect } from "expo-router";
+import { Tabs } from "heroui-native";
+import type { PropsWithChildren } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { ScrollView, Text, View } from "react-native";
+
+import { SectionTabLabel } from "@/components/section-tab-label";
+import { cn } from "@/lib/cn";
+import {
+  formatCompletionScore,
+  getCompletionScoreBarPercent,
+} from "@/lib/memory";
+import { subscribeToMemoryRefresh } from "@/lib/memory-refresh";
+import { retryMissingChallengeSummaries } from "@/lib/memory-sync";
+import { getMemoryOverview } from "@/lib/storage/repository";
+import type {
+  MemoryChallengeSummaryRow,
+  MemoryOverview,
+  MemoryTopicRollup,
+} from "@/lib/storage/types";
+
+function formatSessionDate(iso: string) {
+  return new Date(iso).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function PageHeader() {
+  return (
+    <View className="flex-row items-start justify-between gap-4">
+      <View className="min-w-0 flex-1 gap-2">
+        <Text className="text-3xl font-semibold text-foreground">
+          Memory
+        </Text>
+        <Text className="max-w-xl text-base leading-6 text-muted">
+          A lightweight replay of what keeps repeating, where you are strong,
+          and what still needs more reps.
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function Surface({ children, className }: PropsWithChildren<{ className?: string }>) {
+  return (
+    <View
+      className={cn(
+        "rounded-[var(--radius)] border border-border/45 bg-surface-secondary/10 px-5 py-5",
+        className,
+      )}
+    >
+      {children}
+    </View>
+  );
+}
+
+function SkeletonLine({ className }: { className: string }) {
+  return (
+    <View
+      className={cn(
+        "overflow-hidden rounded-full bg-surface-secondary/70",
+        className,
+      )}
+    />
+  );
+}
+
+function MemoryLoadingSkeleton() {
+  return (
+    <Surface className="gap-5">
+      <View className="gap-3">
+        <SkeletonLine className="h-4 w-20" />
+        <SkeletonLine className="h-7 w-56" />
+        <SkeletonLine className="h-4 w-full" />
+        <SkeletonLine className="h-4 w-4/5" />
+      </View>
+
+      <View className="flex-row flex-wrap gap-3">
+        <View className="min-w-32 flex-1 gap-3 rounded-[var(--radius)] border border-border/35 bg-background/55 px-4 py-4">
+          <SkeletonLine className="h-3 w-24" />
+          <SkeletonLine className="h-8 w-16" />
+        </View>
+        <View className="min-w-32 flex-1 gap-3 rounded-[var(--radius)] border border-border/35 bg-background/55 px-4 py-4">
+          <SkeletonLine className="h-3 w-24" />
+          <SkeletonLine className="h-8 w-20" />
+        </View>
+      </View>
+    </Surface>
+  );
+}
+
+function SectionHeading({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <View className="gap-1 pb-4">
+      <Text className="text-xs font-semibold uppercase tracking-[1px] text-muted">
+        {eyebrow}
+      </Text>
+      <Text className="text-2xl font-semibold text-foreground">
+        {title}
+      </Text>
+      <Text className="text-sm leading-6 text-muted">{description}</Text>
+    </View>
+  );
+}
+
+function MetricChip({ label, value }: { label: string; value: string }) {
+  return (
+    <View className="min-w-32 flex-1 gap-1 rounded-[var(--radius)] border border-border/40 bg-background/65 px-4 py-4">
+      <Text className="text-xs font-semibold uppercase tracking-[1px] text-muted">
+        {label}
+      </Text>
+      <Text className="text-3xl font-semibold text-foreground">
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+function GraphPlaceholder({ overview }: { overview: MemoryOverview }) {
+  const bars = overview.recentSessions.slice(0, 7).map((session) => {
+    return getCompletionScoreBarPercent(session.completionScore);
+  });
+
+  while (bars.length < 7) {
+    bars.push(26 + bars.length * 8);
+  }
+
+  return (
+    <Surface className="gap-5">
+      <SectionHeading
+        eyebrow="graph"
+        title="Progress strip"
+        description="Reserved space for the upcoming memory graph. For now it keeps a quick visual pulse of recent sessions."
+      />
+
+      <View className="rounded-[var(--radius)] border border-dashed border-border/45 bg-background/55 px-4 py-5">
+        <View className="h-[180px] flex-row items-end gap-3">
+          {bars.map((height, index) => (
+            <View key={`memory-bar-${index}`} className="min-w-0 flex-1 items-center gap-3">
+              <View className="h-full w-full max-w-10 justify-end rounded-full bg-surface-secondary/35">
+                <View
+                  className="w-full rounded-full bg-accent/75"
+                  style={{ height: `${height}%` }}
+                />
+              </View>
+              <Text className="text-xs font-medium uppercase tracking-[1px] text-muted">
+                D{index + 1}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    </Surface>
+  );
+}
+
+function PatternList({
+  title,
+  description,
+  items,
+  tone,
+}: {
+  title: string;
+  description: string;
+  items: string[];
+  tone: "strength" | "gap";
+}) {
+  return (
+    <Surface className="flex-1 gap-4">
+      <View className="gap-1">
+        <Text className="text-xl font-semibold text-foreground">
+          {title}
+        </Text>
+        <Text className="text-sm leading-6 text-muted">{description}</Text>
+      </View>
+
+      <View className="gap-3">
+        {items.length > 0 ? (
+          items.map((item) => (
+            <View
+              key={`${tone}-${item}`}
+              className={cn(
+                "rounded-[var(--radius)] border px-4 py-3",
+                tone === "strength"
+                  ? "border-success/20 bg-success/10"
+                  : "border-warning/20 bg-warning/10",
+              )}
+            >
+              <Text className="text-sm leading-6 text-foreground">{item}</Text>
+            </View>
+          ))
+        ) : (
+          <Text className="text-sm leading-6 text-muted">
+            No repeated patterns yet. Finish a few sessions and this section
+            will fill in.
+          </Text>
+        )}
+      </View>
+    </Surface>
+  );
+}
+
+function SessionRow({ session }: { session: MemoryChallengeSummaryRow }) {
+  return (
+    <View className="gap-2 rounded-[var(--radius)] border border-border/35 bg-background/60 px-4 py-4">
+      <View className="flex-row items-start justify-between gap-3">
+        <View className="min-w-0 flex-1 gap-1">
+          <Text className="text-base font-semibold text-foreground">
+            {session.challengeTitle}
+          </Text>
+          <Text className="text-sm leading-6 text-muted">
+            {session.challengeTopic}
+            {session.challengeDifficulty ? ` · ${session.challengeDifficulty}` : ""}
+          </Text>
+        </View>
+
+        <View className="items-end gap-1 pt-0.5">
+          <Text className="text-sm font-semibold text-foreground">
+            {formatCompletionScore(session.completionScore)}
+          </Text>
+          <Text className="text-xs font-medium uppercase tracking-[1px] text-muted">
+            {formatSessionDate(session.generatedAt)}
+          </Text>
+        </View>
+      </View>
+
+      <Text className="text-sm leading-6 text-muted">{session.shortFeedback}</Text>
+    </View>
+  );
+}
+
+function TopicRollupRow({ rollup }: { rollup: MemoryTopicRollup }) {
+  return (
+    <View className="gap-3 rounded-[var(--radius)] border border-border/35 bg-background/60 px-4 py-4">
+      <View className="flex-row items-start justify-between gap-3">
+        <View className="min-w-0 flex-1 gap-1">
+          <Text className="text-base font-semibold text-foreground">
+            {rollup.topic}
+          </Text>
+          <Text className="text-sm leading-6 text-muted">
+            {rollup.count} {rollup.count === 1 ? "session" : "sessions"}
+          </Text>
+        </View>
+        <Text className="pt-0.5 text-sm font-semibold text-foreground">
+          {formatCompletionScore(rollup.averageCompletionScore)}
+        </Text>
+      </View>
+
+      <View className="gap-2">
+        <Text className="text-xs font-semibold uppercase tracking-[1px] text-muted">
+          Top strengths
+        </Text>
+        <Text className="text-sm leading-6 text-foreground">
+          {rollup.topStrengths.length > 0
+            ? rollup.topStrengths.join(" · ")
+            : "No repeated strengths yet."}
+        </Text>
+      </View>
+
+      <View className="gap-2">
+        <Text className="text-xs font-semibold uppercase tracking-[1px] text-muted">
+          Top gaps
+        </Text>
+        <Text className="text-sm leading-6 text-foreground">
+          {rollup.topWeaknesses.length > 0
+            ? rollup.topWeaknesses.join(" · ")
+            : "No repeated gaps yet."}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function EmptyMemoryState() {
+  return (
+    <Surface className="gap-3">
+      <Text className="text-2xl font-semibold text-foreground">
+        Nothing here yet
+      </Text>
+      <Text className="text-sm leading-6 text-muted">
+        Finish a challenge and save a summary to start building your memory view.
+        This screen refreshes automatically in the background.
+      </Text>
+    </Surface>
+  );
+}
+
+export function MemoryScreen() {
+  const [activeTab, setActiveTab] = useState("overview");
+  const [overview, setOverview] = useState<MemoryOverview | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const loadOverview = useCallback(async (refresh: boolean = false) => {
+    if (!refresh) {
+      setIsLoading(true);
+    }
+
+    try {
+      const nextOverview = await getMemoryOverview();
+      setOverview(nextOverview);
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Could not load memory overview.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void retryMissingChallengeSummaries();
+    void loadOverview();
+  }, [loadOverview]);
+
+  useEffect(() => {
+    return subscribeToMemoryRefresh(() => {
+      void loadOverview(true);
+    });
+  }, [loadOverview]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void retryMissingChallengeSummaries();
+      void loadOverview(true);
+    }, [loadOverview]),
+  );
+
+  return (
+    <ScrollView
+      className="flex-1 bg-background"
+      contentInsetAdjustmentBehavior="automatic"
+      contentContainerClassName="gap-10 px-5 pb-safe-offset-10 pt-safe-offset-7"
+    >
+      <PageHeader />
+
+      {isLoading ? (
+        <MemoryLoadingSkeleton />
+      ) : null}
+
+      {errorMessage ? (
+        <Surface>
+          <Text selectable className="text-sm leading-6 text-foreground">
+            {errorMessage}
+          </Text>
+        </Surface>
+      ) : null}
+
+      {!isLoading && !errorMessage && overview ? (
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          variant="secondary"
+          className="gap-5"
+        >
+          <Tabs.List className="px-1">
+            <Tabs.ScrollView
+              scrollAlign="center"
+              contentContainerClassName="min-w-full justify-center gap-2"
+            >
+              <Tabs.Indicator />
+              <Tabs.Trigger value="overview">
+                {({ isSelected }) => (
+                  <SectionTabLabel label="Overview" selected={isSelected} />
+                )}
+              </Tabs.Trigger>
+              <Tabs.Trigger value="recent">
+                {({ isSelected }) => (
+                  <SectionTabLabel label="Recent" selected={isSelected} />
+                )}
+              </Tabs.Trigger>
+              <Tabs.Trigger value="topics">
+                {({ isSelected }) => (
+                  <SectionTabLabel label="Topics" selected={isSelected} />
+                )}
+              </Tabs.Trigger>
+            </Tabs.ScrollView>
+          </Tabs.List>
+
+          <Tabs.Content value="overview">
+            {overview.totalCompleted > 0 ? (
+              <View className="gap-6">
+                <Surface className="gap-5">
+                  <SectionHeading
+                    eyebrow="overview"
+                    title="What your recent history says"
+                    description="A compact read on completed sessions, recent scoring, and repeated themes from stored summaries."
+                  />
+
+                  <View className="flex-row flex-wrap gap-3">
+                    <MetricChip label="completed" value={String(overview.totalCompleted)} />
+                    <MetricChip
+                      label="average"
+                      value={formatCompletionScore(overview.averageCompletionScore)}
+                    />
+                  </View>
+                </Surface>
+
+                <GraphPlaceholder overview={overview} />
+
+                <View className="gap-3 md:flex-row">
+                  <PatternList
+                    title="Repeated strengths"
+                    description="Themes that keep showing up when you do well."
+                    items={overview.strongestPatterns}
+                    tone="strength"
+                  />
+                  <PatternList
+                    title="Repeated gaps"
+                    description="Concepts worth reinforcing in future drills."
+                    items={overview.weakestPatterns}
+                    tone="gap"
+                  />
+                </View>
+              </View>
+            ) : (
+              <EmptyMemoryState />
+            )}
+          </Tabs.Content>
+
+          <Tabs.Content value="recent">
+            {overview.recentSessions.length > 0 ? (
+              <Surface className="gap-4">
+                <SectionHeading
+                  eyebrow="recent"
+                  title="Recent sessions"
+                  description="The latest summaries kept locally for fast replay and pattern spotting."
+                />
+
+                <View className="gap-3">
+                  {overview.recentSessions.map((session) => (
+                    <SessionRow key={session.id} session={session} />
+                  ))}
+                </View>
+              </Surface>
+            ) : (
+              <EmptyMemoryState />
+            )}
+          </Tabs.Content>
+
+          <Tabs.Content value="topics">
+            {overview.topicRollups.length > 0 ? (
+              <Surface className="gap-4">
+                <SectionHeading
+                  eyebrow="topics"
+                  title="By topic"
+                  description="A simple rollup of where your recent practice clusters and how each area is trending."
+                />
+
+                <View className="gap-3">
+                  {overview.topicRollups.map((rollup) => (
+                    <TopicRollupRow key={rollup.topic} rollup={rollup} />
+                  ))}
+                </View>
+              </Surface>
+            ) : (
+              <EmptyMemoryState />
+            )}
+          </Tabs.Content>
+        </Tabs>
+      ) : null}
+    </ScrollView>
+  );
+}

@@ -44,3 +44,16 @@ app-example
 
 /example
 .env
+# Native rebuild
+apps/api/.dev.vars
+apps/api/.wrangler/
+apps/ios/Config/Local.xcconfig
+**/build/
+**/xcuserdata/
+**/DerivedData/
+*.xcresult
+.env
+**/.build/
+apps/api/.dev.vars.*
+!apps/api/.dev.vars.example
+.local/

@@ -1,0 +1,100 @@
+# Drillbit native architecture
+
+This document describes the implemented baseline. The [product council vision](product-vision.md) records the complete direction. The text-first Solo/Coach/Guided experience is implemented; live Speak, selection replacement and immutable linked retries remain deferred.
+
+Drillbit is an iOS 26+ interview practice utility. Today and Memory are the two tabs; Settings is a native sheet. Practice is a full-screen editor with one help sheet and explicit Solo/Coach/Guided assistance. Apple keyboard dictation is the speech input for this version. Spoken interviews, subscriptions and Android UI are deferred.
+
+## Navigation
+
+```mermaid
+flowchart TD
+  Auth[Apple / Google / GitHub sign-in] --> Invite[Invite]
+  Invite --> Setup[Focus and engineering level]
+  Setup --> Today[Today]
+  Today --> Practice[Practice editor]
+  Today --> Prepare[Focus / kind / engineering level]
+  Prepare --> Today
+  Practice --> Help[Help: explicit actions]
+  Help --> Preview[Append / replace preview]
+  Preview --> Practice
+  Help --> Practice
+  Practice --> Options[Assistance / Write / disabled Speak]
+  Practice --> Reflection[Reflection]
+  Reflection --> Today
+  Today <--> Memory[Memory]
+  Memory --> History[Searchable history]
+  Memory --> Evidence[Pattern evidence]
+  History --> Detail[Completed session]
+  Evidence --> Detail
+  Today --> Settings[Settings sheet]
+  Memory --> Settings
+  Settings --> Focus[Focus]
+  Settings --> AI[AI access]
+```
+
+Navigation stays native: tabs select the two permanent destinations, stacks drill into details, sheets contain settings and assistance, and practice owns a full-screen presentation. A local/cloud revision conflict interrupts with an explicit recovery sheet.
+
+## Boundaries
+
+- `apps/ios` owns presentation, native integrations, local drafts and the durable outbox. SwiftData has a versioned schema and an actor-isolated store. Views call AppModel/application services, never SQL.
+- `apps/api` owns authenticated account scope, shared lifecycle, generation, coaching, summaries and schedules. Hono adapts HTTP; store operations enforce conditional mutations; AI and Cloudflare Workflows are separate modules.
+- `packages/contracts/openapi.json` is the HTTP boundary for Swift and future Kotlin clients. Generate it with `bun run contracts` after contract changes.
+- `legacy/expo` is reference material, excluded from the workspace and every new build. Its existing modifications were preserved. The pre-rebuild source snapshot is also outside this checkout at `/Users/dawi/dev/drillbit-before-native-20260908-212600`.
+
+## Practice and sync
+
+A database constraint permits one ready/in-progress challenge per account. Prepared scheduled candidates are separate from active work. Completed answers are frozen; summaries never gate completion. A completion batch checks the expected draft revision and tags the successful mutation with its idempotency command before dependent lifecycle/job writes can proceed. A rejected revision cannot partially complete a session.
+
+Drafts persist locally before cloud writes. The outbox holds the payload, server revision and stable command ID. A newer edit arriving during a network request survives acknowledgement of the older edit. Offline completion remains queued. Revision conflicts preserve the local draft and expose the cloud version for explicit recovery; completed cloud sessions cannot be reopened by a stale client.
+
+Help is a durable job with a stable ID, action kind, assistance mode and draft revision. Opening/dismissing the sheet or switching modes never generates. One active help job per account is enforced in D1. Results survive dismissal; explicit Stop cancels pending/running help, and late results cannot be stored after completion. Help has no automatic provider retries; other existing durable jobs retain bounded retries. The legacy SSE endpoint remains for compatibility, but the native flow no longer uses it.
+
+`practice.ts` owns help and adoption operations. Outline/example text is read-only until explicitly adopted. Suggested drafts have a separate schema field. Preview precedes append/replace; D1 atomically records the source, old/new answer and revision. Undo requires the insertion's exact revision. Later edits invalidate undo. Ambiguous native adoption requests persist their command and input; the editor locks while the same command is reconciled, never silently overwriting a newer local edit.
+
+Completion freezes the answer plus help, adoption and legacy-turn context into `completion_context` in the lifecycle transaction. Summaries read that immutable snapshot. Post-completion reference viewing cannot change reflection inputs. Generated help is conservatively treated as possible exposure; the UI does not claim it measured whether each response was read. Provider work can still incur charges after Stop; application cancellation cannot guarantee provider billing cancellation.
+
+Preparation remembers focus/kind/difficulty per account on this device; the optional instruction affects one generation only. A replacement expires the previous ready question only in the successful insertion transaction, and never replaces in-progress work. Similar-question requests use an owned completed session's reflection and assistance context. They create fresh questions, not mutable revisions of a completed answer.
+
+## Accounts and credentials
+
+Clerk JWT template `drillbit` must contain `aud: "drillbit"`; API verification checks issuer, audience, signature and expiry. Authentication does not grant practice access until a single-use invite is redeemed. Every user-owned SQL operation is scoped to the internal account ID.
+
+Managed OpenRouter keys are Worker secrets. BYOK is OpenRouter-only and AES-GCM encrypted, with account/credential binding in authenticated data. Keys never appear in public responses, prompt contexts or logs. Replacing/removing a key cancels dependent pending jobs; invalid BYOK never falls back to managed access. Removing an account revokes widget credentials immediately and schedules durable deletion of application data and Clerk identity.
+
+The widget receives only a minimal challenge projection through App Groups or a read-only, expiring device token. Full answers, reflections and provider credentials are not widget payloads. Device credentials are stored in the shared Keychain group. Clerk session credentials use the application-only Keychain group.
+
+## Scheduling and learning
+
+The scheduler prepares a candidate 15 minutes before the configured local daily slot. It never expires in-progress work, keeps an existing ready question on generation failure, avoids a backlog of missed days and pauses unattended generation after seven days of inactivity. Calendar calculations use IANA timezones and Temporal, including DST. Local reminders carry generic copy. WidgetKit and background refresh remain best-effort; neither drives AI generation.
+
+Context assembly preserves the current answer and latest request and trims older evidence to a bounded character budget. Generation, help, examples and reflection outputs are schema validated. Generated question specifications include kind, target skill, visible constraints and ambiguity policy. Private evaluator criteria are derived from the visible prompt/constraints rather than a separately generated rubric; internal criterion fields are excluded from public challenge projections. Repeated memory patterns need evidence from at least two sessions. Readiness percentages and synthetic proficiency scores are intentionally absent.
+
+## Native rules
+
+Use system typography, semantic colors, SF Symbols and system component geometry. Custom spacing uses 4-point increments; custom surfaces use a 12-point radius. Keep one main action per state and the editor as the dominant practice surface. Support Dynamic Type, VoiceOver and standard keyboard/dictation behavior. No Expo, web views or third-party UI suite in the new application.
+
+## Model and prompt policy
+
+`google/gemini-3.1-flash-lite` is the only provider model for managed and BYOK requests. The provider enforces the constant independently of settings or queued job snapshots. Migration 0004 updates stored preferences; reads normalize older snapshots. The native model picker is removed. All actions use versioned `companion-v1` task instructions with a shared concise, warm tone layer. Tone is inspired by the user's Poke reference; it does not reproduce private prompts.
+
+Run `bun scripts/check-practice-model.ts` and `bun scripts/check-practice-model.ts --edges` for synthetic live checks. They use the configured OpenRouter key and incur provider usage. Schema/boundary success is separate from human judgment of correctness and tone; see the current acceptance record.
+
+## Contextual companion
+
+[Companion specification](companion-vision.md) defines the implemented native bottom companion and mode boundaries. `InterventionPolicy` is pure; an observable coordinator owns activity, timing and presentation freshness. Views forward events; `PracticeCompanion` integrates persisted commands, account-scoped delivery receipts and HTTP. No voice transport is present.
+
+Migration 0005 adds companion context, normalized interaction cycles, captured automatic requests and delivery receipts. Context mutations use revision checks and idempotency keys. D1 enforces shared automatic budgets, cooldown and duplicate-cycle rejection; `COMPANION_AUTO_ENABLED` controls rollout independently of manual help. Completion freezes pending delivery evidence atomically with the final draft. Generated, shown, uncertain and adopted help are distinct; unknown exposure is never classified as independent work.
+
+Swift DTOs and the public OpenAPI contract are additive. Existing explicit-help clients remain supported. Native recovery uses account-scoped cached payloads rather than changing the stored-draft schema. Every automatic presentation also checks the local edit generation, mode epoch and captured context; reopened pending jobs are historical, not automatically fresh. See the acceptance record for observed checks and remaining device/product validation.
+
+## Engineering levels and timezone preferences
+
+Settings, onboarding and preparation use Intern, Junior, Mid-level, Senior, Staff and Principal (`intern`, `junior`, `mid`, `senior`, `staff`, `principal`). Optional `engineeringLevel` is additive to legacy `difficulty`; absent values normalize easy→junior, medium→mid, hard→senior. Legacy settings writes preserve a stored level. Explicit generation difficulty without a level maps that request only; new clients always send the level. Queued old snapshots normalize on execution, and newly generated challenges retain their level. Historical questions are not rewritten. Level affects visible question scope, never hidden evaluation requirements.
+
+The native timezone list stores IANA identifiers, includes saved/device zones and offers a one-time device-zone selection. Saving does not follow subsequent device-zone changes. Daily clock minutes remain fixed; D1 scheduling and local calendar notifications use the selected timezone with DST rules. Settings retain Done-to-save behavior. LLM provider is the renamed AI access destination, with the same fixed Gemini/OpenRouter configuration.
+
+## Compact Today summary
+
+When no question is active or generating, Today shows Completed, Last 7 days, the latest completed session title with its recorded engineering level and localized completion date/time, and New question. `/v1/memory` adds optional `statistics` with `completed`, `lastSevenDays` and `asOf`; counts are account-scoped across all completed challenges, independent of the 100-session history page. Last 7 days is a rolling 168-hour window at `asOf`. Older cached payloads show unavailable counts rather than inferred totals, and snapshots older than five minutes show their update time. Accessibility text sizes stack the metrics vertically. Existing active-question navigation is unchanged.
+
+Last-session metadata uses the level captured on that question, never the current settings. Legacy sessions map recorded Easy/Medium/Hard to Junior/Mid-level/Senior. Records missing both fields show Level not recorded. Absent or invalid completion dates are omitted.

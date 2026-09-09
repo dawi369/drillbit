@@ -1,0 +1,25 @@
+{
+  "name": "@drillbit/api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "deploy": "wrangler deploy",
+    "db:local": "wrangler d1 migrations apply drillbit-development --local"
+  },
+  "dependencies": {
+    "hono": "^4.9.0",
+    "zod": "^4.0.0",
+    "jose": "^6.0.0",
+    "@js-temporal/polyfill": "^0.5.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "latest",
+    "wrangler": "^4.0.0",
+    "typescript": "~5.9.3",
+    "vitest": "~3.2.4",
+    "@cloudflare/vitest-pool-workers": "^0.8.70"
+  }
+}

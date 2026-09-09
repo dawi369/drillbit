@@ -1,0 +1,739 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		095A54CECC96E78F3BEA8F50 /* PracticeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8F1C4DE69AF2358015E8EDD /* PracticeUITests.swift */; };
+		0AA02AF022C77A9339CDFB76 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F69DED8C37D39A2D21CC2A84 /* Assets.xcassets */; };
+		0EEA0D0A8C2A9562B674EAB4 /* HelpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7FE2F3D17D6A2010A948002 /* HelpView.swift */; };
+		14D473381FCB4038B04FA534 /* MemorySettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCE2282A43B33A17D93AF4C6 /* MemorySettings.swift */; };
+		20212ED453359321401BBE55 /* CompanionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39439B81E58CADD0F8243F46 /* CompanionTests.swift */; };
+		2BCD05DC191DB1D3AC6E50FD /* SharedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8049B9471B01CBFBD8C80764 /* SharedStore.swift */; };
+		387B66BE5AA3210DD6C8A017 /* CompanionPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04CE1C0E2D55B42FFFD0982A /* CompanionPanel.swift */; };
+		3D0DACC7801A3CCC832A9840 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A7106218805AC5263A12438 /* Persistence.swift */; };
+		3D1A1EB693F960C1596B0D8F /* DrillbitApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAD863FB5DA9BAE45F86B3AB /* DrillbitApp.swift */; };
+		70BF4744A694732D3FFBCDBC /* CompanionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A193915AEBBE5F30D2A8AECA /* CompanionCoordinator.swift */; };
+		7DD8D81CCC22B716F6BA3C47 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01713294F3436278FCEE46B6 /* Models.swift */; };
+		868D112482709522C36A981D /* PracticeWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF83E5C54AF9B2C1262CAB8 /* PracticeWorkspace.swift */; };
+		8D4370BA4D4B112FDA7560A6 /* PracticeCompanion.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCDB9D254A54D86DF356AC77 /* PracticeCompanion.swift */; };
+		90F6ED92CF56317BB044798C /* ClerkKit in Frameworks */ = {isa = PBXBuildFile; productRef = D0E2F449415E69EBA68ED8CD /* ClerkKit */; };
+		ADA43CF08FADFB23365A14E8 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01713294F3436278FCEE46B6 /* Models.swift */; };
+		AE7741A51A7892B3DB5B5C08 /* SharedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8049B9471B01CBFBD8C80764 /* SharedStore.swift */; };
+		B60776186F24C169754719F2 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDE151C29EEC1990D2C7E840 /* DesignSystem.swift */; };
+		D090F4FDF85CBD331AA6CAB7 /* DrillbitWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 150BB0656D2594F45A3E045B /* DrillbitWidget.swift */; };
+		D8B1269DC65D854F474432E6 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8E06A264C65F45E7AD14AD1 /* AppModel.swift */; };
+		E4DF89EDCDE360281E583E6A /* DrillbitWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 9A2B037FAEC89AAC90414A59 /* DrillbitWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		EA7151E7DC60BF9B5C5A521E /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 165CE5F9FA389F64A4730557 /* APIClient.swift */; };
+		EAC2A5859464998CB025529A /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BA600A70A653AC369122638 /* WelcomeView.swift */; };
+		ECEC2C8AFBB8086D0EA78BEC /* ContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ED772ACFEBFA6EBE9753089 /* ContractTests.swift */; };
+		F1C52BCF979C4B21823BF045 /* Views.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE6E41BA47189A6E118B4641 /* Views.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		01C718F4443052F05C884D59 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CDAE8C78A1BD321C3455AEE4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AAD277F0C9A7DF607E1E03EB;
+			remoteInfo = DrillbitWidget;
+		};
+		2A3E2E4D976B7AB44BEA2649 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CDAE8C78A1BD321C3455AEE4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3E061873538427D4AA73F0CD;
+			remoteInfo = Drillbit;
+		};
+		6C6B26CA67F6FFD6D71B691B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CDAE8C78A1BD321C3455AEE4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3E061873538427D4AA73F0CD;
+			remoteInfo = Drillbit;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		5B4ED62ABDD94D3084C65441 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				E4DF89EDCDE360281E583E6A /* DrillbitWidget.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		01713294F3436278FCEE46B6 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		04CE1C0E2D55B42FFFD0982A /* CompanionPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionPanel.swift; sourceTree = "<group>"; };
+		150BB0656D2594F45A3E045B /* DrillbitWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrillbitWidget.swift; sourceTree = "<group>"; };
+		165CE5F9FA389F64A4730557 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		1BA600A70A653AC369122638 /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
+		39439B81E58CADD0F8243F46 /* CompanionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionTests.swift; sourceTree = "<group>"; };
+		4C0456C5AFA3D9C114B4F80D /* Drillbit.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Drillbit.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5CF83E5C54AF9B2C1262CAB8 /* PracticeWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeWorkspace.swift; sourceTree = "<group>"; };
+		7ED772ACFEBFA6EBE9753089 /* ContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContractTests.swift; sourceTree = "<group>"; };
+		8049B9471B01CBFBD8C80764 /* SharedStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedStore.swift; sourceTree = "<group>"; };
+		90A5D549D2FB1410F6D6B59B /* DrillbitTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = DrillbitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		9A2B037FAEC89AAC90414A59 /* DrillbitWidget.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = DrillbitWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		9A7106218805AC5263A12438 /* Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persistence.swift; sourceTree = "<group>"; };
+		A193915AEBBE5F30D2A8AECA /* CompanionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionCoordinator.swift; sourceTree = "<group>"; };
+		BCE2282A43B33A17D93AF4C6 /* MemorySettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemorySettings.swift; sourceTree = "<group>"; };
+		C8E06A264C65F45E7AD14AD1 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		C8F1C4DE69AF2358015E8EDD /* PracticeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeUITests.swift; sourceTree = "<group>"; };
+		CCDB9D254A54D86DF356AC77 /* PracticeCompanion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeCompanion.swift; sourceTree = "<group>"; };
+		DAD863FB5DA9BAE45F86B3AB /* DrillbitApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrillbitApp.swift; sourceTree = "<group>"; };
+		E1126329A3402DB0A44CA474 /* Defaults.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Defaults.xcconfig; sourceTree = "<group>"; };
+		EE6E41BA47189A6E118B4641 /* Views.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views.swift; sourceTree = "<group>"; };
+		EF24F5F233F85813B521B540 /* DrillbitUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = DrillbitUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F69DED8C37D39A2D21CC2A84 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		F7FE2F3D17D6A2010A948002 /* HelpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpView.swift; sourceTree = "<group>"; };
+		FDE151C29EEC1990D2C7E840 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		E7D8F7C63B36783F112E0C9D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				90F6ED92CF56317BB044798C /* ClerkKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		5790842B8879964231B60E6A /* DrillbitWidget */ = {
+			isa = PBXGroup;
+			children = (
+				150BB0656D2594F45A3E045B /* DrillbitWidget.swift */,
+			);
+			path = DrillbitWidget;
+			sourceTree = "<group>";
+		};
+		5A2B5B4105C097DEBC913E13 = {
+			isa = PBXGroup;
+			children = (
+				E28F37C1A00C74C1F2AF6224 /* Config */,
+				6210A7DEE85B493289068A7B /* Drillbit */,
+				5790842B8879964231B60E6A /* DrillbitWidget */,
+				6F51C8F13D0215D850FB6C5E /* Shared */,
+				E69BAD5772928980B3139B7C /* Tests */,
+				E2B4BBCEE5B00E9CEC26D230 /* UITests */,
+				C8FE69B7184DC429F57F776B /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		6210A7DEE85B493289068A7B /* Drillbit */ = {
+			isa = PBXGroup;
+			children = (
+				165CE5F9FA389F64A4730557 /* APIClient.swift */,
+				C8E06A264C65F45E7AD14AD1 /* AppModel.swift */,
+				F69DED8C37D39A2D21CC2A84 /* Assets.xcassets */,
+				A193915AEBBE5F30D2A8AECA /* CompanionCoordinator.swift */,
+				04CE1C0E2D55B42FFFD0982A /* CompanionPanel.swift */,
+				FDE151C29EEC1990D2C7E840 /* DesignSystem.swift */,
+				DAD863FB5DA9BAE45F86B3AB /* DrillbitApp.swift */,
+				F7FE2F3D17D6A2010A948002 /* HelpView.swift */,
+				BCE2282A43B33A17D93AF4C6 /* MemorySettings.swift */,
+				9A7106218805AC5263A12438 /* Persistence.swift */,
+				CCDB9D254A54D86DF356AC77 /* PracticeCompanion.swift */,
+				5CF83E5C54AF9B2C1262CAB8 /* PracticeWorkspace.swift */,
+				EE6E41BA47189A6E118B4641 /* Views.swift */,
+				1BA600A70A653AC369122638 /* WelcomeView.swift */,
+			);
+			path = Drillbit;
+			sourceTree = "<group>";
+		};
+		6F51C8F13D0215D850FB6C5E /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				01713294F3436278FCEE46B6 /* Models.swift */,
+				8049B9471B01CBFBD8C80764 /* SharedStore.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		C8FE69B7184DC429F57F776B /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				4C0456C5AFA3D9C114B4F80D /* Drillbit.app */,
+				90A5D549D2FB1410F6D6B59B /* DrillbitTests.xctest */,
+				EF24F5F233F85813B521B540 /* DrillbitUITests.xctest */,
+				9A2B037FAEC89AAC90414A59 /* DrillbitWidget.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		E28F37C1A00C74C1F2AF6224 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				E1126329A3402DB0A44CA474 /* Defaults.xcconfig */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+		E2B4BBCEE5B00E9CEC26D230 /* UITests */ = {
+			isa = PBXGroup;
+			children = (
+				C8F1C4DE69AF2358015E8EDD /* PracticeUITests.swift */,
+			);
+			path = UITests;
+			sourceTree = "<group>";
+		};
+		E69BAD5772928980B3139B7C /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				39439B81E58CADD0F8243F46 /* CompanionTests.swift */,
+				7ED772ACFEBFA6EBE9753089 /* ContractTests.swift */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		3E061873538427D4AA73F0CD /* Drillbit */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BCD41B31486971564EF9B32B /* Build configuration list for PBXNativeTarget "Drillbit" */;
+			buildPhases = (
+				8A5D28AA2404593D13D1E51A /* Sources */,
+				549CE0ACE8B75B40B3653E4F /* Resources */,
+				E7D8F7C63B36783F112E0C9D /* Frameworks */,
+				5B4ED62ABDD94D3084C65441 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A6BC0B5A0538A3F414AAEDA9 /* PBXTargetDependency */,
+			);
+			name = Drillbit;
+			packageProductDependencies = (
+				D0E2F449415E69EBA68ED8CD /* ClerkKit */,
+			);
+			productName = Drillbit;
+			productReference = 4C0456C5AFA3D9C114B4F80D /* Drillbit.app */;
+			productType = "com.apple.product-type.application";
+		};
+		64CE6BB9628FD156B7B31444 /* DrillbitUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 150830310085315300AC6D85 /* Build configuration list for PBXNativeTarget "DrillbitUITests" */;
+			buildPhases = (
+				1DDCFFC4F1B22B1FF7343362 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AA0640E7CA52B539DA426A12 /* PBXTargetDependency */,
+			);
+			name = DrillbitUITests;
+			packageProductDependencies = (
+			);
+			productName = DrillbitUITests;
+			productReference = EF24F5F233F85813B521B540 /* DrillbitUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		AAD277F0C9A7DF607E1E03EB /* DrillbitWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5E61A74EA681D8E5502FC019 /* Build configuration list for PBXNativeTarget "DrillbitWidget" */;
+			buildPhases = (
+				375BC2E71259048C6C28D0C0 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = DrillbitWidget;
+			packageProductDependencies = (
+			);
+			productName = DrillbitWidget;
+			productReference = 9A2B037FAEC89AAC90414A59 /* DrillbitWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		B728ADD47E6F484C8E8B1983 /* DrillbitTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 23A7B50C57757208B02F019C /* Build configuration list for PBXNativeTarget "DrillbitTests" */;
+			buildPhases = (
+				E4FB0EADD9551D5E89F76E92 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				8D5CCAB5A99D65DE785563E3 /* PBXTargetDependency */,
+			);
+			name = DrillbitTests;
+			packageProductDependencies = (
+			);
+			productName = DrillbitTests;
+			productReference = 90A5D549D2FB1410F6D6B59B /* DrillbitTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		CDAE8C78A1BD321C3455AEE4 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					64CE6BB9628FD156B7B31444 = {
+						DevelopmentTeam = 7M4NDAAP73;
+						ProvisioningStyle = Automatic;
+						TestTargetID = 3E061873538427D4AA73F0CD;
+					};
+				};
+			};
+			buildConfigurationList = C080856528589EEE8E07BFA4 /* Build configuration list for PBXProject "Drillbit" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 5A2B5B4105C097DEBC913E13;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				45836B15F0D4DBA12F3BE30E /* XCRemoteSwiftPackageReference "clerk-ios" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = C8FE69B7184DC429F57F776B /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				3E061873538427D4AA73F0CD /* Drillbit */,
+				AAD277F0C9A7DF607E1E03EB /* DrillbitWidget */,
+				B728ADD47E6F484C8E8B1983 /* DrillbitTests */,
+				64CE6BB9628FD156B7B31444 /* DrillbitUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		549CE0ACE8B75B40B3653E4F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0AA02AF022C77A9339CDFB76 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		1DDCFFC4F1B22B1FF7343362 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				095A54CECC96E78F3BEA8F50 /* PracticeUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		375BC2E71259048C6C28D0C0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D090F4FDF85CBD331AA6CAB7 /* DrillbitWidget.swift in Sources */,
+				7DD8D81CCC22B716F6BA3C47 /* Models.swift in Sources */,
+				AE7741A51A7892B3DB5B5C08 /* SharedStore.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8A5D28AA2404593D13D1E51A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				EA7151E7DC60BF9B5C5A521E /* APIClient.swift in Sources */,
+				D8B1269DC65D854F474432E6 /* AppModel.swift in Sources */,
+				70BF4744A694732D3FFBCDBC /* CompanionCoordinator.swift in Sources */,
+				387B66BE5AA3210DD6C8A017 /* CompanionPanel.swift in Sources */,
+				B60776186F24C169754719F2 /* DesignSystem.swift in Sources */,
+				3D1A1EB693F960C1596B0D8F /* DrillbitApp.swift in Sources */,
+				0EEA0D0A8C2A9562B674EAB4 /* HelpView.swift in Sources */,
+				14D473381FCB4038B04FA534 /* MemorySettings.swift in Sources */,
+				ADA43CF08FADFB23365A14E8 /* Models.swift in Sources */,
+				3D0DACC7801A3CCC832A9840 /* Persistence.swift in Sources */,
+				8D4370BA4D4B112FDA7560A6 /* PracticeCompanion.swift in Sources */,
+				868D112482709522C36A981D /* PracticeWorkspace.swift in Sources */,
+				2BCD05DC191DB1D3AC6E50FD /* SharedStore.swift in Sources */,
+				F1C52BCF979C4B21823BF045 /* Views.swift in Sources */,
+				EAC2A5859464998CB025529A /* WelcomeView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E4FB0EADD9551D5E89F76E92 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				20212ED453359321401BBE55 /* CompanionTests.swift in Sources */,
+				ECEC2C8AFBB8086D0EA78BEC /* ContractTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		8D5CCAB5A99D65DE785563E3 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3E061873538427D4AA73F0CD /* Drillbit */;
+			targetProxy = 2A3E2E4D976B7AB44BEA2649 /* PBXContainerItemProxy */;
+		};
+		A6BC0B5A0538A3F414AAEDA9 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AAD277F0C9A7DF607E1E03EB /* DrillbitWidget */;
+			targetProxy = 01C718F4443052F05C884D59 /* PBXContainerItemProxy */;
+		};
+		AA0640E7CA52B539DA426A12 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3E061873538427D4AA73F0CD /* Drillbit */;
+			targetProxy = 6C6B26CA67F6FFD6D71B691B /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		2EC835E9123CF5568C865FF6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dawi.DrillbitTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Drillbit.app/Drillbit";
+			};
+			name = Release;
+		};
+		38BEB6236B1389F289BCCC9B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 2;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 2.0.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		404404820D469AC93BB6506C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 7M4NDAAP73;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dawi.DrillbitUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Drillbit;
+			};
+			name = Debug;
+		};
+		66F767BBAC071424F3C6E84E /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = E1126329A3402DB0A44CA474 /* Defaults.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Config/Widget.entitlements;
+				INFOPLIST_FILE = Config/WidgetInfo.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dawi.drillbit.widget;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		6E52D60DFBE04E2EB6395099 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = E1126329A3402DB0A44CA474 /* Defaults.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Config/App.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Config/AppInfo.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dawi.drillbit;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		82D824B56F80DDB6C0599F2D /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = E1126329A3402DB0A44CA474 /* Defaults.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Config/App.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Config/AppInfo.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dawi.drillbit;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		A11E1886665C68D1AD4F8588 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 2;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 2.0.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		B52334AD05A2420053A07802 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 7M4NDAAP73;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dawi.DrillbitUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Drillbit;
+			};
+			name = Release;
+		};
+		B945C2EA87D9CB3550D6F89F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dawi.DrillbitTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Drillbit.app/Drillbit";
+			};
+			name = Debug;
+		};
+		FE18EA6267DCCA775F2064EB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = E1126329A3402DB0A44CA474 /* Defaults.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Config/Widget.entitlements;
+				INFOPLIST_FILE = Config/WidgetInfo.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dawi.drillbit.widget;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		150830310085315300AC6D85 /* Build configuration list for PBXNativeTarget "DrillbitUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				404404820D469AC93BB6506C /* Debug */,
+				B52334AD05A2420053A07802 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		23A7B50C57757208B02F019C /* Build configuration list for PBXNativeTarget "DrillbitTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B945C2EA87D9CB3550D6F89F /* Debug */,
+				2EC835E9123CF5568C865FF6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		5E61A74EA681D8E5502FC019 /* Build configuration list for PBXNativeTarget "DrillbitWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FE18EA6267DCCA775F2064EB /* Debug */,
+				66F767BBAC071424F3C6E84E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		BCD41B31486971564EF9B32B /* Build configuration list for PBXNativeTarget "Drillbit" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6E52D60DFBE04E2EB6395099 /* Debug */,
+				82D824B56F80DDB6C0599F2D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		C080856528589EEE8E07BFA4 /* Build configuration list for PBXProject "Drillbit" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				38BEB6236B1389F289BCCC9B /* Debug */,
+				A11E1886665C68D1AD4F8588 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		45836B15F0D4DBA12F3BE30E /* XCRemoteSwiftPackageReference "clerk-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/clerk/clerk-ios.git";
+			requirement = {
+				kind = revision;
+				revision = 02f98f89a19b6c079517c9aae07df7edd0e600e5;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		D0E2F449415E69EBA68ED8CD /* ClerkKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 45836B15F0D4DBA12F3BE30E /* XCRemoteSwiftPackageReference "clerk-ios" */;
+			productName = ClerkKit;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = CDAE8C78A1BD321C3455AEE4 /* Project object */;
+}

@@ -1,0 +1,66 @@
+{
+  "id": "practice-fixture",
+  "lifecycle": "in_progress",
+  "title": "Configuration cache",
+  "prompt": "Design local flag evaluation with outage handling and rollback.",
+  "topic": "Distributed systems",
+  "session": {
+    "answer": "An assisted draft",
+    "revision": 3,
+    "updated_at": "2026-09-09T09:00:00.000Z"
+  },
+  "help": [
+    {
+      "id": "help-fixture",
+      "kind": "draft",
+      "status": "completed",
+      "revision": 2,
+      "body": "Make failure handling explicit.",
+      "suggestedAnswer": "An assisted draft"
+    },
+    {
+      "id": "nudge-fixture",
+      "kind": "nudge",
+      "status": "completed",
+      "revision": 3,
+      "body": "What should a client do during an outage?",
+      "outcome": "intervention",
+      "suggestedFocus": null,
+      "plan": [],
+      "suggestedAnswer": null,
+      "capture": {
+        "contextRevision": 2,
+        "modeEpoch": 1,
+        "cycle": "example-cycle",
+        "digest": "example-digest",
+        "trigger": "pause"
+      },
+      "deliveries": [
+        "uncertain",
+        "shown"
+      ]
+    }
+  ],
+  "adoptions": [
+    {
+      "id": "adoption-fixture",
+      "source_id": "help-fixture",
+      "operation": "replace",
+      "revision": 3
+    }
+  ],
+  "automaticCompanion": true,
+  "companion": {
+    "revision": 2,
+    "mode": "coach",
+    "modeEpoch": 1,
+    "paused": false,
+    "selectedFocus": null,
+    "decisions": [],
+    "automaticCount": 1,
+    "lastAutomaticAt": "2026-09-09T09:00:00.000Z",
+    "digest": "example-digest",
+    "cycle": "example-cycle"
+  },
+  "engineeringLevel": "senior"
+}

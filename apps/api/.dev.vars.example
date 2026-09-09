@@ -1,0 +1,7 @@
+# Copy to .dev.vars, never commit it. Use a separate Clerk development instance.
+CLERK_ISSUER=https://your-instance.clerk.accounts.dev
+CLERK_SECRET_KEY=
+OPENROUTER_API_KEY=
+# Generate with: openssl rand -base64 32
+CREDENTIAL_KEY=
+MANAGED_AI_ENABLED=true
