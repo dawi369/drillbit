@@ -1,6 +1,6 @@
 # Interviewer council: candidate product direction
 
-9 September 2026 · Council discussion retained below. The user approved the Interview room and the name **Interview style**, with **Quick / Standard / In-depth**, then requested implementation. See architecture.md and acceptance.md for the delivered behavior and evidence.
+9 September 2026 · Updated after a second council: the user approved a continuous, manually foldable interview document. The original brief, exchanges and growing draft now share one scroll surface; asynchronous replies never fold content. One disclosure per exchange was chosen over separate question/answer accordions, and manual folding over automatic history compaction. See the Continuous interview document section of architecture.md for the delivered mechanics. Earlier council discussion is retained below. The user approved the Interview room and the name **Interview style**, with **Quick / Standard / In-depth**, then requested implementation. See architecture.md and acceptance.md for the delivered behavior and evidence.
 
 Three perspectives reviewed the current product: interview learning, native interaction, and adaptive assistance. They agree on replacing mode switching with one interviewer and explicit conversational turns. They disagree on whether the remaining setting should describe support or follow-up depth. This document preserves that disagreement rather than presenting every recommendation as consensus. The implemented baseline remains in architecture.md and companion-vision.md.
 

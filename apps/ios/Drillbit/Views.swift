@@ -12,14 +12,14 @@ struct RootView: View {
           NavigationStack { SetupView(model: model) }
         } else {
           TabView {
-            Tab("Today", systemImage: "sun.max") {
+            Tab("Home", systemImage: "house") {
               NavigationStack {
-                TodayView(model: model).toolbar {
+                HomeView(model: model).toolbar {
                   Button("Settings", systemImage: "gearshape") { settingsOpen = true }
                 }
               }
             }
-            Tab("Memory", systemImage: "book.closed") {
+            Tab("Library", systemImage: "book.closed") {
               NavigationStack {
                 MemoryView(model: model).toolbar {
                   Button("Settings", systemImage: "gearshape") { settingsOpen = true }
@@ -32,6 +32,7 @@ struct RootView: View {
         WelcomeView(model: model)
       }
     }
+    .preferredColorScheme(model.fixture && ProcessInfo.processInfo.arguments.contains("--dark") ? .dark : nil)
     .task { await model.launch() }
     .onChange(of: scenePhase) { _, phase in
       if phase == .active {
@@ -105,7 +106,7 @@ struct LocalRecoveryView: View {
     }.task { local = await model.localAnswer(challenge) }
   }
 }
-struct TodayView: View {
+struct HomeView: View {
   @Bindable var model: AppModel
   @State private var flow: QuestionFlowEntry?
   @State private var started: Challenge?
@@ -120,6 +121,7 @@ struct TodayView: View {
               .font(.caption).foregroundStyle(.secondary)
             Text(challenge.title).font(.headline).lineLimit(2)
             Text("\(challenge.topic) · \(challenge.levelLabel)").font(.subheadline).foregroundStyle(.secondary)
+            if challenge.lifecycle == "ready", let reason = challenge.selectionReason { Text(reason).font(.caption).foregroundStyle(.secondary) }
             Button(challenge.lifecycle == "in_progress" ? "Resume" : "Preview question") {
               if challenge.lifecycle == "in_progress" { Task { await model.open(challenge) } }
               else { flow = QuestionFlowEntry(challenge: challenge) }
@@ -143,7 +145,7 @@ struct TodayView: View {
         }
       }.frame(maxWidth: 640, alignment: .leading).padding(24)
     }.safeAreaPadding(.bottom, 24)
-      .navigationTitle("Today").navigationBarTitleDisplayMode(.inline)
+      .navigationTitle("Home").navigationBarTitleDisplayMode(.inline)
       .refreshable { await model.refresh() }
       .sheet(item: $flow, onDismiss: {
         if let started { model.presented = started; self.started = nil }
@@ -303,12 +305,13 @@ struct ReflectionView: View {
       }
       .task {
         guard !model.fixture else { return }
-        for _ in 0..<45 {
+        let started = Date()
+        while Date().timeIntervalSince(started) < 90 {
           if let detail: Challenge = try? await model.api.send("challenges/" + initial.id) {
             current = detail
             if detail.reflection != nil { return }
           }
-          try? await Task.sleep(for: .seconds(2))
+          try? await Task.sleep(for: .milliseconds(Date().timeIntervalSince(started) < 10 ? 500 : 1500))
           if Task.isCancelled { return }
         }
       }
@@ -386,21 +389,6 @@ struct PracticeOverview: View {
       layout {
         metric("Completed", value: memory.statistics?.completed)
         metric("Last 7 days", value: memory.statistics?.lastSevenDays)
-      }
-      if let session = memory.sessions.first {
-        Divider()
-        VStack(alignment: .leading, spacing: 4) {
-          Text("Last session").font(.caption).foregroundStyle(.secondary)
-          Text(session.title).font(.subheadline).lineLimit(2)
-          let level: String? = session.levelLabel
-          let finished = session.completedAt.flatMap(Date.fromAPI)
-          if level != nil || finished != nil {
-            Text([level, finished.map { "Finished " + $0.formatted(date: .abbreviated, time: .shortened) }].compactMap { $0 }.joined(separator: " · "))
-              .font(.caption).foregroundStyle(.secondary)
-          }
-        }
-      } else if memory.statistics?.completed == 0 {
-        Text("Your first session starts here.").font(.subheadline).foregroundStyle(.secondary)
       }
       if let value = memory.statistics, let date = Date.fromAPI(value.asOf), Date().timeIntervalSince(date) > 300 {
         Text("Updated \(date.formatted(date: .abbreviated, time: .shortened))")

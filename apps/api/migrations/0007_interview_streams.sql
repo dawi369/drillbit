@@ -1,0 +1,4 @@
+CREATE TABLE interview_streams (
+ job_id TEXT PRIMARY KEY REFERENCES jobs(id) ON DELETE CASCADE,
+ text TEXT NOT NULL DEFAULT ''
+);

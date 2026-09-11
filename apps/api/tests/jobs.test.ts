@@ -32,8 +32,12 @@ it("durably generates a valid challenge and replay does not call the provider ag
       body: (raw: string) => {
         const request = JSON.parse(raw);
         expect(request.provider.require_parameters).toBe(true);
-        expect(request.messages[0].content).toContain("Required JSON schema:");
-        expect(request.messages[0].content).toContain("ambiguityPolicy");
+        expect(request.provider.sort).toBe("latency");
+        expect(request.reasoning.enabled).toBe(false);
+        expect(request.model).toBe("google/gemini-2.5-flash-lite");
+        expect(request.messages[0].content).not.toContain("Required JSON schema:");
+        expect(request.response_format.type).toBe("json_schema");
+        expect(request.response_format.json_schema.schema.properties).toHaveProperty("ambiguityPolicy");
         return true;
       },
     })
@@ -43,6 +47,7 @@ it("durably generates a valid challenge and replay does not call the provider ag
           message: {
             content: JSON.stringify({
               kind: "design",
+              scenario:"Feature flags", primaryConceptId:"api-design", secondaryConceptIds:[], tagEvidence:[{conceptId:"api-design",requirementIndex:0}],
               targetSkill: "Availability",
               constraints: [],
               evaluationCriteria: ["local evaluation"],
@@ -185,4 +190,18 @@ it("deletes a redeemed invitation and all account data after Clerk deletion", as
       .bind(id)
       .first(),
   ).toBeNull();
+});
+it("returns durable job intent before slow workflow dispatch completes", async () => {
+  const account = await accountFor(bindings, crypto.randomUUID());
+  await bindings.DB.prepare("UPDATE accounts SET status='active' WHERE id=?").bind(account.id).run();
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const deferred: Promise<unknown>[] = [];
+  const fast = {...bindings, JOBS:{create: async () => { await gate; return {id:"slow"}; }}, defer:(work:Promise<unknown>) => deferred.push(work)} as unknown as Env;
+  const id = crypto.randomUUID();
+  const result = await createJob(fast,account.id,id,"generate",null,{settings:await settingsFor(bindings,account.id)});
+  expect(result?.id).toBe(id);
+  expect(deferred).toHaveLength(1);
+  expect(await bindings.DB.prepare("SELECT status FROM jobs WHERE id=?").bind(id).first()).toMatchObject({status:"pending"});
+  release(); await Promise.all(deferred);
 });

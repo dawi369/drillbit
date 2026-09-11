@@ -3,11 +3,17 @@ import Foundation
 
 @MainActor final class APIClient {
   let baseURL: URL
-  init(baseURL: URL) { self.baseURL = baseURL }
+  private let tokenProvider: @MainActor () async throws -> String?
+  private let transport: @MainActor (URLRequest) async throws -> (Data, URLResponse)
+  init(baseURL: URL,
+       tokenProvider: @escaping @MainActor () async throws -> String? = { try await Clerk.shared.session?.getToken(.init(template: "drillbit")) },
+       transport: @escaping @MainActor (URLRequest) async throws -> (Data, URLResponse) = { try await URLSession.shared.data(for: $0) }) {
+    self.baseURL = baseURL; self.tokenProvider = tokenProvider; self.transport = transport
+  }
   func request(_ path: String, method: String = "GET", body: Data? = nil, command: String? = nil)
     async throws -> URLRequest
   {
-    guard let token = try await Clerk.shared.session?.getToken(.init(template: "drillbit")) else {
+    guard let token = try await tokenProvider() else {
       throw APIError(code: "unauthenticated", message: "Sign in to continue.", status: 401)
     }
     var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)!
@@ -29,7 +35,7 @@ import Foundation
   ) async throws -> T {
     let encoded = try body.map { try JSONEncoder().encode($0) }
     let request = try await request(path, method: method, body: encoded, command: command)
-    let (data, response) = try await URLSession.shared.data(for: request)
+    let (data, response) = try await transport(request)
     try validate(data, response)
     return try JSONDecoder.api.decode(T.self, from: data)
   }
@@ -75,6 +81,19 @@ import Foundation
         code: "interrupted",
         message: "Coaching was interrupted. The partial response is not saved.", status: 0)
     }
+  }
+  func interviewStream(id: String, turn: String, onSnapshot: @MainActor (InterviewStreamSnapshot) -> Void) async throws {
+    let request = try await request("challenges/\(id)/interview/\(turn)/stream")
+    let (bytes, response) = try await URLSession.shared.bytes(for: request)
+    guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { throw URLError(.badServerResponse) }
+    for try await line in bytes.lines {
+      try Task.checkCancellation()
+      guard line.hasPrefix("data:") else { continue }
+      let value = try JSONDecoder().decode(InterviewStreamSnapshot.self, from: Data(line.dropFirst(5).utf8))
+      onSnapshot(value)
+      if !["pending", "running"].contains(value.status) { return }
+    }
+    throw URLError(.networkConnectionLost)
   }
   private func validate(_ data: Data, _ response: URLResponse) throws {
     guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }

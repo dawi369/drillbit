@@ -1,0 +1,5 @@
+[
+  {"status":"pending","text":""},
+  {"status":"running","text":"What happens"},
+  {"status":"completed","text":"What happens when a worker crashes?"}
+]

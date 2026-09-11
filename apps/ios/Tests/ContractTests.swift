@@ -9,6 +9,26 @@ import Testing
 #endif
 
 struct ContractTests {
+  #if !canImport(DrillbitCore)
+  @MainActor @Test func libraryPreloadsOnceUntilCommittedInvalidation() async throws {
+    let container = try ModelContainer(for: Schema(StoreV1.models), configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+    let model = AppModel(container: container, baseURL: URL(string: "https://example.invalid")!, fixture: true, monitorNetwork: false)
+    await model.launch()
+    let account = try #require(model.bootstrap?.account.id)
+    let key = "library:" + account + ":|||0|false"
+    #expect(model.librarySnapshots[key]?.questions.count == 1)
+    #expect(model.libraryDetailSnapshots["library-detail:" + account + ":library-completed"]?.attempts.count == 1)
+    let version = model.libraryVersion
+    model.fixtureLibrary = []
+    await model.preloadLibrary()
+    #expect(model.libraryVersion == version)
+    #expect(model.librarySnapshots[key]?.questions.count == 1)
+    await model.preloadLibrary(force: true)
+    #expect(model.librarySnapshots[key]?.questions.isEmpty == true)
+    #expect(model.libraryVersion == version + 1)
+  }
+
+  #endif
   @Test func historicalChallengeLevels() throws {
     for (difficulty, expected) in [("easy", "Junior"), ("medium", "Mid-level"), ("hard", "Senior")] {
       let json = "{\"id\":\"old\",\"lifecycle\":\"completed\",\"title\":\"Notification service\",\"prompt\":\"Design it\",\"topic\":\"Backend\",\"difficulty\":\"\(difficulty)\"}"

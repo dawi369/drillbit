@@ -13,6 +13,7 @@
 		14D473381FCB4038B04FA534 /* MemorySettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCE2282A43B33A17D93AF4C6 /* MemorySettings.swift */; };
 		20212ED453359321401BBE55 /* CompanionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39439B81E58CADD0F8243F46 /* CompanionTests.swift */; };
 		2BCD05DC191DB1D3AC6E50FD /* SharedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8049B9471B01CBFBD8C80764 /* SharedStore.swift */; };
+		38084B68C426518EDAE4F208 /* InterviewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44C89C686607D2F20377EADE /* InterviewTests.swift */; };
 		387B66BE5AA3210DD6C8A017 /* CompanionPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04CE1C0E2D55B42FFFD0982A /* CompanionPanel.swift */; };
 		3D0DACC7801A3CCC832A9840 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A7106218805AC5263A12438 /* Persistence.swift */; };
 		3D1A1EB693F960C1596B0D8F /* DrillbitApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAD863FB5DA9BAE45F86B3AB /* DrillbitApp.swift */; };
@@ -79,6 +80,7 @@
 		165CE5F9FA389F64A4730557 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		1BA600A70A653AC369122638 /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
 		39439B81E58CADD0F8243F46 /* CompanionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionTests.swift; sourceTree = "<group>"; };
+		44C89C686607D2F20377EADE /* InterviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterviewTests.swift; sourceTree = "<group>"; };
 		4C0456C5AFA3D9C114B4F80D /* Drillbit.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Drillbit.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5CF83E5C54AF9B2C1262CAB8 /* PracticeWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeWorkspace.swift; sourceTree = "<group>"; };
 		7ED772ACFEBFA6EBE9753089 /* ContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContractTests.swift; sourceTree = "<group>"; };
@@ -197,6 +199,7 @@
 			children = (
 				39439B81E58CADD0F8243F46 /* CompanionTests.swift */,
 				7ED772ACFEBFA6EBE9753089 /* ContractTests.swift */,
+				44C89C686607D2F20377EADE /* InterviewTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -379,6 +382,7 @@
 			files = (
 				20212ED453359321401BBE55 /* CompanionTests.swift in Sources */,
 				ECEC2C8AFBB8086D0EA78BEC /* ContractTests.swift in Sources */,
+				38084B68C426518EDAE4F208 /* InterviewTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

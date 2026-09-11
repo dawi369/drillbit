@@ -1,4 +1,6 @@
-import { interviewInputSchema, requestInterview, retryInterview } from "./interview";
+import { concepts } from "./taxonomy";
+import { libraryPage, questionDetail, setEligibility, startQuestion, coverage } from "./library";
+import { interviewStreamSnapshot, interviewInputSchema, requestInterview, retryInterview } from "./interview";
 import { updateContext, receive } from "./companion";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
@@ -6,6 +8,7 @@ import { streamSSE } from "hono/streaming";
 import { z } from "zod";
 import {
   Fault,
+  MODEL_ID,
   generationSchema,
   levelForDifficulty,
   answerSchema,
@@ -56,6 +59,12 @@ app.use(
   }),
 );
 app.use("*", async (c, next) => {
+  // Job intent is already durable in D1. Enqueue without holding the HTTP reply;
+  // the scheduled reconciler still recovers a failed workflow dispatch.
+  try {
+    const context = c.executionCtx;
+    c.env = { ...c.env, defer: work => context.waitUntil(work) };
+  } catch { /* Direct in-process test requests have no execution context. */ }
   c.set("requestId", uuid());
   await next();
   c.header("X-Request-ID", c.get("requestId"));
@@ -124,8 +133,15 @@ app.use("/v1/*", async (c, next) => {
       403,
       "Redeem an invite to start practicing.",
     );
+  if(c.req.method!=="GET" && !permitted.includes(c.req.path) && (await c.env.DB.prepare("SELECT enabled FROM practice_epoch WHERE id=1").first<{enabled:number}>())?.enabled===0)throw new Fault("maintenance",503,"Practice is being updated. Please try again shortly.");
   await next();
 });
+app.get("/v1/taxonomy", c => c.json({version:1,concepts}));
+app.get("/v1/library", async c => c.json(await libraryPage(c.env,c.get("account").id,new URL(c.req.url).searchParams)));
+app.get("/v1/library/coverage", async c => c.json({concepts:await coverage(c.env,c.get("account").id)}));
+app.get("/v1/questions/:id", async c => c.json(await questionDetail(c.env,c.get("account").id,c.req.param("id"),c.req.query("cursor"))));
+app.put("/v1/questions/:id/eligibility", async c => c.json(await setEligibility(c.env,c.get("account").id,c.req.param("id"),requireCommand(c.req.header("Idempotency-Key")),await c.req.json())));
+app.post("/v1/questions/:id/start", async c => c.json(await startQuestion(c.env,c.get("account").id,c.req.param("id"),requireCommand(c.req.header("Idempotency-Key")))));
 app.get("/v1/bootstrap", async (c) => {
   const a = c.get("account");
   const active = await activeChallenge(c.env, a.id);
@@ -141,6 +157,7 @@ app.get("/v1/bootstrap", async (c) => {
     .first();
   return c.json({
     account: { id: a.id, status: a.status },
+    practiceEpoch: (await c.env.DB.prepare("SELECT value FROM practice_epoch WHERE id=1").first<{value:string}>())!.value,
     settings: await settingsFor(c.env, a.id),
     challenge: active ? await detail(c.env, a.id, active.id) : null,
     jobs: jobs.results,
@@ -181,6 +198,7 @@ app.post("/v1/invite", async (c) => {
 });
 app.put("/v1/settings", async (c) => {
   const settings = settingsSchema.parse(await c.req.json());
+  settings.model = MODEL_ID;
   const account = c.get("account").id;
   settings.engineeringLevel ??= (await settingsFor(c.env, account)).engineeringLevel;
   if (
@@ -341,6 +359,23 @@ app.post("/v1/jobs/:id/cancel", async (c) => {
 app.get("/v1/challenges/:id", async (c) =>
   c.json(await detail(c.env, c.get("account").id, c.req.param("id"))),
 );
+app.get("/v1/challenges/:id/interview/:turn/stream", async c => {
+  const account = c.get("account").id, id = c.req.param("id"), turn = c.req.param("turn");
+  const initial = await interviewStreamSnapshot(c.env, account, id, turn);
+  c.header("Cache-Control", "no-store");
+  return streamSSE(c, async stream => {
+    let closed = false, previous = "", value = initial;
+    stream.onAbort(() => { closed = true; });
+    const deadline = Date.now() + 75000;
+    while (!closed && Date.now() < deadline) {
+      const data = JSON.stringify(value);
+      if (data !== previous) { await stream.writeSSE({event:"snapshot",data}); previous = data; }
+      if (!["pending","running"].includes(value.status)) return;
+      await stream.sleep(200);
+      if (!closed) value = await interviewStreamSnapshot(c.env, account, id, turn);
+    }
+  });
+});
 app.post("/v1/challenges/:id/interview", async c => c.json(await requestInterview(c.env,c.get("account").id,c.req.param("id"),requireCommand(c.req.header("Idempotency-Key")),interviewInputSchema.parse(await c.req.json())),202));
 app.post("/v1/challenges/:id/interview/:turn/retry", async c => c.json(await retryInterview(c.env,c.get("account").id,c.req.param("id"),c.req.param("turn"),requireCommand(c.req.header("Idempotency-Key"))),202));
 app.post("/v1/challenges/:id/start", async (c) => {
@@ -405,6 +440,7 @@ app.post("/v1/challenges/:id/skip", async (c) => {
     id = c.req.param("id");
   await ownedChallenge(c.env, a, id);
   await c.env.DB.batch([
+    c.env.DB.prepare("UPDATE questions SET eligible=0,eligibility_revision=eligibility_revision+1,eligibility_updated_at=? WHERE account_id=? AND id IN (SELECT x.question_id FROM question_attempts x JOIN challenges c ON c.id=x.challenge_id WHERE c.id=? AND c.lifecycle IN ('ready','in_progress'))").bind(timestamp(),a,id),
     c.env.DB.prepare(
       "UPDATE challenges SET lifecycle='skipped' WHERE id=? AND account_id=? AND lifecycle IN ('ready','in_progress')",
     ).bind(id, a),

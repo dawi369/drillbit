@@ -1,0 +1,8 @@
+{
+  "promptId": "original",
+  "kind": "answer",
+  "revision": 2,
+  "text": "Use a durable queue with bounded retries.",
+  "style": "in_depth",
+  "saveDraft": true
+}

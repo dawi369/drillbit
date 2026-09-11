@@ -1,3 +1,4 @@
+import { conceptId, eligibilityInput, observationSchema } from "../../apps/api/src/taxonomy";
 import { interviewInputSchema, interviewResultSchema, interviewStyleSchema } from "../../apps/api/src/interview";
 import {
   captureSchema,
@@ -45,9 +46,10 @@ const companion = z.object({
 });
 const interview = z.object({
   style: interviewStyleSchema, prompt: z.string(), wrapUp: z.boolean(),
-  turns: z.array(z.object({ id: z.string(), ordinal: z.number().int(), kind: z.enum(["answer","clarification","hint","example","continue"]), prompt: z.string(), text: z.string(), createdAt: z.string(), jobId: z.string(), status: z.string(), error: z.string().nullable().optional(), result: interviewResultSchema.nullable() })),
+  turns: z.array(z.object({ id: z.string(), ordinal: z.number().int(), kind: z.enum(["answer","clarification","hint","example","continue"]), prompt: z.string(), text: z.string(), createdAt: z.string(), jobId: z.string(), status: z.string(), error: z.string().nullable().optional(), partial: z.string().nullable().optional(), result: interviewResultSchema.nullable() })),
 });
 const challenge = challengeSchema.extend({
+  questionId: z.string().optional(), scenario:z.string().optional(), primaryConceptId:conceptId.optional(), conceptIds:z.array(conceptId).optional(), selectionReason:z.string().optional(),
   interviewStyle: interviewStyleSchema.optional(),
   interview: interview.optional(),
   difficulty: z.enum(["easy", "medium", "hard"]).optional(),
@@ -116,7 +118,15 @@ const challenge = challengeSchema.extend({
     )
     .optional(),
 });
+const libraryQuestion=z.object({id:z.string(),title:z.string(),prompt:z.string(),scenario:z.string(),engineeringLevel:engineeringLevelSchema,primaryConceptId:conceptId,conceptIds:z.array(conceptId).min(1).max(3),eligible:z.boolean(),eligibilityRevision:z.number().int(),lastActivity:z.string().optional(),attemptCount:z.number().int().optional()});
 export const wire = {
+  Taxonomy:z.object({version:z.literal(1),concepts:z.array(z.object({id:conceptId,label:z.string(),category:z.string(),aliases:z.array(z.string()),description:z.string().optional()}))}),
+  LibraryQuestion:libraryQuestion,
+  LibraryPage:z.object({questions:z.array(libraryQuestion),nextCursor:z.string().nullable()}),
+  LibraryDetail:z.object({question:libraryQuestion,attempts:z.array(challenge),nextCursor:z.string().nullable()}),
+  EligibilityInput:eligibilityInput,
+  SkillObservation:observationSchema,
+  Coverage:z.object({concepts:z.array(z.object({conceptId,completedAttempts:z.number().int(),distinctQuestions:z.number().int(),lastPractised:z.string().nullable()}))}),
   Companion: companion,
   CompanionUpdate: companionUpdateSchema,
   DeliveryInput: receiptsSchema,
@@ -127,6 +137,7 @@ export const wire = {
   AdoptionInput: adoptionSchema,
   InterviewInput: interviewInputSchema,
   InterviewState: interview,
+  InterviewStreamSnapshot: z.object({ status: z.string(), text: z.string() }),
   PreparationInput: generationSchema,
   ChallengeContent: challengeSchema,
   QuestionSpecification: questionSpecificationSchema,
@@ -143,6 +154,7 @@ export const wire = {
   Question: z.object({ question: z.string().max(4000) }),
   Credential: z.object({ suffix: z.string() }),
   Bootstrap: z.object({
+    practiceEpoch:z.string().optional(),
     account: z.object({ id: z.string(), status: z.string() }),
     settings: settingsSchema,
     challenge: challenge.nullable(),

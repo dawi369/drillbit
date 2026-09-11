@@ -22,13 +22,13 @@ import WidgetKit
   let disk: DiskStore
   let api: APIClient
   let fixture: Bool
-  private var syncing = false
+  private var syncTask: Task<Void, Never>?
   private var refreshing = false
   private var monitor = NWPathMonitor()
   private let logger = Logger(subsystem: "dawi.drillbit", category: "application")
-  init(container: ModelContainer, baseURL: URL, fixture: Bool) {
+  init(container: ModelContainer, baseURL: URL, fixture: Bool, client: APIClient? = nil, monitorNetwork: Bool = true) {
     disk = DiskStore(modelContainer: container)
-    api = APIClient(baseURL: baseURL)
+    api = client ?? APIClient(baseURL: baseURL)
     self.fixture = fixture
     monitor.pathUpdateHandler = { [weak self] path in
       if path.status == .satisfied {
@@ -39,7 +39,190 @@ import WidgetKit
         }
       }
     }
-    monitor.start(queue: DispatchQueue(label: "drillbit.connectivity"))
+    if monitorNetwork { monitor.start(queue: DispatchQueue(label: "drillbit.connectivity")) }
+  }
+  // Account and filter scoped snapshots survive navigation; only committed writes refresh them.
+  var librarySnapshots: [String: LibraryPage] = [:]
+  var libraryDetailSnapshots: [String: LibraryDetail] = [:]
+  private var libraryCompletionTasks: [String: Task<Void, Never>] = [:]
+  private var libraryWarmAccount: String?
+  private var libraryWarmTask: Task<Void, Never>?
+  var librarySessions: [String: Challenge] = [:]
+  private var locallySkipped: [String: Set<String>] = [:]
+  func isLocallySkipped(account: String, id: String) -> Bool { locallySkipped[account]?.contains(id) == true }
+  var libraryVersion = 0
+  var libraryCoverage: [CoverageResponse.Entry] = []
+
+  /// Warm the first 25 completed and skipped questions, including their attempt lists.
+  /// Navigation consumes these snapshots; only committed mutations invalidate them.
+  private func awaitLibraryResults(challengeID: String, account: String) {
+    guard libraryCompletionTasks[challengeID] == nil else { return }
+    libraryCompletionTasks[challengeID] = Task { @MainActor in
+      defer { self.libraryCompletionTasks[challengeID] = nil }
+      for _ in 0..<90 {
+        guard !Task.isCancelled, self.bootstrap?.account.id == account else { return }
+        if let result: Challenge = try? await self.api.send("challenges/" + challengeID), result.lifecycle == "completed", result.reflection != nil {
+          await self.preloadLibrary(force: true)
+          return
+        }
+        do { try await Task.sleep(for: .seconds(2)) } catch { return }
+      }
+    }
+  }
+  func preloadLibrary(force: Bool = false, onlySkipped: Bool = false) async {
+    guard let account = bootstrap?.account.id else { return }
+    if let task = libraryWarmTask { await task.value; if !force, libraryWarmAccount == account { return } }
+    if !force, libraryWarmAccount == account { return }
+    libraryWarmAccount = account
+    let task = Task { @MainActor in
+      var pages = force ? self.librarySnapshots.filter { $0.key.hasSuffix(":|||0|false") || $0.key.hasSuffix(":|||0|true") } : self.librarySnapshots
+      var details = self.libraryDetailSnapshots
+      for skipped in (onlySkipped ? [true] : [false, true]) {
+        let key = "library:" + account + ":|||0|" + String(skipped)
+        if pages[key] == nil, let data = try? await self.disk.cached(key: key), let cached = try? JSONDecoder().decode(LibraryPage.self, from: data) { pages[key] = cached }
+        let path = "library?q=&skipped=" + String(skipped) + "&concepts="
+        if let page = try? await self.libraryResponse(path: path) { pages[key] = page }
+        guard self.bootstrap?.account.id == account else { return }
+        if let page = pages[key] {
+          for batchStart in stride(from: 0, to: page.questions.count, by: 5) {
+            let batch = Array(page.questions[batchStart..<min(batchStart + 5, page.questions.count)])
+            await withTaskGroup(of: (String, LibraryDetail?).self) { group in
+              for q in batch { group.addTask {
+                var detail = try? await self.libraryDetail(id: q.id, path: "questions/" + q.id)
+                if let first = detail?.attempts.first, !self.fixture, let full: Challenge = try? await self.api.send("challenges/" + first.id) { detail?.attempts[0] = full }
+                return (q.id, detail)
+              } }
+              for await (id, detail) in group {
+                let detailKey = "library-detail:" + account + ":" + id
+                if let detail { details[detailKey] = detail; try? await self.disk.cache(key: detailKey, data: JSONEncoder().encode(detail)) }
+                else if details[detailKey] == nil, let data = try? await self.disk.cached(key: detailKey) { details[detailKey] = try? JSONDecoder().decode(LibraryDetail.self, from: data) }
+              }
+            }
+          }
+          try? await self.disk.cache(key: key, data: JSONEncoder().encode(page))
+        }
+      }
+      guard self.bootstrap?.account.id == account else { return }
+      if !onlySkipped, !self.fixture, let value: CoverageResponse = try? await self.api.send("library/coverage") { self.libraryCoverage = value.concepts }
+      guard self.bootstrap?.account.id == account else { return }
+      for detail in details.values { for attempt in detail.attempts where attempt.session != nil { self.librarySessions[account + ":" + attempt.id] = attempt } }
+      let pending = (try? await self.disk.cached(key: "eligibility:" + account)).flatMap { try? JSONDecoder().decode([EligibilityCommand].self, from: $0) } ?? []
+      for command in pending {
+        details["library-detail:" + account + ":" + command.questionId]?.question.eligible = command.eligible
+        for key in pages.keys where key.hasSuffix("true") {
+          pages[key]?.questions.removeAll { $0.id == command.questionId && command.eligible }
+        }
+      }
+      self.libraryDetailSnapshots = details
+      self.librarySnapshots = pages
+      self.libraryVersion += 1
+    }
+    libraryWarmTask = task
+    await task.value
+    libraryWarmTask = nil
+  }
+  var taxonomy: [PracticeConcept] = []
+  var fixtureLibrary: [LibraryQuestion] = []
+  var fixtureLibraryAttempts: [String: [Challenge]] = [:]
+  func libraryResponse(path: String) async throws -> LibraryPage {
+    if !fixture { return try await api.send(path) }
+    await loadTaxonomy()
+    let query = URLComponents(string: "https://fixture/" + path)?.queryItems ?? []
+    let skipped = query.first { $0.name == "skipped" }?.value == "true"
+    let search = query.first { $0.name == "q" }?.value ?? ""
+    let concepts = (query.first { $0.name == "concepts" }?.value ?? "").split(separator: ",").map(String.init)
+    let rows = fixtureLibrary.filter { q in
+      let last = fixtureLibraryAttempts[q.id]?.first
+      return (skipped ? last?.lifecycle == "skipped" && !q.eligible : fixtureLibraryAttempts[q.id]?.contains { $0.lifecycle == "completed" } == true)
+        && (search.isEmpty || q.title.localizedCaseInsensitiveContains(search))
+        && (concepts.isEmpty || concepts.contains { q.conceptIds.contains($0) })
+    }
+    return LibraryPage(questions: rows, nextCursor: nil)
+  }
+  func libraryDetail(id: String, path: String) async throws -> LibraryDetail {
+    if !fixture { return try await api.send(path) }
+    await loadTaxonomy()
+    guard let q = fixtureLibrary.first(where: { $0.id == id }) else { throw CancellationError() }
+    return LibraryDetail(question: q, attempts: fixtureLibraryAttempts[id] ?? [], nextCursor: nil)
+  }
+  func startLibraryQuestion(_ question: LibraryQuestion, command: String) async throws -> Challenge {
+    if !fixture { return try await api.send("questions/" + question.id + "/start", method: "POST", command: command) }
+    let attempt = Challenge(questionId: question.id, scenario: question.scenario, primaryConceptId: question.primaryConceptId, conceptIds: question.conceptIds, engineeringLevel: question.engineeringLevel, id: command, lifecycle: "in_progress", title: question.title, prompt: question.prompt, topic: "System design", session: SessionDraft(answer: "", revision: 0))
+    fixtureLibraryAttempts[question.id, default: []].insert(attempt, at: 0)
+    return attempt
+  }
+  func loadTaxonomy() async {
+    if fixture {
+      if taxonomy.isEmpty {
+        taxonomy = [PracticeConcept(id: "queues", label: "Queues & streams", category: "Async & coordination", aliases: []), PracticeConcept(id: "retry-safety", label: "Retry safety & idempotency", category: "Async & coordination", aliases: []), PracticeConcept(id: "caching", label: "Caching", category: "Traffic & performance", aliases: [])]
+        for (id, title, state) in [("library-completed", "Design notification delivery", "completed"), ("library-skipped", "Design a distributed scheduler", "skipped")] {
+          let question = LibraryQuestion(id: id, title: title, prompt: "Design a durable service that handles worker failures and retries. Explain how you prevent duplicate side effects and preserve accepted work.", scenario: "Notification service", engineeringLevel: "senior", primaryConceptId: "queues", conceptIds: ["queues", "retry-safety"], eligible: false, eligibilityRevision: 0, lastActivity: "2026-09-10T12:00:00Z", attemptCount: state == "completed" ? 1 : 0)
+          fixtureLibrary.append(question)
+          fixtureLibraryAttempts[id] = [Challenge(id: id + "-attempt", lifecycle: state, title: title, prompt: question.prompt, topic: "System design", createdAt: question.lastActivity, completedAt: state == "completed" ? question.lastActivity : nil, session: SessionDraft(answer: "My preserved original reasoning", revision: 1))]
+        }
+      }
+      return
+    }
+    guard let account = bootstrap?.account.id else { return }
+    do { let response: TaxonomyResponse = try await api.send("taxonomy"); guard bootstrap?.account.id == account else { return }; taxonomy = response.concepts; try await disk.cache(key: "taxonomy:" + account, data: JSONEncoder().encode(response)) }
+    catch { if let data = try? await disk.cached(key: "taxonomy:" + account), let response = try? JSONDecoder().decode(TaxonomyResponse.self, from: data) { taxonomy = response.concepts } }
+  }
+  func acceptEpoch(_ result: Bootstrap) async throws {
+    guard let epoch = result.practiceEpoch else { return }
+    let key = "epoch:" + result.account.id
+    let old = try await disk.cached(key: key).flatMap { String(data: $0, encoding: .utf8) }
+    if old != epoch {
+      try await disk.clearPractice(account: result.account.id)
+      librarySnapshots = [:]; libraryDetailSnapshots = [:]; libraryWarmAccount = nil; librarySessions = [:]
+      presented = nil; conflict = nil; hasPendingWrites = false
+      if bootstrap?.account.id == result.account.id { bootstrap?.challenge = result.challenge; bootstrap?.jobs = result.jobs }
+      try SharedStore.save(WidgetSnapshot(challenge: result.challenge, updatedAt: Date().ISO8601Format()))
+      memory = MemoryResponse(sessions: [], patterns: [])
+      UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+      try await disk.cache(key: key, data: Data(epoch.utf8))
+    }
+  }
+  func queueEligibility(_ question: LibraryQuestion, eligible: Bool) async throws {
+    if fixture { if let index = fixtureLibrary.firstIndex(where: { $0.id == question.id }) { fixtureLibrary[index].eligible = eligible; fixtureLibrary[index].eligibilityRevision += 1
+      if let account = bootstrap?.account.id { libraryDetailSnapshots["library-detail:" + account + ":" + question.id]?.question = fixtureLibrary[index] }
+    }
+      for key in librarySnapshots.keys where key.hasSuffix("true") { librarySnapshots[key]?.questions.removeAll { $0.id == question.id && eligible } }
+      libraryVersion += 1
+      return }
+    guard let account = bootstrap?.account.id else { throw CancellationError() }
+    try await disk.enqueueEligibility(account: account, command: EligibilityCommand(id: UUID().uuidString, questionId: question.id, revision: question.eligibilityRevision, eligible: eligible))
+    guard bootstrap?.account.id == account else { return }
+    let detailKey = "library-detail:" + account + ":" + question.id
+    libraryDetailSnapshots[detailKey]?.question.eligible = eligible
+    for key in librarySnapshots.keys where key.hasSuffix("true") {
+      librarySnapshots[key]?.questions.removeAll { $0.id == question.id && eligible }
+    }
+    libraryVersion += 1
+    hasPendingWrites = true
+    Task { await sync(drainNewCommands: true) }
+  }
+
+  private func drainEligibility(account: String) async throws {
+    let key = "eligibility:" + account
+    let commands = try await disk.cached(key: key).flatMap { try JSONDecoder().decode([EligibilityCommand].self, from: $0) } ?? []
+    for command in commands {
+      guard bootstrap?.account.id == account else { throw CancellationError() }
+      do { let updated: LibraryQuestion = try await api.send("questions/" + command.questionId + "/eligibility", method: "PUT", body: EligibilityInput(revision: command.revision, eligible: command.eligible), command: command.id)
+        guard bootstrap?.account.id == account else { throw CancellationError() }
+        let detailKey = "library-detail:" + account + ":" + command.questionId
+        libraryDetailSnapshots[detailKey]?.question = updated
+        for key in librarySnapshots.keys { librarySnapshots[key]?.questions.removeAll { $0.id == updated.id && updated.eligible && key.hasSuffix("true") } }
+        libraryVersion += 1
+      }
+      catch let failure as APIError where [404,409].contains(failure.status) {
+        guard bootstrap?.account.id == account else { throw CancellationError() }
+        error = failure.message
+        try await disk.acknowledgeEligibility(account: account, command: command.id)
+        await preloadLibrary(force: true, onlySkipped: true)
+        continue
+      }
+      try await disk.acknowledgeEligibility(account: account, command: command.id)
+    }
   }
   func perform(_ action: () async throws -> Void) async {
     do { try await action() } catch is CancellationError {} catch {
@@ -50,6 +233,7 @@ import WidgetKit
   func launch() async {
     if fixture {
       seedFixture()
+      await preloadLibrary()
       return
     }
     for _ in 0..<25 {
@@ -63,6 +247,7 @@ import WidgetKit
       let cached = try? JSONDecoder.api.decode(Bootstrap.self, from: data)
     {
       bootstrap = cached
+      if let id = cached.challenge?.id, (try? await disk.pendingSkips(account: account).contains(id)) == true { bootstrap?.challenge = nil }
       settings = cached.settings
     }
     await refresh()
@@ -91,15 +276,18 @@ import WidgetKit
     refreshing = true
     defer { refreshing = false }
     do {
-      await sync()
       let result: Bootstrap = try await api.send("bootstrap")
+      try await acceptEpoch(result)
       bootstrap = result
+      let queuedSkips = try await disk.pendingSkips(account: result.account.id)
+      if let id = result.challenge?.id, locallySkipped[result.account.id]?.contains(id) == true || queuedSkips.contains(id) { bootstrap?.challenge = nil }
       settings = result.settings
       try SharedStore.setSecret(result.account.id, key: "account")
       try SharedStore.setSecret(Clerk.shared.user?.id, key: "subject")
       try await disk.cache(
-        key: "bootstrap:" + result.account.id, data: JSONEncoder().encode(result))
+        key: "bootstrap:" + result.account.id, data: JSONEncoder().encode(bootstrap ?? result))
       if result.account.status == "active" {
+        await preloadLibrary()
         if SharedStore.secret("widgetToken") == nil
           || (SharedStore.secret("widgetTokenExpires").flatMap { Date.fromAPI($0) } ?? .distantPast)
             < Date().addingTimeInterval(86400)
@@ -146,10 +334,17 @@ import WidgetKit
       throw APIError(code: "busy", message: "A question is already being prepared.", status: 409)
     }
     busy = true
+    defer { busy = false }
+    if !fixture {
+      await sync()
+      guard bootstrap?.account.id == account else { throw CancellationError() }
+      guard try await disk.pendingSkips(account: account).isEmpty else {
+        throw APIError(code: "skip_pending", message: "Your skip is saved. Connect to prepare the next question.", status: 0)
+      }
+    }
     preparationFailure = nil
     failedPreparation = nil
     failedPreparationSource = nil
-    defer { busy = false }
     if fixture {
       #if DEBUG
       if ProcessInfo.processInfo.arguments.contains("--fixture-slow-generation") {
@@ -170,7 +365,6 @@ import WidgetKit
       bootstrap?.challenge = challenge
       return challenge
     }
-    await sync()
     guard bootstrap?.account.id == account else { throw CancellationError() }
     if hasPendingWrites {
       throw APIError(code: "sync_pending", message: "Connect and sync your saved answer before starting another challenge.", status: 0)
@@ -182,13 +376,19 @@ import WidgetKit
       try await waitForJob(id)
       guard bootstrap?.account.id == account else { throw CancellationError() }
       challenge = try await api.send("challenges/" + id)
-    } else { throw APIError(code: "missing_question", message: "The question is not available yet. Check Today shortly.", status: 0) }
+    } else { throw APIError(code: "missing_question", message: "The question is not available yet. Check Home shortly.", status: 0) }
     guard bootstrap?.account.id == account else { throw CancellationError() }
-    await refresh()
+    bootstrap?.challenge = challenge
+    Task {
+      guard bootstrap?.account.id == account else { return }
+      await refresh()
+    }
     return challenge
   }
   func waitForJob(_ id: String) async throws {
-    for _ in 0..<45 {
+    let started = Date()
+    let deadline = started.addingTimeInterval(90)
+    while Date() < deadline {
       try Task.checkCancellation()
       let job: Job = try await api.send("jobs/" + id)
       if job.status == "completed" { return }
@@ -196,7 +396,7 @@ import WidgetKit
         throw APIError(
           code: "job_failed", message: job.error ?? "The operation stopped. Try again.", status: 0)
       }
-      try await Task.sleep(for: .seconds(2))
+      try await Task.sleep(for: .milliseconds(Date().timeIntervalSince(started) < 10 ? 500 : 1500))
     }
     throw APIError(
       code: "job_pending", message: "Still preparing. You can leave and return later.", status: 0)
@@ -240,20 +440,58 @@ import WidgetKit
   }
   func save(_ challenge: Challenge, answer: String, completing: Bool = false) async throws {
     guard let account = bootstrap?.account.id else { return }
+    guard !isLocallySkipped(account: account, id: challenge.id) else { return }
     try await disk.save(account: account, id: challenge.id, answer: answer, completing: completing)
     saveStatus = "Saved on this device"
-    hasPendingWrites = true
+    hasPendingWrites = try await !disk.pending(account: account).isEmpty
   }
-  func sync() async {
-    guard let account = bootstrap?.account.id, !syncing, !fixture else { return }
-    syncing = true
-    defer { syncing = false }
+  func waitForCurrentSync() async { if let syncTask { await syncTask.value } }
+  func sync(challengeID: String? = nil, drainNewCommands: Bool = false) async {
+    if let running = syncTask {
+      await running.value
+      // A caller preparing a submission must drain edits queued during the previous pass.
+      if challengeID != nil || drainNewCommands { await sync(challengeID: challengeID) }
+      return
+    }
+    let task = Task {
+      defer { syncTask = nil }
+      await drainSync(challengeID: challengeID)
+    }
+    syncTask = task
+    await task.value
+  }
+  private func drainSync(challengeID: String?) async {
+    guard let account = bootstrap?.account.id, !fixture else { return }
     do {
-      let drafts = try await disk.pending(account: account)
+      let queuedSkips = try await disk.pendingSkips(account: account)
+      let queuedEligibility = try await disk.cached(key: "eligibility:" + account).flatMap { try JSONDecoder().decode([EligibilityCommand].self, from: $0) } ?? []
+      let queuedDrafts = try await disk.pending(account: account)
+      hasPendingWrites = !queuedSkips.isEmpty || !queuedEligibility.isEmpty || !queuedDrafts.isEmpty
+      let remote: Bootstrap = try await api.send("bootstrap")
+      try await acceptEpoch(remote)
+      guard bootstrap?.account.id == account else { return }
+      let skips = try await disk.pendingSkips(account: account)
+      for id in skips {
+        do {
+          let _: EmptyResponse = try await api.send("challenges/" + id + "/skip", method: "POST")
+        } catch let failure as APIError where failure.status == 404 {
+          // An already removed attempt needs no further mutation.
+        }
+        guard bootstrap?.account.id == account else { return }
+        try await disk.acknowledgeSkip(account: account, id: id)
+        locallySkipped[account, default: []].insert(id)
+        if conflict?.id == id { conflict = nil }
+        if bootstrap?.challenge?.id == id { bootstrap?.challenge = nil }
+      }
+      if !skips.isEmpty { await preloadLibrary(force: true, onlySkipped: true) }
+      try await drainEligibility(account: account)
+      let drafts = try await disk.pending(account: account).filter { challengeID == nil || $0.challengeID == challengeID }
       if let review = drafts.first(where: { $0.conflict }), conflict == nil {
         conflict = try await api.send("challenges/" + review.challengeID)
       }
       for draft in drafts where !draft.conflict {
+        let interviewKey = "interview:" + account + ":" + draft.challengeID + ":pending"
+        if let data = try await disk.cached(key: interviewKey), (try? JSONDecoder().decode(PendingInterviewCommand.self, from: data)) != nil { continue }
         do {
           saveStatus = "Syncing"
           let receiptData = try await disk.cached(
@@ -284,6 +522,7 @@ import WidgetKit
             try await disk.acknowledge(
               account: account, sent: draft,
               revision: result.session?.revision ?? draft.revision + 1)
+            awaitLibraryResults(challengeID: draft.challengeID, account: account)
           } else {
             let result: RevisionResponse = try await api.send(
               "challenges/\(draft.challengeID)/draft", method: "PUT", body: write,
@@ -300,7 +539,10 @@ import WidgetKit
           break
         }
       }
-      hasPendingWrites = try await !disk.pending(account: account).isEmpty
+      let pendingDrafts = try await !disk.pending(account: account).isEmpty
+      let pendingSkips = try await !disk.pendingSkips(account: account).isEmpty
+      let pendingEligibility = try await disk.cached(key: "eligibility:" + account).flatMap { try JSONDecoder().decode([EligibilityCommand].self, from: $0) } ?? []
+      hasPendingWrites = pendingDrafts || pendingSkips || !pendingEligibility.isEmpty
     } catch { self.error = error.localizedDescription }
   }
   func resolveConflict(keepLocal: Bool) async {
@@ -334,17 +576,23 @@ import WidgetKit
     bootstrap?.challenge = nil
     return completed
   }
-  func skip(_ id: String) async {
+  func skip(_ id: String, answer: String? = nil) async {
+    guard let account = bootstrap?.account.id else { return }
     await perform {
-      if !fixture {
-        let _: EmptyResponse = try await api.send("challenges/\(id)/skip", method: "POST")
-      }
+      if !fixture { try await disk.queueSkip(account: account, id: id, answer: answer) }
+      guard bootstrap?.account.id == account else { return }
+      locallySkipped[account, default: []].insert(id)
+      if bootstrap?.challenge?.id == id { bootstrap?.challenge = nil }
       presented = nil
-      await refresh()
+      if let bootstrap { try? await disk.cache(key: "bootstrap:" + account, data: JSONEncoder().encode(bootstrap)) }
+      if !fixture {
+        hasPendingWrites = true
+        Task { await sync(challengeID: id) }
+      }
     }
   }
   func updateSettings() async throws {
-    settings.model = "google/gemini-3.1-flash-lite"
+    settings.model = "google/gemini-2.5-flash-lite"
     settings.engineeringLevel = settings.selectedLevel
     if !fixture {
       let _: PracticeSettings = try await api.send("settings", method: "PUT", body: settings)
@@ -404,6 +652,8 @@ import WidgetKit
     try SharedStore.save(WidgetSnapshot(challenge: nil, updatedAt: ""))
     WidgetCenter.shared.reloadAllTimelines()
     UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+    libraryWarmTask?.cancel(); libraryWarmTask = nil; libraryWarmAccount = nil
+    librarySnapshots = [:]; libraryDetailSnapshots = [:]; librarySessions = [:]; libraryCoverage = []
     bootstrap = nil
     preparationFailure = nil
     failedPreparation = nil
@@ -432,6 +682,22 @@ import WidgetKit
     if ProcessInfo.processInfo.arguments.contains("--fixture-dashboard") {
       let recent = Challenge(difficulty: "easy", id: "recent", lifecycle: "completed", title: "Design a reliable job queue", prompt: "", topic: "Backend", completedAt: "2026-09-09T10:30:00Z")
       memory = MemoryResponse(statistics: .init(completed: 12, lastSevenDays: 4, asOf: ISO8601DateFormatter().string(from: Date())), sessions: [recent], patterns: [])
+    }
+    #endif
+    #if DEBUG
+    if ProcessInfo.processInfo.arguments.contains("--fixture-interview-history") {
+      challenge.lifecycle = "in_progress"
+      var current = challenge.prompt
+      var turns: [InterviewTurn] = []
+      for index in 1...3 {
+        let short = index == 1 && ProcessInfo.processInfo.arguments.contains("--fixture-short-turn")
+        let next = short ? "Hello there." : "Follow-up \(index): How would your design handle failure in component \(index)?"
+        turns.append(InterviewTurn(id: "history-\(index)", ordinal: index - 1, kind: "answer", prompt: current,
+          text: short ? "Hello interviewer" : "Decision \(index). " + String(repeating: "Use durable records, bounded retries and explicit ownership. Explain the recovery path and its trade-offs.\n\n", count: 4),
+          createdAt: "2026-09-09T18:00:00Z", jobId: "history-\(index)", status: "completed", result: InterviewResponse(outcome: "follow_up", text: next)))
+        current = next
+      }
+      challenge.interview = InterviewState(prompt: current, turns: turns)
     }
     #endif
     bootstrap = Bootstrap(

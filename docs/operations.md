@@ -135,3 +135,20 @@ Signed Release version `2.0.0` build `2` archived to `/tmp/drillbit-testflight/D
 ## Interview development rollout — 9 September 2026
 
 D1 backup precedes additive migration `0006_interview.sql`. Development Worker `43ca2338-28c9-486b-8e36-04ca2b1c5db4` supports ordered interview turns and response retries while retaining older clients. Final signed native distribution was simulator-only. A synthetic live workflow completed; its isolated account/data was removed. Interview jobs have no automatic inference retries; users retry the response while the original answer remains committed. Keep the additive table when rolling back compatible Worker code. The new client requires interview-capable backend endpoints.
+
+Development interview-style compatibility update (9 September 2026): Worker `aaccb3da-6ba7-4089-a45b-163b5a1b678e` accepts optional per-turn style and atomically records it with the accepted turn. No migration. Health returned 200. Native distribution for this iteration is simulator only.
+
+
+10 September 2026: development Worker version `2de0e125-147e-4c43-b3c9-c28b24b18792` selects Gemini 2.5 Flash-Lite, reasoning disabled, latency-sorted providers. Health returned 200 after deployment. Existing database and stored answers are unchanged. Old 3.1 client settings remain accepted and normalized. Simulator distribution only.
+
+### Interview stream rollout (10 September 2026)
+
+Migration `0007_interview_streams` was applied to development D1 after backup `.local/before-interview-stream-20260910.sql`. Deploy the backend before installing the streaming client. The stream endpoint only subscribes to an existing account-owned turn; it never triggers another paid request. Reconnect interrupted subscriptions through Retry. Older clients continue reading completed challenge/interview detail. Stream text is provisional and deleted with its owning job; never use it as evidence of a completed interviewer response. No TestFlight upload was performed.
+
+### Library rollout and practice reset — 10 September 2026
+
+Development database: `drillbit-development` (`872d5aed-a356-4b2b-a479-aa3042478aee`). Backup: ignored `.local/before-library-reset-20260910.sql`; never publish the backup because it includes private practice/configuration data. Migration 0008 adds questions, attempt links, idempotent eligibility commands and the practice epoch/maintenance gate.
+
+The authorized reset cleared challenges and their dependent practice content, old companion commands, non-account-deletion jobs, questions and AI-run history. It retained accounts, settings, invitations, credentials, device registrations and usage-limit accounting. Settings focus was normalized to System design. The reset advanced `practice_epoch.value`; new native builds clear old account-scoped practice queues before replay. `enabled=0` pauses scheduled reconciliation and practice mutations; `enabled=1` resumes them. Old queued jobs cannot recreate attempts after reset because result writes require surviving jobs/challenges.
+
+Deploy compatible backend first, then install the simulator build. Latest library rollout version: `d0c78072-c3d1-421d-a944-fadd65f22527`. Provider remains Gemini 2.5 Flash Lite. No TestFlight distribution was performed. Future resets require an explicit authorized scope, verified development target, backup, maintenance gate, epoch advance and post-reset configuration/data counts.

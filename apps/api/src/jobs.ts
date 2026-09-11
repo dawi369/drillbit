@@ -1,3 +1,7 @@
+import { z } from "zod";
+import { historicalSnapshot } from "./history";
+import { concepts } from "./taxonomy";
+import { selectConcept } from "./library";
 import { interviewSchemaFor, normalizeInterviewResult, interviewWrapUp } from "./interview";
 import { interventionFor } from "./companion-contract";
 import {
@@ -18,20 +22,16 @@ import {
   settingsSchema,
   type Settings,
 } from "./domain";
-import { structured } from "./ai";
+import { structured, streamedInterview } from "./ai";
 import { activeChallenge, detail, dispatch, type Job } from "./store";
 import type { Env } from "./platform";
 export async function runJob(env: Env, id: string) {
-  const job = await env.DB.prepare("SELECT * FROM jobs WHERE id=?")
-    .bind(id)
-    .first<Job>();
+  const job = await env.DB.prepare("SELECT j.*,a.status AS account_status,a.subject AS account_subject FROM jobs j JOIN accounts a ON a.id=j.account_id WHERE j.id=?")
+    .bind(id).first<Job & {account_status: string; account_subject: string; created_at: string}>();
   if (!job || job.status === "completed" || job.status === "cancelled") return;
-  const account = await env.DB.prepare(
-    "SELECT status,subject FROM accounts WHERE id=?",
-  )
-    .bind(job.account_id)
-    .first<{ status: string; subject: string }>();
-  if (!account) return;
+  const account = {status: job.account_status, subject: job.account_subject};
+  const queuedAt = Date.parse(job.created_at);
+  if (Number.isFinite(queuedAt)) console.info(JSON.stringify({event: "inference_job_start", kind: job.kind, queuedMs: Math.max(0, Date.now() - queuedAt)}));
   if (job.kind === "delete_account") {
     if (!env.CLERK_SECRET_KEY)
       throw new Error("Clerk deletion is not configured");
@@ -68,44 +68,66 @@ export async function runJob(env: Env, id: string) {
     instruction?: string;
     interviewStyle?: string;
     turnId?: string;
+    primaryConceptId?: string;
     followUp?: unknown;
   }>(job.input);
   input.settings = normalizeSettings(input.settings);
   const now = timestamp();
   let data: unknown;
   if (job.kind === "generate") {
+    const selection = await selectConcept(env,job.account_id,input.settings.engineeringLevel!,input.primaryConceptId);
+    const restored = !input.instruction && !input.followUp ? await env.DB.prepare("SELECT * FROM questions WHERE account_id=? AND eligible=1 AND json_extract(data,'$.engineeringLevel')=? AND (? IS NULL OR json_extract(data,'$.primaryConceptId')=?) ORDER BY eligibility_updated_at,id LIMIT 1").bind(job.account_id,input.settings.engineeringLevel!,input.primaryConceptId??null,input.primaryConceptId??null).first<{id:string;data:string}>() : null;
     const recent = await env.DB.prepare(
-      "SELECT c.data,r.data AS reflection FROM challenges c LEFT JOIN reflections r ON r.challenge_id=c.id WHERE c.account_id=? AND c.lifecycle IN ('completed','skipped') ORDER BY c.created_at DESC LIMIT 20",
+      "SELECT c.data,c.lifecycle,c.completed_at,r.data AS reflection FROM challenges c LEFT JOIN reflections r ON r.challenge_id=c.id WHERE c.account_id=? AND c.lifecycle IN ('completed','skipped') ORDER BY c.created_at DESC LIMIT 20",
     )
       .bind(job.account_id)
       .all();
-    data = await structured(
+    data = restored ? JSON.parse(restored.data) : await structured(
       env,
       job.account_id,
       input.settings,
       "generate",
       {
         settings: input.settings,
-        kind: input.kind ?? "auto",
+        historicalSnapshot: await historicalSnapshot(env, job.account_id),
+        kind: "design",
+        selection,
+        taxonomy: concepts,
+        metadataInstructions: "Design a system-design problem centrally testing selection.primaryConceptId. Return that exact primaryConceptId and 0–2 distinct secondaryConceptIds from the taxonomy. scenario is a 1–3 word noun phrase. tagEvidence is the sole tag list: include the primary concept exactly once and at most two secondary concepts. Each entry has requirementIndex: 0 for prompt, or 1-based index into constraints. Concepts classify the problem, never introduce hidden grading requirements.",
         instruction: input.instruction,
         followUp: input.followUp,
-        recent: recent.results,
+
       },
-      questionGenerationSchema,
+      questionGenerationSchema.safeExtend({primaryConceptId:z.literal(selection.primaryConceptId)}),
     );
     const generated = data as import("zod").z.infer<
       typeof questionGenerationSchema
     >;
+    if (!restored) {
+      if(generated.primaryConceptId!==selection.primaryConceptId)throw new Error("question_concept_mismatch");
+
+    }
+    const questionID=restored?.id??id;
     // Derive the private checklist from visible requirements rather than trusting a second generated rubric.
     data = {
       ...generated,
+      questionId: questionID,
+      topic: "System design",
+      secondaryConceptIds: generated.tagEvidence.filter(e=>e.conceptId!==generated.primaryConceptId).map(e=>e.conceptId),
+      conceptIds: [generated.primaryConceptId,...generated.tagEvidence.filter(e=>e.conceptId!==generated.primaryConceptId).map(e=>e.conceptId)],
+      scenario: generated.scenario.trim().replace(/\s+/g," "),
+      scenarioKey: generated.scenario.trim().replace(/\s+/g," ").toLowerCase(),
+      taxonomyVersion: 1,
+      selectionReason: restored ? "A question you added back to your pool." : selection.reason,
+      selectionSnapshot: { ...selection, requestedLevel: input.settings.engineeringLevel, instruction: input.instruction??"", recent: recent.results.slice(0,10).map(r=>{const q=JSON.parse(r.data as string);return {title:q.title,primaryConceptId:q.primaryConceptId,scenario:q.scenario};}) },
       evaluationCriteria: [generated.prompt, ...generated.constraints],
-      prompt: generated.constraints.length
+      prompt: !restored && generated.constraints.length
         ? generated.prompt +
           "\n\nConstraints\n" +
           generated.constraints.map((value) => "• " + value).join("\n")
         : generated.prompt,
     };
+    if(!restored && await env.DB.prepare("SELECT id FROM questions WHERE account_id=? AND json_extract(data,'$.prompt')=? LIMIT 1").bind(job.account_id,(data as {prompt:string}).prompt).first())throw new Error("duplicate_question");
     const lifecycle =
       input.availableAt && input.availableAt > now ? "prepared" : "ready";
     // An in-progress session always wins. A concurrent generation may become an unused prepared candidate.
@@ -127,13 +149,16 @@ export async function runJob(env: Env, id: string) {
           promptVersion: "practice-v2",
           difficulty: input.settings.difficulty,
           engineeringLevel: input.settings.engineeringLevel,
-          interviewStyle: input.interviewStyle ?? "standard",
+          interviewStyle: "standard",
         }),
         now,
         input.availableAt ?? now,
         id,
         job.account_id,
       ),
+      env.DB.prepare("INSERT OR IGNORE INTO questions(id,account_id,data,created_at,eligibility_updated_at) SELECT ?,account_id,data,created_at,created_at FROM challenges WHERE id=?").bind(questionID,id),
+      env.DB.prepare("INSERT OR IGNORE INTO question_attempts(challenge_id,question_id) SELECT id,? FROM challenges WHERE id=?").bind(questionID,id),
+      env.DB.prepare("UPDATE questions SET eligible=0,eligibility_revision=eligibility_revision+1 WHERE id=? AND EXISTS(SELECT 1 FROM question_attempts WHERE challenge_id=?)").bind(questionID,id),
       env.DB.prepare(
         "INSERT OR IGNORE INTO sessions(challenge_id,updated_at) SELECT id,? FROM challenges WHERE id=?",
       ).bind(now, id),
@@ -145,7 +170,10 @@ export async function runJob(env: Env, id: string) {
   }
   if (!job.challenge_id) return;
   if (job.kind === "interview") {
-    const output = interviewWrapUp(input.context, input.action?.kind ?? "answer") ?? normalizeInterviewResult(await structured(env,job.account_id,input.settings,"interview",{...input.context as object, action: input.action},interviewSchemaFor(input.action?.kind ?? "answer")));
+    const output = await streamedInterview(env,job.account_id,input.settings,{...input.context as object, action: input.action},interviewSchemaFor(input.action?.kind ?? "answer"), async text => {
+      const saved = await env.DB.prepare("INSERT INTO interview_streams(job_id,text) SELECT ?,? WHERE EXISTS(SELECT 1 FROM jobs j JOIN challenges c ON c.id=j.challenge_id JOIN accounts a ON a.id=j.account_id WHERE j.id=? AND j.status='running' AND c.lifecycle='in_progress' AND a.status='active') ON CONFLICT(job_id) DO UPDATE SET text=excluded.text").bind(id,text,id).run();
+      if (!saved.meta.changes) throw new Error("interview_cancelled");
+    });
     const isAnswer = ["answer","continue"].includes(input.action?.kind ?? "");
     if ((isAnswer && output.outcome === "reply") || (!isAnswer && output.outcome !== "reply")) throw new Error("Invalid interview outcome");
     await env.DB.batch([
@@ -264,6 +292,7 @@ export class PracticeWorkflow extends WorkflowEntrypoint<
   }
 }
 export async function reconcile(env: Env) {
+  if ((await env.DB.prepare("SELECT enabled FROM practice_epoch WHERE id=1").first<{enabled:number}>())?.enabled === 0) return;
   const now = timestamp(),
     soon = new Date(Date.now() + 15 * 60000).toISOString(),
     activeSince = new Date(Date.now() - 7 * 86400000).toISOString();

@@ -13,7 +13,7 @@ struct PracticeSettings: Codable, Equatable, Sendable {
   var dailyMinutes = 540
   var reminderEnabled = false
   var aiMode = "managed"
-  var model = "google/gemini-3.1-flash-lite"
+  var model = "google/gemini-2.5-flash-lite"
 }
 struct SessionDraft: Codable, Sendable {
   var answer: String
@@ -51,6 +51,11 @@ struct RequestStatus: Codable, Sendable {
   var status: String
 }
 struct Challenge: Codable, Identifiable, Sendable {
+  var questionId: String?
+  var scenario: String?
+  var primaryConceptId: String?
+  var conceptIds: [String]?
+  var selectionReason: String?
   var interviewStyle: InterviewStyle?
   var interview: InterviewState?
   var engineeringLevel: String?
@@ -90,6 +95,7 @@ struct Job: Codable, Identifiable, Sendable {
   var challengeId: String?
 }
 struct Bootstrap: Codable, Sendable {
+  var practiceEpoch: String?
   struct Account: Codable, Sendable {
     var id: String
     var status: String
@@ -224,6 +230,7 @@ struct AdoptionInput: Codable, Sendable {
   var revision: Int
 }
 struct PreparationInput: Codable {
+  var primaryConceptId: String? = nil
   var interviewStyle: InterviewStyle? = nil
   var focus: String
   var kind: String
@@ -291,7 +298,7 @@ enum InterviewStyle: String, CaseIterable, Codable, Identifiable, Sendable {
   var id: String { rawValue }
   var title: String { switch self { case .quick: "Quick"; case .standard: "Standard"; case .inDepth: "In-depth" } }
   var explanation: String { switch self {
-    case .quick: "One question and a focused follow-up."
+    case .quick: "Brief, focused follow-ups."
     case .standard: "Explore your approach and its trade-offs."
     case .inDepth: "More follow-ups that challenge your assumptions."
   } }
@@ -311,6 +318,7 @@ struct InterviewTurn: Codable, Identifiable, Sendable {
   var status: String
   var error: String?
   var result: InterviewResponse?
+  var partial: String? = nil
   var pending: Bool { ["pending", "running"].contains(status) }
 }
 struct InterviewState: Codable, Sendable {
@@ -324,6 +332,18 @@ struct InterviewInput: Codable, Sendable {
   var kind: String
   var revision: Int
   var text: String = ""
+  var style: InterviewStyle? = nil
+  var saveDraft: Bool? = nil
+}
+
+/// A finalized user answer, captured against the active account and prompt.
+/// Provisional speech stays inside the future voice adapter and never enters this API.
+struct FinalizedInterviewAnswer: Codable, Sendable {
+  var id: UUID
+  var account: String
+  var challengeID: String
+  var promptID: String
+  var text: String
 }
 
 struct PendingInterviewCommand: Codable, Sendable {
@@ -331,3 +351,47 @@ struct PendingInterviewCommand: Codable, Sendable {
   var input: InterviewInput
   var retryTurn: String?
 }
+
+/// A reading projection of durable turns. A follow-up belongs to the next exchange only.
+struct InterviewExchange: Identifiable, Sendable {
+  var id: String
+  var prompt: String
+  var turns: [InterviewTurn] = []
+  var hasAnswer: Bool { turns.contains { $0.kind == "answer" } }
+  static func document(original: String, state: InterviewState) -> [Self] {
+    var result = [Self(id: "original", prompt: original)]
+    for turn in state.turns.sorted(by: { $0.ordinal < $1.ordinal }) {
+      result[result.count - 1].turns.append(turn)
+      if ["answer", "continue"].contains(turn.kind), turn.result?.outcome != "wrap_up" {
+        result.append(Self(id: turn.id, prompt: turn.result?.text ?? turn.partial ?? ""))
+      }
+    }
+    return result
+  }
+}
+struct InterviewReadingState: Codable, Sendable {
+  var expandedAnswers: Set<String>? = nil
+  var collapsed: Set<String> = []
+  var offset: Double = 0
+}
+
+struct InterviewStreamSnapshot: Decodable { var status: String; var text: String }
+
+struct PracticeConcept: Codable, Identifiable, Sendable { var id: String; var label: String; var category: String; var aliases: [String] }
+struct TaxonomyResponse: Codable, Sendable { var version: Int; var concepts: [PracticeConcept] }
+struct LibraryQuestion: Codable, Identifiable, Sendable, Equatable {
+  var id: String; var title: String; var prompt: String; var scenario: String; var engineeringLevel: String
+  var primaryConceptId: String; var conceptIds: [String]; var eligible: Bool; var eligibilityRevision: Int
+  var lastActivity: String?; var attemptCount: Int?
+  var levelLabel: String { EngineeringLevel.choices.first { $0.0 == engineeringLevel }?.1 ?? engineeringLevel }
+}
+struct LibraryPage: Codable, Sendable { var questions: [LibraryQuestion]; var nextCursor: String? }
+struct LibraryDetail: Codable, Sendable { var question: LibraryQuestion; var attempts: [Challenge]; var nextCursor: String? }
+struct CoverageResponse: Codable, Sendable {
+  struct Entry: Codable, Sendable { var conceptId: String; var completedAttempts: Int; var distinctQuestions: Int; var lastPractised: String? }
+  var concepts: [Entry]
+}
+struct EligibilityCommand: Codable, Identifiable, Sendable {
+  var id: String; var questionId: String; var revision: Int; var eligible: Bool
+}
+struct EligibilityInput: Codable { var revision: Int; var eligible: Bool }

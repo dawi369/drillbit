@@ -1,6 +1,8 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { Fault, timestamp } from "./domain";
 export interface Env {
+  /** Request-scoped lifetime extension; never persisted or used as job state. */
+  defer?: (work: Promise<unknown>) => void;
   DB: D1Database;
   JOBS: Workflow<{ jobId: string }>;
   CLERK_ISSUER: string;

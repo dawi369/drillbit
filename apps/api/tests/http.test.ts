@@ -305,5 +305,7 @@ it("serves revision-checked interview turns through the authenticated public con
  expect(response.status).toBe(202);expect(wire.InterviewState.safeParse(await response.json()).success).toBe(true);
  const replay=await request(`challenges/${id}/interview`,subject,"POST",input,cmd);expect(replay.status).toBe(202);
  const missing=await request(`challenges/${id}/interview`,subject,"POST",input);expect(missing.status).toBe(400);
+ const snapshots=await import("../../../packages/contracts/fixtures/interview-stream.json");for(const snapshot of snapshots.default)expect(wire.InterviewStreamSnapshot.safeParse(snapshot).success).toBe(true);
  const fixture=await import("../../../packages/contracts/fixtures/interview.json");expect(wire.InterviewState.safeParse(fixture.default).success).toBe(true);
+ const inputFixture=await import("../../../packages/contracts/fixtures/interview-input.json");expect(wire.InterviewInput.parse(inputFixture.default).style).toBe("in_depth");
 });

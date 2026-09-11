@@ -172,3 +172,154 @@ Conversation navigation refinement: moved the workspace's top-right Conversation
 Removed topic, engineering level and interview style from the preview reading surface. Title/prompt now explicitly retain their multiline intrinsic height within a full-size scroll view; the Start/Choose another footer stays safe-area anchored. Shared centered loading status now covers preview generation, Today generation, interviewer responses and example preparation.
 
 Signed iPhone 17 Pro simulator checks passed: selected style remains available in the overflow menu after its removal from preview; largest Dynamic Type preview actually changes scroll position; a long normal-size prompt can scroll to its final line above Start; loading transitions into the minimal preview. Screenshots of centered loading, normal preview, long-prompt ending and accessibility scrolling were reviewed. Results: `/tmp/drillbit-preview-layout.xcresult` (style passed; initial scroll gesture incorrectly landed on the large footer), `/tmp/drillbit-preview-scroll3.xcresult` (corrected gesture within the reading viewport passed), `/tmp/drillbit-preview-final.xcresult` (two tests passed). No backend changes, physical-device verification or TestFlight upload for this adjustment.
+
+## Interview style, focus stability and Share recovery — 9 September 2026
+
+- Workspace … → Interview style reuses the native checkmarked selection list. Choice persists per account/attempt locally and is carried by the next explicit command; backend atomically records the selected style with the accepted turn and uses it in generation context. Old clients omit the optional field and retain the current style. No migration or global-settings change.
+- Removed the workspace save-status caption. Keyboard focus no longer collapses the question; the disclosure remains user-controlled.
+- Reproduced the reported Share message in the real native controller/outbox path using injected HTTP transport: overlapping autosave produced zero submissions and “Your draft is saved. Connect and sync before sharing.” (`/tmp/drillbit-share-red2.log`). Sync previously returned immediately when another pass was running. It now awaits that pass, drains this challenge, and checks this draft rather than all account pending writes. Retry retains and resubmits a preflight-failed action. Drafts/conflicts and ambiguous idempotent commands remain preserved.
+- **18 native tests passed**, including three submission scenarios (in-flight autosave with a newer edit, offline failure then explicit Retry, unrelated unsynced work), style cache restoration and style in the submitted command. Tests use the real controller, DiskStore and HTTP serialization with synthetic transport, not live Clerk/Gemini. `/tmp/drillbit-share-style-final.xcresult`.
+- **52 D1/API tests passed**, covering style capture, idempotency, stale-revision rejection and omitted-field compatibility (`/tmp/drillbit-style-api-final.log`). Shared request fixture validation subsequently passed all 11 HTTP tests (`/tmp/drillbit-style-http-final.log`). TypeScript and diff checks passed.
+- **Pro simulator UI:** full Share/follow-up/help/Finish journey passed (`/tmp/drillbit-share-style.xcresult`); editable style, retained selection after reopening, and question remaining visible during typing passed (`/tmp/drillbit-share-style-final.xcresult`). Picker and keyboard screenshots visually reviewed. Initial style UI assertion had an incorrect literal prompt; corrected to a stable accessibility identifier. Physical device and spoken VoiceOver remain unverified.
+- Compatible development Worker deployed as `aaccb3da-6ba7-4089-a45b-163b5a1b678e`; live health returned 200. No live model request was needed for these changes. Simulator only, no TestFlight upload.
+
+## Continuous, manually foldable interview document — 9 September 2026
+
+Implemented the approved second-council direction: one scroll surface for original specification, question/answer/help exchanges and a growing draft. Exchange headings fold manually, with overflow-only trailing fade and separate chevron; two-line native truncation replaces the fade at accessibility sizes. Header carries the actual title; Finish moved into …; original-only Full question remains available. Active history no longer needs a separate Conversation sheet. Submitted answers and inline wrap-up preserve the document.
+
+- **20 native tests passed**, including projection ordering, one copy of each follow-up, assistance grouped with its question, failed-answer retention and account-scoped folding/offset persistence. Existing submission race, offline Retry and unrelated-pending-draft regressions remain green.
+- **Signed Pro simulator verification passed**: Share → follow-up → inline previous answer → help with unchanged draft → wrap-up → Finish cancel/confirm; manual fold + close/resume with draft/position preserved; delayed wrap-up while reading history without a viewport jump; a separate delayed follow-up check also preserved position and showed New follow-up; long multiline typing retained the entire value and grew the editor; largest Dynamic Type editing and original-question sheet return stayed reachable. Main evidence: `/tmp/drillbit-document-final.xcresult` (20 native tests, four UI tests), `/tmp/drillbit-document-followup.xcresult` (targeted follow-up journey).
+- Visually reviewed light-mode folded/history and response screens, dark long-answer keyboard, and largest text with keyboard/full question. The SwiftUI multiline field initially failed the long-answer sizing/caret check. A small UITextView bridge now disables internal scrolling, measures growing content, and reports caret geometry to the parent scroller. Its focus lifecycle is owned by the native delegate; the final long-answer test checks complete text retention as well as height growth.
+- Disclosure choices are never changed by typing, requests or response arrival. A person scrolling back gets an explicit return/new-response action rather than a forced jump or an enabled offscreen Share action. Presentation offset is local, device-specific convenience state.
+- No backend/API migration or deployment for this document change. No TestFlight upload. Physical-device, spoken VoiceOver, and dedicated Reduced Motion/Reduced Transparency setting runs remain unverified; this layout adds no custom animation or translucent surface.
+
+
+## Inline original question and Share freeze — 9 September 2026
+
+Removed the duplicate original-question modal and its redundant inline link. Full question in … expands the original exchange and scrolls to the document’s top edge, including after keyboard dismissal. The entire specification scrolls with the document; draft and history remain in place.
+
+Reproduced the user’s live-simulator Share freeze. A three-second process sample (`/tmp/drillbit-share-hang.sample.txt`) placed every main-thread sample in `GrowingInterviewEditor.updateUIView` → `UITextView.resignFirstResponder` → SwiftUI responder-graph re-entry / AttributeGraph cycle reporting. UIKit focus/editability reconciliation now runs on the next main-queue turn with current bindings, outside the view update. This fixes a UI-thread stall before submission rather than changing the backend or bypassing draft synchronization.
+
+Verification: 20 native tests passed, including overlapping autosave, offline retry and unrelated pending-draft submission cases (`/tmp/drillbit-inline-share.xcresult`). The interview Share → follow-up → ask → wrap-up → Finish cancel/confirm UI journey passed in that run; its initial two navigation failures were fixed by scrolling to the document edge. Both final navigation regressions then passed (`/tmp/drillbit-inline-jump.xcresult`): an 18-paragraph original specification scrolls through to the unchanged draft, Full question returns to the heading whether folded or expanded, and largest Dynamic Type supports expand → fold → type → Share without a hang. Screenshots were inspected.
+
+Live-service verification: launched the updated signed-in simulator, resumed the preserved user draft, focused its editor and shared it successfully. The backend returned a grounded follow-up visible inline. Full question expanded the original specification at the top without a modal. No backend changes/deployment or TestFlight upload; no physical-device verification. The simulator is left running for testing.
+
+
+## Keep shared answers beside replies — 9 September 2026
+
+Question disclosures now hide only question wording. Sent answers remain visible; completed answer snapshots appear immediately above the interviewer follow-up in the same block. Accepted Share folds the question just answered; failed submission keeps the draft and disclosure intact. A divider separates the original question from the initial answer editor. No backend or persistence contract changes.
+
+Simulator verification: `/tmp/drillbit-answer-pair.xcresult` passed the complete interview journey and largest Dynamic Type editor journey. Assertions verify automatic original-question collapse, the submitted answer remaining hittable beside its response, and continued visibility when the follow-up is manually folded; clarification preserves the next draft and Finish cancel/confirm still works. The follow-up screenshot was visually inspected. Normal signed-in simulator relaunched; no TestFlight upload or physical-device verification.
+
+
+## Response-driven answer folding and faster model — 10 September 2026
+
+20 native tests and the complete interview UI journey passed (`/tmp/drillbit-collapse-speed.xcresult`). The journey verifies that a completed answer is collapsed, its row stays reachable beside the reply, and tapping restores the full text. The original disclosure now previews the title. Pending/failed answers remain expanded; manual expansion persists in an optional cache field.
+
+52 backend/D1 tests and TypeScript checking passed, including fixed-model/latency-routing/reasoning-off request assertions and legacy model acceptance. In a two-prompt synthetic OpenRouter comparison, 2.5 Flash-Lite completed in 0.84/0.51 seconds at $0.0000208/$0.0000174, versus 3.1 Flash-Lite at 0.91/0.82 seconds and $0.0000765/$0.0000725. Both used latency routing; 2.5 had reasoning disabled and 3.1 used minimal reasoning. This small sample establishes neither global fastest-model status nor production percentile latency.
+
+Live checks using the app’s prompts and actual generation/interview schemas returned valid, coherent outputs: question generation 1.41 seconds ($0.00014); interview follow-up 0.49 seconds ($0.0000636). A separate interview sample took 0.48 seconds. These are direct provider times, excluding workflow dispatch and client polling. Broad level-specific quality evaluation is not complete; 2.5 may offer less precise follow-ups than 3.1. Routing semantics: https://openrouter.ai/docs/guides/routing/provider-selection . Backend deployed with health 200; simulator installed; no TestFlight or physical-device verification.
+
+
+## Home, compact send and voice input foundation — 10 September 2026
+
+Home replaces Today, retaining practice counts and question/preparation controls while removing the latest-session summary. The send/finish control uses a 44-point SF Symbol with explicit accessibility labels; existing disabled states and confirmation remain. Screenshots of Home and keyboard-open sending were inspected.
+
+`/tmp/drillbit-home-voice.xcresult`: 21 native tests and two UI journeys passed (Home dashboard and complete interview flow). The new finalized-answer test checks account rejection, written-draft preservation, stale prompt rejection, duplicate/mismatched event handling and restored answer/reply history. These voice-input tests use a fixture response, not live audio or a live voice service. The existing backend still owns response generation and turn storage. No API migration/deployment or TestFlight upload was needed. Final simulator build includes the remaining Home recovery-copy rename.
+
+
+## Resume disclosure timing and compact question preview — 10 September 2026
+
+Restores local disclosure choices before showing interactive document content; network hydration no longer applies saved choices after user interaction. Collapsed original question displays a two-line title and up to three description lines. AI answer waiting/sharing labels are inline text, without large loading indicators or spinners.
+
+`/tmp/drillbit-resume-final.xcresult`: two UI journeys passed — history restoration/late response and full send/ask/review/Finish flow. Checks include restored collapsed state and draft, stable history position during reply arrival, and zero progress indicators while waiting. The earlier history test assumed a Return to answer control would always be needed; it now also supports the shorter history produced by collapsed answers. The collapsed-preview screenshot was visually inspected. Simulator only; no backend deployment or TestFlight upload.
+
+
+## Skip alert and tighter disclosure headers — 10 September 2026
+
+Replaced Skip’s anchored confirmation dialog with a standard alert. Expanded question headers now use bottom-aligned 44-point hit areas and an 8-point body gap; answer headers use 4 points. `/tmp/drillbit-skip-spacing.xcresult`: full interview journey and Skip cancel/confirm journey both passed. Cancellation preserved the typed draft, confirmation returned to Home, and the alert screenshot was inspected. Simulator only; no backend or TestFlight changes.
+
+
+10 September 2026: reduced the gap above expanded Follow-up headers while preserving collapsed exchange spacing. Removed sharing/waiting captions from interview and Ask surfaces, retaining failure recovery. The complete interview UI journey passed (`/tmp/drillbit-tight-followup.xcresult`); follow-up screenshot inspected. Updated app relaunched in the simulator. No backend or TestFlight changes.
+
+## Immediate Send and streamed interviewer — 10 September 2026
+
+Implemented immediate collapsed outgoing answer + Interviewer header, real provider streaming through durable jobs, and removal of the automatic wrap-up panel/turn ceiling. Visually inspected screenshots immediately after Send and during partial response: the disclosure arrow/header already exist before text arrives, with the previous compact exchange spacing preserved.
+
+- Backend: typecheck/contracts generation passed; 53 tests across seven files passed. Coverage includes provisional text before completion, JSON escape fragments, account isolation, lifecycle cancellation and existing retry/revision behavior.
+- Native: 21 unit tests passed; complete interview journey and explicit slow-stream UI journey passed (`/tmp/drillbit-stream-final.xcresult`). After fixing the completion/submission race, 21 native tests and the immediate-Send/partial-stream journey passed again (`/tmp/drillbit-stream-race-fixed.xcresult`). UI fixtures deliberately delay responses to verify the intermediate state; they are not live latency measurements.
+- Live Gemini 2.5 Flash Lite: direct provider stream returned first parsed text at approximately 810 ms, completed at 879 ms, with a grounded worker-retry follow-up. This measures provider transport, not the signed-in native round trip. Short replies may appear nearly together at the snapshot cadence.
+- D1 backup created under ignored `.local`; additive migration 0007 applied and compatible development backend deployed. Simulator build only; no TestFlight or physical-device verification. Full signed-in native streaming latency remains unmeasured.
+
+## System-design library and metadata — 10 September 2026
+
+Implemented the approved foundation: system-design-only preparation; temporary area picker; 24-concept taxonomy; short scenarios; immutable questions with repeatable attempts; native Library/search/filters; skipped-question pool recovery; coverage counts; deterministic basic selection; and account-scoped reset epochs/outbox recovery. Context engineering, skill inference and personalized review scheduling remain deferred.
+
+Verification:
+- Backend typecheck, contract generation and 61 tests across eight suites passed (`/tmp/library-test-final2.log`). D1 checks include 103-question pagination, combined filters/alias search, coverage counts, account isolation, repeated/competing starts, immutable original answers, stale eligibility revisions, conflicting command payloads, and restored-question selection without calling a provider.
+- 22 native tests passed, including account-scoped reset cleanup, durable draft recovery and interview submission regression checks (`/tmp/drillbit-library-final.xcresult`). Generation/preview/resume passed in `/tmp/drillbit-library-v2.xcresult`; temporary preparation and accessible Settings/onboarding passed in `/tmp/drillbit-library-v3.xcresult`.
+- Library/Skip/Add back/Preview/Start UI journey passed at normal size; the same journey passed in actual dark appearance at largest Dynamic Type (`/tmp/drillbit-library-large.xcresult`). Screenshots were inspected. Large content requires native scrolling; tests verify reaching actions after scrolling. A fixture-only uninitialized Clerk access in coverage loading was fixed during validation. No complete VoiceOver session or physical iPhone test was performed.
+- Live Gemini samples rotated all 24 concepts across the six levels. The final batch accepted 23/24; one overlong scenario was rejected by validation. An explicit retry for that concept passed. Earlier testing exposed copied-evidence/cross-array disagreements, leading to the single indexed tag-list contract. Sampled prompts were reviewed for visible design decisions and level scope; this is not a validated skill assessor. Evidence files: ignored `.local/library-generation-evaluation.json` and `.local/library-generation-retry.json`.
+- Development D1 was backed up, migration 0008 applied, then practice records were reset. Post-reset counts: one account, one settings record, zero D1 credential records (unchanged from backup), zero questions/attempts/old companion commands/practice jobs. Managed-provider Worker secrets remain configured. The maintenance gate was re-enabled after deployment; backend health returned OK. No TestFlight upload.
+
+## Library refresh and floating interview controls — 10 September 2026
+
+Implemented account/filter-scoped cached Library presentation with background revalidation, cached question details, a two-word scenario header, directly visible Close, no Return to answer shortcut, and transparent safe-area footer around voice/send controls. No backend contract changes.
+
+Verification: Pro simulator build and Library revisit → skipped recovery → preview → start passed, as did immediate send/collapse/streaming (`/tmp/drillbit-floating-controls.xcresult`). The history restoration test initially failed because simulator typing entered a character out of order; an unchanged rerun passed draft restoration, late-response scroll preservation and manual scrolling to the response (`/tmp/drillbit-history-refresh-recheck.xcresult`). Library and streaming screenshots inspected. No physical-device, fresh accessibility-matrix or live slow-network verification in this change. No TestFlight upload.
+
+## Library preload correction — 10 September 2026
+
+Removed refresh-on-entry and pull-to-refresh. Launch warms the first 25 completed/skipped questions, question details and each latest full attempt. Library navigation uses prepared snapshots; uncached filters/pagination remain demand-loaded. Completion refresh waits for stored server feedback outside the results screen; skip refreshes only skipped records and eligibility acknowledgements patch cache.
+
+Verification: 10 ContractTests passed, including preload-once/until-invalidation and preloaded attempt data (`/tmp/drillbit-preload-unit.xcresult`). Library revisit/skipped restoration/preview/start passed (`/tmp/drillbit-library-preload-final.xcresult`). Initial UI verification caught stale restored eligibility in fixture cache; corrected and rerun passed. Cold-launch network latency, physical-device behavior and the live delayed-feedback watcher were not separately measured. Simulator-only delivery.
+
+## XML interviewer context — 10 September 2026
+
+Backend typecheck, generated contracts and 65 tests across nine suites passed (`/tmp/context-tests-final.log`). Added D1 checks for bounded account-scoped history and pinned prompt edition, plus XML escaping and committed role ordering tests. The updated native style journey passed (`/tmp/drillbit-standard-style-v2.xcresult`); screenshots inspected with Standard selected and Quick/In-depth disabled in preparation and active interview.
+
+Reviewed five synthetic live batches with the unchanged Gemini 2.5 Flash Lite configuration. Final batch: eight schema-valid replies (`.local/interviewer-context-evaluation.json`, `/tmp/interviewer-context-final-live.log`). Direct clarification and nudges improved; role-paired history improved the resolved-topic example. Repetition, generic refusals and unwanted follow-up wording remain stochastic quality limitations. One earlier batch had one provider/schema failure. This is exploratory product evaluation, not a guarantee of instruction adherence or technical correctness.
+
+Development Worker deployed as `c6d06d35-063a-4cc3-ac32-c3f2227de8a2`; health returned OK. No migration, TestFlight upload or physical-device verification.
+
+## Smooth interview document transitions — 10 September 2026
+
+Unified structural animations, fading incoming rows, animated stream growth and settled scrolling replace abrupt response-time relayout. Busy clarification/help preserves the editor rather than removing it. Reduced Motion bypasses animation.
+
+Pro simulator send/stream/next-editor and history-restoration/late-response tests passed (`/tmp/drillbit-smooth-response.xcresult`); final send journey passed after removing overlapping outgoing fades (`/tmp/drillbit-smooth-response-polish.xcresult`). Recorded and inspected frame sequences from `/tmp/drillbit-response-motion-polished.mov`: the interviewer header remains in place through streaming, then the next editor arrives below it. Earlier recording revealed outgoing editor/question ghosting, which was removed with identity removal transitions. No physical-device or separate Reduced Motion runtime check in this pass. Simulator only.
+
+## Faster, clipped question expansion — 10 September 2026
+
+Manual disclosures now open in 180 ms with intrinsically measured content clipped to the animated reveal height. Content hides immediately during collapse so it does not overlap the returning excerpt. Reduced Motion removes timing; collapsed text is neither interactive nor exposed to accessibility.
+
+Send/stream and history restoration regressions passed (`/tmp/drillbit-clipped-disclosure.xcresult`). Repeated original-question expand/collapse test checks the first history row remains below the prompt (`/tmp/drillbit-expansion-final.xcresult`). Recorded 20 fps frame inspection around opening in `/tmp/drillbit-question-expansion.mov` showed the question progressively revealing above the history. Collapse inspection prompted removal of lingering full text behind the excerpt. Physical-device behavior not checked.
+
+### Stable question title
+
+The original question now has one persistent title in the disclosure header, with consistent typography and intrinsic wrapping. Only the description passes through the clipped reveal, preventing the title from being sliced during expansion. Repeated expansion/history-boundary test passed (`/tmp/drillbit-stable-question-title.xcresult`); recorded frames from `/tmp/drillbit-stable-title.mov` inspected. Simulator only.
+
+### Unified original-question motion
+
+The original description now remains one text view, with its height animated between a three-line preview and the full prompt. This supersedes the immediate full-text hiding described above for the original question. Manual disclosure and first Send share a 220 ms ease-in-out transition; the title stays outside the clipped area.
+
+Repeated expansion/history-boundary and immediate-send/stream tests passed (`/tmp/drillbit-unified-question-motion.xcresult`). The send test passed again (`/tmp/drillbit-first-send-unified.xcresult`); 20 fps frames from `/tmp/drillbit-first-send-unified.mov` show the description shrinking progressively on first Send, with a stable title and the You/Interviewer rows appearing below. No physical-device or separate Reduced Motion runtime verification in this pass.
+
+### Submitted text uses the question disclosure motion
+
+Submitted answers now keep one opaque text view while compressing to a single line, using the same 220 ms ease-in-out measured-height component as the original question. Send stages the snapshot without the document insertion animation before compressing both disclosures. Manual answer expansion uses that same component; the complete answer remains available.
+
+The original-question expansion/history-boundary test passed in `/tmp/drillbit-answer-motion.xcresult`. The extended multi-line Send, partial stream, completed response, and answer reopen/re-collapse journey passed in `/tmp/drillbit-submission-final.xcresult`. Earlier runs missed the fixture's 100 ms partial updates; the explicitly slow fixture now holds each partial for 400 ms, leaving production transport unchanged. Recordings exposed the initial blank handoff and informed the staging fix. Final recording `/tmp/drillbit-submission-final.mov` confirms settled and reopened content, but did not capture every handoff frame reliably. Exact animation feel still needs user confirmation; physical-device and separate Reduced Motion runtime checks were not performed.
+
+### Compact, content-aware transcript rows
+
+Three Pro simulator UI tests passed in `/tmp/drillbit-compact-final.xcresult`: original-question expansion stays above history; multi-line Send/stream/reopen works; one-line user and interviewer turns have no disclosure controls. Exported screenshots in `/tmp/drillbit-compact-screens` were inspected for the short-turn history and completed streamed reply. They show the reduced divider/header spacing, short turns as plain text, and arrows on longer turns. Dynamic Type uses live SwiftUI measurements, but largest-type, VoiceOver and physical-device runtime checks were not repeated in this pass. Simulator only.
+
+### Stable row labels
+
+Send/partial-stream/completion/answer-reopen and single-line disclosure tests passed in `/tmp/drillbit-stable-labels.xcresult`. Labels now opt out of local animation, and exchange/draft insertion no longer fades their headers. Existing disclosure timing is preserved. This pass verifies simulator interaction regression checks; transient shimmer has not been independently frame-verified or checked on a physical phone.
+
+## Optimistic Skip and pool restoration — 11 September 2026
+
+Home clears immediately after local Skip persistence; the workspace closes without awaiting HTTP or Library hydration. Cancel still preserves the editor. Pool restoration patches local eligibility after enqueue and syncs outside the detail view. Queued commands are account-scoped, applied over refreshed snapshots, and included in sign-out pending-write checks. Skipped drafts use a local terminal marker so stale remote snapshots cannot overwrite the retained answer or restart its upload.
+
+Verification: 21 Swift core tests passed (`/tmp/drillbit-final-core.log`), including duplicate/scoped Skip queue handling, on-disk queue restoration and retained draft after acknowledgement/stale load. Skip cancel/confirm/Home and Library pool-restoration simulator journeys passed (`/tmp/drillbit-optimistic-final.xcresult`). These UI journeys use fixtures; live offline/reconnect and physical-device flows were not exercised. Existing repeat-safe Skip and revision-checked eligibility endpoints are unchanged; no deployment or TestFlight build.

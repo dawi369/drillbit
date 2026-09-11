@@ -1,8 +1,9 @@
+import { conceptId, questionMetadata } from "./taxonomy";
 import { captureSchema, receiptSchema } from "./companion-contract";
 import { z } from "zod";
 import { Temporal } from "@js-temporal/polyfill";
 
-export const MODEL_ID = "google/gemini-3.1-flash-lite";
+export const MODEL_ID = "google/gemini-2.5-flash-lite";
 export const engineeringLevelSchema = z.enum(["intern", "junior", "mid", "senior", "staff", "principal"]);
 export const levelForDifficulty = (difficulty: string) => difficulty === "easy" ? "junior" : difficulty === "hard" ? "senior" : "mid";
 export const settingsSchema = z.object({
@@ -24,7 +25,7 @@ export const settingsSchema = z.object({
   dailyMinutes: z.number().int().min(0).max(1439).default(540),
   reminderEnabled: z.boolean().default(false),
   aiMode: z.enum(["managed", "byok"]).default("managed"),
-  model: z.literal(MODEL_ID).default(MODEL_ID),
+  model: z.enum([MODEL_ID, "google/gemini-3.1-flash-lite"]).default(MODEL_ID),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 export const challengeSchema = z.object({
@@ -41,6 +42,10 @@ export const questionSpecificationSchema = challengeSchema.extend({
 });
 export const questionGenerationSchema = questionSpecificationSchema.omit({
   evaluationCriteria: true,
+}).extend({scenario:questionMetadata.shape.scenario,primaryConceptId:conceptId,tagEvidence:questionMetadata.shape.tagEvidence}).superRefine((value,ctx)=> {
+ const ids=value.tagEvidence.map(e=>e.conceptId);
+ if(new Set(ids).size!==ids.length||!ids.includes(value.primaryConceptId))ctx.addIssue({code:"custom",message:"Include the primary concept exactly once and at most two distinct secondary concepts"});
+ if(value.tagEvidence.some(e=>e.requirementIndex>value.constraints.length))ctx.addIssue({code:"custom",message:"Tag reference does not exist"});
 });
 export const reflectionSchema = z.object({
   summary: z.string().min(1).max(1000),
@@ -108,9 +113,10 @@ export function parseJSON<T>(text: string): T {
 
 export function normalizeSettings(value: unknown): Settings {
   const settings = settingsSchema.parse({ ...(value as object), model: MODEL_ID });
-  return { ...settings, engineeringLevel: settings.engineeringLevel ?? levelForDifficulty(settings.difficulty) };
+  return { ...settings, focus: "System design", engineeringLevel: settings.engineeringLevel ?? levelForDifficulty(settings.difficulty) };
 }
 export const generationSchema = z.object({
+  primaryConceptId: conceptId.optional(),
   interviewStyle: z.enum(["quick", "standard", "in_depth"]).optional(),
   focus: z.string().trim().min(1).max(4000).optional(),
   kind: z.enum(["auto", "explain", "design"]).default("auto"),

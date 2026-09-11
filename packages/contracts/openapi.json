@@ -10,6 +10,727 @@
     }
   ],
   "paths": {
+    "/v1/taxonomy": {
+      "get": {
+        "summary": "Get the versioned system-design concept vocabulary",
+        "operationId": "get_taxonomy",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Taxonomy"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invite required or account unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not owned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision or lifecycle conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid invitation or provider credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Usage limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Provider temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/library": {
+      "get": {
+        "summary": "Search and filter the account question library",
+        "operationId": "get_library",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "concepts",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "level",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "skipped",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invite required or account unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not owned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision or lifecycle conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid invitation or provider credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Usage limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Provider temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/library/coverage": {
+      "get": {
+        "summary": "Count completed practice by concept without inferring ability",
+        "operationId": "get_library_coverage",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Coverage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invite required or account unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not owned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision or lifecycle conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid invitation or provider credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Usage limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Provider temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/questions/{id}": {
+      "get": {
+        "summary": "Read a question and paginated attempts",
+        "operationId": "get_questions__id_",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invite required or account unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not owned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision or lifecycle conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid invitation or provider credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Usage limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Provider temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/questions/{id}/eligibility": {
+      "put": {
+        "summary": "Update question-pool eligibility with revision and idempotency",
+        "operationId": "put_questions__id__eligibility",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "required": true,
+            "in": "header",
+            "description": "Required for generation, draft writes, completion, assistance, retries and deletion of an account.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EligibilityInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryQuestion"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Durable operation accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryQuestion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invite required or account unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not owned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision or lifecycle conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid invitation or provider credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Usage limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Provider temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/questions/{id}/start": {
+      "post": {
+        "summary": "Start a fresh attempt for an immutable question",
+        "operationId": "post_questions__id__start",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "required": true,
+            "in": "header",
+            "description": "Required for generation, draft writes, completion, assistance, retries and deletion of an account.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Challenge"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Durable operation accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Challenge"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invite required or account unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not owned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision or lifecycle conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid invitation or provider credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Usage limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Provider temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/challenges/{id}/interview": {
       "post": {
         "summary": "Commit an answer or request clarification/help without advancing the answer",
@@ -3629,6 +4350,41 @@
           }
         }
       }
+    },
+    "/v1/challenges/{id}/interview/{turn}/stream": {
+      "get": {
+        "summary": "Subscribe to persisted interviewer text snapshots without starting another inference",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "turn",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SSE snapshot events with JSON text and job status. Partial text is provisional until completed; reconnect by resubscribing.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3639,6 +4395,1364 @@
       }
     },
     "schemas": {
+      "Taxonomy": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "const": 1
+          },
+          "concepts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "enum": [
+                    "data-modeling",
+                    "indexing",
+                    "transactions",
+                    "consistency",
+                    "replication",
+                    "partitioning",
+                    "api-design",
+                    "caching",
+                    "load-balancing",
+                    "rate-limiting",
+                    "capacity-planning",
+                    "queues",
+                    "retry-safety",
+                    "coordination",
+                    "scheduling",
+                    "fault-tolerance",
+                    "backpressure",
+                    "observability",
+                    "migration",
+                    "authorization",
+                    "tenant-isolation",
+                    "data-lifecycle",
+                    "multi-region",
+                    "cost-efficiency"
+                  ]
+                },
+                "label": {
+                  "type": "string"
+                },
+                "category": {
+                  "type": "string"
+                },
+                "aliases": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "description": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "label",
+                "category",
+                "aliases"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "version",
+          "concepts"
+        ],
+        "additionalProperties": false
+      },
+      "LibraryQuestion": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "scenario": {
+            "type": "string"
+          },
+          "engineeringLevel": {
+            "type": "string",
+            "enum": [
+              "intern",
+              "junior",
+              "mid",
+              "senior",
+              "staff",
+              "principal"
+            ]
+          },
+          "primaryConceptId": {
+            "type": "string",
+            "enum": [
+              "data-modeling",
+              "indexing",
+              "transactions",
+              "consistency",
+              "replication",
+              "partitioning",
+              "api-design",
+              "caching",
+              "load-balancing",
+              "rate-limiting",
+              "capacity-planning",
+              "queues",
+              "retry-safety",
+              "coordination",
+              "scheduling",
+              "fault-tolerance",
+              "backpressure",
+              "observability",
+              "migration",
+              "authorization",
+              "tenant-isolation",
+              "data-lifecycle",
+              "multi-region",
+              "cost-efficiency"
+            ]
+          },
+          "conceptIds": {
+            "minItems": 1,
+            "maxItems": 3,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "data-modeling",
+                "indexing",
+                "transactions",
+                "consistency",
+                "replication",
+                "partitioning",
+                "api-design",
+                "caching",
+                "load-balancing",
+                "rate-limiting",
+                "capacity-planning",
+                "queues",
+                "retry-safety",
+                "coordination",
+                "scheduling",
+                "fault-tolerance",
+                "backpressure",
+                "observability",
+                "migration",
+                "authorization",
+                "tenant-isolation",
+                "data-lifecycle",
+                "multi-region",
+                "cost-efficiency"
+              ]
+            }
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "eligibilityRevision": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "lastActivity": {
+            "type": "string"
+          },
+          "attemptCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "prompt",
+          "scenario",
+          "engineeringLevel",
+          "primaryConceptId",
+          "conceptIds",
+          "eligible",
+          "eligibilityRevision"
+        ],
+        "additionalProperties": false
+      },
+      "LibraryPage": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "questions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "prompt": {
+                  "type": "string"
+                },
+                "scenario": {
+                  "type": "string"
+                },
+                "engineeringLevel": {
+                  "type": "string",
+                  "enum": [
+                    "intern",
+                    "junior",
+                    "mid",
+                    "senior",
+                    "staff",
+                    "principal"
+                  ]
+                },
+                "primaryConceptId": {
+                  "type": "string",
+                  "enum": [
+                    "data-modeling",
+                    "indexing",
+                    "transactions",
+                    "consistency",
+                    "replication",
+                    "partitioning",
+                    "api-design",
+                    "caching",
+                    "load-balancing",
+                    "rate-limiting",
+                    "capacity-planning",
+                    "queues",
+                    "retry-safety",
+                    "coordination",
+                    "scheduling",
+                    "fault-tolerance",
+                    "backpressure",
+                    "observability",
+                    "migration",
+                    "authorization",
+                    "tenant-isolation",
+                    "data-lifecycle",
+                    "multi-region",
+                    "cost-efficiency"
+                  ]
+                },
+                "conceptIds": {
+                  "minItems": 1,
+                  "maxItems": 3,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "data-modeling",
+                      "indexing",
+                      "transactions",
+                      "consistency",
+                      "replication",
+                      "partitioning",
+                      "api-design",
+                      "caching",
+                      "load-balancing",
+                      "rate-limiting",
+                      "capacity-planning",
+                      "queues",
+                      "retry-safety",
+                      "coordination",
+                      "scheduling",
+                      "fault-tolerance",
+                      "backpressure",
+                      "observability",
+                      "migration",
+                      "authorization",
+                      "tenant-isolation",
+                      "data-lifecycle",
+                      "multi-region",
+                      "cost-efficiency"
+                    ]
+                  }
+                },
+                "eligible": {
+                  "type": "boolean"
+                },
+                "eligibilityRevision": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "lastActivity": {
+                  "type": "string"
+                },
+                "attemptCount": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "prompt",
+                "scenario",
+                "engineeringLevel",
+                "primaryConceptId",
+                "conceptIds",
+                "eligible",
+                "eligibilityRevision"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "questions",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "LibraryDetail": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "prompt": {
+                "type": "string"
+              },
+              "scenario": {
+                "type": "string"
+              },
+              "engineeringLevel": {
+                "type": "string",
+                "enum": [
+                  "intern",
+                  "junior",
+                  "mid",
+                  "senior",
+                  "staff",
+                  "principal"
+                ]
+              },
+              "primaryConceptId": {
+                "type": "string",
+                "enum": [
+                  "data-modeling",
+                  "indexing",
+                  "transactions",
+                  "consistency",
+                  "replication",
+                  "partitioning",
+                  "api-design",
+                  "caching",
+                  "load-balancing",
+                  "rate-limiting",
+                  "capacity-planning",
+                  "queues",
+                  "retry-safety",
+                  "coordination",
+                  "scheduling",
+                  "fault-tolerance",
+                  "backpressure",
+                  "observability",
+                  "migration",
+                  "authorization",
+                  "tenant-isolation",
+                  "data-lifecycle",
+                  "multi-region",
+                  "cost-efficiency"
+                ]
+              },
+              "conceptIds": {
+                "minItems": 1,
+                "maxItems": 3,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "data-modeling",
+                    "indexing",
+                    "transactions",
+                    "consistency",
+                    "replication",
+                    "partitioning",
+                    "api-design",
+                    "caching",
+                    "load-balancing",
+                    "rate-limiting",
+                    "capacity-planning",
+                    "queues",
+                    "retry-safety",
+                    "coordination",
+                    "scheduling",
+                    "fault-tolerance",
+                    "backpressure",
+                    "observability",
+                    "migration",
+                    "authorization",
+                    "tenant-isolation",
+                    "data-lifecycle",
+                    "multi-region",
+                    "cost-efficiency"
+                  ]
+                }
+              },
+              "eligible": {
+                "type": "boolean"
+              },
+              "eligibilityRevision": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "lastActivity": {
+                "type": "string"
+              },
+              "attemptCount": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "prompt",
+              "scenario",
+              "engineeringLevel",
+              "primaryConceptId",
+              "conceptIds",
+              "eligible",
+              "eligibilityRevision"
+            ],
+            "additionalProperties": false
+          },
+          "attempts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "prompt": {
+                  "type": "string",
+                  "minLength": 20,
+                  "maxLength": 3000
+                },
+                "topic": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80
+                },
+                "questionId": {
+                  "type": "string"
+                },
+                "scenario": {
+                  "type": "string"
+                },
+                "primaryConceptId": {
+                  "type": "string",
+                  "enum": [
+                    "data-modeling",
+                    "indexing",
+                    "transactions",
+                    "consistency",
+                    "replication",
+                    "partitioning",
+                    "api-design",
+                    "caching",
+                    "load-balancing",
+                    "rate-limiting",
+                    "capacity-planning",
+                    "queues",
+                    "retry-safety",
+                    "coordination",
+                    "scheduling",
+                    "fault-tolerance",
+                    "backpressure",
+                    "observability",
+                    "migration",
+                    "authorization",
+                    "tenant-isolation",
+                    "data-lifecycle",
+                    "multi-region",
+                    "cost-efficiency"
+                  ]
+                },
+                "conceptIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "data-modeling",
+                      "indexing",
+                      "transactions",
+                      "consistency",
+                      "replication",
+                      "partitioning",
+                      "api-design",
+                      "caching",
+                      "load-balancing",
+                      "rate-limiting",
+                      "capacity-planning",
+                      "queues",
+                      "retry-safety",
+                      "coordination",
+                      "scheduling",
+                      "fault-tolerance",
+                      "backpressure",
+                      "observability",
+                      "migration",
+                      "authorization",
+                      "tenant-isolation",
+                      "data-lifecycle",
+                      "multi-region",
+                      "cost-efficiency"
+                    ]
+                  }
+                },
+                "selectionReason": {
+                  "type": "string"
+                },
+                "interviewStyle": {
+                  "type": "string",
+                  "enum": [
+                    "quick",
+                    "standard",
+                    "in_depth"
+                  ]
+                },
+                "interview": {
+                  "type": "object",
+                  "properties": {
+                    "style": {
+                      "type": "string",
+                      "enum": [
+                        "quick",
+                        "standard",
+                        "in_depth"
+                      ]
+                    },
+                    "prompt": {
+                      "type": "string"
+                    },
+                    "wrapUp": {
+                      "type": "boolean"
+                    },
+                    "turns": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "ordinal": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "answer",
+                              "clarification",
+                              "hint",
+                              "example",
+                              "continue"
+                            ]
+                          },
+                          "prompt": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string"
+                          },
+                          "jobId": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "error": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "partial": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "result": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "outcome": {
+                                    "type": "string",
+                                    "enum": [
+                                      "follow_up",
+                                      "reply",
+                                      "wrap_up"
+                                    ]
+                                  },
+                                  "text": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 2400
+                                  }
+                                },
+                                "required": [
+                                  "outcome",
+                                  "text"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "ordinal",
+                          "kind",
+                          "prompt",
+                          "text",
+                          "createdAt",
+                          "jobId",
+                          "status",
+                          "result"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "style",
+                    "prompt",
+                    "wrapUp",
+                    "turns"
+                  ],
+                  "additionalProperties": false
+                },
+                "difficulty": {
+                  "type": "string",
+                  "enum": [
+                    "easy",
+                    "medium",
+                    "hard"
+                  ]
+                },
+                "engineeringLevel": {
+                  "type": "string",
+                  "enum": [
+                    "intern",
+                    "junior",
+                    "mid",
+                    "senior",
+                    "staff",
+                    "principal"
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                },
+                "lifecycle": {
+                  "type": "string",
+                  "enum": [
+                    "prepared",
+                    "ready",
+                    "in_progress",
+                    "completed",
+                    "skipped",
+                    "expired"
+                  ]
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "completedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "session": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "answer": {
+                          "type": "string"
+                        },
+                        "revision": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "updated_at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "answer",
+                        "revision",
+                        "updated_at"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "turns": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "role": {
+                        "type": "string"
+                      },
+                      "text": {
+                        "type": "string"
+                      },
+                      "state": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "role",
+                      "text",
+                      "state"
+                    ],
+                    "additionalProperties": {}
+                  }
+                },
+                "reflection": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "summary": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 1000
+                        },
+                        "worked": {
+                          "maxItems": 4,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 300
+                          }
+                        },
+                        "improve": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 1000
+                        },
+                        "takeaway": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 1000
+                        },
+                        "strengths": {
+                          "maxItems": 4,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 80
+                          }
+                        },
+                        "gaps": {
+                          "maxItems": 4,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 80
+                          }
+                        }
+                      },
+                      "required": [
+                        "summary",
+                        "worked",
+                        "improve",
+                        "takeaway",
+                        "strengths",
+                        "gaps"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "example": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "overview": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 3000
+                        },
+                        "sections": {
+                          "minItems": 1,
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "heading": {
+                                "type": "string",
+                                "maxLength": 100
+                              },
+                              "body": {
+                                "type": "string",
+                                "maxLength": 4000
+                              }
+                            },
+                            "required": [
+                              "heading",
+                              "body"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "tradeoffs": {
+                          "maxItems": 6,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 1000
+                          }
+                        },
+                        "pitfalls": {
+                          "maxItems": 6,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 1000
+                          }
+                        }
+                      },
+                      "required": [
+                        "overview",
+                        "sections",
+                        "tradeoffs",
+                        "pitfalls"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "companion": {
+                  "type": "object",
+                  "properties": {
+                    "cycleConsumed": {
+                      "type": "boolean"
+                    },
+                    "guidedStarted": {
+                      "type": "boolean"
+                    },
+                    "revision": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "solo",
+                        "coach",
+                        "guided"
+                      ]
+                    },
+                    "modeEpoch": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "paused": {
+                      "type": "boolean"
+                    },
+                    "selectedFocus": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "decisions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "text"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "automaticCount": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "lastAutomaticAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "digest": {
+                      "type": "string"
+                    },
+                    "cycle": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "revision",
+                    "mode",
+                    "modeEpoch",
+                    "paused",
+                    "selectedFocus",
+                    "decisions",
+                    "automaticCount",
+                    "lastAutomaticAt",
+                    "digest",
+                    "cycle"
+                  ],
+                  "additionalProperties": false
+                },
+                "automaticCompanion": {
+                  "type": "boolean"
+                },
+                "coachRequest": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "help": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string"
+                      },
+                      "revision": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "capture": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "contextRevision": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "modeEpoch": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "cycle": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 128
+                              },
+                              "digest": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 128
+                              },
+                              "trigger": {
+                                "type": "string",
+                                "enum": [
+                                  "explicit",
+                                  "guided_entry",
+                                  "change",
+                                  "pause"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "contextRevision",
+                              "modeEpoch",
+                              "cycle",
+                              "digest",
+                              "trigger"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "deliveries": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "outcome": {
+                        "type": "string",
+                        "enum": [
+                          "intervention",
+                          "no_intervention"
+                        ]
+                      },
+                      "suggestedFocus": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "plan": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "body": {
+                        "type": "string"
+                      },
+                      "suggestedAnswer": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "status",
+                      "kind",
+                      "revision"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "adoptions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "source_id": {
+                        "type": "string"
+                      },
+                      "operation": {
+                        "type": "string"
+                      },
+                      "revision": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "source_id",
+                      "operation",
+                      "revision"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "title",
+                "prompt",
+                "topic",
+                "id",
+                "lifecycle"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "question",
+          "attempts",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "EligibilityInput": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "eligible": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "revision",
+          "eligible"
+        ],
+        "additionalProperties": false
+      },
+      "SkillObservation": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "const": 1
+          },
+          "attemptId": {
+            "type": "string"
+          },
+          "conceptId": {
+            "type": "string",
+            "enum": [
+              "data-modeling",
+              "indexing",
+              "transactions",
+              "consistency",
+              "replication",
+              "partitioning",
+              "api-design",
+              "caching",
+              "load-balancing",
+              "rate-limiting",
+              "capacity-planning",
+              "queues",
+              "retry-safety",
+              "coordination",
+              "scheduling",
+              "fault-tolerance",
+              "backpressure",
+              "observability",
+              "migration",
+              "authorization",
+              "tenant-isolation",
+              "data-lifecycle",
+              "multi-region",
+              "cost-efficiency"
+            ]
+          },
+          "competency": {
+            "type": "string",
+            "enum": [
+              "requirements",
+              "scale",
+              "boundaries",
+              "correctness",
+              "tradeoffs",
+              "failure",
+              "evolution",
+              "communication"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "demonstrated",
+              "developing",
+              "needs_revisit",
+              "not_observed"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "sourceTurnIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "exposure": {
+            "type": "string",
+            "enum": [
+              "unassisted",
+              "prompted",
+              "example",
+              "adopted",
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "version",
+          "attemptId",
+          "conceptId",
+          "competency",
+          "state",
+          "text",
+          "sourceTurnIds",
+          "exposure"
+        ],
+        "additionalProperties": false
+      },
+      "Coverage": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "concepts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "conceptId": {
+                  "type": "string",
+                  "enum": [
+                    "data-modeling",
+                    "indexing",
+                    "transactions",
+                    "consistency",
+                    "replication",
+                    "partitioning",
+                    "api-design",
+                    "caching",
+                    "load-balancing",
+                    "rate-limiting",
+                    "capacity-planning",
+                    "queues",
+                    "retry-safety",
+                    "coordination",
+                    "scheduling",
+                    "fault-tolerance",
+                    "backpressure",
+                    "observability",
+                    "migration",
+                    "authorization",
+                    "tenant-isolation",
+                    "data-lifecycle",
+                    "multi-region",
+                    "cost-efficiency"
+                  ]
+                },
+                "completedAttempts": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "distinctQuestions": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "lastPractised": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "conceptId",
+                "completedAttempts",
+                "distinctQuestions",
+                "lastPractised"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "concepts"
+        ],
+        "additionalProperties": false
+      },
       "Companion": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
@@ -3914,9 +6028,12 @@
             ]
           },
           "model": {
-            "default": "google/gemini-3.1-flash-lite",
+            "default": "google/gemini-2.5-flash-lite",
             "type": "string",
-            "const": "google/gemini-3.1-flash-lite"
+            "enum": [
+              "google/gemini-2.5-flash-lite",
+              "google/gemini-3.1-flash-lite"
+            ]
           }
         },
         "required": [
@@ -4099,10 +6216,23 @@
             "minimum": 0,
             "maximum": 9007199254740991
           },
+          "saveDraft": {
+            "description": "For answers, atomically submit current text against revision without a preceding draft upload.",
+            "type": "boolean"
+          },
           "text": {
             "default": "",
             "type": "string",
             "maxLength": 20000
+          },
+          "style": {
+            "type": "string",
+            "enum": [
+              "quick",
+              "standard",
+              "in_depth"
+            ],
+            "description": "Legacy styles remain accepted; new turns currently use Standard only."
           }
         },
         "required": [
@@ -4175,6 +6305,12 @@
                     "null"
                   ]
                 },
+                "partial": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "result": {
                   "anyOf": [
                     {
@@ -4229,10 +6365,56 @@
         ],
         "additionalProperties": false
       },
+      "InterviewStreamSnapshot": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "text"
+        ],
+        "additionalProperties": false
+      },
       "PreparationInput": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "primaryConceptId": {
+            "type": "string",
+            "enum": [
+              "data-modeling",
+              "indexing",
+              "transactions",
+              "consistency",
+              "replication",
+              "partitioning",
+              "api-design",
+              "caching",
+              "load-balancing",
+              "rate-limiting",
+              "capacity-planning",
+              "queues",
+              "retry-safety",
+              "coordination",
+              "scheduling",
+              "fault-tolerance",
+              "backpressure",
+              "observability",
+              "migration",
+              "authorization",
+              "tenant-isolation",
+              "data-lifecycle",
+              "multi-region",
+              "cost-efficiency"
+            ]
+          },
           "interviewStyle": {
             "type": "string",
             "enum": [
@@ -4406,6 +6588,76 @@
             "minLength": 1,
             "maxLength": 80
           },
+          "questionId": {
+            "type": "string"
+          },
+          "scenario": {
+            "type": "string"
+          },
+          "primaryConceptId": {
+            "type": "string",
+            "enum": [
+              "data-modeling",
+              "indexing",
+              "transactions",
+              "consistency",
+              "replication",
+              "partitioning",
+              "api-design",
+              "caching",
+              "load-balancing",
+              "rate-limiting",
+              "capacity-planning",
+              "queues",
+              "retry-safety",
+              "coordination",
+              "scheduling",
+              "fault-tolerance",
+              "backpressure",
+              "observability",
+              "migration",
+              "authorization",
+              "tenant-isolation",
+              "data-lifecycle",
+              "multi-region",
+              "cost-efficiency"
+            ]
+          },
+          "conceptIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "data-modeling",
+                "indexing",
+                "transactions",
+                "consistency",
+                "replication",
+                "partitioning",
+                "api-design",
+                "caching",
+                "load-balancing",
+                "rate-limiting",
+                "capacity-planning",
+                "queues",
+                "retry-safety",
+                "coordination",
+                "scheduling",
+                "fault-tolerance",
+                "backpressure",
+                "observability",
+                "migration",
+                "authorization",
+                "tenant-isolation",
+                "data-lifecycle",
+                "multi-region",
+                "cost-efficiency"
+              ]
+            }
+          },
+          "selectionReason": {
+            "type": "string"
+          },
           "interviewStyle": {
             "type": "string",
             "enum": [
@@ -4470,6 +6722,12 @@
                       "type": "string"
                     },
                     "error": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "partial": {
                       "type": [
                         "string",
                         "null"
@@ -5319,6 +7577,9 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "practiceEpoch": {
+            "type": "string"
+          },
           "account": {
             "type": "object",
             "properties": {
@@ -5391,9 +7652,12 @@
                 ]
               },
               "model": {
-                "default": "google/gemini-3.1-flash-lite",
+                "default": "google/gemini-2.5-flash-lite",
                 "type": "string",
-                "const": "google/gemini-3.1-flash-lite"
+                "enum": [
+                  "google/gemini-2.5-flash-lite",
+                  "google/gemini-3.1-flash-lite"
+                ]
               }
             },
             "required": [
@@ -5427,6 +7691,76 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 80
+                  },
+                  "questionId": {
+                    "type": "string"
+                  },
+                  "scenario": {
+                    "type": "string"
+                  },
+                  "primaryConceptId": {
+                    "type": "string",
+                    "enum": [
+                      "data-modeling",
+                      "indexing",
+                      "transactions",
+                      "consistency",
+                      "replication",
+                      "partitioning",
+                      "api-design",
+                      "caching",
+                      "load-balancing",
+                      "rate-limiting",
+                      "capacity-planning",
+                      "queues",
+                      "retry-safety",
+                      "coordination",
+                      "scheduling",
+                      "fault-tolerance",
+                      "backpressure",
+                      "observability",
+                      "migration",
+                      "authorization",
+                      "tenant-isolation",
+                      "data-lifecycle",
+                      "multi-region",
+                      "cost-efficiency"
+                    ]
+                  },
+                  "conceptIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "data-modeling",
+                        "indexing",
+                        "transactions",
+                        "consistency",
+                        "replication",
+                        "partitioning",
+                        "api-design",
+                        "caching",
+                        "load-balancing",
+                        "rate-limiting",
+                        "capacity-planning",
+                        "queues",
+                        "retry-safety",
+                        "coordination",
+                        "scheduling",
+                        "fault-tolerance",
+                        "backpressure",
+                        "observability",
+                        "migration",
+                        "authorization",
+                        "tenant-isolation",
+                        "data-lifecycle",
+                        "multi-region",
+                        "cost-efficiency"
+                      ]
+                    }
+                  },
+                  "selectionReason": {
+                    "type": "string"
                   },
                   "interviewStyle": {
                     "type": "string",
@@ -5492,6 +7826,12 @@
                               "type": "string"
                             },
                             "error": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "partial": {
                               "type": [
                                 "string",
                                 "null"
@@ -6195,6 +8535,76 @@
                     "minLength": 1,
                     "maxLength": 80
                   },
+                  "questionId": {
+                    "type": "string"
+                  },
+                  "scenario": {
+                    "type": "string"
+                  },
+                  "primaryConceptId": {
+                    "type": "string",
+                    "enum": [
+                      "data-modeling",
+                      "indexing",
+                      "transactions",
+                      "consistency",
+                      "replication",
+                      "partitioning",
+                      "api-design",
+                      "caching",
+                      "load-balancing",
+                      "rate-limiting",
+                      "capacity-planning",
+                      "queues",
+                      "retry-safety",
+                      "coordination",
+                      "scheduling",
+                      "fault-tolerance",
+                      "backpressure",
+                      "observability",
+                      "migration",
+                      "authorization",
+                      "tenant-isolation",
+                      "data-lifecycle",
+                      "multi-region",
+                      "cost-efficiency"
+                    ]
+                  },
+                  "conceptIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "data-modeling",
+                        "indexing",
+                        "transactions",
+                        "consistency",
+                        "replication",
+                        "partitioning",
+                        "api-design",
+                        "caching",
+                        "load-balancing",
+                        "rate-limiting",
+                        "capacity-planning",
+                        "queues",
+                        "retry-safety",
+                        "coordination",
+                        "scheduling",
+                        "fault-tolerance",
+                        "backpressure",
+                        "observability",
+                        "migration",
+                        "authorization",
+                        "tenant-isolation",
+                        "data-lifecycle",
+                        "multi-region",
+                        "cost-efficiency"
+                      ]
+                    }
+                  },
+                  "selectionReason": {
+                    "type": "string"
+                  },
                   "interviewStyle": {
                     "type": "string",
                     "enum": [
@@ -6259,6 +8669,12 @@
                               "type": "string"
                             },
                             "error": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "partial": {
                               "type": [
                                 "string",
                                 "null"
@@ -6944,6 +9360,76 @@
                   "minLength": 1,
                   "maxLength": 80
                 },
+                "questionId": {
+                  "type": "string"
+                },
+                "scenario": {
+                  "type": "string"
+                },
+                "primaryConceptId": {
+                  "type": "string",
+                  "enum": [
+                    "data-modeling",
+                    "indexing",
+                    "transactions",
+                    "consistency",
+                    "replication",
+                    "partitioning",
+                    "api-design",
+                    "caching",
+                    "load-balancing",
+                    "rate-limiting",
+                    "capacity-planning",
+                    "queues",
+                    "retry-safety",
+                    "coordination",
+                    "scheduling",
+                    "fault-tolerance",
+                    "backpressure",
+                    "observability",
+                    "migration",
+                    "authorization",
+                    "tenant-isolation",
+                    "data-lifecycle",
+                    "multi-region",
+                    "cost-efficiency"
+                  ]
+                },
+                "conceptIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "data-modeling",
+                      "indexing",
+                      "transactions",
+                      "consistency",
+                      "replication",
+                      "partitioning",
+                      "api-design",
+                      "caching",
+                      "load-balancing",
+                      "rate-limiting",
+                      "capacity-planning",
+                      "queues",
+                      "retry-safety",
+                      "coordination",
+                      "scheduling",
+                      "fault-tolerance",
+                      "backpressure",
+                      "observability",
+                      "migration",
+                      "authorization",
+                      "tenant-isolation",
+                      "data-lifecycle",
+                      "multi-region",
+                      "cost-efficiency"
+                    ]
+                  }
+                },
+                "selectionReason": {
+                  "type": "string"
+                },
                 "interviewStyle": {
                   "type": "string",
                   "enum": [
@@ -7008,6 +9494,12 @@
                             "type": "string"
                           },
                           "error": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "partial": {
                             "type": [
                               "string",
                               "null"
@@ -7614,6 +10106,76 @@
                   "minLength": 1,
                   "maxLength": 80
                 },
+                "questionId": {
+                  "type": "string"
+                },
+                "scenario": {
+                  "type": "string"
+                },
+                "primaryConceptId": {
+                  "type": "string",
+                  "enum": [
+                    "data-modeling",
+                    "indexing",
+                    "transactions",
+                    "consistency",
+                    "replication",
+                    "partitioning",
+                    "api-design",
+                    "caching",
+                    "load-balancing",
+                    "rate-limiting",
+                    "capacity-planning",
+                    "queues",
+                    "retry-safety",
+                    "coordination",
+                    "scheduling",
+                    "fault-tolerance",
+                    "backpressure",
+                    "observability",
+                    "migration",
+                    "authorization",
+                    "tenant-isolation",
+                    "data-lifecycle",
+                    "multi-region",
+                    "cost-efficiency"
+                  ]
+                },
+                "conceptIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "data-modeling",
+                      "indexing",
+                      "transactions",
+                      "consistency",
+                      "replication",
+                      "partitioning",
+                      "api-design",
+                      "caching",
+                      "load-balancing",
+                      "rate-limiting",
+                      "capacity-planning",
+                      "queues",
+                      "retry-safety",
+                      "coordination",
+                      "scheduling",
+                      "fault-tolerance",
+                      "backpressure",
+                      "observability",
+                      "migration",
+                      "authorization",
+                      "tenant-isolation",
+                      "data-lifecycle",
+                      "multi-region",
+                      "cost-efficiency"
+                    ]
+                  }
+                },
+                "selectionReason": {
+                  "type": "string"
+                },
                 "interviewStyle": {
                   "type": "string",
                   "enum": [
@@ -7678,6 +10240,12 @@
                             "type": "string"
                           },
                           "error": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "partial": {
                             "type": [
                               "string",
                               "null"
@@ -8301,6 +10869,76 @@
                     "minLength": 1,
                     "maxLength": 80
                   },
+                  "questionId": {
+                    "type": "string"
+                  },
+                  "scenario": {
+                    "type": "string"
+                  },
+                  "primaryConceptId": {
+                    "type": "string",
+                    "enum": [
+                      "data-modeling",
+                      "indexing",
+                      "transactions",
+                      "consistency",
+                      "replication",
+                      "partitioning",
+                      "api-design",
+                      "caching",
+                      "load-balancing",
+                      "rate-limiting",
+                      "capacity-planning",
+                      "queues",
+                      "retry-safety",
+                      "coordination",
+                      "scheduling",
+                      "fault-tolerance",
+                      "backpressure",
+                      "observability",
+                      "migration",
+                      "authorization",
+                      "tenant-isolation",
+                      "data-lifecycle",
+                      "multi-region",
+                      "cost-efficiency"
+                    ]
+                  },
+                  "conceptIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "data-modeling",
+                        "indexing",
+                        "transactions",
+                        "consistency",
+                        "replication",
+                        "partitioning",
+                        "api-design",
+                        "caching",
+                        "load-balancing",
+                        "rate-limiting",
+                        "capacity-planning",
+                        "queues",
+                        "retry-safety",
+                        "coordination",
+                        "scheduling",
+                        "fault-tolerance",
+                        "backpressure",
+                        "observability",
+                        "migration",
+                        "authorization",
+                        "tenant-isolation",
+                        "data-lifecycle",
+                        "multi-region",
+                        "cost-efficiency"
+                      ]
+                    }
+                  },
+                  "selectionReason": {
+                    "type": "string"
+                  },
                   "interviewStyle": {
                     "type": "string",
                     "enum": [
@@ -8365,6 +11003,12 @@
                               "type": "string"
                             },
                             "error": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "partial": {
                               "type": [
                                 "string",
                                 "null"

@@ -194,6 +194,8 @@ it("completion wins over a late provider result and freezes assistance", async (
 });
 it("normalizes old persisted models but rejects selecting another model", () => {
   expect(normalizeSettings({ model: "old" }).model).toBe(MODEL_ID);
+  expect(settingsSchema.safeParse({ model: "google/gemini-3.1-flash-lite" }).success).toBe(true);
+  expect(normalizeSettings({ model: "google/gemini-3.1-flash-lite" }).model).toBe(MODEL_ID);
   expect(settingsSchema.safeParse({ model: "old" }).success).toBe(false);
 });
 
@@ -297,6 +299,7 @@ it("starting a question wins against an in-flight replacement", async () => {
         {
           message: {
             content: JSON.stringify({
+              scenario:"Outage recovery", primaryConceptId:"api-design", secondaryConceptIds:[], tagEvidence:[{conceptId:"api-design",requirementIndex:0}],
               title: "New question",
               prompt: "Explain how to handle an outage.",
               topic: "Systems",

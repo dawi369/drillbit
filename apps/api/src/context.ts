@@ -93,3 +93,17 @@ export function boundedContext(input: unknown, limit = 40000): unknown {
   }
   return result;
 }
+
+function escapeXML(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+}
+/** Data never becomes markup, even when a draft contains closing tags. */
+export function xmlContext(input: unknown): string {
+  function field(key: string, value: unknown): string {
+    const name = /^[A-Za-z][A-Za-z0-9_]*$/.test(key) ? key : "field";
+    const body = value == null ? "" : Array.isArray(value) ? value.map(item => field("item", item)).join("")
+      : typeof value === "object" ? Object.entries(value).map(([k,v]) => field(k,v)).join("") : escapeXML(String(value));
+    return `<${name}>${body}</${name}>`;
+  }
+  return field("practice_context", boundedContext(input));
+}

@@ -446,9 +446,10 @@ struct PracticeView: View {
     }
     .task(id: practice.running?.id) {
       guard practice.running != nil else { return }
+      let started = Date()
       while !Task.isCancelled, practice.finished == nil, practice.running != nil {
         await practice.refreshHelp()
-        try? await Task.sleep(for: .seconds(3))
+        try? await Task.sleep(for: .milliseconds(Date().timeIntervalSince(started) < 10 ? 500 : 1500))
       }
     }
     .onReceive(NotificationCenter.default.publisher(for: UITextView.textDidChangeNotification)) {
@@ -658,7 +659,8 @@ struct PreparationView: View {
   var onSubmitted: () -> Void = {}
   var submit: ((PreparationInput) -> Void)? = nil
   var recovery: PreparationInput? = nil
-  @State private var focus = ""
+  @State private var focus = "System design"
+  @State private var practiceArea = ""
   @State private var kind = "auto"
   @State private var engineeringLevel = "mid"
   @State private var instruction = ""
@@ -666,26 +668,16 @@ struct PreparationView: View {
   @State private var includeSource = true
   @State private var initialized = false
   @Environment(\.dismiss) private var dismiss
-  private var focuses: [String] {
-    var values = PracticeFocus.choices
-    if !model.settings.focus.isEmpty && !values.contains(model.settings.focus) { values.append(model.settings.focus) }
-    if let recovery, !values.contains(recovery.focus) { values.append(recovery.focus) }
-    return values
-  }
   var body: some View {
     Form {
       Section {
-        Picker("Topic", selection: $focus) {
-          ForEach(focuses, id: \.self) { Text($0).tag($0) }
-        }.accessibilityIdentifier("prepareTopic")
+        NavigationLink { PracticeAreaPicker(model: model, selection: $practiceArea) } label: {
+          LabeledContent("Practice area", value: model.taxonomy.first { $0.id == practiceArea }?.label ?? "Automatic")
+        }.accessibilityIdentifier("prepareArea")
         Picker("Target level", selection: $engineeringLevel) {
           ForEach(EngineeringLevel.choices, id: \.0) { Text($0.1).tag($0.0) }
         }.accessibilityIdentifier("prepareLevel")
-        Picker("Format", selection: $kind) {
-          Text("Choose for me").tag("auto")
-          Text("Explain").tag("explain")
-          Text("Design").tag("design")
-        }
+
       }
       if includeSource, let source, let reflection = source.reflection {
         Section("Building on your last session") {
@@ -708,7 +700,7 @@ struct PreparationView: View {
       Section {
         Button("Prepare question") {
           let input = PreparationInput(
-            interviewStyle: interviewStyle, focus: focus, kind: kind, difficulty: model.settings.difficulty,
+            primaryConceptId: practiceArea.isEmpty ? nil : practiceArea, interviewStyle: interviewStyle, focus: "System design", kind: "design", difficulty: model.settings.difficulty,
             engineeringLevel: engineeringLevel,
             replaceId: model.bootstrap?.challenge?.lifecycle == "ready" ? model.bootstrap?.challenge?.id : nil,
             instruction: instruction,
@@ -729,17 +721,17 @@ struct PreparationView: View {
           Text("Your current question stays until the new one is ready.")
         }
       }
-    }.navigationTitle("New question").navigationBarTitleDisplayMode(.inline).toolbar {
+    }.task { await model.loadTaxonomy() }.navigationTitle("New question").navigationBarTitleDisplayMode(.inline).toolbar {
       Button("Cancel") { dismiss() }
     }
     .onAppear {
       guard !initialized else { return }
       initialized = true
-      focus = model.settings.focus
+      focus = "System design"
       engineeringLevel = model.settings.selectedLevel
       if let recovery {
-        interviewStyle = recovery.interviewStyle ?? .standard
-        focus = recovery.focus
+        interviewStyle = .standard
+        practiceArea = recovery.primaryConceptId ?? ""
         engineeringLevel = recovery.engineeringLevel ?? EngineeringLevel.legacy(recovery.difficulty)
         kind = recovery.kind
         instruction = recovery.instruction

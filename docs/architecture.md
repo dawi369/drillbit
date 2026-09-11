@@ -76,7 +76,7 @@ Use system typography, semantic colors, SF Symbols and system component geometry
 
 ## Model and prompt policy
 
-`google/gemini-3.1-flash-lite` is the only provider model for managed and BYOK requests. The provider enforces the constant independently of settings or queued job snapshots. Migration 0004 updates stored preferences; reads normalize older snapshots. The native model picker is removed. All actions use versioned `companion-v1` task instructions with a shared concise, warm tone layer. Tone is inspired by the user's Poke reference; it does not reproduce private prompts.
+`google/gemini-2.5-flash-lite` is the only provider model for managed and BYOK requests. The provider enforces the constant independently of settings or queued job snapshots. Migration 0004 updates stored preferences; reads normalize older snapshots. The native model picker is removed. All actions use versioned `companion-v1` task instructions with a shared concise, warm tone layer. Tone is inspired by the user's Poke reference; it does not reproduce private prompts.
 
 Run `bun scripts/check-practice-model.ts` and `bun scripts/check-practice-model.ts --edges` for synthetic live checks. They use the configured OpenRouter key and incur provider usage. Schema/boundary success is separate from human judgment of correctness and tone; see the current acceptance record.
 
@@ -114,12 +114,129 @@ Existing generation/detail/Start APIs and ready-question replacement semantics a
 
 ## Interview room — 9 September 2026
 
-The active native workspace is now `InterviewView`, replacing the Solo/Coach/Guided selector with explicit turn-taking. The older companion implementation and public APIs remain for compatibility and historical assistance; its timers are not mounted in the new workspace. Today and the preview route are unchanged. Start interview opens a writing canvas; Share answer commits a snapshot, then a separate durable job produces a single follow-up. The … menu holds Ask interviewer, Conversation and the recorded interview style; the bottom bar retains voice and Share answer. Ask interviewer opens clarification, nudge and read-only example actions without sharing or replacing the draft. Conversation preserves prior turns, including in completed-session detail. Live voice remains disabled.
+The active native workspace is now `InterviewView`, replacing the Solo/Coach/Guided selector with explicit turn-taking. The older companion implementation and public APIs remain for compatibility and historical assistance; its timers are not mounted in the new workspace. Today and the preview route are unchanged. Start interview opens a writing canvas; Share answer commits a snapshot, then a separate durable job produces a single follow-up. The … menu holds Finish interview, Ask interviewer, an editable Interview style list and Full question; the bottom bar retains voice and Share answer. Ask interviewer opens clarification, nudge and read-only example actions without sharing or replacing the draft. The active document preserves prior turns inline; the dedicated transcript remains available in completed-session detail. Live voice remains disabled.
 
-Interview style is a temporary preparation choice: Quick, Standard (default), In-depth. It is stored with generated questions as `quick`, `standard`, `in_depth`, independent of engineering level and global settings. Older questions default to Standard. Quick permits one initial follow-up, Standard up to two, In-depth up to four before a deterministic wrap-up offer; the model may offer an earlier wrap-up. These are ceilings rather than mandatory rounds. Keep going explicitly requests an additional question, followed by another wrap-up offer. No automatic completion or inference from typing pauses.
+Interview style is a temporary preparation choice and can be changed from the workspace menu: Quick, Standard (default), In-depth. It is stored with generated questions as `quick`, `standard`, `in_depth`, independent of engineering level and global settings. Older questions default to Standard. Workspace choices persist locally per account/attempt and are sent as an optional `style` on the next explicit interview command. The server captures that style in generation context and atomically stores it with the accepted turn; stale or duplicate commands cannot change it independently. Requests without a style retain the saved value, and existing turns remain unchanged. Quick permits one initial follow-up, Standard up to two, In-depth up to four before a deterministic wrap-up offer; the model may offer an earlier wrap-up. These are ceilings rather than mandatory rounds. Keep going explicitly requests an additional question, followed by another wrap-up offer. No automatic completion or inference from typing pauses.
 
 Migration `0006_interview.sql` adds ordered `interview_turns` linked to durable jobs. `POST /challenges/{id}/interview` accepts an answer/clarification/hint/example/continue command with draft revision, current prompt identity and idempotency key. A D1 batch creates the turn/job and increments the session revision; only an answer clears the active draft. Competing requests cannot share the same revision or leave a partial turn. Account-wide single-flight and per-account/attempt limits bound requests. `POST /challenges/{id}/interview/{turn}/retry` retries a failed response with a new job while retaining the original committed answer. Workflow automatic retries are disabled for interview inference.
 
 Native pending commands are persisted before submission in the account-scoped DiskStore cache. Ambiguous requests retain their original command and lock submission until reconciled. The existing draft outbox preserves offline typing and conflicts. Restoration reads existing state; replay does not create another answer or paid job. Completion remains revision checked, cancels pending interview work and freezes the ordered transcript alongside any unshared final draft. A late model response cannot alter a completed interview. Generated assistance is conservatively recorded as unknown exposure; no claim of independent work is inferred from missing receipts. Examples in the new Ask sheet are read-only; the legacy revision-checked adoption APIs remain supported.
 
-The sole model remains Gemini 3.1 Flash Lite. `interview-v1` separates follow-up/wrap-up schemas from clarification/help replies, preventing a clarification response from advancing the turn. Wrap-up copy is normalized by the server. Long histories are bounded by dropping oldest context turns with an explicit omitted-turn count; complete stored history remains intact, and reflection instructions restrict conclusions to available evidence. Current answer and current prompt are retained. Broader long-interview reflection quality remains a product acceptance concern.
+The sole model is Gemini 2.5 Flash Lite. `interview-v1` separates follow-up/wrap-up schemas from clarification/help replies, preventing a clarification response from advancing the turn. Wrap-up copy is normalized by the server. Long histories are bounded by dropping oldest context turns with an explicit omitted-turn count; complete stored history remains intact, and reflection instructions restrict conclusions to available evidence. Current answer and current prompt are retained. Broader long-interview reflection quality remains a product acceptance concern.
+
+Interview submission waits for an in-flight draft sync and then drains the current challenge only. Unrelated pending drafts do not block sharing; a real local conflict or unsynced current draft still does. Failed pre-submission sync retains the action for explicit Retry. Save-status captions are absent from the workspace, and keyboard focus never changes the question disclosure state. API transport/token injection lets native regression tests exercise this real controller/outbox path without Clerk or paid model calls.
+
+
+## Continuous interview document — 9 September 2026
+
+The interview workspace is one vertical document: the original specification, chronological exchanges, and the current growing answer. `InterviewExchange.document` projects existing durable turns; an answer’s follow-up becomes the next exchange’s question exactly once. Clarification, nudges and examples stay with their question and are not presented as candidate answers. No API or database change is needed.
+
+Each exchange has one manual disclosure. Everything starts expanded. Collapsed rows show a question excerpt with a trailing 20-percent fade only when needed, plus a separate unfaded chevron; accessibility text uses up to two lines and native truncation. Entire headings are disclosure buttons with complete VoiceOver labels and expanded/collapsed values. Typing and polling never fold content. An explicitly accepted Share folds the question just answered; failed submissions leave its disclosure unchanged. Folding only hides question wording, never submitted answers or recovery controls. Disclosure choices and the document offset are cached per account/attempt on this device; returning restores them. Offset restoration is a reading convenience, not a shared server revision.
+
+The header uses the actual question title, Close and …; Finish interview is first in the menu with confirmation. Full question expands the original exchange and scrolls to its heading in the same document; there is no separate original-question sheet. Active history no longer requires a Conversation sheet. Wrap-up appends to the document, preserving all earlier work and offering Finish & review / Keep going.
+
+A non-scrolling native UITextView provides growing multiline editing and caret/selection geometry within SwiftUI. The outer ScrollView owns vertical scrolling, including the full original specification. UIKit first-responder and editability changes are deferred until after `updateUIView` returns: resigning synchronously re-enters SwiftUI’s responder graph and can stall Share and scrolling. The SwiftUI-only multiline field failed the long-answer caret check, so the small native bridge measures intrinsic height and reveals the caret above the keyboard without moving selection. User scrolling takes priority; ordinary layout updates do not imply following a response. No custom motion or transparent surface is required.
+
+A submitted answer remains in place while sharing, then appears as a committed snapshot in its exchange. Pending and failed response UI stays beside that snapshot, including a reachable retry when folded. A response reveals the next question only while the person follows the active end. If they scroll back or inspect a sheet, an explicit New follow-up / Wrap-up ready action appears instead. While older history is in view, Return to answer replaces Share to prevent sending an offscreen draft. The existing outbox, idempotency, conflict and completion safeguards remain unchanged.
+
+
+### Sent answer and interviewer response
+
+Each completed answer is rendered immediately before the follow-up it produced, within the same visual block. The prior question disclosure no longer owns the answer’s visibility. Pending/failed answers remain visible beneath their question; successful response arrival places the same durable answer snapshot beside its reply. A divider separates question wording from the initial editor and separates completed exchange blocks. The wire format, stored turns, revision checks and pending-command recovery are unchanged. This supersedes the earlier whole-exchange folding behaviour.
+
+
+### Reply-driven answer folding and latency — 10 September 2026
+
+Submitted answers stay open while awaiting a response or after failure. Once a completed reply exists, the answer becomes a one-line disclosure above that reply. Manual answer expansion persists in the account/attempt reading cache (`expandedAnswers`, optional for compatibility). The original question’s collapsed excerpt is its title. Question and answer disclosures remain independent.
+
+All managed and BYOK calls now use `google/gemini-2.5-flash-lite`, disable reasoning and sort compatible OpenRouter providers by latency. Schema enforcement remains required for structured calls. Settings accepts the previous 3.1 model identifier for old clients, normalizes writes/reads and queued jobs to the fixed model, and introduces no migration or model picker. Native response polling runs once per second only while a job is pending (foreground fetches only), reducing the previous three-second polling delay.
+
+
+## Home and the future voice transcript boundary — 10 September 2026
+
+Home replaces Today in navigation and user-facing recovery copy. It remains a plain native, scrollable hub: completion counts, last-seven-days count, current ready/in-progress question and preparation/progress/recovery controls. The latest-session summary is removed from Home; historical sessions remain in Memory. The workspace send action is a 44-point arrow-up control paired with the disabled waveform control. Wrap-up uses a checkmark with an explicit VoiceOver label and the existing confirmation.
+
+`FinalizedInterviewAnswer` captures a stable turn UUID, account, challenge, prompt identity and finalized text. `InterviewController.receiveFinalizedAnswer` is the entry point for a future voice adapter: it checks captured identity, blocks stale prompts or an unrelated written draft, and reuses the same draft outbox, idempotent interview command and response-history pipeline as typing. Duplicate accepted events are ignored only if their text matches; mismatched duplicate events are rejected. Pre-submission retry preserves the event’s command UUID. Accepted answers and generated replies are already stored as ordinary interview turns, so exiting voice needs no second transcript import or merge.
+
+Only finalized user answers enter this API. Partial recognition stays inside the future adapter; clarification/discussion is a separate destination and must not be passed as an answer. The agent response continues through the existing backend and appears in the same text history. Recording, audio permissions, speech recognition, playback, cancellation/barge-in and externally generated live-model transcript import remain unimplemented. Voice stays disabled. This is a tested input boundary, not a working voice session.
+
+
+### Resume restoration and quiet waiting — 10 September 2026
+
+Disclosure state is read from the account/attempt cache before document content becomes interactive, rather than after the controller’s asynchronous refresh. Restoration cannot overwrite a new disclosure tap. Initial turn hydration is excluded from live-reply navigation. The collapsed original shows its title (up to two lines) and a three-line description; Full question still expands it in place. Sharing and pending interviewer states use inline secondary text with no progress spinner, including the Ask sheet. Explicit Share and completed-answer folding rules otherwise remain unchanged.
+
+
+### Skip confirmation and disclosure spacing — 10 September 2026
+
+Skip uses a standard alert with Keep practising and destructive Skip question actions, avoiding a confirmation popover anchored to a menu item that has disappeared. Expanded question headers align their content at the bottom of the existing 44-point tap target, with an 8-point body gap; expanded answer headers use a 4-point gap. Collapsed previews and native accessibility labels remain unchanged.
+
+
+10 September 2026 follow-up spacing refinement: expanded exchanges use 4-point stack spacing and vertically centred disclosure headers, reducing the blank space above Follow-up while retaining 44-point tap targets. Collapsed exchanges retain their existing 8-point spacing. Sharing and waiting status captions are removed from the workspace and Ask sheet; pending-command locks, saved answers and error/retry controls remain unchanged.
+
+### Interview streaming — 10 September 2026
+
+Send immediately projects a collapsed outgoing answer and a stable Interviewer disclosure row. The existing persisted command/revision mechanism remains authoritative: ambiguous submission failures retain that command; definite rejection restores the editor. Opening a disclosure during inference is respected when the result completes. New interviews never suggest wrap-up; Finish remains explicit. Historical wrap-up outcomes remain decodable.
+
+Workflow generation now consumes real provider SSE, extracts only complete JSON string fragments, and persists provisional text in additive migration `0007_interview_streams`. Account-scoped GET `/v1/challenges/:id/interview/:turn/stream` emits changed `{status,text}` snapshots without starting inference. Publication is capped to roughly one write per 150 ms; subscribers check every 200 ms. Full schema validation and the existing lifecycle checks still gate final transcript commitment. Partial text is not a completed answer. Disconnecting a subscriber does not cancel its durable job; explicit retry reconnects, and completed challenge detail restores the final transcript. No fabricated typing replay is added; very short replies can finish between snapshots.
+
+The native controller tracks the pending job identity, rejects callbacks for another account/job, and reconciles completed detail after submission settles. Reduced Motion disables the collapse animation. No progress spinner, waiting caption, sound or automatic wrap-up panel is shown.
+
+## System-design library foundation — 10 September 2026
+
+Home and Library are the two tabs. Focus is removed from onboarding, Settings and preparation; all generation, including legacy request shapes, normalizes to System design. Preparation offers a temporary Practice area (Automatic or one canonical concept), engineering level, interview style and optional request. There is no format picker.
+
+Migration 0008 separates immutable `questions` from existing challenge/attempt identities through `question_attempts`. Repeated Start creates a new challenge/session linked to the same question. Old attempts remain readable. Question-pool eligibility has its own revision and durable idempotency records. Skip excludes the question, Add back restores eligibility without starting or generating, and explicit repeat Start respects the one-active-attempt constraint. Generation may reuse an eligible question at the requested level/area without a provider call. It consumes eligibility when the ready candidate is created. Otherwise deterministic selection prefers less-covered primary concepts at the requested level, avoiding the latest two concepts; explicit area selection wins. Completion counts are evidence of practice volume, not proficiency.
+
+The versioned taxonomy has 24 server-owned concept IDs, labels, categories, aliases and descriptions. New generation returns a 1–3 word scenario and one list of 1–3 concept/evidence entries; the primary ID is constrained in the actual response schema. Each evidence entry references prompt index 0 or a one-based constraint index. The server derives secondary IDs and validates uniqueness, primary inclusion and valid references. This avoids redundant model-generated arrays or fragile copied quotation matching. The references identify source requirements; semantic relevance remains a model-quality evaluation concern. Private tag evidence and selection snapshots are excluded from public projections. Inferred tags are absent from unanswered previews.
+
+Library APIs provide account-scoped pagination, search, OR concept filters combined with level/date filters, immutable question detail with paginated attempts, revision-checked eligibility updates, repeat Start and factual per-concept coverage. The native list caches first pages/details, clearly labels offline/incomplete data and queues eligibility changes in the local actor-backed store. Library replaces the earlier free-text recurring-pattern presentation; existing reflections remain in attempt detail. Generation uses up to ten compact recent signatures and bounded reflection excerpts, with explicit request and selected area preserved. A versioned observation contract is reserved, but no new skill assessments, review intervals or mastery scores are generated in this phase.
+
+Bootstrap includes `practiceEpoch`. Native sync checks bootstrap before replaying the outbox, and a changed epoch clears only that account's practice drafts, caches, pending commands and reminders, preserving authentication/preferences. This adds one bootstrap request before a sync pass; future transport/context work may optimize that guard without permitting stale replay. The development reset preserved account/settings/provider configuration and cleared old practice data. `practice_epoch.enabled` is a maintenance gate for mutations and scheduling. Exact-content duplicate generation is rejected without replacing existing work. Existing interview streaming, completion snapshots and assistance exposure remain authoritative.
+
+## Library refresh and interview chrome — 10 September 2026
+
+Library keeps account/filter-scoped in-memory snapshots, backed by the existing account-scoped disk cache. Superseded by launch preloading below; page entry no longer revalidates. Request identities reject superseded filter responses, and refresh failures retain displayed results. Practice epoch changes clear these snapshots. Question details also hydrate from cached state before fetching.
+
+Interview navigation displays at most two words from the recorded scenario (legacy fallback: System design); the full title remains in the original-question section. Close remains directly accessible. The safe-area footer reserves keyboard/caret clearance but draws no full-width background: only the disabled voice and send/finish controls have surfaces. History-return shortcuts are removed; late responses continue to respect manual scrolling.
+
+## Launch-preloaded Library — 10 September 2026
+
+Launch prepares the first 25 completed and 25 skipped questions, their first attempt pages, and each question’s latest full attempt (five concurrent question fetches). Account-scoped disk snapshots provide offline fallback. Pages consume memory snapshots without entry/pull-to-refresh requests; uncached filters and older pages load on demand and remain cached. Publication happens after detail hydration. Ordinary foreground/bootstrap refresh does not rewarm the Library.
+
+Successful completion acknowledgement starts an account-scoped watcher outside the results view. Once the server returns stored feedback, it refreshes the Library snapshot and invalidates cached filters. The watcher is bounded to 90 two-second polls; a later cold launch also reconciles the database. Failed/unacknowledged completion cannot trigger this refresh. Skip refreshes only the skipped collection; pool acknowledgements patch cached eligibility without refetching. Close/navigation does not invalidate Library data.
+
+## XML interviewer context — 10 September 2026
+
+The active Standard interviewer uses a versioned XML prompt, account-scoped recent-history snapshots and committed user/assistant role pairs. Each new interview job pins its prompt edition and history; XML escaping keeps candidate content separate from policy. Generation consumes the same bounded history for variety. Standard is the sole active style; legacy style inputs normalize for new turns without removing historical enum values. Runtime prompt administration remains future work. See [context engineering](context-engineering.md) for provenance, limits and editing boundaries.
+
+## Interview document motion — 10 September 2026
+
+Structural exchange/disclosure/draft changes use a shared 320 ms ease-in-out transition; arriving rows fade and streamed text height settles over 180 ms without text replay. New-exchange scrolling waits 340 ms for keyboard/document changes, uses an animated bottom anchor, and cancels when the target changes or the user browses history. Restoration has no entrance animation; Reduced Motion disables these animations. Busy clarification/help no longer removes the draft editor: it remains in place but disabled. Answer submission still replaces the editor with the durable outgoing snapshot, and final response commitment reveals the next editor smoothly.
+
+### Disclosure clipping correction
+
+Manual question/answer disclosures use a faster 180 ms ease-out independently of the 320 ms response transition. Expanded text is intrinsically measured inside an explicitly sized, clipped reveal region. It cannot draw at its final height over following rows while the surrounding layout is still opening. Hidden content is excluded from hit testing and accessibility. The initially expanded view uses intrinsic height until measurement, avoiding an empty first frame.
+
+### Unified original-question disclosure
+
+The original description is now a single persistent body-font text view, clipped between measured three-line and full heights. There is no duplicate excerpt/full-description swap or immediate opacity removal. The title remains in its stable header. Manual disclosure and Send both use the same 220 ms ease-in-out motion; the preview changes to secondary color without reflowing to another font. This supersedes the earlier original-question reveal implementation.
+
+### Submitted-answer disclosure
+
+Original questions and submitted answers share the same persistent-text, measured-height disclosure component and 220 ms ease-in-out timing. Answers retain a one-line preview and primary text color. Send first lays out the opaque submitted snapshot, then compresses it and the answered question together; newly submitted blocks do not replay an insertion fade. The short handoff is transient view state, independent of durable submission and stream recovery. Restored answers keep their saved disclosure state.
+
+### Content-sized transcript rows
+
+Answer and interviewer rows compare intrinsic SwiftUI body-text height with a measured one-line preview at the actual available width. One-line turns have no disclosure button or collapsed/expanded accessibility state; longer turns retain the shared 220 ms disclosure. Measurements update with text, width and Dynamic Type. Disclosure buttons overlay the label/first-line region with a 44-point hit target instead of reserving a separate tall header. Transcript divider spacing is 12 points, document top padding is 20 points, and the original-question label/title gap is 4 points.
+
+### Stable transcript labels
+
+Original-question, You, Interviewer and draft labels use a shared nonanimating label view. They retain fixed typography and top-leading alignment, and opt out of local animation transactions. Whole exchange and draft insertion fades were removed so an ancestor cannot fade the labels. Content disclosure still uses its existing measured-height motion; labels travel with normal document reflow and scrolling rather than floating over other rows.
+
+## Optimistic local actions — 11 September 2026
+
+Skip first stores an account-scoped command and the latest editor text in SwiftData, then dismisses the workspace and removes its Home card without awaiting HTTP. AppModel drains skips in the background before draft writes, reusing the existing repeat-safe Skip endpoint. Acknowledgement retires pending draft uploads while retaining the local answer. Queued skips mask stale bootstrap data after relaunch; a local tombstone also rejects late interviewer presentation. Network failures leave the command pending for reconnect/manual sync. New generation waits for queued skips to drain before requesting a paid job. Sign-out pending-write checks include these commands.
+
+Add back to pool now publishes local eligibility immediately after durably enqueuing the existing revision-checked command. Library hydration reapplies pending eligibility so refresh does not undo the optimistic state. A 404/409 response reconciles Library data and exposes the server error; transport errors leave the command queued. Work arriving during an existing sync receives a subsequent drain pass.
+
+This pattern applies to confirmed local intent, not fabricated server results: Start, generation, and completed feedback retain their acknowledgement boundaries. No backend schema or contract changes.

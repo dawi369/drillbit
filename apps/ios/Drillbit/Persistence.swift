@@ -77,6 +77,7 @@ struct LocalDraft: Sendable {
       throw APIError(
         code: "draft_missing", message: "Reopen this session before editing.", status: 0)
     }
+    if value.pendingKind == "skipped" { return }
     if value.answer == answer && !completing { return }
     value.answer = answer
     value.pendingKind = completing ? "complete" : "draft"
@@ -86,7 +87,7 @@ struct LocalDraft: Sendable {
   func pending(account: String) throws -> [LocalDraft] {
     try modelContext.fetch(
       FetchDescriptor<StoredDraft>(
-        predicate: #Predicate { $0.account == account && $0.pendingKind != "" })
+        predicate: #Predicate { $0.account == account && $0.pendingKind != "" && $0.pendingKind != "skipped" })
     ).map(snapshot)
   }
   func acknowledge(account: String, sent: LocalDraft, revision: Int) throws {
@@ -146,6 +147,53 @@ struct LocalDraft: Sendable {
       try cached(key: key).flatMap { try JSONDecoder().decode([DeliveryReceipt].self, from: $0) }
       ?? []
     try cache(key: key, data: JSONEncoder().encode(receipts.filter { !ids.contains($0.id) }))
+  }
+  func prepareInterviewAnswer(account: String, id: String, answer: String, command: String, promptID: String, style: InterviewStyle) throws -> PendingInterviewCommand {
+    guard let draft = try row(account: account, id: id), !draft.conflict, !["complete", "skipped"].contains(draft.pendingKind) else {
+      throw APIError(code: "sync_pending", message: "Review the current draft before sending.", status: 409)
+    }
+    draft.answer = answer
+    draft.pendingKind = "draft"
+    draft.command = command
+    let pending = PendingInterviewCommand(command: command, input: InterviewInput(promptId: promptID, kind: "answer", revision: draft.revision, text: answer, style: style, saveDraft: true))
+    try cache(key: "interview:" + account + ":" + id + ":pending", data: JSONEncoder().encode(pending))
+    return pending
+  }
+  func acknowledgeInterviewAnswer(account: String, id: String, text: String, revision: Int) throws {
+    guard let draft = try row(account: account, id: id), draft.pendingKind == "draft", draft.answer == text, !draft.conflict else { return }
+    draft.answer = ""; draft.serverAnswer = ""; draft.revision = revision; draft.pendingKind = ""
+    try modelContext.save()
+  }
+  func pendingSkips(account: String) throws -> [String] {
+    try cached(key: "skips:" + account).flatMap { try JSONDecoder().decode([String].self, from: $0) } ?? []
+  }
+  func queueSkip(account: String, id: String, answer: String? = nil) throws {
+    if let answer, let draft = try row(account: account, id: id) { draft.answer = answer }
+    var ids = try pendingSkips(account: account)
+    if !ids.contains(id) { ids.append(id) }
+    try cache(key: "skips:" + account, data: JSONEncoder().encode(ids))
+  }
+  func acknowledgeSkip(account: String, id: String) throws {
+    // Retain the answer locally, but stop trying to upload edits to a retired attempt.
+    if let draft = try row(account: account, id: id) { draft.pendingKind = "skipped"; draft.conflict = false }
+    let ids = try pendingSkips(account: account).filter { $0 != id }
+    try cache(key: "skips:" + account, data: JSONEncoder().encode(ids))
+  }
+  func enqueueEligibility(account: String, command: EligibilityCommand) throws {
+    let key = "eligibility:" + account
+    var values = try cached(key: key).flatMap { try JSONDecoder().decode([EligibilityCommand].self, from: $0) } ?? []
+    if !values.contains(where: { $0.questionId == command.questionId }) { values.append(command) }
+    try cache(key: key, data: JSONEncoder().encode(values))
+  }
+  func acknowledgeEligibility(account: String, command: String) throws {
+    let key = "eligibility:" + account
+    let values = try cached(key: key).flatMap { try JSONDecoder().decode([EligibilityCommand].self, from: $0) } ?? []
+    try cache(key: key, data: JSONEncoder().encode(values.filter { $0.id != command }))
+  }
+  func clearPractice(account: String) throws {
+    for value in try modelContext.fetch(FetchDescriptor<StoredDraft>(predicate: #Predicate { $0.account == account })) { modelContext.delete(value) }
+    for value in try modelContext.fetch(FetchDescriptor<CachedPayload>()) where value.key.contains(":" + account + ":") || value.key.hasSuffix(":" + account) || value.key.hasPrefix(account + ":") { modelContext.delete(value) }
+    try modelContext.save()
   }
   func clear() throws {
     try modelContext.delete(model: StoredDraft.self)

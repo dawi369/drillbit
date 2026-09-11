@@ -5,6 +5,12 @@ const definitions = Object.fromEntries(
   Object.entries(wire).map(([name, schema]) => [name, z.toJSONSchema(schema)]),
 );
 const operations: [string, string, string, string?][] = [
+  ["get","taxonomy","Get the versioned system-design concept vocabulary"],
+  ["get","library","Search and filter the account question library"],
+  ["get","library/coverage","Count completed practice by concept without inferring ability"],
+  ["get","questions/{id}","Read a question and paginated attempts"],
+  ["put","questions/{id}/eligibility","Update question-pool eligibility with revision and idempotency","EligibilityInput"],
+  ["post","questions/{id}/start","Start a fresh attempt for an immutable question"],
   ["post", "challenges/{id}/interview", "Commit an answer or request clarification/help without advancing the answer", "InterviewInput"],
   ["post", "challenges/{id}/interview/{turn}/retry", "Retry a failed interviewer response without resubmitting the answer"],
   [
@@ -78,6 +84,7 @@ const operations: [string, string, string, string?][] = [
   ["get", "widget", "Read minimal widget snapshot using device token"],
 ];
 const responseNames: Record<string, string> = {
+  "get taxonomy":"Taxonomy", "get library":"LibraryPage", "get library/coverage":"Coverage", "get questions/{id}":"LibraryDetail", "put questions/{id}/eligibility":"LibraryQuestion", "post questions/{id}/start":"Challenge",
   "post challenges/{id}/interview": "InterviewState",
   "post challenges/{id}/interview/{turn}/retry": "InterviewState",
   "put challenges/{id}/companion": "Companion",
@@ -110,6 +117,7 @@ const responseNames: Record<string, string> = {
   "get widget": "Widget",
 };
 const idempotent = new Set([
+  "put questions/{id}/eligibility", "post questions/{id}/start",
   "post challenges/{id}/interview",
   "post challenges/{id}/interview/{turn}/retry",
   "put challenges/{id}/companion",
@@ -135,6 +143,7 @@ for (const [method, path, summary, schema] of operations) {
     operationId: method + "_" + path.replace(/[^a-z]/g, "_"),
     parameters: [
       ...(path.includes("{turn}") ? [{ name: "turn", in: "path", required: true, schema: { type: "string" } }] : []),
+      ...(["library","questions/{id}"].includes(path) ? (path === "library" ? ["cursor","q","concepts","level","since","skipped"] : ["cursor"]).map(name=>({name,in:"query",schema:{type:"string"}})) : []),
       ...(path === "sessions"
         ? ["cursor", "q"].map((name) => ({
             name,
@@ -223,6 +232,13 @@ for (const [method, path, summary, schema] of operations) {
     },
   };
 }
+paths["/v1/challenges/{id}/interview/{turn}/stream"] = {
+  get: {
+    summary: "Subscribe to persisted interviewer text snapshots without starting another inference",
+    parameters: [{name:"id",in:"path",required:true,schema:{type:"string"}},{name:"turn",in:"path",required:true,schema:{type:"string"}}],
+    responses: {"200":{description:"SSE snapshot events with JSON text and job status. Partial text is provisional until completed; reconnect by resubscribing.",content:{"text/event-stream":{schema:{type:"string"}}}}}
+  }
+};
 writeFileSync(
   "packages/contracts/openapi.json",
   JSON.stringify(

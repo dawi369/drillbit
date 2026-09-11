@@ -145,7 +145,7 @@ export async function detail(env: Env, account: string, id: string) {
   };
 }
 export function present(row: ChallengeRow) {
-  const { evaluationCriteria, ambiguityPolicy, targetSkill, ...content } =
+  const { evaluationCriteria, ambiguityPolicy, targetSkill, tagEvidence, selectionSnapshot, ...content } =
     parseJSON<Record<string, unknown>>(row.data);
   return {
     id: row.id,
@@ -198,11 +198,11 @@ export async function createJob(
   return env.DB.prepare("SELECT * FROM jobs WHERE id=?").bind(id).first<Job>();
 }
 export async function dispatch(env: Env, id: string) {
-  try {
-    await env.JOBS.create({ id, params: { jobId: id } });
-  } catch {
+  const enqueue = env.JOBS.create({ id, params: { jobId: id } }).catch(() => {
     console.warn(JSON.stringify({ event: "job_dispatch_deferred", jobId: id }));
-  }
+  });
+  if (env.defer) { env.defer(enqueue); return; }
+  await enqueue;
 }
 export async function complete(
   env: Env,
