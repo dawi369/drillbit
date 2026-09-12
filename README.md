@@ -2,10 +2,9 @@
 
 # Drillbit
 
-**Your next boss fight.**
+**Hard questions. Good company.**
 
-System design practice with an AI interviewer who knows this is practice.
-Think out loud, get unstuck, and come back a little better.
+System design practice with an AI interviewer you can think out loud with.
 
 [![Verify](https://github.com/dawi369/drillbit/actions/workflows/verify.yml/badge.svg)](https://github.com/dawi369/drillbit/actions/workflows/verify.yml)
 ![iOS 26+](https://img.shields.io/badge/iOS-26%2B-black?logo=apple)
