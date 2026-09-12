@@ -420,3 +420,20 @@ The simulator owner's exact account is exempt from daily voice starts and techni
 Implemented server-side account/local-day claims and client day caching, existing-question/pending-job reuse, explicit failure recovery, no scheduled generation, and a generic local reminder. 88 D1/backend tests and typecheck passed (`/tmp/daily-tests.log`), including concurrent devices, DST/local midnight, account isolation, preservation of existing work, and no generation from overdue scheduler settings. Daily wire fixture parsing and contract generation passed. `/tmp/drillbit-daily-open.xcresult` passed Home automatic preparation/regeneration; final native build passed (`/tmp/daily-final-build.log`).
 
 D1 migration 0010 applied after private backup. Worker deployed as `465f3af9-8d38-4090-9c43-a13b00e14a95`. Final simulator installed/launched; remote D1 read verified the owner's authenticated app created the `2026-09-12` daily-visit record. This verifies live app-to-backend day registration, not a fresh live inference or physical notification delivery. No TestFlight upload or APNs setup.
+
+### Voice navigation and question wording — 12 September 2026
+
+Removed the duplicate bottom Use text control. The single top-left exit retains cancellation, immediate audio shutdown and draft preservation; Mute remains the main bottom action. Signed simulator journeys `testLiveVoicePreservesDraftAndTranscript` and `testVoiceRoomCancelDuringConnection` pass, including a single-exit assertion. All 88 backend tests pass. Six synthetic live Gemini interview samples returned valid responses without calling the exercise a prompt; this is a small text sample, not physical-device voice acceptance.
+
+Text prompt edition `interviewer-standard-v5` adds question/problem/scenario terminology while retaining v4 social routing, reasoning and outcome contracts. Prior editions remain resolvable. The same wording applies to realtime voice instructions and delegated technical guidance. Development Worker deployed as `d7e77e84-8671-4b24-b7cf-b29b3e0932f4`; existing voice connections need a new session to receive updated instructions. No TestFlight upload.
+
+### Primary microphone and native icon catalog — 12 September 2026
+
+Voice uses a centred, icon-only 72-point microphone control. Muted state has a red slashed symbol, distinct surface and VoiceOver value; live state uses inverse semantic colours. Routine microphone captions and action subtitles are removed. Connection/error messages and the single navigation exit remain. `AppIcon` centralizes SF Symbols across the main app without an external font/package. Simulator voice journeys pass in light and largest Dynamic Type dark appearances; captures inspected. A rapid-toggle symbol blending artifact required replacing the symbol view identity while preserving button identity; the final light-mode journey passes and was visually rechecked. Signed build only; no TestFlight upload or new audio cues.
+
+### Voice Start and immediate text handoff — 12 September 2026
+
+- Signed iPhone 17 Pro simulator: explicit Start before active mic; mute/unmute; shared history; draft and transcript preserved on Use text; re-entry shows Start without automatic reconnection; connecting cancellation cannot resurrect the room; unavailable voice preserves the reply. Four targeted UI journeys pass, including largest Dynamic Type/dark appearance. Start-state screenshots inspected.
+- WebRTC now uses manual audio-unit control. Use text disables capture/playback synchronously while final receipts drain; late startup cannot re-enable a stopped transport. Refresh guards protect the local transcript until closure is reconciled.
+- Local connection preparation is gated by already-granted microphone permission and fresh positive account capability. No paid API preconnection; explicit Start uses fresh answer context. Preparation failure falls back to a fresh local offer.
+- Physical-device speaker cutoff, route interruption and microphone handoff remain unverified in this pass. Simulator fixtures do not establish live provider audio behavior. No TestFlight upload.

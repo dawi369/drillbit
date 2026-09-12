@@ -25,6 +25,7 @@ private struct VoiceOutbox: Codable {
   var blocksText: Bool { [.connecting,.active,.ending].contains(phase) || outbox != nil }
   private let interview: InterviewController
   private var transport: NativeVoiceTransport?
+  private var prepared: (link: NativeVoiceTransport, offer: Task<String, Error>, date: Date)?
   private var outbox: VoiceOutbox?
   private var syncing = false
   private var acknowledged: Set<String> = []
@@ -48,6 +49,21 @@ private struct VoiceOutbox: Codable {
       await sync()
       if outbox != nil { phase = .unavailable }
     }
+  }
+  // Prepare ICE locally only; opening an interview must never create a billed session.
+  func prepareIfAllowed() {
+    guard !interview.model.fixture, phase == .idle, !blocksText, prepared == nil,
+          interview.currentAccount, interview.acceptsVoiceInput,
+          AVAudioApplication.shared.recordPermission == .granted,
+          let capability = interview.model.bootstrap?.capabilities?.voice,
+          capability.available, capability.isFresh() else { return }
+    let link = NativeVoiceTransport()
+    prepared = (link, Task { try await link.offer() }, Date())
+  }
+  func discardPreparation() {
+    prepared?.offer.cancel()
+    prepared?.link.close()
+    prepared = nil
   }
   func start() async {
     guard !blocksText, !interview.locked, interview.currentAccount, interview.acceptsVoiceInput else { return }
@@ -83,15 +99,31 @@ private struct VoiceOutbox: Codable {
       let audio = AVAudioSession.sharedInstance()
       try audio.setCategory(.playAndRecord,mode:.voiceChat,options:[.defaultToSpeaker,.allowBluetoothHFP])
       try audio.setActive(true)
-      let link = NativeVoiceTransport()
+      if let prepared, Date().timeIntervalSince(prepared.date) > 60 { discardPreparation() }
+      let preparation = prepared
+      prepared = nil
+      var link = preparation?.link ?? NativeVoiceTransport()
       transport = link
+      let offer: String
+      if let preparation {
+        do { offer = try await preparation.offer.value }
+        catch {
+          guard generation == epoch else { link.close(); return }
+          // A speculative local preparation must not make explicit Start fail.
+          link.close()
+          link = NativeVoiceTransport()
+          transport = link
+          offer = try await link.offer()
+        }
+      } else { offer = try await link.offer() }
+      guard generation == epoch else { link.close(); return }
       link.onEvent = { [weak self] data in self?.enqueue(data,epoch:epoch) }
       link.onFailure = { [weak self] in self?.interrupt("Voice disconnected. Your transcript is preserved.") }
-      let offer = try await link.offer()
-      guard generation == epoch else { link.close(); return }
       let result: VoiceConnection = try await interview.model.api.send("challenges/\(interview.challenge.id)/voice",method:"POST",body:VoiceStart(sdp:offer,revision:draft.revision),command:id)
       guard generation == epoch else { link.close(); return }
       try await link.answer(result.sdp)
+      guard generation == epoch, phase == .connecting || phase == .active else { link.close(); return }
+      link.startAudio()
       Task { [weak self] in
         try? await Task.sleep(for:.seconds(10))
         guard let self, self.generation == epoch, self.phase == .connecting else { return }
@@ -125,7 +157,12 @@ private struct VoiceOutbox: Codable {
     transport?.mute(muted)
     transport?.send(["type": muted ? "session.input_audio.mute" : "session.input_audio.unmute", "event_id":UUID().uuidString])
   }
-  func stopAudioImmediately() { transport?.stopAudio() }
+  func stopAudioImmediately() {
+    discardPreparation()
+    // Cancel startup synchronously, before the exit's asynchronous finalization.
+    if phase == .connecting { generation = UUID() }
+    transport?.stopAudio()
+  }
   func end() async {
     guard isOpen, phase != .ending else { return }
     let wasConnecting = phase == .connecting
@@ -144,7 +181,7 @@ private struct VoiceOutbox: Codable {
   }
   func interrupt(_ reason: String) {
     guard phase == .active || phase == .connecting else { return }
-    transport?.mute(true)
+    stopAudioImmediately()
     Task { await end(); message = reason }
   }
   func dismiss() { if !blocksText { phase = .idle; message = nil } }
@@ -260,12 +297,27 @@ private struct VoiceOutbox: Codable {
   private var peer: RTCPeerConnection?
   private var channel: RTCDataChannel?
   private var track: RTCAudioTrack?
+  private var stopped = false
+  private var ownsAudio = false
+  override init() {
+    super.init()
+    RTCAudioSession.sharedInstance().useManualAudio = true
+    RTCAudioSession.sharedInstance().isAudioEnabled = false
+  }
+  func startAudio() {
+    guard !stopped, peer != nil else { return }
+    ownsAudio = true
+    track?.isEnabled = true
+    RTCAudioSession.sharedInstance().isAudioEnabled = true
+  }
   func offer() async throws -> String {
+    guard !stopped else { throw CancellationError() }
     let config=RTCConfiguration();config.sdpSemantics = .unifiedPlan
     let constraints=RTCMediaConstraints(mandatoryConstraints:nil,optionalConstraints:nil)
     guard let pc=factory.peerConnection(with:config,constraints:constraints,delegate:self) else { throw NSError(domain:"Voice",code:1) }
     peer=pc
     let audio=factory.audioTrack(with:factory.audioSource(with:constraints),trackId:"microphone")
+    audio.isEnabled = false
     track=audio;pc.add(audio,streamIds:["drillbit-voice"])
     channel=pc.dataChannel(forLabel:"oai-events",configuration:RTCDataChannelConfiguration());channel?.delegate=self
     let offer:RTCSessionDescription = try await withCheckedThrowingContinuation { c in pc.offer(for:RTCMediaConstraints(mandatoryConstraints:["OfferToReceiveAudio":"true"],optionalConstraints:nil)) { s,e in if let s { c.resume(returning:s) } else { c.resume(throwing:e ?? NSError(domain:"Voice",code:2)) } } }
@@ -278,10 +330,18 @@ private struct VoiceOutbox: Codable {
     guard let peer else { return }
     try await withCheckedThrowingContinuation { (c:CheckedContinuation<Void,Error>) in peer.setRemoteDescription(RTCSessionDescription(type:.answer,sdp:sdp)) { e in if let e { c.resume(throwing:e) } else { c.resume() } } }
   }
-  func stopAudio() { track?.isEnabled=false; for receiver in peer?.receivers ?? [] { receiver.track?.isEnabled=false } }
-  func mute(_ muted:Bool) { track?.isEnabled = !muted }
+  func stopAudio() {
+    stopped = true
+    track?.isEnabled = false
+    for receiver in peer?.receivers ?? [] { receiver.track?.isEnabled = false }
+    if ownsAudio {
+      RTCAudioSession.sharedInstance().isAudioEnabled = false
+      ownsAudio = false
+    }
+  }
+  func mute(_ muted:Bool) { guard !stopped else { return }; track?.isEnabled = !muted }
   func send(_ event:[String:Any]) { if let data=try? JSONSerialization.data(withJSONObject:event) { channel?.sendData(RTCDataBuffer(data:data,isBinary:false)) } }
-  func close() { track?.isEnabled=false;channel?.delegate=nil;channel?.close();peer?.delegate=nil;peer?.close();peer=nil;channel=nil;track=nil }
+  func close() { stopAudio();channel?.delegate=nil;channel?.close();peer?.delegate=nil;peer?.close();peer=nil;channel=nil;track=nil }
   nonisolated func dataChannelDidChangeState(_ dataChannel:RTCDataChannel) {}
   nonisolated func dataChannel(_ dataChannel:RTCDataChannel,didReceiveMessageWith buffer:RTCDataBuffer) { let data=buffer.data; Task { @MainActor [weak self] in self?.onEvent?(data) } }
   nonisolated func peerConnection(_ peerConnection:RTCPeerConnection,didChange stateChanged:RTCSignalingState) {}

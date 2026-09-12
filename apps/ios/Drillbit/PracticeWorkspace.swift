@@ -475,7 +475,7 @@ struct PracticeView: View {
   private var workspace: some View {
     VStack(alignment: .leading, spacing: 12) {
       if typeSize.isAccessibilitySize {
-        Button("Read question", systemImage: "text.alignleft") {
+        Button("Read question", systemImage: AppIcon.text.rawValue) {
           focused = false
           sheet = .question
         }.font(.subheadline).labelStyle(.titleOnly).padding(.horizontal, 24)
@@ -518,7 +518,7 @@ struct PracticeView: View {
       }
       HStack(spacing: 16) {
         Button {} label: {
-          Image(systemName: "waveform")
+          Image(systemName: AppIcon.voice.rawValue)
             .font(.body.weight(.medium))
             .foregroundStyle(.tertiary)
             .frame(width: 44, height: 44)
@@ -563,7 +563,7 @@ struct PracticeView: View {
         )
       }
       ToolbarItem(placement: .topBarTrailing) {
-        Button("Practice options", systemImage: "ellipsis") {
+        Button("Practice options", systemImage: AppIcon.more.rawValue) {
           focused = false
           sheet = .options
         }
@@ -612,7 +612,7 @@ struct PracticeView: View {
         practice.running != nil
           ? "Help is preparing"
           : practice.mode == .solo ? "Solo · Get help" : "\(practice.mode.rawValue) help",
-        systemImage: "sparkle")
+        systemImage: AppIcon.assistance.rawValue)
     }.accessibilityIdentifier("openHelp")
   }
   private var saveLabel: some View {

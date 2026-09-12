@@ -330,3 +330,11 @@ The client checks on Home entry and foregrounding, not on background refresh. It
 Cron retains recovery of user-started work but creates no daily generation jobs or timer-based replacements. Pending legacy jobs containing `availableAt` are cancelled, and a late scheduled workflow exits before inference. Already running requests cannot have their incurred provider cost reversed. Existing ready/in-progress work is preserved across dates.
 
 The daily notification remains a generic local calendar reminder in the selected timezone. The Settings label is Reminder time. Its title/body are defined in `AppModel.reconcileReminder`; it does not assert question readiness and needs no APNs setup. Legacy `next_due` storage remains compatible but no longer drives generation.
+
+### Explicit voice Start and text handoff — 12 September 2026
+
+Opening the voice room is presentation only. Its primary 72-point control starts as a play button; explicit Start requests microphone permission if needed and opens one paid session, then replaces the symbol with the live mute control. Returning from text requires Start again. Reduced Motion removes symbol replacement movement.
+
+Use text stops WebRTC's manually managed audio unit synchronously, latches the transport against late reactivation, and cancels pending startup. The data channel may drain final transcript/usage receipts for up to five seconds with audio disabled. Server refresh cannot replace the locally projected transcript while voice or its outbox is active.
+
+Question loading may prepare local SDP/ICE only when microphone permission is already granted and a fresh account capability allows voice. No microphone permission prompt, audio capture/playback, backend session reservation or paid provider connection occurs during preparation. Prepared offers older than 60 seconds are discarded at Start; leaving/backgrounding discards preparation. GPT-Live sessions are duration billed, so provider connection remains an explicit Start operation.

@@ -43,3 +43,34 @@ struct LoadingStatus: View {
       .accessibilityElement(children: .combine)
   }
 }
+
+/// Native symbol catalog shared by navigation and actions throughout the app.
+enum AppIcon: String, CaseIterable {
+  case settings = "gearshape"
+  case send = "arrow.up"
+  case latest = "arrow.down"
+  case undo = "arrow.uturn.backward"
+  case checkmark = "checkmark"
+  case skip = "forward"
+  case hint = "lightbulb"
+  case preferences = "slider.horizontal.3"
+  case text = "text.alignleft"
+  case more = "ellipsis"
+  case voice = "waveform"
+  case books = "books.vertical"
+  case completed = "checkmark.circle"
+  case filter = "line.3.horizontal.decrease"
+  case delete = "trash"
+  case assistance = "sparkle"
+  case retry = "arrow.clockwise"
+  case regenerate = "arrow.triangle.2.circlepath"
+  case library = "book.closed"
+  case home = "house"
+  case apple = "apple.logo"
+  case start = "play.fill"
+  case microphone = "mic.fill"
+  case microphoneMuted = "mic.slash.fill"
+  case history = "clock.arrow.circlepath"
+  case collapsed = "chevron.right"
+  case expanded = "chevron.down"
+}

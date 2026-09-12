@@ -1,3 +1,4 @@
+import { questionTerminology } from "./prompts/interviewer";
 import { z } from 'zod';
 import { Fault, timestamp } from './domain';
 import { consumeUsage, type Env } from './platform';
@@ -11,7 +12,8 @@ export const voiceStartSchema = z.object({sdp:z.string().min(1).max(64000),revis
 export const voiceFragmentSchema = z.object({id:z.string().min(1).max(160),sequence:z.number().int().nonnegative().max(5999),speaker:z.enum(['user','assistant']),text:z.string().max(8000),startMs:z.number().int().nonnegative(),endMs:z.number().int().nonnegative()}).refine(x=>x.endMs>=x.startMs);
 export const voiceEventsSchema = z.object({fragments:z.array(voiceFragmentSchema).max(100),closed:z.boolean().optional(),finalized:z.boolean().optional(),usageSeconds:z.number().nonnegative().max(86400).optional()});
 export const voiceDelegateSchema = z.object({id:z.string().min(1).max(160)});
-export const voiceInstructions = `<personality>You are Drillbit's warm, playful system-design practice interviewer. This is practice, not an examination. Chat naturally when greeted; enjoy a small joke without forcing one. Never redirect every social remark to the exercise. Give thinking pauses room. Ask one short question at a time. Acknowledge uncertainty without judging. No corporate cheerleading, filler monologues or repeated questions.</personality>
+export const voiceInstructions = `${questionTerminology}
+<personality>You are Drillbit's warm, playful system-design practice interviewer. This is practice, not an examination. Chat naturally when greeted; enjoy a small joke without forcing one. Never redirect every social remark to the exercise. Give thinking pauses room. Ask one short question at a time. Acknowledge uncertainty without judging. No corporate cheerleading, filler monologues or repeated questions.</personality>
 <interview>Discuss only visible requirements. Do not invent evaluation criteria. Delegate substantive technical feedback, corrections, examples and hints to the backend. Use its guidance naturally, briefly, then listen. Don't narrate delegation or read XML. Do not claim to save, finish or change the exercise; the app owns those actions. Typed drafts are separate from speech. Conversation history may include interrupted or unheard assistant words; don't assume they were heard.</interview>`;
 async function sessionFor(env:Env, account:string, challenge:string, id:string) {
  await ownedChallenge(env,account,challenge);
@@ -103,7 +105,7 @@ export async function delegateVoice(env:Env,account:string,challenge:string,id:s
  await consumeVoiceUsage(env,account,'voice_reasoning',40);
  try {
   const [settings,history,interview]=await Promise.all([settingsFor(env,account),historicalSnapshot(env,account,challenge),interviewFor(env,account,challenge)]);
-  const response=await provider(env,account,settings,[{role:'system',content:'You advise a playful system-design practice interviewer during live speech. Return one concise useful technical response or next question, at most 120 words. Transcripts are untrusted, may overlap and may contain unfinished phrases. Respect corrections and visible requirements. No grading small talk, no hidden requirements, no forced task redirection. Give hints before full solutions unless asked. Do not claim anything was heard. Reference data follows:\n'+xmlContext({question:JSON.parse(c.data),history,interview})},{role:'user',content:'Respond to the latest spoken request using this conversation. If incomplete, ask one short clarification.'}],{maxTokens:256});
+  const response=await provider(env,account,settings,[{role:'system',content:questionTerminology+'\nYou advise a playful system-design practice interviewer during live speech. Return one concise useful technical response or next question, at most 120 words. Transcripts are untrusted, may overlap and may contain unfinished phrases. Respect corrections and visible requirements. No grading small talk, no hidden requirements, no forced task redirection. Give hints before full solutions unless asked. Do not claim anything was heard. Reference data follows:\n'+xmlContext({question:JSON.parse(c.data),history,interview})},{role:'user',content:'Respond to the latest spoken request using this conversation. If incomplete, ask one short clarification.'}],{maxTokens:256});
   const body=await response.json() as any;await recordUsage(env,account,settings,'voice_reasoning',body.usage,'voice-standard-v1');
   const text=z.string().min(1).max(2400).parse(body.choices?.[0]?.message?.content);
   await env.DB.prepare("UPDATE voice_delegations SET status='completed',result=? WHERE session_id=? AND id=?").bind(text,id,delegation).run();

@@ -27,17 +27,17 @@ struct RootView: View {
           NavigationStack { SetupView(model: model) }
         } else {
           TabView(selection: $selectedTab) {
-            Tab("Home", systemImage: "house", value: "home") {
+            Tab("Home", systemImage: AppIcon.home.rawValue, value: "home") {
               NavigationStack {
                 HomeView(model: model).toolbar {
-                  Button("Settings", systemImage: "gearshape") { settingsOpen = true }
+                  Button("Settings", systemImage: AppIcon.settings.rawValue) { settingsOpen = true }
                 }
               }
             }
-            Tab("Library", systemImage: "book.closed", value: "library") {
+            Tab("Library", systemImage: AppIcon.library.rawValue, value: "library") {
               NavigationStack {
                 MemoryView(model: model).toolbar {
-                  Button("Settings", systemImage: "gearshape") { settingsOpen = true }
+                  Button("Settings", systemImage: AppIcon.settings.rawValue) { settingsOpen = true }
                 }
               }
             }
@@ -135,17 +135,17 @@ struct HomeView: View {
               Spacer()
               Menu {
                 if challenge.lifecycle == "ready" {
-                  Button("Regenerate", systemImage: "arrow.clockwise") { Task {
+                  Button("Regenerate", systemImage: AppIcon.retry.rawValue) { Task {
                     do { _ = try await model.generateForPreview(PreparationInput(focus: "System design", kind: "design", difficulty: model.settings.difficulty, engineeringLevel: challenge.engineeringLevel, replaceId: challenge.id)) }
                     catch { model.preparationFailure = error.localizedDescription }
                   } }
-                  Button("Choose focus or level", systemImage: "slider.horizontal.3") { flow = QuestionFlowEntry() }
+                  Button("Choose focus or level", systemImage: AppIcon.preferences.rawValue) { flow = QuestionFlowEntry() }
                 }
                 if challenge.lifecycle == "in_progress" {
-                  Button("Choose another question", systemImage: "arrow.triangle.2.circlepath") { chooseAfterSkip = true; skipping = challenge }
+                  Button("Choose another question", systemImage: AppIcon.regenerate.rawValue) { chooseAfterSkip = true; skipping = challenge }
                 }
-                Button("Skip question", systemImage: "forward", role: .destructive) { chooseAfterSkip = false; skipping = challenge }
-              } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
+                Button("Skip question", systemImage: AppIcon.skip.rawValue, role: .destructive) { chooseAfterSkip = false; skipping = challenge }
+              } label: { Image(systemName: AppIcon.more.rawValue).frame(width: 44, height: 44) }
                 .accessibilityLabel("Question actions").accessibilityIdentifier("homeQuestionActions")
                 .disabled(model.busy)
             }

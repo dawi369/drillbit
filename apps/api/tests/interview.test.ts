@@ -116,7 +116,7 @@ it("captures bounded account-scoped historical evidence with a pinned prompt edi
  const cmd=crypto.randomUUID(); await requestInterview(e,a,id,cmd,{kind:'answer',text:'Use a queue',revision:2});
  const job=await e.DB.prepare("SELECT input FROM jobs WHERE id=?").bind(cmd).first<{input:string}>();
  const context=JSON.parse(job!.input).context;
- expect(context.promptVersion).toBe('interviewer-standard-v4');
+ expect(context.promptVersion).toBe('interviewer-standard-v5');
  expect(context.historicalSnapshot.attempts).toHaveLength(8);
  expect(context.historicalSnapshot.attempts.every((x:any)=>x.status==='skipped' && x.feedback===null)).toBe(true);
  expect(JSON.stringify(context.historicalSnapshot)).not.toContain(other.id);

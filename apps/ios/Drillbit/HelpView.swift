@@ -87,7 +87,7 @@ struct HelpView: View {
             ).foregroundStyle(.secondary)
           }
           if practice.undoEvent != nil {
-            Button("Undo insertion", systemImage: "arrow.uturn.backward") {
+            Button("Undo insertion", systemImage: AppIcon.undo.rawValue) {
               Task { await practice.undo() }
             }.accessibilityIdentifier("undoInsertion")
           }
@@ -136,7 +136,7 @@ struct HelpView: View {
         HStack(alignment: .bottom) {
           TextField("Ask a question", text: $question, axis: .vertical).lineLimit(1...4)
             .textFieldStyle(.roundedBorder)
-          Button("Send", systemImage: "arrow.up") {
+          Button("Send", systemImage: AppIcon.send.rawValue) {
             let text = question
             Task { await practice.request("question", question: text) }
           }.labelStyle(.iconOnly).disabled(

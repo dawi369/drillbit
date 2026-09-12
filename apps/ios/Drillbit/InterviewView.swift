@@ -111,16 +111,16 @@ import OSLog
     guard currentAccount else { throw CancellationError() }
   }
   func refresh() async {
-    guard currentAccount, !busy, !refreshing, pending == nil, !model.fixture else { return }
+    guard currentAccount, voice?.blocksText != true, !busy, !refreshing, pending == nil, !model.fixture else { return }
     refreshing = true
     defer { refreshing = false }
     let generation = editGeneration
     do {
       let fresh: Challenge = try await model.api.send("challenges/" + challenge.id)
-      guard currentAccount, !busy, generation == editGeneration, savedGeneration == generation else { return }
+      guard currentAccount, voice?.blocksText != true, !busy, generation == editGeneration, savedGeneration == generation else { return }
       guard (fresh.session?.revision ?? 0) >= (challenge.session?.revision ?? 0) else { return }
       let local = try await model.disk.load(account: account, challenge: fresh)
-      guard currentAccount, !busy, generation == editGeneration, local.kind.isEmpty, !local.conflict else { return }
+      guard currentAccount, voice?.blocksText != true, !busy, generation == editGeneration, local.kind.isEmpty, !local.conflict else { return }
       answer = local.answer
       if let interview = fresh.interview { state = interview }
       challenge = fresh
@@ -371,7 +371,7 @@ private struct InterviewTurnRow: View {
     .overlay(alignment: .topTrailing) {
       if overflows {
         Button(action: toggle) {
-          Image(systemName: expanded ? "chevron.down" : "chevron.right")
+          Image(systemName: expanded ? AppIcon.expanded.rawValue : AppIcon.collapsed.rawValue)
             .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
             .frame(width: 44, height: 44).contentShape(Rectangle())
         }.buttonStyle(.plain)
@@ -451,13 +451,14 @@ struct InterviewView: View {
       liveVoice = voice
       interview.voice = voice
       await voice.restore()
+      voice.prepareIfAllowed()
       sessionRestored = true
     }
     .task(id: "\(interview.streamTurn?.jobId ?? ""):\(interview.streamEpoch):\(phase == .active)") {
       if phase == .active { await interview.watchResponse() }
     }
     .onChange(of: phase) { _, value in
-      if value != .active { interview.acceptsVoiceInput = false; interview.voice?.interrupt("Voice stopped while the app was inactive.") }
+      if value != .active { interview.acceptsVoiceInput = false; interview.voice?.discardPreparation(); interview.voice?.interrupt("Voice stopped while the app was inactive.") }
       if value == .background { persistReading(); Task { if !interview.locked { try? await interview.flush() } } }
       if value == .active { interview.acceptsVoiceInput = true; Task { await interview.refresh() } }
     }
@@ -465,7 +466,7 @@ struct InterviewView: View {
       Button("Done", role: .cancel) { voiceExplanation = nil }
     } message: { Text(voiceExplanation ?? "") }
     .onAppear { interview.acceptsVoiceInput = phase == .active }
-    .onDisappear { interview.acceptsVoiceInput = false; interview.voice?.interrupt("Voice ended."); persistReading() }
+    .onDisappear { interview.acceptsVoiceInput = false; interview.voice?.discardPreparation(); interview.voice?.interrupt("Voice ended."); persistReading() }
   }
   private var workspace: some View {
     ScrollView {
@@ -558,15 +559,15 @@ struct InterviewView: View {
       ToolbarItem(placement: .topBarTrailing) {
         Menu {
           if interview.state.wrapUp { Button("Continue interview") { Task { await interview.submit("continue") } } }
-          Button("Give me a nudge", systemImage: "lightbulb") { Task { await interview.submit("hint") } }
+          Button("Give me a nudge", systemImage: AppIcon.hint.rawValue) { Task { await interview.submit("hint") } }
             .disabled(interview.locked || interview.failedTurn != nil || liveVoice?.blocksText == true)
-          Button("Show an example", systemImage: "text.alignleft") { Task { await interview.submit("example") } }
+          Button("Show an example", systemImage: AppIcon.text.rawValue) { Task { await interview.submit("example") } }
             .disabled(interview.locked || interview.failedTurn != nil || liveVoice?.blocksText == true)
-          Button("Interview style", systemImage: "slider.horizontal.3") { sheet = .style }.disabled(interview.locked)
-          Button("Finish interview", systemImage: "checkmark") { focused = false; confirmFinish = true }.disabled(!interview.canFinish)
+          Button("Interview style", systemImage: AppIcon.preferences.rawValue) { sheet = .style }.disabled(interview.locked)
+          Button("Finish interview", systemImage: AppIcon.checkmark.rawValue) { focused = false; confirmFinish = true }.disabled(!interview.canFinish)
           Divider()
-          Button("Skip question", systemImage: "forward", role: .destructive) { confirmSkip = true }.disabled(interview.voice?.blocksText == true)
-        } label: { Image(systemName: "ellipsis") }
+          Button("Skip question", systemImage: AppIcon.skip.rawValue, role: .destructive) { confirmSkip = true }.disabled(interview.voice?.blocksText == true)
+        } label: { Image(systemName: AppIcon.more.rawValue) }
           .accessibilityLabel("Interview options").accessibilityIdentifier("interviewOptions")
       }
     }
@@ -605,7 +606,7 @@ struct InterviewView: View {
               // Keep the title outside the clipped description.
               Text(challenge.title).font(.headline).fixedSize(horizontal: false, vertical: true)
             }.frame(maxWidth: .infinity, alignment: .leading)
-            Image(systemName: collapsed ? "chevron.right" : "chevron.down").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+            Image(systemName: collapsed ? AppIcon.collapsed.rawValue : AppIcon.expanded.rawValue).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
           }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
         }.buttonStyle(InterviewDisclosureButtonStyle())
           .accessibilityLabel("Original question. " + challenge.prompt)
@@ -640,7 +641,7 @@ struct InterviewView: View {
       focused = false
       voiceQuestionCollapsed = true
       showingVoiceRoom = true
-      await voice.start()
+      voice.dismiss()
     } catch { voiceExplanation = "Couldn’t check voice availability. Check your connection and try again. Your reply is unchanged." }
   }
   private func leaveVoiceRoom() {
@@ -768,7 +769,7 @@ struct InterviewView: View {
       }
 
       HStack(spacing: 16) {
-      Button { Task { await enterVoice() } } label: { Image(systemName: "waveform").font(.system(size: 20, weight: .medium)).foregroundStyle(.primary)
+      Button { Task { await enterVoice() } } label: { Image(systemName: AppIcon.voice.rawValue).font(.system(size: 20, weight: .medium)).foregroundStyle(.primary)
         .frame(width: 44, height: 44).background(.quaternary, in: RoundedRectangle(cornerRadius: 12)) }
         .buttonStyle(.plain).disabled(checkingVoice || liveVoice == nil || interview.locked || interview.voice?.blocksText == true).accessibilityLabel("Live voice").accessibilityIdentifier("liveVoice")
       Spacer(minLength: 0)
@@ -777,7 +778,7 @@ struct InterviewView: View {
           followingLiveEnd = true
           Task { await shareAnswer() }
         } label: {
-          Image(systemName: "arrow.up")
+          Image(systemName: AppIcon.send.rawValue)
             .font(.system(size: 20, weight: .semibold))
             .frame(width: 44, height: 44)
             .background(Color.primary, in: RoundedRectangle(cornerRadius: 12))
@@ -876,6 +877,7 @@ private struct InterviewVoiceRoom<Question: View>: View {
   @ViewBuilder var question: () -> Question
   var leave: () -> Void
   @State private var showingHistory = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   var body: some View {
     InterviewConversation(state: interview.displayState, latestOnly: !showingHistory, header: question)
       .background(AppPalette.background)
@@ -883,37 +885,54 @@ private struct InterviewVoiceRoom<Question: View>: View {
       .navigationTitle(interview.challenge.scenario?.split(whereSeparator: \.isWhitespace).prefix(2).joined(separator: " ") ?? "Voice interview")
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
-        ToolbarItem(placement: .cancellationAction) { Button("Use text", action: leave).accessibilityLabel("Use text; end voice") }
+        ToolbarItem(placement: .cancellationAction) { Button(voice.phase == .connecting ? "Cancel" : "Use text", action: leave).accessibilityLabel(voice.phase == .connecting ? "Cancel voice connection" : "Use text; end voice").accessibilityIdentifier("voiceEnd") }
         ToolbarItem(placement: .topBarTrailing) {
-          Button(showingHistory ? "Live" : "History", systemImage: showingHistory ? "waveform" : "clock.arrow.circlepath") { showingHistory.toggle() }
+          Button(showingHistory ? "Live" : "History", systemImage: showingHistory ? AppIcon.voice.rawValue : AppIcon.history.rawValue) { showingHistory.toggle() }
             .accessibilityIdentifier("voiceHistory")
         }
       }
   }
-  private var status: String {
+  private var status: String? {
     switch voice.phase {
-    case .idle: "Voice ended"
+    case .idle: nil
     case .connecting: "Connecting…"
-    case .active: voice.muted ? "Microphone muted" : "Microphone on"
+    case .active: nil
     case .ending: "Voice ended · saving conversation"
     case .unavailable: "Voice unavailable"
     }
   }
   private var controls: some View {
     VStack(spacing: 12) {
-      Text(status).font(.subheadline).foregroundStyle(.secondary)
+      if let status { Text(status).font(.subheadline).foregroundStyle(.secondary) }
       if let message = voice.message { Text(message).font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center) }
       HStack(alignment: .top, spacing: 40) {
-        if voice.phase == .active {
-          voiceControl(voice.muted ? "Unmute" : "Mute", symbol: voice.muted ? "mic.slash.fill" : "mic.fill", id: "voiceMute", action: voice.toggleMute)
-            .accessibilityLabel(voice.muted ? "Unmute microphone" : "Mute microphone")
+        if voice.phase == .idle || voice.phase == .connecting || voice.phase == .active {
+          Button {
+            if voice.phase == .idle { Task { await voice.start() } }
+            else { voice.toggleMute() }
+          } label: {
+            Image(systemName: voice.phase == .active ? (voice.muted ? AppIcon.microphoneMuted.rawValue : AppIcon.microphone.rawValue) : AppIcon.start.rawValue)
+              .font(.system(size: 28, weight: .medium))
+              .symbolRenderingMode(.monochrome)
+              .contentTransition(.identity)
+              .foregroundStyle(voice.muted ? AppPalette.destructive : AppPalette.background)
+              .frame(width: 72, height: 72)
+              .background(voice.muted ? AppPalette.surface : AppPalette.primary, in: Circle())
+              .contentShape(Circle())
+              .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace))
+              .opacity(voice.phase == .connecting ? 0.4 : 1)
+          }
+          .buttonStyle(.plain)
+          .disabled(voice.phase == .connecting)
+          .accessibilityIdentifier(voice.phase == .active ? "voiceMute" : "voiceStart")
+          .accessibilityLabel(voice.phase == .active ? (voice.muted ? "Unmute microphone" : "Mute microphone") : "Start voice")
+          .accessibilityValue(voice.phase == .active ? (voice.muted ? "Muted" : "Microphone on") : "Microphone off")
         }
         if voice.phase == .unavailable {
-          voiceControl(voice.blocksText ? "Sync" : "Retry", symbol: "arrow.clockwise", id: "voiceRetry") { Task {
+          voiceControl(voice.blocksText ? "Sync" : "Retry", symbol: AppIcon.retry.rawValue, id: "voiceRetry") { Task {
             if voice.blocksText { await voice.retrySync() } else { await voice.start() }
           } }
         }
-        voiceControl(voice.phase == .connecting ? "Cancel" : "Use text", symbol: "keyboard", id: "voiceEnd", action: leave)
       }.frame(maxWidth: .infinity)
       #if DEBUG
       if interview.model.fixture, ProcessInfo.processInfo.arguments.contains("--fixture-voice"), voice.phase == .active {
@@ -994,7 +1013,7 @@ struct InterviewConversation<Header: View>: View {
     .safeAreaInset(edge: .bottom, alignment: .trailing, spacing: 0) {
       if !following {
         Button { setFollowing(true); position.wrappedValue.scrollTo(id: "voiceLatest", anchor: .bottom) } label: {
-          Image(systemName: "arrow.down").font(.system(size: 20)).frame(width: 44, height: 44)
+          Image(systemName: AppIcon.latest.rawValue).font(.system(size: 20)).frame(width: 44, height: 44)
             .background(AppPalette.background, in: RoundedRectangle(cornerRadius: 12))
         }.buttonStyle(.plain).accessibilityLabel("Latest").accessibilityIdentifier("voiceLatestButton").padding(8)
       }
@@ -1012,7 +1031,7 @@ struct InterviewStylePicker: View {
         HStack(spacing:16) {
           VStack(alignment:.leading,spacing:4) { Text(style.title).foregroundStyle(.primary); Text(style == .standard ? style.explanation : "Coming later").font(.subheadline).foregroundStyle(.secondary) }
           Spacer()
-          if style == .standard { Image(systemName:"checkmark").foregroundStyle(.primary) }
+          if style == .standard { Image(systemName:AppIcon.checkmark.rawValue).foregroundStyle(.primary) }
         }.padding(.vertical,4)
       }.disabled(style != .standard).opacity(style == .standard ? 1 : 0.4)
         .accessibilityAddTraits(style == .standard ? .isSelected : [])

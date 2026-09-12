@@ -43,7 +43,7 @@ struct WelcomeView: View {
               Button {
                 authenticate { await model.signIn() }
               } label: {
-                Label("Sign in with Apple", systemImage: "apple.logo")
+                Label("Sign in with Apple", systemImage: AppIcon.apple.rawValue)
               }
               .buttonStyle(PracticeButtonStyle())
               Button("Continue with Google") {

@@ -65,7 +65,7 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         RootView(model: model).tint(AppPalette.primary)
       } else {
         ContentUnavailableView(
-          "Setup required", systemImage: "gearshape",
+          "Setup required", systemImage: AppIcon.settings.rawValue,
           description: Text(configurationError ?? "Configuration is unavailable."))
       }
     }

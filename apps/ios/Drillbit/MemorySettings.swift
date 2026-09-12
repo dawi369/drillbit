@@ -131,7 +131,7 @@ struct SessionDetailView: View {
       .sheet(isPresented: $preparing, onDismiss: { if let started { model.presented = started; self.started = nil } }) {
         QuestionFlow(model: model, source: challenge, onStart: { started = $0 })
       }
-      .toolbar { Button("Delete", systemImage: "trash", role: .destructive) { deleting = true } }
+      .toolbar { Button("Delete", systemImage: AppIcon.delete.rawValue, role: .destructive) { deleting = true } }
       .confirmationDialog("Delete this session and its learning evidence?", isPresented: $deleting)
     {
       Button("Delete session", role: .destructive) {
@@ -257,7 +257,7 @@ struct FocusView: View {
             HStack {
               Text(focus)
               Spacer()
-              if model.settings.focus == focus { Image(systemName: "checkmark") }
+              if model.settings.focus == focus { Image(systemName: AppIcon.checkmark.rawValue) }
             }
           }
         }
@@ -284,7 +284,7 @@ struct AIAccessView: View {
       }
       Section("OpenRouter") {
         if let suffix = suffix ?? model.bootstrap?.credential?.suffix {
-          Label("Key ending in \(suffix)", systemImage: "checkmark.circle").foregroundStyle(
+          Label("Key ending in \(suffix)", systemImage: AppIcon.completed.rawValue).foregroundStyle(
             AppPalette.success)
         }
         SecureField("OpenRouter key", text: $key).textInputAutocapitalization(.never)
@@ -395,7 +395,7 @@ struct TimeZoneSelectionView: View {
       Button("Use current device time zone") { selection = TimeZone.current.identifier; dismiss() }
       ForEach(Array(Set(Self.zones + [selection, TimeZone.current.identifier])).sorted().filter { search.isEmpty || Self.label($0).localizedCaseInsensitiveContains(search) || $0.localizedCaseInsensitiveContains(search) }, id: \.self) { zone in
         Button { selection = zone; dismiss() } label: {
-          HStack { Text(Self.label(zone)).foregroundStyle(.primary); Spacer(); if selection == zone { Image(systemName: "checkmark") } }
+          HStack { Text(Self.label(zone)).foregroundStyle(.primary); Spacer(); if selection == zone { Image(systemName: AppIcon.checkmark.rawValue) } }
         }.accessibilityAddTraits(selection == zone ? .isSelected : [])
       }
     }.searchable(text: $search).navigationTitle("Time zone").navigationBarTitleDisplayMode(.inline)
@@ -410,11 +410,11 @@ struct PracticeAreaPicker: View {
   var body: some View {
     List {
       Button { selection = ""; dismiss() } label: {
-        HStack { Text("Automatic"); Spacer(); if selection.isEmpty { Image(systemName: "checkmark") } }
+        HStack { Text("Automatic"); Spacer(); if selection.isEmpty { Image(systemName: AppIcon.checkmark.rawValue) } }
       }.foregroundStyle(.primary)
       ForEach(model.taxonomy.filter { search.isEmpty || $0.label.localizedCaseInsensitiveContains(search) }) { concept in
         Button { selection = concept.id; dismiss() } label: {
-          HStack { Text(concept.label); Spacer(); if selection == concept.id { Image(systemName: "checkmark") } }
+          HStack { Text(concept.label); Spacer(); if selection == concept.id { Image(systemName: AppIcon.checkmark.rawValue) } }
         }.foregroundStyle(.primary).accessibilityAddTraits(selection == concept.id ? .isSelected : [])
       }
     }.navigationTitle("Practice area").searchable(text: $search).task { await model.loadTaxonomy() }
@@ -472,7 +472,7 @@ struct LibraryView: View {
         }
       }
       if questions.isEmpty && loadedIdentity == identity && !loading && failure == nil {
-        ContentUnavailableView(skipped ? "No skipped questions" : "Your question library", systemImage: "books.vertical", description: Text(skipped ? "Questions you skip will be kept here." : "Completed questions and repeat attempts will appear here."))
+        ContentUnavailableView(skipped ? "No skipped questions" : "Your question library", systemImage: AppIcon.books.rawValue, description: Text(skipped ? "Questions you skip will be kept here." : "Completed questions and repeat attempts will appear here."))
       }
       ForEach(questions) { question in
         VStack(alignment: .leading, spacing: 8) {
@@ -497,11 +497,11 @@ struct LibraryView: View {
     .navigationTitle(skipped ? "Skipped questions" : "Library")
     .searchable(text: $search)
     .toolbar {
-      Button("Filters", systemImage: "line.3.horizontal.decrease") { filterOpen = true }
+      Button("Filters", systemImage: AppIcon.filter.rawValue) { filterOpen = true }
       if !skipped {
         Menu {
-          NavigationLink { LibraryView(model: model, skipped: true) } label: { Label("Skipped questions", systemImage: "forward") }
-        } label: { Image(systemName: "ellipsis") }.accessibilityLabel("Library menu")
+          NavigationLink { LibraryView(model: model, skipped: true) } label: { Label("Skipped questions", systemImage: AppIcon.skip.rawValue) }
+        } label: { Image(systemName: AppIcon.more.rawValue) }.accessibilityLabel("Library menu")
       }
     }
     .sheet(isPresented: $filterOpen) {
