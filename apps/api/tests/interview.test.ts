@@ -16,7 +16,7 @@ async function fixture(style="standard") {
  await e.DB.prepare("INSERT INTO sessions(challenge_id,answer,revision,updated_at) VALUES(?,'Use a queue',2,'now')").bind(id).run();
  return {a:a.id,id};
 }
-function streamed(result: object) { return new Response('data: ' + JSON.stringify({choices:[{delta:{content:JSON.stringify(result)}}]}) + '\n\ndata: [DONE]\n\n',{status:200}); }
+function streamed(result: object) { return new Response('data: ' + JSON.stringify({choices:[{delta:{content:JSON.stringify({move:"ask_one",...result})}}]}) + '\n\ndata: [DONE]\n\n',{status:200}); }
 function provider(result: object) { return vi.spyOn(globalThis,"fetch").mockImplementation(async()=>streamed(result)); }
 it("commits exactly one answer snapshot and rejects stale or competing devices",async()=>{
  const {a,id}=await fixture(),cmd=crypto.randomUUID(),input={kind:"answer",text:"Use a queue",revision:2};
@@ -98,7 +98,7 @@ it("publishes real provider text before completion and scopes stream readers",as
  const mock=vi.spyOn(globalThis,"fetch").mockResolvedValue(new Response(body));
  const work=runJob(e,cmd);
  const emit=(text:string)=>controller.enqueue(encoder.encode('data: '+JSON.stringify({choices:[{delta:{content:text}}]})+'\n\n'));
- emit('{"outcome":"follow_up","text":"What happens');
+ emit('{"move":"ask_one","text":"What happens');
  try {
   await vi.waitFor(async()=>expect((await interviewStreamSnapshot(e,a,id,cmd)).text).toBe("What happens"));
   expect((await interviewFor(e,a,id)).turns[0].result).toBeNull();
@@ -116,7 +116,7 @@ it("captures bounded account-scoped historical evidence with a pinned prompt edi
  const cmd=crypto.randomUUID(); await requestInterview(e,a,id,cmd,{kind:'answer',text:'Use a queue',revision:2});
  const job=await e.DB.prepare("SELECT input FROM jobs WHERE id=?").bind(cmd).first<{input:string}>();
  const context=JSON.parse(job!.input).context;
- expect(context.promptVersion).toBe('interviewer-standard-v2');
+ expect(context.promptVersion).toBe('interviewer-standard-v4');
  expect(context.historicalSnapshot.attempts).toHaveLength(8);
  expect(context.historicalSnapshot.attempts.every((x:any)=>x.status==='skipped' && x.feedback===null)).toBe(true);
  expect(JSON.stringify(context.historicalSnapshot)).not.toContain(other.id);
@@ -137,7 +137,7 @@ it("atomically submits unsynced text without weakening legacy or revision checks
 
 it("drains provider tokens while a partial write is slow, with only one writer", async () => {
  const {a}=await fixture();
- const pieces=['{"outcome":"follow_up","text":"','Hello',' there',' from',' this',' streamed',' reply',' today.','"}'];
+ const pieces=['{"move":"chat","text":"','Hello',' there',' from',' this',' streamed',' reply',' today.','"}'];
  const chunks=pieces.map(content=>'data: '+JSON.stringify({choices:[{delta:{content}}]})+'\n\n').concat('data: [DONE]\n\n');
  let reads=0, release!:()=>void, active=0, peak=0;
  const gate=new Promise<void>(resolve=>{release=resolve;});

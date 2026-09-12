@@ -270,3 +270,19 @@ it("competing payloads cannot reuse an eligibility command to update two questio
  expect(results.filter(r=>r.status==="fulfilled")).toHaveLength(1);
  const count=await env.DB.prepare("SELECT COUNT(*) n FROM questions WHERE account_id=? AND eligible=1").bind(account).first<{n:number}>();expect(count!.n).toBe(1);
 });
+
+it("rotates feedback and overdue revisits at the requested level without treating skips as weakness", async () => {
+  const {account,ids}=await fixture(4);
+  for(let i=0;i<ids.length;i++) {
+    const concept=["retry-safety","queues","indexing","queues"][i];
+    for(const table of ["questions","challenges"]) await env.DB.prepare(`UPDATE ${table} SET data=json_set(data,'$.primaryConceptId',?,'$.conceptIds',json(?)) WHERE id=?`).bind(concept,JSON.stringify([concept]),ids[i]).run();
+  }
+  const feedback={summary:"Retry identity needs attention.",worked:[],improve:"Use stable keys.",takeaway:"Identify the operation.",strengths:[],gaps:[],evidence:[{conceptId:"retry-safety",quote:"Retry",observation:"No operation identity",signal:"needs_practice",assistance:"unknown"}]};
+  await env.DB.prepare("INSERT INTO reflections(challenge_id,data,created_at) VALUES(?,?,?)").bind(ids[0],JSON.stringify(feedback),"2026-01-01T00:00:00Z").run();
+  const selection=await selectConcept(bindings,account,"senior");
+  expect(selection.primaryConceptId).toBe("retry-safety");expect(selection.reason).toContain("feedback");
+  expect((await selectConcept(bindings,account,"junior")).reason).not.toContain("feedback");
+  expect((await selectConcept(bindings,account,"senior","queues")).primaryConceptId).toBe("queues");
+  await env.DB.prepare("UPDATE challenges SET lifecycle='skipped' WHERE id=?").bind(ids[0]).run();
+  expect((await selectConcept(bindings,account,"senior")).reason).not.toContain("feedback");
+});

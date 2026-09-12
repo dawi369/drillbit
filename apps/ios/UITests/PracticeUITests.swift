@@ -2,6 +2,109 @@ import XCTest
 
 @MainActor
 final class PracticeUITests: XCTestCase {
+  func testLiveVoicePreservesDraftAndTranscript() throws { try voiceJourney(extra:[]) }
+  func testLiveVoiceAccessibleDark() throws { try voiceJourney(extra:["--dark","-UIPreferredContentSizeCategoryName","UICTContentSizeCategoryAccessibilityXXXL"]) }
+  func testVoiceRoomCancelDuringConnection() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures", "--fixture-voice", "--fixture-voice-connecting"]
+    app.launch()
+    XCTAssertTrue(app.buttons["startPractice"].waitForExistence(timeout: 10))
+    app.buttons["startPractice"].tap(); app.buttons["previewStart"].tap()
+    XCTAssertTrue(app.buttons["liveVoice"].waitForExistence(timeout: 5))
+    app.buttons["liveVoice"].tap()
+    XCTAssertTrue(app.staticTexts["Connecting…"].waitForExistence(timeout: 2))
+    capture("Voice room connecting", app)
+    app.buttons["voiceEnd"].tap()
+    XCTAssertTrue(app.buttons["liveVoice"].waitForExistence(timeout: 2))
+    // Allow the suspended startup to resume; it must not resurrect audio/a room.
+    XCTAssertFalse(app.buttons["voiceMute"].waitForExistence(timeout: 4))
+    XCTAssertTrue(app.buttons["liveVoice"].isEnabled)
+  }
+  private func voiceJourney(extra:[String]) throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures", "--fixture-voice"] + extra
+    app.launch()
+    XCTAssertTrue(app.buttons["startPractice"].waitForExistence(timeout:10))
+    app.buttons["startPractice"].tap(); app.buttons["previewStart"].tap()
+    let editor = app.descendants(matching:.any).matching(identifier:"answerEditor").firstMatch
+    XCTAssertTrue(editor.waitForExistence(timeout:5))
+    editor.tap(); editor.typeText("Keep my written draft.")
+    app.buttons["liveVoice"].tap()
+    XCTAssertTrue(app.buttons["voiceMute"].waitForExistence(timeout:5))
+    app.buttons["voiceMute"].tap()
+    XCTAssertEqual(app.buttons["voiceMute"].label,"Unmute microphone")
+    app.buttons["voiceMute"].tap()
+    XCTAssertFalse(app.otherElements["voiceSessionDivider"].exists, "An empty voice session has no separator")
+    capture("Voice room question", app)
+    app.buttons["voiceFixtureSpeech"].tap()
+    app.buttons["Conversation"].tap()
+    XCTAssertTrue(app.staticTexts["I'd use a durable queue."].waitForExistence(timeout:5))
+    XCTAssertTrue(app.staticTexts["Makes sense. What happens when a worker retries?"].exists)
+    capture("Voice room conversation", app)
+    app.buttons["Question"].tap()
+    XCTAssertTrue(app.buttons["voiceMute"].exists)
+    app.buttons["Conversation"].tap()
+    app.buttons["voiceEnd"].tap()
+    XCTAssertTrue(app.buttons["liveVoice"].waitForExistence(timeout:5))
+    XCTAssertEqual(editor.value as? String,"Keep my written draft.")
+    XCTAssertTrue(app.staticTexts["I'd use a durable queue."].exists)
+  }
+
+  func testAppearanceAndLearningEvidence() throws {
+    continueAfterFailure = false
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures", "--fixture-dashboard", "--fixture-evidence"]
+    app.launch()
+    XCTAssertTrue(app.buttons["Settings"].waitForExistence(timeout: 10))
+    app.buttons["Settings"].tap()
+    let appearance = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Appearance,")).firstMatch
+    for _ in 0..<5 where !appearance.isHittable { app.swipeUp() }
+    appearance.tap(); app.buttons["Dark"].tap()
+    capture("Appearance dark", app)
+    app.buttons["Done"].tap()
+    app.terminate(); app.launch()
+    app.buttons["Settings"].tap()
+    for _ in 0..<5 where !appearance.isHittable { app.swipeUp() }
+    XCTAssertTrue(appearance.label.contains("Dark"))
+    appearance.tap(); app.buttons["System"].tap(); app.buttons["Done"].tap()
+    app.tabBars.buttons["Library"].tap()
+    app.buttons["Practice evidence"].tap()
+    XCTAssertTrue(app.staticTexts["Defined a bounded retry policy."].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.staticTexts["Independence not established"].exists)
+    capture("Grounded practice evidence", app)
+  }
+
+  func testSessionRestorationDoesNotShowSignIn() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures", "--fixture-dashboard", "--fixture-cached-home", "--fixture-slow-launch"]
+    app.launch()
+    XCTAssertTrue(app.otherElements["sessionRestoration"].waitForExistence(timeout: 2))
+    XCTAssertFalse(app.buttons["Sign in with Apple"].exists)
+    XCTAssertTrue(app.staticTexts["Your practice"].waitForExistence(timeout: 10))
+    XCTAssertFalse(app.buttons["Sign in with Apple"].exists)
+    app.terminate()
+    app.launchArguments = ["--fixtures", "--fixture-slow-launch", "--fixture-signed-out"]
+    app.launch()
+    XCTAssertTrue(app.otherElements["sessionRestoration"].waitForExistence(timeout: 2))
+    XCTAssertFalse(app.buttons["Sign in with Apple"].exists)
+    XCTAssertTrue(app.buttons["Sign in with Apple"].waitForExistence(timeout: 10))
+  }
+
+  func testCachedHomeStatisticsAppearOnFirstHomeFrame() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures", "--fixture-dashboard", "--fixture-cached-home"]
+    for _ in 0..<2 {
+      app.launch()
+      XCTAssertTrue(app.staticTexts["Your practice"].waitForExistence(timeout: 10))
+      XCTAssertTrue(app.otherElements["Completed, 12"].exists || app.staticTexts["12"].exists)
+      XCTAssertTrue(app.otherElements["Last 7 days, 4"].exists || app.staticTexts["4"].exists)
+      XCTAssertFalse(app.staticTexts["—"].exists)
+      XCTAssertFalse(app.staticTexts["Loading practice…"].exists)
+      capture("Cached practice statistics", app)
+      app.terminate()
+    }
+  }
+
   func testLibraryAndSkippedQuestionRecovery() throws { try libraryJourney(extra: []) }
   func testLibraryAccessibleDark() throws { try libraryJourney(extra: ["--dark", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]) }
   private func libraryJourney(extra: [String]) throws {
@@ -282,16 +385,17 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "answerEditor").firstMatch.isHittable)
     XCTAssertFalse(app.buttons["openHelp"].exists)
     XCTAssertTrue(app.buttons["liveVoice"].exists)
-    XCTAssertFalse(app.buttons["liveVoice"].isEnabled)
+    XCTAssertTrue(app.buttons["liveVoice"].isEnabled)
     capture("Accessible editor", app)
     app.descendants(matching: .any).matching(identifier: "answerEditor").firstMatch.tap()
     app.descendants(matching: .any).matching(identifier: "answerEditor").firstMatch.typeText("A plan")
     XCTAssertTrue(app.buttons["shareAnswer"].isHittable)
     XCTAssertTrue(app.buttons["interviewOptions"].isHittable)
     capture("Accessible interview keyboard", app)
-    app.buttons["interviewOptions"].tap()
-    app.buttons["Full question"].tap()
+    let document = app.scrollViews["interviewDocument"]
     let original = app.buttons["exchange-original"]
+    for _ in 0..<12 where !original.isHittable { document.swipeDown() }
+    original.tap()
     XCTAssertTrue(original.waitForExistence(timeout: 5))
     XCTAssertTrue(original.isHittable)
     XCTAssertEqual(original.value as? String, "Expanded")
@@ -311,7 +415,7 @@ final class PracticeUITests: XCTestCase {
 
 
 
-  func testFullQuestionExpandsAndScrollsInline() throws {
+  func testOriginalQuestionExpandsAndScrollsInline() throws {
     continueAfterFailure = false
     let app = XCUIApplication()
     app.launchArguments = ["--fixtures", "--fixture-long-question"]
@@ -325,18 +429,17 @@ final class PracticeUITests: XCTestCase {
     let editor = app.descendants(matching: .any).matching(identifier: "answerEditor").firstMatch
     editor.tap()
     editor.typeText("Preserve this draft")
-    app.buttons["interviewOptions"].tap()
-    app.buttons["Full question"].tap()
+    let document = app.scrollViews["interviewDocument"]
+    for _ in 0..<12 where !original.isHittable { document.swipeDown() }
+    original.tap()
     XCTAssertTrue(original.isHittable)
     XCTAssertEqual(original.value as? String, "Expanded")
     XCTAssertFalse(app.navigationBars["Original question"].exists)
-    let document = app.scrollViews["interviewDocument"]
     for _ in 0..<35 where !editor.isHittable { document.swipeUp() }
     XCTAssertTrue(editor.isHittable, "The entire original question scrolls to the answer")
     XCTAssertEqual(editor.value as? String, "Preserve this draft")
-    app.buttons["interviewOptions"].tap()
-    app.buttons["Full question"].tap()
-    XCTAssertTrue(original.isHittable, "Jump works when the question is already expanded")
+    for _ in 0..<35 where !original.isHittable { document.swipeDown() }
+    XCTAssertTrue(original.isHittable)
     XCTAssertEqual(original.value as? String, "Expanded")
     capture("Original question inline", app)
   }
@@ -414,7 +517,7 @@ final class PracticeUITests: XCTestCase {
     let editor = app.descendants(matching: .any).matching(identifier: "answerEditor").firstMatch
     XCTAssertTrue(editor.waitForExistence(timeout:5))
     XCTAssertFalse(app.buttons["practiceMode"].exists)
-    XCTAssertFalse(app.buttons["liveVoice"].isEnabled)
+    XCTAssertTrue(app.buttons["liveVoice"].isEnabled)
     XCTAssertTrue(app.otherElements["answerDivider"].exists)
     editor.tap(); editor.typeText("Use a durable queue and retry failed work.")
     capture("Interview writing", app)
@@ -439,8 +542,8 @@ final class PracticeUITests: XCTestCase {
     app.buttons["Ask interviewer"].tap()
     app.buttons["Give me a nudge"].tap()
     XCTAssertTrue(app.staticTexts["Consider what a retry can know about an operation that already happened."].waitForExistence(timeout:5))
-    capture("Ask interviewer", app)
-    app.buttons["Done"].tap()
+    XCTAssertFalse(app.navigationBars["Ask interviewer"].exists)
+    capture("Inline interviewer help", app)
     XCTAssertEqual(editor.value as? String, "I need to handle duplicate effects.")
     app.buttons["shareAnswer"].tap()
     XCTAssertTrue(editor.waitForExistence(timeout: 8))
@@ -538,6 +641,27 @@ final class PracticeUITests: XCTestCase {
       XCTAssertGreaterThanOrEqual(answer.frame.minY, body.frame.maxY)
     }
     capture("Expanded original above history", app)
+  }
+
+  func testDisclosureHeadersKeepTheirPosition() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures", "--fixture-interview-history", "--fixture-follow-up"]
+    app.launch()
+    XCTAssertTrue(app.buttons["startPractice"].waitForExistence(timeout: 10))
+    app.buttons["startPractice"].tap()
+    let original = app.buttons["exchange-original"]
+    XCTAssertTrue(original.waitForExistence(timeout: 5))
+    let originalY = original.frame.minY
+    original.tap()
+    XCTAssertEqual(original.frame.minY, originalY, accuracy: 0.5)
+    let response = app.buttons["exchange-history-1"]
+    XCTAssertTrue(response.waitForExistence(timeout: 5))
+    let headerY = response.frame.minY
+    for _ in 0..<4 {
+      response.tap()
+      XCTAssertEqual(response.frame.minY, headerY, accuracy: 0.5)
+    }
+    capture("Stable disclosure headers", app)
   }
 
   func testDocumentHistoryRestorationAndLateResponse() throws {

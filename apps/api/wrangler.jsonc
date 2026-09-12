@@ -11,8 +11,9 @@
   },
   "vars": {
     "CLERK_ISSUER": "https://trusting-finch-496.clerk.accounts.dev",
-    "MODEL_ID": "google/gemini-2.5-flash-lite",
+    "MODEL_ID": "google/gemini-3.1-flash-lite",
     "MANAGED_AI_ENABLED": "true",
+    "VOICE_ENABLED": "true",
     "COMPANION_AUTO_ENABLED": "true",
     "CREDENTIAL_KEY_VERSION": "1",
     "CLERK_AUDIENCE": "drillbit"

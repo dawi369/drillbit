@@ -40,6 +40,8 @@
 	<string>$(CLERK_PUBLISHABLE_KEY)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Talk with your practice interviewer using live voice.</string>
 	<key>SharedKeychainGroup</key>
 	<string>$(AppIdentifierPrefix)dawi.drillbit.shared</string>
 	<key>UIBackgroundModes</key>

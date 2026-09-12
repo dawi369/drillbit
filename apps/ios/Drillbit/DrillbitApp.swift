@@ -38,7 +38,7 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
       let container = try ModelContainer(
         for: Schema(StoreV1.models), migrationPlan: StoreMigrations.self,
         configurations: configuration)
-      if !fixture { Clerk.configure(publishableKey: key) }
+      if !fixture { Clerk.configure(publishableKey: key); AppDiagnostics.shared.start() }
       let appModel = AppModel(
         container: container,
         baseURL: URL(string: endpoint) ?? URL(string: "https://example.invalid")!, fixture: fixture)
@@ -62,14 +62,7 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
   var body: some Scene {
     WindowGroup {
       if let model {
-        RootView(model: model).tint(AppPalette.primary).onReceive(
-          NotificationCenter.default.publisher(for: .init("OpenPractice"))
-        ) { _ in
-          Task {
-            await model.refresh()
-            if let challenge = model.bootstrap?.challenge { await model.open(challenge) }
-          }
-        }
+        RootView(model: model).tint(AppPalette.primary)
       } else {
         ContentUnavailableView(
           "Setup required", systemImage: "gearshape",

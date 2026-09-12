@@ -39,6 +39,12 @@ import Foundation
     try validate(data, response)
     return try JSONDecoder.api.decode(T.self, from: data)
   }
+  func exportPage(query: String?) async throws -> Data {
+    let request = try await request("account/export" + (query.map { "?" + $0 } ?? ""))
+    let (data, response) = try await transport(request)
+    try validate(data, response)
+    return data
+  }
   func coach(id: String, question: String, command: String, onDelta: @MainActor (String) -> Void)
     async throws
   {

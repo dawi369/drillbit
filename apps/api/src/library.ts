@@ -1,8 +1,9 @@
+import { learningEvidence } from "./learning";
 import { Fault, timestamp } from "./domain";
 import { concepts, eligibilityInput } from "./taxonomy";
 import { detail, type ChallengeRow, present } from "./store";
 import type { Env } from "./platform";
-type Question = {
+export type Question = {
   id: string;
   account_id: string;
   data: string;
@@ -21,7 +22,7 @@ export async function ownedQuestion(env: Env, account: string, id: string) {
     throw new Fault("not_found", 404, "This question is no longer available.");
   return q;
 }
-const projection = (q: Question) => {
+export const questionProjection = (q: Question) => {
   const {
     evaluationCriteria,
     ambiguityPolicy,
@@ -110,7 +111,7 @@ export async function libraryPage(
     last = page.at(-1);
   return {
     questions: page.map((q) => ({
-      ...projection(q),
+      ...questionProjection(q),
       lastActivity: q.activity,
       attemptCount: q.attemptCount,
     })),
@@ -146,7 +147,7 @@ export async function questionDetail(
   const page = rows.results.slice(0, 25),
     last = page.at(-1);
   return {
-    question: projection(q),
+    question: questionProjection(q),
     attempts: page.map(present),
     nextCursor:
       rows.results.length > 25 && last
@@ -179,7 +180,7 @@ export async function setEligibility(
         409,
         "This command has already been used.",
       );
-    return projection(await ownedQuestion(env, account, id));
+    return questionProjection(await ownedQuestion(env, account, id));
   }
   await env.DB.batch([
     env.DB.prepare(
@@ -222,7 +223,7 @@ export async function setEligibility(
       "This question changed on another device. Refresh and try again.",
     );
   if(accepted.question_id!==id||accepted.revision!==input.revision||!!accepted.eligible!==input.eligible)throw new Fault("command_conflict",409,"This command has already been used.");
-  return projection(await ownedQuestion(env, account, id));
+  return questionProjection(await ownedQuestion(env, account, id));
 }
 export async function startQuestion(
   env: Env,
@@ -292,7 +293,7 @@ export async function selectConcept(
   explicit?: string,
 ) {
   const rows = await env.DB.prepare(
-    "SELECT json_extract(q.data,'$.primaryConceptId') id,COUNT(DISTINCT q.id) count,MAX(c.completed_at) last FROM questions q JOIN question_attempts x ON x.question_id=q.id JOIN challenges c ON c.id=x.challenge_id WHERE q.account_id=? AND c.lifecycle='completed' AND json_extract(q.data,'$.engineeringLevel')=? GROUP BY 1",
+    "SELECT json_extract(q.data,'$.primaryConceptId') id,COUNT(*) count,MAX(c.completed_at) last FROM questions q JOIN question_attempts x ON x.question_id=q.id JOIN challenges c ON c.id=x.challenge_id WHERE q.account_id=? AND c.lifecycle='completed' AND json_extract(q.data,'$.engineeringLevel')=? GROUP BY 1",
   )
     .bind(account, level)
     .all<{ id: string; count: number; last: string }>();
@@ -310,12 +311,29 @@ export async function selectConcept(
         (a.last ?? "").localeCompare(b.last ?? "") ||
         a.id.localeCompare(b.id),
     );
+  const completed = rows.results.reduce((total, row) => total + row.count, 0);
+  const evidence = await learningEvidence(env, account, level);
+  const recentIDs = new Set(recent.results.map(r => r.id));
+  const latest = new Map<string, typeof evidence>();
+  for (const item of evidence) {
+    const entries = latest.get(item.conceptId);
+    if (!entries) latest.set(item.conceptId, [item]);
+    else if (entries[0].sessionId === item.sessionId) entries.push(item);
+  }
+  const gap = [...latest.values()].flat().find(e => e.signal === "needs_practice" && !recentIDs.has(e.conceptId)
+    && rows.results.some(r => r.id === e.conceptId));
+  const revisit = [...rows.results].filter(r => !recentIDs.has(r.id)
+    && Date.now() - Date.parse(r.last) >= 14 * 86400000)
+    .sort((a,b) => a.last.localeCompare(b.last) || a.id.localeCompare(b.id))[0];
+  const selected = completed % 3 === 1 && gap ? gap.conceptId
+    : completed % 3 === 2 && revisit ? revisit.id : candidates[0]!.id;
   return {
-    primaryConceptId: explicit ?? candidates[0]!.id,
-    reason: explicit
-      ? "Your selected practice area."
+    primaryConceptId: explicit ?? selected,
+    reason: explicit ? "Your selected practice area."
+      : completed % 3 === 1 && gap ? "Revisit an area highlighted in previous feedback."
+      : completed % 3 === 2 && revisit ? "Revisit a concept you have not practised recently."
       : "An area with less completed practice at this level.",
-    version: 1,
+    version: 2,
   };
 }
 export async function coverage(env: Env, account: string) {

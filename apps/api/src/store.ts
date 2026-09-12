@@ -1,3 +1,4 @@
+import { assertNoVoice } from "./voice";
 import { interviewFor } from "./interview";
 import { contextFor, receiptStatements } from "./companion";
 import { receiptSchema } from "./companion-contract";
@@ -217,13 +218,14 @@ export async function complete(
   const challenge = await ownedChallenge(env, account, id);
   if (challenge.lifecycle === "completed" && challenge.command_id === command)
     return;
-  if (!answer.trim() && !(await env.DB.prepare("SELECT id FROM interview_turns WHERE challenge_id=? AND kind='answer' LIMIT 1").bind(id).first()))
+  await assertNoVoice(env,account,id);
+  if (!answer.trim() && !(await env.DB.prepare("SELECT id FROM interview_turns WHERE challenge_id=? AND (kind='answer' OR (kind='voice' AND EXISTS(SELECT 1 FROM voice_fragments f WHERE f.session_id=interview_turns.id AND f.speaker='user' AND length(trim(f.text))>0))) LIMIT 1").bind(id).first()))
     throw new Fault("empty_answer", 400, "Write an answer before finishing.");
   const now = timestamp();
   await env.DB.batch([
     env.DB.prepare(
-      `UPDATE sessions SET answer=?,revision=revision+1,command_id=?,updated_at=? WHERE challenge_id=? AND revision=? AND EXISTS(SELECT 1 FROM challenges WHERE id=? AND account_id=? AND lifecycle IN ('ready','in_progress'))`,
-    ).bind(answer, command, now, id, revision, id, account),
+      `UPDATE sessions SET answer=?,revision=revision+1,command_id=?,updated_at=? WHERE challenge_id=? AND revision=? AND EXISTS(SELECT 1 FROM challenges WHERE id=? AND account_id=? AND lifecycle IN ('ready','in_progress')) AND NOT EXISTS(SELECT 1 FROM voice_sessions v WHERE v.challenge_id=sessions.challenge_id AND v.status IN ('connecting','active') AND v.expires_at>?)`,
+    ).bind(answer, command, now, id, revision, id, account, now),
     ...receiptStatements(env, id, receipts, command),
     env.DB.prepare(
       `UPDATE challenges SET lifecycle='completed',completed_at=?,command_id=? WHERE id=? AND account_id=? AND lifecycle IN ('ready','in_progress') AND EXISTS(SELECT 1 FROM sessions WHERE challenge_id=? AND command_id=?)`,
@@ -241,7 +243,7 @@ export async function complete(
       `INSERT OR IGNORE INTO completion_context(challenge_id,data)
       SELECT c.id,json_object(
         'question',json(c.data),
-        'interview',json((SELECT json_group_array(json_object('kind',t.kind,'prompt',t.prompt,'answer',t.text,'result',json(t.result),'delivery','unknown')) FROM (SELECT * FROM interview_turns WHERE challenge_id=c.id ORDER BY ordinal) t)),
+        'interview',json((SELECT json_group_array(json_object('kind',t.kind,'prompt',t.prompt,'answer',t.text,'result',json(t.result),'delivery','unknown','voice',json((SELECT json_group_array(json_object('speaker',f.speaker,'text',f.text,'startMs',f.start_ms,'endMs',f.end_ms)) FROM voice_fragments f WHERE f.session_id=t.id)))) FROM (SELECT * FROM interview_turns WHERE challenge_id=c.id ORDER BY ordinal) t)),
         'session',json_object('answer',s.answer,'revision',s.revision),
         'help',json((SELECT json_group_array(json_object('id',j.id,'kind',json_extract(j.input,'$.action.kind'),'status',j.status,'body',json_extract(h.data,'$.body'),'suggestedAnswer',json_extract(h.data,'$.suggestedAnswer'))) FROM jobs j LEFT JOIN help_results h ON h.id=j.id WHERE j.challenge_id=c.id AND j.kind='help')),
         'turns',json((SELECT json_group_array(json_object('role',t.role,'text',t.text)) FROM turns t WHERE t.challenge_id=c.id)),

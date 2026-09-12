@@ -1,0 +1,1 @@
+{"fragments":[{"id":"event_user_1","sequence":0,"speaker":"user","text":"Use a queue.","startMs":0,"endMs":900},{"id":"event_assistant_1","sequence":1,"speaker":"assistant","text":"What if a worker retries?","startMs":1000,"endMs":2200}],"closed":true,"finalized":false,"usageSeconds":4}

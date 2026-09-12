@@ -5,6 +5,10 @@ const definitions = Object.fromEntries(
   Object.entries(wire).map(([name, schema]) => [name, z.toJSONSchema(schema)]),
 );
 const operations: [string, string, string, string?][] = [
+  ["post","challenges/{id}/voice","Start a voice session without submitting the typed draft","VoiceStart"],
+  ["post","challenges/{id}/voice/{voice}/events","Persist idempotent voice fragments and close receipts","VoiceEvents"],
+  ["post","challenges/{id}/voice/{voice}/delegate","Request technical guidance for a live session","VoiceDelegate"],
+  ["get", "account/export", "Export paginated account practice data without credentials"],
   ["get","taxonomy","Get the versioned system-design concept vocabulary"],
   ["get","library","Search and filter the account question library"],
   ["get","library/coverage","Count completed practice by concept without inferring ability"],
@@ -104,6 +108,7 @@ const responseNames: Record<string, string> = {
   "post challenges/{id}/example": "ExampleOperation",
   "delete challenges/{id}": "OK",
   "get memory": "Memory",
+  "get account/export": "AccountExport",
   "get sessions": "HistoryPage",
   "get jobs/{id}": "Job",
   "post jobs/{id}/retry": "Job",
@@ -144,6 +149,7 @@ for (const [method, path, summary, schema] of operations) {
     parameters: [
       ...(path.includes("{turn}") ? [{ name: "turn", in: "path", required: true, schema: { type: "string" } }] : []),
       ...(["library","questions/{id}"].includes(path) ? (path === "library" ? ["cursor","q","concepts","level","since","skipped"] : ["cursor"]).map(name=>({name,in:"query",schema:{type:"string"}})) : []),
+      ...(path === "account/export" ? [{name:"cursor",in:"query",schema:{type:"string"}}] : []),
       ...(path === "sessions"
         ? ["cursor", "q"].map((name) => ({
             name,

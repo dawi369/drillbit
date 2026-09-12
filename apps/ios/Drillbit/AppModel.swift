@@ -9,6 +9,12 @@ import WidgetKit
 @MainActor @Observable final class AppModel {
   var bootstrap: Bootstrap?
   var memory = MemoryResponse(sessions: [], patterns: [])
+  private var homeCacheAccount: String?
+  private var memoryRequestVersion = 0
+  private var launching = true
+  private(set) var restoringSession = true
+  private(set) var launchError: String?
+  private var cacheGeneration = 0
   var settings = PracticeSettings()
   var presented: Challenge?
   var error: String?
@@ -62,6 +68,7 @@ import WidgetKit
       for _ in 0..<90 {
         guard !Task.isCancelled, self.bootstrap?.account.id == account else { return }
         if let result: Challenge = try? await self.api.send("challenges/" + challengeID), result.lifecycle == "completed", result.reflection != nil {
+          await self.loadMemory()
           await self.preloadLibrary(force: true)
           return
         }
@@ -178,6 +185,7 @@ import WidgetKit
       if bootstrap?.account.id == result.account.id { bootstrap?.challenge = result.challenge; bootstrap?.jobs = result.jobs }
       try SharedStore.save(WidgetSnapshot(challenge: result.challenge, updatedAt: Date().ISO8601Format()))
       memory = MemoryResponse(sessions: [], patterns: [])
+      homeCacheAccount = nil; memoryRequestVersion += 1; cacheGeneration += 1
       UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
       try await disk.cache(key: key, data: Data(epoch.utf8))
     }
@@ -230,9 +238,62 @@ import WidgetKit
       logger.error("Operation failed; details shown in UI")
     }
   }
+  /// Hydrate authenticated account data locally before publishing Home.
+  private func restoreHomeCache(account: String) async {
+    guard homeCacheAccount != account else { return }
+    let generation = cacheGeneration
+    var restoredMemory = MemoryResponse(sessions: [], patterns: [])
+    if let data = try? await disk.cached(key: "memory:" + account),
+       let cached = try? JSONDecoder.api.decode(MemoryResponse.self, from: data) { restoredMemory = cached }
+    var pages: [String: LibraryPage] = [:]
+    var details: [String: LibraryDetail] = [:]
+    for skipped in [false, true] {
+      let key = "library:" + account + ":|||0|" + String(skipped)
+      if let data = try? await disk.cached(key: key), let page = try? JSONDecoder().decode(LibraryPage.self, from: data) {
+        pages[key] = page
+        for question in page.questions {
+          let detailKey = "library-detail:" + account + ":" + question.id
+          if let data = try? await disk.cached(key: detailKey), let detail = try? JSONDecoder().decode(LibraryDetail.self, from: data) { details[detailKey] = detail }
+        }
+      }
+    }
+    let pending = (try? await disk.cached(key: "eligibility:" + account)).flatMap { try? JSONDecoder().decode([EligibilityCommand].self, from: $0) } ?? []
+    for command in pending {
+      details["library-detail:" + account + ":" + command.questionId]?.question.eligible = command.eligible
+      for key in pages.keys where key.hasSuffix("true") { pages[key]?.questions.removeAll { $0.id == command.questionId && command.eligible } }
+    }
+    let cachedTaxonomy = (try? await disk.cached(key: "taxonomy:" + account)).flatMap { try? JSONDecoder().decode(TaxonomyResponse.self, from: $0) }
+    guard cacheGeneration == generation else { return }
+    memory = restoredMemory
+    librarySnapshots = pages
+    libraryDetailSnapshots = details
+    librarySessions = [:]
+    for detail in details.values { for attempt in detail.attempts where attempt.session != nil { librarySessions[account + ":" + attempt.id] = attempt } }
+    taxonomy = cachedTaxonomy?.concepts ?? []
+    homeCacheAccount = account
+    libraryVersion += 1
+  }
   func launch() async {
+    restoringSession = true
+    launchError = nil
+    defer { restoringSession = false }
     if fixture {
+      if ProcessInfo.processInfo.arguments.contains("--fixture-slow-launch") {
+        try? await Task.sleep(for: .seconds(8))
+      }
+      if ProcessInfo.processInfo.arguments.contains("--fixture-signed-out") {
+        launching = false
+        return
+      }
       seedFixture()
+      if ProcessInfo.processInfo.arguments.contains("--fixture-cached-home"), let seeded = bootstrap {
+        bootstrap = nil
+        try? await disk.cache(key: "memory:" + seeded.account.id, data: JSONEncoder().encode(memory))
+        memory = MemoryResponse(sessions: [], patterns: [])
+        await restoreHomeCache(account: seeded.account.id)
+        bootstrap = seeded
+      }
+      launching = false
       await preloadLibrary()
       return
     }
@@ -241,16 +302,30 @@ import WidgetKit
       try? await Task.sleep(for: .milliseconds(200))
       if Task.isCancelled { return }
     }
+    guard Clerk.shared.isLoaded else {
+      launchError = "Couldn’t restore your session. Check your connection and try again."
+      return
+    }
     if let subject = Clerk.shared.user?.id, subject == SharedStore.secret("subject"),
       let account = SharedStore.secret("account"),
       let data = try? await disk.cached(key: "bootstrap:" + account),
       let cached = try? JSONDecoder.api.decode(Bootstrap.self, from: data)
     {
+      try? await acceptEpoch(cached)
+      await restoreHomeCache(account: account)
+      guard Clerk.shared.user?.id == subject else { launching = false; return }
       bootstrap = cached
       if let id = cached.challenge?.id, (try? await disk.pendingSkips(account: account).contains(id)) == true { bootstrap?.challenge = nil }
       settings = cached.settings
+      restoringSession = false
     }
+    launching = false
+    if Clerk.shared.user == nil { return }
     await refresh()
+    if bootstrap == nil, Clerk.shared.user != nil {
+      launchError = "Couldn’t load your account. Your saved practice is safe. Try again."
+      error = nil
+    }
   }
   func signIn() async {
     await perform {
@@ -272,21 +347,28 @@ import WidgetKit
     }
   }
   func refresh() async {
-    guard !fixture, !refreshing else { return }
+    guard !fixture, !refreshing, !launching else { return }
+    let subject = Clerk.shared.user?.id
     refreshing = true
     defer { refreshing = false }
     do {
       let result: Bootstrap = try await api.send("bootstrap")
+      guard Clerk.shared.user?.id == subject else { return }
       try await acceptEpoch(result)
+      if bootstrap?.account.id != result.account.id { bootstrap = nil }
+      await restoreHomeCache(account: result.account.id)
+      guard Clerk.shared.user?.id == subject else { return }
       bootstrap = result
       let queuedSkips = try await disk.pendingSkips(account: result.account.id)
       if let id = result.challenge?.id, locallySkipped[result.account.id]?.contains(id) == true || queuedSkips.contains(id) { bootstrap?.challenge = nil }
       settings = result.settings
+      try? await reconcileReminder()
       try SharedStore.setSecret(result.account.id, key: "account")
       try SharedStore.setSecret(Clerk.shared.user?.id, key: "subject")
       try await disk.cache(
         key: "bootstrap:" + result.account.id, data: JSONEncoder().encode(bootstrap ?? result))
       if result.account.status == "active" {
+        await loadMemory()
         await preloadLibrary()
         if SharedStore.secret("widgetToken") == nil
           || (SharedStore.secret("widgetTokenExpires").flatMap { Date.fromAPI($0) } ?? .distantPast)
@@ -303,7 +385,6 @@ import WidgetKit
             challenge: result.challenge, updatedAt: ISO8601DateFormatter().string(from: Date())))
         WidgetCenter.shared.reloadTimelines(ofKind: SharedStore.widgetKind)
         await sync()
-        await loadMemory()
       }
     } catch let e as APIError where e.status == 401 {
       if bootstrap == nil {
@@ -315,16 +396,25 @@ import WidgetKit
   }
   func loadMemory() async {
     guard let account = bootstrap?.account.id, !fixture else { return }
+    memoryRequestVersion += 1
+    let version = memoryRequestVersion
+    let epoch = bootstrap?.practiceEpoch
     do {
-      memory = try await api.send("memory")
-      try await disk.cache(key: "memory:" + account, data: JSONEncoder().encode(memory))
-    } catch {
-      if let data = try? await disk.cached(key: "memory:" + account),
-        let cached = try? JSONDecoder.api.decode(MemoryResponse.self, from: data)
-      {
-        memory = cached
-      }
-    }
+      let updated: MemoryResponse = try await api.send("memory")
+      guard bootstrap?.account.id == account, bootstrap?.practiceEpoch == epoch, memoryRequestVersion == version else { return }
+      memory = updated
+      try await disk.cache(key: "memory:" + account, data: JSONEncoder().encode(updated))
+    } catch { /* Keep the already-published snapshot during failed refreshes. */ }
+  }
+  func refreshAfterSessionDeletion() async throws {
+    guard let account = bootstrap?.account.id else { return }
+    if let task = libraryWarmTask { await task.value }
+    guard bootstrap?.account.id == account else { return }
+    try await disk.invalidateLibrary(account: account)
+    libraryDetailSnapshots = [:]; librarySessions = [:]; librarySnapshots = [:]
+    libraryCoverage = []; libraryVersion += 1
+    await loadMemory()
+    await preloadLibrary(force: true)
   }
   func generate(_ preparation: PreparationInput? = nil) async {
     await perform { _ = try await generateForPreview(preparation) }
@@ -466,7 +556,8 @@ import WidgetKit
       let queuedSkips = try await disk.pendingSkips(account: account)
       let queuedEligibility = try await disk.cached(key: "eligibility:" + account).flatMap { try JSONDecoder().decode([EligibilityCommand].self, from: $0) } ?? []
       let queuedDrafts = try await disk.pending(account: account)
-      hasPendingWrites = !queuedSkips.isEmpty || !queuedEligibility.isEmpty || !queuedDrafts.isEmpty
+      let queuedVoice = try await disk.hasPendingVoice(account: account)
+      hasPendingWrites = !queuedSkips.isEmpty || !queuedEligibility.isEmpty || !queuedDrafts.isEmpty || queuedVoice
       let remote: Bootstrap = try await api.send("bootstrap")
       try await acceptEpoch(remote)
       guard bootstrap?.account.id == account else { return }
@@ -542,7 +633,8 @@ import WidgetKit
       let pendingDrafts = try await !disk.pending(account: account).isEmpty
       let pendingSkips = try await !disk.pendingSkips(account: account).isEmpty
       let pendingEligibility = try await disk.cached(key: "eligibility:" + account).flatMap { try JSONDecoder().decode([EligibilityCommand].self, from: $0) } ?? []
-      hasPendingWrites = pendingDrafts || pendingSkips || !pendingEligibility.isEmpty
+      let pendingVoice = try await disk.hasPendingVoice(account: account)
+      hasPendingWrites = pendingDrafts || pendingSkips || !pendingEligibility.isEmpty || pendingVoice
     } catch { self.error = error.localizedDescription }
   }
   func resolveConflict(keepLocal: Bool) async {
@@ -592,32 +684,37 @@ import WidgetKit
     }
   }
   func updateSettings() async throws {
-    settings.model = "google/gemini-2.5-flash-lite"
+    settings.model = "google/gemini-3.1-flash-lite"
     settings.engineeringLevel = settings.selectedLevel
     if !fixture {
       let _: PracticeSettings = try await api.send("settings", method: "PUT", body: settings)
     }
-    let center = UNUserNotificationCenter.current()
-    center.removePendingNotificationRequests(withIdentifiers: ["daily-practice"])
-    if settings.reminderEnabled {
-      let granted = try await center.requestAuthorization(options: [.alert, .sound])
-      if !granted {
-        throw APIError(
-          code: "notifications_denied",
-          message: "Enable notifications for Drillbit in iPhone Settings.", status: 0)
-      }
-      let content = UNMutableNotificationContent()
-      content.title = "Time for a practice session"
-      content.body = "One question. A little space to think."
-      content.userInfo = ["route": "today"]
-      try await center.add(
-        UNNotificationRequest(
-          identifier: "daily-practice", content: content,
-          trigger: UNCalendarNotificationTrigger(
-            dateMatching: reminderComponents(minutes: settings.dailyMinutes, timezone: settings.timezone), repeats: true))
-      )
-    }
+    try await reconcileReminder(requestPermission: true)
     await refresh()
+  }
+  func reconcileReminder(requestPermission: Bool = false) async throws {
+    guard !fixture else { return }
+    let center = UNUserNotificationCenter.current()
+    guard settings.reminderEnabled else {
+      center.removePendingNotificationRequests(withIdentifiers: ["daily-practice"])
+      return
+    }
+    var authorization = await center.notificationSettings().authorizationStatus
+    if requestPermission && authorization == .notDetermined {
+      _ = try await center.requestAuthorization(options: [.alert, .sound])
+      authorization = await center.notificationSettings().authorizationStatus
+    }
+    guard authorization == .authorized || authorization == .provisional else {
+      center.removePendingNotificationRequests(withIdentifiers: ["daily-practice"])
+      if requestPermission { throw APIError(code: "notifications_denied", message: "Your practice time is saved. Enable notifications for Drillbit in iPhone Settings to receive reminders.", status: 0) }
+      return
+    }
+    let content = UNMutableNotificationContent()
+    content.title = "A little space to think"
+    content.body = "Your practice is here whenever you’re ready."
+    content.userInfo = ["route": "home"]
+    try await center.add(UNNotificationRequest(identifier: "daily-practice", content: content,
+      trigger: UNCalendarNotificationTrigger(dateMatching: reminderComponents(minutes: settings.dailyMinutes, timezone: settings.timezone), repeats: true)))
   }
   func retry(_ job: Job) async {
     await perform {
@@ -660,6 +757,7 @@ import WidgetKit
     failedPreparationSource = nil
     presented = nil
     memory = MemoryResponse(sessions: [], patterns: [])
+    homeCacheAccount = nil; memoryRequestVersion += 1; cacheGeneration += 1
   }
   private func seedFixture() {
     settings.onboardingComplete = true
@@ -682,6 +780,9 @@ import WidgetKit
     if ProcessInfo.processInfo.arguments.contains("--fixture-dashboard") {
       let recent = Challenge(difficulty: "easy", id: "recent", lifecycle: "completed", title: "Design a reliable job queue", prompt: "", topic: "Backend", completedAt: "2026-09-09T10:30:00Z")
       memory = MemoryResponse(statistics: .init(completed: 12, lastSevenDays: 4, asOf: ISO8601DateFormatter().string(from: Date())), sessions: [recent], patterns: [])
+      if ProcessInfo.processInfo.arguments.contains("--fixture-evidence") {
+        memory.evidence = [LearningEvidence(conceptId: "queues", observation: "Defined a bounded retry policy.", quote: "Retry at most three times.", signal: "demonstrated", assistance: "unknown", sessionId: "recent", at: "2026-09-09T10:30:00Z")]
+      }
     }
     #endif
     #if DEBUG

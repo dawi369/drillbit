@@ -9,6 +9,8 @@ export interface Env {
   CLERK_AUDIENCE: string;
   CLERK_SECRET_KEY?: string;
   OPENROUTER_API_KEY?: string;
+  OPENAI_API_KEY?: string;
+  VOICE_ENABLED?: string;
   CREDENTIAL_KEY?: string;
   CREDENTIAL_KEY_VERSION: string;
   MODEL_ID: string;

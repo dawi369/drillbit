@@ -1,7 +1,7 @@
 /** Synthetic live acceptance; credentials are read from the environment, never printed. */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { z } from "../apps/api/node_modules/zod";
-import { messagesFor } from "../apps/api/src/ai";
+import { messagesFor, interviewModelSchema, parseInterviewModelResult } from "../apps/api/src/ai";
 import { interviewResultSchema, interviewSchemaFor, normalizeInterviewResult, interviewWrapUp } from "../apps/api/src/interview";
 import { MODEL_ID } from "../apps/api/src/domain";
 if (!process.env.OPENROUTER_API_KEY) throw new Error("Provider key missing");
@@ -19,10 +19,10 @@ const results=[];
 for (const sample of cases) {
  const wrap = interviewWrapUp(sample.context, sample.context.action.kind);
  if (wrap) { results.push({name:sample.name,output:wrap}); console.log(sample.name+": "+JSON.stringify(wrap)); continue; }
- const response=await fetch("https://openrouter.ai/api/v1/chat/completions",{method:"POST",headers:{Authorization:`Bearer ${process.env.OPENROUTER_API_KEY}`,"Content-Type":"application/json"},body:JSON.stringify({model:MODEL_ID,messages:messagesFor("interview",sample.context),response_format:{type:"json_schema",json_schema:{name:"interview",strict:true,schema:z.toJSONSchema(interviewSchemaFor(sample.context.action.kind))}}}),signal:AbortSignal.timeout(60000)});
+ const response=await fetch("https://openrouter.ai/api/v1/chat/completions",{method:"POST",headers:{Authorization:`Bearer ${process.env.OPENROUTER_API_KEY}`,"Content-Type":"application/json"},body:JSON.stringify({model:MODEL_ID,messages:messagesFor("interview",sample.context),response_format:{type:"json_schema",json_schema:{name:"interview",strict:true,schema:z.toJSONSchema(interviewModelSchema(sample.context, interviewSchemaFor(sample.context.action.kind)))}}}),signal:AbortSignal.timeout(60000)});
  if(!response.ok) throw new Error(`Provider status ${response.status}`);
  const envelope=await response.json() as any;
- const output=normalizeInterviewResult(interviewResultSchema.parse(JSON.parse(envelope.choices[0].message.content)));
+ const output=parseInterviewModelResult(sample.context, interviewSchemaFor(sample.context.action.kind), JSON.parse(envelope.choices[0].message.content));
  results.push({name:sample.name,output});
  console.log(sample.name+": "+JSON.stringify(output));
 }

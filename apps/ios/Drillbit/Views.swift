@@ -4,22 +4,37 @@ import SwiftUI
 struct RootView: View {
   @Bindable var model: AppModel
   @State private var settingsOpen = false
+  @State private var selectedTab = "home"
+  @AppStorage("appearance") private var appearance = "system"
   @Environment(\.scenePhase) private var scenePhase
   var body: some View {
     Group {
-      if let account = model.bootstrap?.account, account.status == "active" {
+      if model.restoringSession || model.launchError != nil {
+        VStack(spacing: 16) {
+          Text("Drillbit").font(.title2.weight(.semibold))
+          if let message = model.launchError {
+            Text(message).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            Button("Try again") { Task { await model.launch() } }
+          }
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.background)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("sessionRestoration")
+      } else if let account = model.bootstrap?.account, account.status == "active" {
         if !model.settings.onboardingComplete {
           NavigationStack { SetupView(model: model) }
         } else {
-          TabView {
-            Tab("Home", systemImage: "house") {
+          TabView(selection: $selectedTab) {
+            Tab("Home", systemImage: "house", value: "home") {
               NavigationStack {
                 HomeView(model: model).toolbar {
                   Button("Settings", systemImage: "gearshape") { settingsOpen = true }
                 }
               }
             }
-            Tab("Library", systemImage: "book.closed") {
+            Tab("Library", systemImage: "book.closed", value: "library") {
               NavigationStack {
                 MemoryView(model: model).toolbar {
                   Button("Settings", systemImage: "gearshape") { settingsOpen = true }
@@ -32,7 +47,11 @@ struct RootView: View {
         WelcomeView(model: model)
       }
     }
-    .preferredColorScheme(model.fixture && ProcessInfo.processInfo.arguments.contains("--dark") ? .dark : nil)
+    .preferredColorScheme(model.fixture && ProcessInfo.processInfo.arguments.contains("--dark") ? .dark : appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
+    .onReceive(NotificationCenter.default.publisher(for: .init("OpenPractice"))) { _ in
+      selectedTab = "home"
+      Task { await model.refresh() }
+    }
     .task { await model.launch() }
     .onChange(of: scenePhase) { _, phase in
       if phase == .active {
@@ -80,17 +99,8 @@ struct RootView: View {
     }
     .onOpenURL { url in
       if url.scheme == "dawi.drillbit" && url.host == "callback" { return }
-      Task {
-        if url.host == "challenge", let id = url.pathComponents.last, id != "/" {
-          await model.perform {
-            let challenge: Challenge = try await model.api.send("challenges/" + id)
-            await model.open(challenge)
-          }
-        } else {
-          await model.refresh()
-          if let challenge = model.bootstrap?.challenge { await model.open(challenge) }
-        }
-      }
+      selectedTab = "home"
+      Task { await model.refresh() }
     }
   }
 }
@@ -267,6 +277,8 @@ struct QuestionFlow: View {
   }
 }
 struct ReflectionView: View {
+  @State private var waitingForFeedback = true
+  @State private var feedbackCheck = 0
   @State private var preparingFollowUp = false
   @State private var startedFollowUp: Challenge?
   var model: AppModel
@@ -283,10 +295,14 @@ struct ReflectionView: View {
           Text(
             model.hasPendingWrites && !model.fixture
               ? "Saved on this device. Your answer will sync when connected."
-              : "Your answer is saved. Feedback is being prepared."
+              : waitingForFeedback ? "Your answer is saved. Feedback is being prepared." : "Your practice is complete. Feedback will appear here and in your library when it’s ready."
           ).foregroundStyle(
             .secondary)
-          ProgressView()
+          if waitingForFeedback { ProgressView().accessibilityLabel("Preparing feedback") }
+          else { Button("Check feedback") { feedbackCheck += 1 } }
+          if let job = model.bootstrap?.jobs.first(where: { $0.challengeId == initial.id && $0.kind == "summarize" && $0.status == "failed" }) {
+            Button("Retry feedback") { Task { await model.retry(job); feedbackCheck += 1 } }
+          }
         }
         Button("Done") {
           model.presented = nil
@@ -303,13 +319,17 @@ struct ReflectionView: View {
       }) {
         QuestionFlow(model: model, source: current ?? initial, onStart: { startedFollowUp = $0 })
       }
-      .task {
+      .task(id: feedbackCheck) {
         guard !model.fixture else { return }
+        waitingForFeedback = true
+        defer { waitingForFeedback = false }
+        let account = model.bootstrap?.account.id
         let started = Date()
         while Date().timeIntervalSince(started) < 90 {
           if let detail: Challenge = try? await model.api.send("challenges/" + initial.id) {
+            guard account == model.bootstrap?.account.id, !Task.isCancelled else { return }
             current = detail
-            if detail.reflection != nil { return }
+            if detail.reflection != nil { await model.loadMemory(); return }
           }
           try? await Task.sleep(for: .milliseconds(Date().timeIntervalSince(started) < 10 ? 500 : 1500))
           if Task.isCancelled { return }
@@ -328,9 +348,17 @@ struct ReflectionContent: View {
           ForEach(reflection.worked, id: \.self) { Text($0) }
         }
       }
-      VStack(alignment: .leading, spacing: 8) {
-        Text("Next time").font(.headline)
-        Text(reflection.improve)
+      if !reflection.improve.isEmpty {
+        VStack(alignment: .leading, spacing: 8) {
+          Text("Next time").font(.headline)
+          Text(reflection.improve)
+        }
+      }
+      if let exercise = reflection.nextExercise {
+        VStack(alignment: .leading, spacing: 8) {
+          Text("Practise next").font(.headline)
+          Text(exercise)
+        }
       }
       Text(reflection.takeaway).foregroundStyle(.secondary)
     }
@@ -386,9 +414,13 @@ struct PracticeOverview: View {
     VStack(alignment: .leading, spacing: 16) {
       Text("Your practice").font(.title2.weight(.semibold))
       let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 16)) : AnyLayout(HStackLayout(alignment: .top, spacing: 24))
-      layout {
-        metric("Completed", value: memory.statistics?.completed)
-        metric("Last 7 days", value: memory.statistics?.lastSevenDays)
+      if let statistics = memory.statistics {
+        layout {
+          metric("Completed", value: statistics.completed)
+          metric("Last 7 days", value: statistics.lastSevenDays)
+        }
+      } else {
+        Text("Loading practice…").font(.subheadline).foregroundStyle(.secondary)
       }
       if let value = memory.statistics, let date = Date.fromAPI(value.asOf), Date().timeIntervalSince(date) > 300 {
         Text("Updated \(date.formatted(date: .abbreviated, time: .shortened))")
@@ -396,12 +428,12 @@ struct PracticeOverview: View {
       }
     }.frame(maxWidth: .infinity, alignment: .leading)
   }
-  private func metric(_ title: String, value: Int?) -> some View {
+  private func metric(_ title: String, value: Int) -> some View {
     VStack(alignment: .leading, spacing: 4) {
-      Text(value.map(String.init) ?? "—").font(.title.weight(.semibold)).monospacedDigit()
+      Text(String(value)).font(.title.weight(.semibold)).monospacedDigit()
       Text(title).font(.subheadline).foregroundStyle(.secondary)
     }.frame(maxWidth: .infinity, alignment: .leading)
       .accessibilityElement(children: .ignore)
-      .accessibilityLabel("\(title), \(value.map(String.init) ?? "not synced yet")")
+      .accessibilityLabel("\(title), \(value)")
   }
 }

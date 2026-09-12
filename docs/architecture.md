@@ -240,3 +240,69 @@ Skip first stores an account-scoped command and the latest editor text in SwiftD
 Add back to pool now publishes local eligibility immediately after durably enqueuing the existing revision-checked command. Library hydration reapplies pending eligibility so refresh does not undo the optimistic state. A 404/409 response reconciles Library data and exposes the server error; transport errors leave the command queued. Work arriving during an existing sync receives a subsequent drain pass.
 
 This pattern applies to confirmed local intent, not fabricated server results: Start, generation, and completed feedback retain their acknowledgement boundaries. No backend schema or contract changes.
+
+## Inference latency pipeline — 11 September 2026
+
+All provider calls send their JSON schema once through `response_format`, rather than duplicating it in the system prompt. Strict schema validation, the fixed model, quota accounting and latency-based provider routing remain intact. All inference jobs load their job/account state in one scoped query. HTTP-triggered workflow enqueue uses request-scoped `waitUntil` after durable D1 job creation; responses no longer wait for workflow creation acknowledgement. Scheduled reconciliation still recovers dispatch failures. This does not bypass Workflow startup or its durable execution boundary.
+
+New interview answers set optional `saveDraft=true`: the existing revision-checked D1 batch commits the submitted text into the turn and clears the answer atomically, without a preceding draft PUT. Legacy clients still require their text to match the synced draft. Native submission waits for any existing autosave/sync, then atomically persists the local answer and outgoing command. General draft sync skips attempts with an outstanding interview command. Local text is cleared only after the server acknowledges that submission; conflicts/replays retain the existing safeguards. The backend must be deployed before distributing this native path.
+
+Interview settings/history reads run concurrently. Stream snapshots use one account-scoped join, reusing the initial snapshot when opening SSE. A single coalescing writer persists partial text without blocking provider-token consumption; the final validated text waits for prior writes, and write failure aborts the provider stream. Transport still relays durable D1 snapshots at 200 ms intervals; this is not direct provider-to-client streaming.
+
+Generation, help and visible review polling checks every 500 ms for the first ten seconds, then every 1.5 seconds, preserving existing timeout windows. Generation avoids its duplicate full sync and publishes a confirmed question before a background Home refresh. Backend logs report queue-to-execution, credential/quota setup, provider-header and first-text timing without practice content. Native OSLog reports Send-to-first-text for new submissions. `scripts/measure-inference.ts` measures synthetic provider-only samples; it cannot establish end-to-end app latency.
+
+## Cache-first Home hydration — 11 September 2026
+
+After verifying the cached account belongs to the current Clerk subject, launch restores statistics, the first completed/skipped Library pages and their cached details, and topic taxonomy before publishing Home. Pending eligibility changes overlay those snapshots. Network refresh retains visible content; statistics refresh before Library/network maintenance and after completed feedback has been stored. Account changes, sign-out and practice-epoch resets invalidate hydration; request versions and account/epoch checks reject stale statistics responses. Uncached statistics show a compact loading message rather than invented counts or dash placeholders. No API or database change.
+
+## Session restoration before root routing — 11 September 2026
+
+Root routing distinguishes initial session restoration from signed-out state. A neutral native surface remains until Clerk is loaded and the matching account cache is hydrated; authenticated launches without cache also await bootstrap. Cached Home can appear before network maintenance completes. A Clerk readiness timeout or authenticated bootstrap failure offers Retry without rendering sign-in. A loaded Clerk client with no user reaches Welcome normally. Existing subject/account cache checks and sign-out behavior remain authoritative.
+
+## Coordinated disclosure placement — 11 September 2026
+
+Interview disclosure height and surrounding document placement inherit one SwiftUI `.smooth(duration: 0.3, extraBounce: 0)` transaction. The text component no longer overrides timing locally, and row labels no longer suppress inherited placement animation. Labels retain identity transitions and fixed typography without fades. Structural insertion shares the same curve; streaming retains its separate short growth timing. Reduced Motion and restoration/staging still disable document animation. This supersedes the earlier 220 ms disclosure and label-transaction suppression decisions.
+
+## Practice personality and voice admission — 11 September 2026
+
+New interview jobs pin `interviewer-standard-v3`; V2 remains resolvable for queued jobs. XML policy/reference material is separated from natural conversation messages and the final utterance, so the problem statement is no longer bundled into every conversational request. A follow_up outcome represents the next turn, including social replies; no public response schema changes. Gemini 3.1 Flash-Lite is the single active model, with legacy 2.5 settings accepted and normalized.
+
+Finalized voice-answer admission normalizes edge whitespace and rejects inactive/hidden or finished workspaces, retaining existing durable command/replay and draft guards. Voice stays disabled. See `docs/context-engineering.md` for researched personality decisions and partial live acceptance, and `docs/voice-foundations.md` for remaining audio-specific requirements.
+
+## V4 conversation routing and response ownership — 11 September 2026
+
+New interview jobs pin V4. A narrow whole-message social recognizer changes inference context only; it does not alter persistence, replace replies or drop historical data. Main context uses escaped XML reference data explicitly marked untrusted, followed by native conversation roles. V4 model output is `{move,text}`; the private move is validated then discarded. The server determines public follow_up/reply from the accepted action. Models cannot choose wrap_up or change lifecycle. Old V2/V3 editions retain their schema/assembly paths. Public API, Swift DTOs, D1 schema and streaming text protocol are unchanged.
+
+Substantive V4 calls use low reasoning; recognized social messages and other operations retain disabled reasoning. There is one provider call per turn. Cost/latency and reviewed sample acceptance are in `docs/personality-acceptance.md`.
+
+## Text-practice completeness — 11 September 2026
+
+The current product is Home / Library with the Interview room. This section and the [completeness ledger](product-completeness.md) supersede older Today/Memory and model-name descriptions above. Current model is Gemini 3.1 Flash Lite; live voice remains disabled.
+
+Reflection output `feedback-v2` adds required model-side evidence and nextExercise while public stored fields remain optional for old clients/records. Evidence is accepted only when its quote occurs in submitted candidate text and its concept is on the question. Quote validation is not semantic proof; observations remain model feedback. The server does not certify independence from missing delivery history. New reflections may have an empty improvement when the stated requirements are met. No historical sessions are rewritten. The last 100 completed-session observations travel in the existing cached memory response, with source IDs and dates.
+
+Concept selection version 2 rotates exploration, feedback and 14-day revisit opportunities at the selected level, excludes recent generated primary concepts, and never treats skips as weakness. Feedback comes from the latest observed session per concept; explicit selection wins. Source-linked follow-ups prefer the recorded weakness concept and use the existing generation/preview/start route.
+
+`GET /v1/account/export` paginates both sessions and question records with independent creation cursors and a fixed creation watermark. It uses authenticated account scope and public projections, includes eligibility, and excludes provider/device credentials and private evaluator fields. This is a readable data export, not an atomic database backup. Native export flushes pending work before fetching and checks account identity on every page.
+
+Appearance is a local System/Light/Dark preference. Notification/widget links select Home rather than calling Start. Authorized reminders reconcile after bootstrap without prompting on launch, using the saved IANA zone. Deleting a session invalidates its persisted Library snapshots. Reflection waiting terminates with an explicit check/retry path instead of an endless spinner.
+
+HTTP diagnostics log only method/status/duration/request ID. Inference usage records the actual prompt edition and charges even if output validation fails. MetricKit logs crash/hang counts locally; raw diagnostic payloads and practice content are not transmitted.
+
+### Inline interviewer help
+
+Ask interviewer remains in the workspace menu as a compact action sheet: Give me a nudge, Show an example, and an optional clarification field. Accepted commands dismiss the sheet only after local persistence; pre-submission failures retain its input. Help replies render incremental stream text in the existing conversation, with no duplicate sheet history. Help submissions preserve the unfinished answer and reuse existing revision, recovery and account-scoping contracts.
+
+## Live voice integration — 12 September 2026
+
+The native interview now has a gated WebRTC voice mode; see [voice foundations and acceptance boundaries](voice-foundations.md). Migration 0009 adds account-scoped voice sessions, immutable transcript fragments and idempotent delegation records. A voice session reserves an ordinary ordered interview block backed by a completed `voice` job; it never passes speech through `requestInterview` and therefore cannot generate duplicate text replies. Public interview turns add optional `voice` fragments and the `voice` kind; existing text DTOs remain valid. Completion snapshots include fragments, and feedback checks user quotes against those fragments. Versioned native and backend paths must be rolled out together before enabling voice for clients that understand the new turn kind.
+
+Local voice outboxes are included in account pending-write checks. D1 owns transcript and lifecycle state; provider event IDs identify fragments, while app command UUIDs identify sessions. Ending voice leaves the attempt and written draft in place. `VOICE_ENABLED=false` retains text practice while live provider and device acceptance remain open.
+
+### Dedicated voice room
+
+`InterviewView` is the stable owning shell for both writing and voice. Its `ZStack` switches presentation without replacing the controller or `LiveVoice`; route children do not start or tear down sessions. Explicit entry starts once, selector changes only change visibility, and leaving stops local capture/playback synchronously before asynchronous closure. A generation check after durable startup persistence prevents cancellation from resurrecting a connection. Repeated End while already ending is ignored.
+
+The room reuses the original-question component and disclosure state. Question and Conversation retain independent scroll positions within the room; transcript rows project the same immutable fragments used in writing. Manual transcript scrolling disables automatic following; Latest returns to the end. There is no additional transcript store, API or migration. A brief bottom-leading surface transition is independent of networking; Reduced Motion uses opacity only. This is a restrained page transition, not a stretched waveform animation.
+
+Mute and End remain in a bottom safe-area inset. Back has the same local audio-stop behavior as End. Draft editing and completion remain gated only while the existing voice closure/outbox conflicts; failed synchronization is recoverable from writing. App/account/attempt lifetime guards remain authoritative. No page appearance reconnects or replays a greeting.

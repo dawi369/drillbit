@@ -15,7 +15,7 @@ export async function historicalSnapshot(env: Env, account: string, excludeAttem
       return { attemptId: row.id, scenario: String(q.scenario ?? q.title ?? "").slice(0,100),
         engineeringLevel: q.engineeringLevel ?? null, conceptIds: Array.isArray(q.conceptIds) ? q.conceptIds.slice(0,3) : [],
         status: row.lifecycle, at: row.completed_at ?? row.created_at, assistance: "unknown; do not infer independent work",
-        feedback: row.lifecycle === "completed" && feedback ? { provenance: "prior model feedback, not a skill assessment", observation: String(feedback.summary ?? "").slice(0,240), nextPractice: String(feedback.improve ?? "").slice(0,240) } : null };
+        feedback: row.lifecycle === "completed" && feedback ? { provenance: "prior model feedback, not a skill assessment", observation: String(feedback.summary ?? "").slice(0,240), nextPractice: String(feedback.nextExercise ?? feedback.improve ?? "").slice(0,400) } : null };
     }),
   };
 }

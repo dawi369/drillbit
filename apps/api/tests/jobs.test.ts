@@ -34,7 +34,7 @@ it("durably generates a valid challenge and replay does not call the provider ag
         expect(request.provider.require_parameters).toBe(true);
         expect(request.provider.sort).toBe("latency");
         expect(request.reasoning.enabled).toBe(false);
-        expect(request.model).toBe("google/gemini-2.5-flash-lite");
+        expect(request.model).toBe("google/gemini-3.1-flash-lite");
         expect(request.messages[0].content).not.toContain("Required JSON schema:");
         expect(request.response_format.type).toBe("json_schema");
         expect(request.response_format.json_schema.schema.properties).toHaveProperty("ambiguityPolicy");

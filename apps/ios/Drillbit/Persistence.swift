@@ -126,6 +126,18 @@ struct LocalDraft: Sendable {
     }
     try modelContext.save()
   }
+  func hasPendingVoice(account: String) throws -> Bool {
+    try modelContext.fetch(FetchDescriptor<CachedPayload>()).contains {
+      $0.key.hasPrefix("interview:" + account + ":") && $0.key.hasSuffix(":voice-outbox") && $0.payload != Data("null".utf8)
+    }
+  }
+  func invalidateLibrary(account: String) throws {
+    for value in try modelContext.fetch(FetchDescriptor<CachedPayload>())
+      where value.key.hasPrefix("library:" + account + ":") || value.key.hasPrefix("library-detail:" + account + ":") {
+      modelContext.delete(value)
+    }
+    try modelContext.save()
+  }
   func cached(key: String) throws -> Data? {
     try modelContext.fetch(FetchDescriptor<CachedPayload>(predicate: #Predicate { $0.key == key }))
       .first?.payload

@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 struct MemoryView: View {
   var model: AppModel
@@ -71,6 +72,8 @@ struct SessionDetailView: View {
   var initial: Challenge
   @State private var current: Challenge?
   @State private var deleting = false
+  @State private var preparing = false
+  @State private var started: Challenge?
   init(model: AppModel, initial: Challenge) {
     self.model = model; self.initial = initial
     _current = State(initialValue: model.librarySessions[(model.bootstrap?.account.id ?? "") + ":" + initial.id])
@@ -81,6 +84,8 @@ struct SessionDetailView: View {
     ScrollView {
       VStack(alignment: .leading, spacing: 24) {
         Text(challenge.title).font(.title.weight(.semibold))
+        Text(challenge.levelLabel).foregroundStyle(.secondary)
+        if let date = challenge.completedAt.flatMap({ Date.fromAPI($0) }) { Text(date.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary) }
         Text(challenge.prompt).foregroundStyle(.secondary)
         if let interview = challenge.interview, !interview.turns.isEmpty {
           NavigationLink("Interview conversation") { InterviewConversation(state: interview) }
@@ -93,6 +98,7 @@ struct SessionDetailView: View {
         AssistanceSummary(challenge: challenge)
         if let reflection = challenge.reflection {
           ReflectionContent(reflection: reflection)
+          Button("Practise this next") { preparing = true }.buttonStyle(PracticeButtonStyle())
         } else if challenge.lifecycle == "completed" {
           Text("Feedback is pending. You can retry failed feedback from Home.").foregroundStyle(
             .secondary)
@@ -122,6 +128,9 @@ struct SessionDetailView: View {
         }
       }.padding(24)
     }.navigationTitle("Session").navigationBarTitleDisplayMode(.inline)
+      .sheet(isPresented: $preparing, onDismiss: { if let started { model.presented = started; self.started = nil } }) {
+        QuestionFlow(model: model, source: challenge, onStart: { started = $0 })
+      }
       .toolbar { Button("Delete", systemImage: "trash", role: .destructive) { deleting = true } }
       .confirmationDialog("Delete this session and its learning evidence?", isPresented: $deleting)
     {
@@ -130,7 +139,7 @@ struct SessionDetailView: View {
           await model.perform {
             let _: EmptyResponse = try await model.api.send(
               "challenges/" + challenge.id, method: "DELETE")
-            await model.loadMemory()
+            try await model.refreshAfterSessionDeletion()
             dismiss()
           }
         }
@@ -148,6 +157,7 @@ struct SettingsView: View {
   @State private var deleting = false
   @State private var discarding = false
   @State private var saving = false
+  @AppStorage("appearance") private var appearance = "system"
   private var time: Binding<Date> {
     Binding(
       get: {
@@ -172,9 +182,18 @@ struct SettingsView: View {
           LabeledContent("Time zone", value: TimeZoneSelectionView.label(model.settings.timezone))
         }
         Toggle("Daily reminder", isOn: $model.settings.reminderEnabled)
+        ReminderPermissionRow()
       }
       Section { NavigationLink("LLM provider") { AIAccessView(model: model) } }
+      Section("Appearance") {
+        Picker("Appearance", selection: $appearance) {
+          Text("System").tag("system")
+          Text("Light").tag("light")
+          Text("Dark").tag("dark")
+        }
+      }
       Section("Account") {
+        NavigationLink("Export practice data") { PracticeExportView(model: model) }
         Button("Sign out") {
           Task {
             await model.perform {
@@ -295,7 +314,7 @@ struct AIAccessView: View {
           }
         }
         LabeledContent {
-          Text("Gemini 2.5 Flash Lite").foregroundStyle(.secondary)
+          Text("Gemini 3.1 Flash Lite").foregroundStyle(.secondary)
         } label: {
           Text("Model").foregroundStyle(.primary)
         }
@@ -355,7 +374,7 @@ struct AssistanceSummary: View {
         : (challenge.help ?? []).contains(where: { $0.body != nil })
           || (challenge.interview?.turns ?? []).contains(where: { ["hint", "example"].contains($0.kind) })
           || !(challenge.turns ?? []).isEmpty || challenge.example != nil
-          ? "Practised with help" : "No help used"
+          ? "Practised with help" : "No explicit help recorded"
     )
     .font(.footnote).foregroundStyle(.secondary)
   }
@@ -444,6 +463,7 @@ struct LibraryView: View {
   private var identity: String { Self.cacheIdentity(search: search, tags: tags, level: level, days: days, skipped: skipped) }
   var body: some View {
     List {
+      if !skipped { NavigationLink("Practice evidence") { PracticeEvidenceView(model: model) } }
       if tags.count == 1, let id = tags.first, let value = coverage.first(where: { $0.conceptId == id }) {
         Section {
           LabeledContent("Completed attempts", value: String(value.completedAttempts))
@@ -647,6 +667,20 @@ struct LibraryQuestionView: View {
     } catch {
       guard model.bootstrap?.account.id == account, !Task.isCancelled else { return }
       failure = "Couldn’t refresh. Showing saved details if available."
+    }
+  }
+}
+
+struct ReminderPermissionRow: View {
+  @State private var denied = false
+  @Environment(\.scenePhase) private var phase
+  var body: some View {
+    Group {
+      if denied {
+        Link("Enable reminders in iPhone Settings", destination: URL(string: UIApplication.openSettingsURLString)!)
+      }
+    }.task(id: phase) {
+      denied = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus == .denied
     }
   }
 }

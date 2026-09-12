@@ -7,6 +7,16 @@ import Testing
 @testable import Drillbit
 #endif
 struct InterviewTests {
+  @Test func voiceFragmentsPreserveSpacesOverlapAndStableRows() {
+    let first = VoiceFragment(id:"one",sequence:0,speaker:"user",text:"Use a",startMs:0,endMs:500)
+    let overlapping = VoiceFragment(id:"two",sequence:1,speaker:"assistant",text:"Mm-hm.",startMs:300,endMs:600)
+    let next = VoiceFragment(id:"three",sequence:2,speaker:"user",text:" queue.",startMs:500,endMs:900)
+    let rows = VoiceTranscript.rows([first,overlapping,next])
+    #expect(rows.map(\.id) == ["one","two"])
+    #expect(rows[0].text == "Use a queue.")
+    #expect(rows[1].text == "Mm-hm.")
+  }
+
   @Test func atomicInterviewSubmissionRetainsTextUntilAcknowledged() async throws {
     let container = try ModelContainer(for: Schema(StoreV1.models), configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     let disk = DiskStore(modelContainer: container)
@@ -102,6 +112,32 @@ struct InterviewTests {
 
 #if !canImport(DrillbitCore)
 @MainActor struct InterviewSubmissionTests {
+  @Test func liveVoiceKeepsDraftAndRestoresWithoutAnotherRequest() async throws {
+    let container = try ModelContainer(for: Schema(StoreV1.models), configurations: ModelConfiguration(isStoredInMemoryOnly:true))
+    let challenge = Challenge(id:"live",lifecycle:"in_progress",title:"Queue",prompt:"How?",topic:"System design",session:SessionDraft(answer:"",revision:0))
+    let model = AppModel(container:container,baseURL:URL(string:"https://interview.test")!,fixture:true,monitorNetwork:false)
+    model.bootstrap = Bootstrap(account:.init(id:"a",status:"active"),settings:PracticeSettings(),challenge:challenge,jobs:[])
+    let interview=InterviewController(model:model,challenge:challenge)
+    await interview.load(); interview.edit("Keep this draft")
+    let voice=LiveVoice(interview:interview); interview.voice=voice
+    await voice.start(); #expect(voice.phase == .active)
+    await voice.fixtureSpeech()
+    #expect(interview.answer == "Keep this draft")
+    #expect(!interview.canFinish)
+    #expect(try await model.disk.hasPendingVoice(account:"a"))
+    #expect(try await !model.disk.hasPendingVoice(account:"b"))
+    await voice.end()
+    #expect(voice.phase == .idle)
+    #expect(interview.state.turns.first?.voice?.count == 2)
+    #expect(try await !model.disk.hasPendingVoice(account:"a"))
+    let restored=InterviewController(model:model,challenge:challenge)
+    await restored.load()
+    let restoredVoice=LiveVoice(interview:restored); await restoredVoice.restore()
+    #expect(restoredVoice.phase == .idle)
+    #expect(restored.state.turns.first?.voice?.count == 2)
+    #expect(restored.answer == "Keep this draft")
+  }
+
   @Test func finalizedVoiceAnswersUseTheDurableInterviewTranscript() async throws {
     let container = try ModelContainer(for: Schema(StoreV1.models), configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     let challenge = Challenge(id: "voice-question", lifecycle: "in_progress", title: "Queue", prompt: "How?", topic: "Backend", session: SessionDraft(answer: "", revision: 0))
@@ -116,7 +152,9 @@ struct InterviewTests {
     await #expect(throws: APIError.self) { try await controller.receiveFinalizedAnswer(event) }
     #expect(controller.answer == "A written draft")
     controller.edit("")
-    try await controller.receiveFinalizedAnswer(event)
+    var padded = event; padded.text = "  " + event.text + "\n"
+    try await controller.receiveFinalizedAnswer(padded)
+    try await controller.receiveFinalizedAnswer(padded)
     try await controller.receiveFinalizedAnswer(event)
     #expect(controller.state.turns.count == 1)
     #expect(controller.state.turns.first?.text == event.text)
@@ -126,6 +164,12 @@ struct InterviewTests {
     await #expect(throws: APIError.self) { try await controller.receiveFinalizedAnswer(duplicate) }
     var oldPrompt = event; oldPrompt.id = UUID()
     await #expect(throws: APIError.self) { try await controller.receiveFinalizedAnswer(oldPrompt) }
+    controller.acceptsVoiceInput = false
+    await #expect(throws: APIError.self) { try await controller.receiveFinalizedAnswer(event) }
+    controller.acceptsVoiceInput = true
+    controller.finished = challenge
+    await #expect(throws: APIError.self) { try await controller.receiveFinalizedAnswer(event) }
+    controller.finished = nil
     let restored = InterviewController(model: model, challenge: controller.challenge)
     await restored.load()
     #expect(restored.state.turns.first?.id == event.id.uuidString)
@@ -153,9 +197,10 @@ struct InterviewTests {
         remote.session = SessionDraft(answer:input.answer,revision:input.revision+1)
         data = try JSONEncoder().encode(RevisionResponse(revision:input.revision+1))
       } else if path.hasSuffix("/interview") {
+        if failuresRemaining > 0 { failuresRemaining -= 1; throw URLError(.notConnectedToInternet) }
         let input = try JSONDecoder().decode(InterviewInput.self,from:request.httpBody!)
         #expect(input.text == "Latest answer")
-        #expect(input.style == .quick)
+        #expect(input.style == .standard)
         #expect(input.revision == remote.session?.revision)
         shares += 1
         remote.session = SessionDraft(answer:"",revision:input.revision+1)
@@ -171,7 +216,7 @@ struct InterviewTests {
     await interview.selectStyle(.quick)
     let restored = InterviewController(model:model,challenge:remote)
     await restored.load()
-    #expect(restored.style == .quick)
+    #expect(restored.style == .standard)
     var autosave: Task<Void, Never>?
     if scenario == "autosave" {
       try await model.save(remote,answer:"Earlier answer")
@@ -188,7 +233,8 @@ struct InterviewTests {
     await autosave?.value
     if scenario == "offline" {
       #expect(shares == 0)
-      #expect(interview.answer == "Latest answer")
+      #expect(interview.pending?.input.text == "Latest answer")
+      #expect(try await model.disk.cached(key: interview.key + ":pending") != nil)
       await interview.retry()
     }
     #expect(shares == 1)

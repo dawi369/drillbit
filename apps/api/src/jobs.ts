@@ -1,3 +1,4 @@
+import { groundReflection } from "./learning";
 import { z } from "zod";
 import { historicalSnapshot } from "./history";
 import { concepts } from "./taxonomy";
@@ -75,7 +76,10 @@ export async function runJob(env: Env, id: string) {
   const now = timestamp();
   let data: unknown;
   if (job.kind === "generate") {
-    const selection = await selectConcept(env,job.account_id,input.settings.engineeringLevel!,input.primaryConceptId);
+    const followUp = input.followUp as {reflection?: {evidence?: {conceptId: string; signal: string}[]}; question?: {primaryConceptId?: string}} | undefined;
+    const focus = followUp?.reflection?.evidence?.find(e => e.signal === "needs_practice")?.conceptId
+      ?? followUp?.question?.primaryConceptId;
+    const selection = await selectConcept(env,job.account_id,input.settings.engineeringLevel!,input.primaryConceptId ?? focus);
     const restored = !input.instruction && !input.followUp ? await env.DB.prepare("SELECT * FROM questions WHERE account_id=? AND eligible=1 AND json_extract(data,'$.engineeringLevel')=? AND (? IS NULL OR json_extract(data,'$.primaryConceptId')=?) ORDER BY eligibility_updated_at,id LIMIT 1").bind(job.account_id,input.settings.engineeringLevel!,input.primaryConceptId??null,input.primaryConceptId??null).first<{id:string;data:string}>() : null;
     const recent = await env.DB.prepare(
       "SELECT c.data,c.lifecycle,c.completed_at,r.data AS reflection FROM challenges c LEFT JOIN reflections r ON r.challenge_id=c.id WHERE c.account_id=? AND c.lifecycle IN ('completed','skipped') ORDER BY c.created_at DESC LIMIT 20",
@@ -251,6 +255,7 @@ export async function runJob(env: Env, id: string) {
       exampleSchema,
     );
   else throw new Error("Unknown job kind");
+  if (job.kind === "summarize") data = groundReflection(data, context);
   const table = job.kind === "summarize" ? "reflections" : "examples";
   await env.DB.batch([
     env.DB.prepare(

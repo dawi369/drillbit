@@ -323,3 +323,75 @@ Send/partial-stream/completion/answer-reopen and single-line disclosure tests pa
 Home clears immediately after local Skip persistence; the workspace closes without awaiting HTTP or Library hydration. Cancel still preserves the editor. Pool restoration patches local eligibility after enqueue and syncs outside the detail view. Queued commands are account-scoped, applied over refreshed snapshots, and included in sign-out pending-write checks. Skipped drafts use a local terminal marker so stale remote snapshots cannot overwrite the retained answer or restart its upload.
 
 Verification: 21 Swift core tests passed (`/tmp/drillbit-final-core.log`), including duplicate/scoped Skip queue handling, on-disk queue restoration and retained draft after acknowledgement/stale load. Skip cancel/confirm/Home and Library pool-restoration simulator journeys passed (`/tmp/drillbit-optimistic-final.xcresult`). These UI journeys use fixtures; live offline/reconnect and physical-device flows were not exercised. Existing repeat-safe Skip and revision-checked eligibility endpoints are unchanged; no deployment or TestFlight build.
+
+## Inference pipeline optimization — 11 September 2026
+
+Verified 68 backend tests on the D1 test runtime (`/tmp/drillbit-latency-verified.log`) and TypeScript checking. Added coverage for atomic unsynced-answer submission, old-client text matching, competing revisions, idempotent replay, slow workflow enqueue after durable job creation, and provider-token draining under a blocked single partial writer. All 22 Swift core tests passed (`/tmp/drillbit-latency-core.log`), including account-scoped local atomic command preparation, retained text before acknowledgement and stale-text acknowledgement rejection. Simulator Send/stream and Skip checks passed (`/tmp/drillbit-latency-ui.xcresult`); generation/preview/resume and Send passed in `/tmp/drillbit-inference-final-ui.xcresult`. These UI tests use fixtures, not authenticated live atomic-submission traffic.
+
+Four synthetic live provider requests returned schema-valid interview outputs. Previous duplicated-prompt first-visible-text times: 905 and 477 ms; compact-prompt: 460 and 574 ms (`/tmp/drillbit-live-latency.log`). These are provider-only observations with uncontrolled routing/warmup, not evidence of an end-to-end percentage improvement. Native/Worker timing instrumentation is available for the next real interview.
+
+Development backend deployed as `2550aac2-a5e9-4014-9760-ac98c3a03c28`; deployed `/health` returned `status:ok`. No schema migration. Simulator delivery only; no TestFlight or physical-device verification. Workflow startup remains; D1-backed SSE is still used. Architecture documentation explicitly distinguishes those retained costs from the optimizations implemented.
+
+## Cache-first practice statistics — 11 September 2026
+
+Native build and two Pro simulator UI tests passed in `/tmp/drillbit-cache-home.xcresult`: cached statistics were present on the first observed Home frame across two launches, and Library/Skipped restoration remained functional. The statistics fixture writes through DiskStore and exercises the production hydration helper before Home publication; it does not exercise live Clerk authentication or a physical offline/reconnect cycle. Exported Home screenshot inspected in `/tmp/drillbit-cache-home-screens` shows populated counts with no dash or loading placeholders. Cache retention and stale account/request guards were reviewed in code. Simulator only; no backend deployment or TestFlight upload.
+
+## No sign-in flash during launch — 11 September 2026
+
+Build and two simulator UI tests passed (`/tmp/drillbit-auth-launch-final.xcresult`). An eight-second delayed restoration fixture verifies the neutral launch surface has no Apple sign-in button, then reaches cached Home; a separate confirmed-signed-out fixture reaches Welcome after restoration. The cached-statistics launch regression also passes twice. Clerk's installed source confirms `isLoaded` requires both environment and client. The first test run used too short a fixture delay for accessibility observation; the final run extends only the fixture delay. Timeout and authenticated-bootstrap recovery branches were code-reviewed, not live fault-injected. No physical-device or TestFlight verification.
+
+## Fluid disclosure layout — 11 September 2026
+
+Two simulator UI tests passed in `/tmp/drillbit-fluid-disclosure.xcresult`: repeated original-question expansion retains the history boundary, and Send/stream/answer-reopen remains functional. Inspected 16 fps frames from `/tmp/drillbit-fluid-disclosure.mov` (`/tmp/drillbit-fluid-motion.png`): downstream rows and labels move progressively during question collapse/expansion rather than labels jumping ahead. No physical-device or new Reduced Motion runtime verification.
+
+## Practice personality and voice foundation — 11 September 2026
+
+TypeScript checking and 69 D1/backend tests passed (`/tmp/drillbit-personality-tests-release.log`). All 25 native tests passed (`/tmp/drillbit-personality-native-final.xcresult`), covering normalized voice replay, draft protection, stale identities, finished/inactive admission, and restoration. The full native run also exposed older tests expecting Quick style and a pre-submission draft upload; updated those expectations to Standard and injected offline failure at the actual atomic interview endpoint, retaining pending-work/retry assertions. Simulator Send/stream/reopen passed (`/tmp/drillbit-personality-ui.xcresult`).
+
+Live synthetic personality evaluation is a partial product pass, despite 14/14 valid final response envelopes. See `docs/context-engineering.md` for observed improvements, failures, costs and reproducible evaluator. Final non-reasoning sample: `/tmp/drillbit-personality-release.log`; earlier baseline and candidate logs are retained under `/tmp/drillbit-personality-*.log`. No real user history was used. No claim of fully polished Poke-like personality, prompt-injection resistance, end-to-end latency or live audio readiness.
+
+Development Worker deployed as `b426c78b-b2f8-4ba7-81f5-3d462d57ec6a`; `/health` returned `status:ok`. No migration. Simulator build installed; no TestFlight or physical-device verification.
+
+## V4 playful practice partner — 11 September 2026
+
+TypeScript checking and 72 backend/D1 tests passed (`/tmp/drillbit-v4-verified-tests.log`), including social-context isolation/full-context restoration, rejecting technical messages from social routing, deterministic protocol outcomes, legacy editions, malformed moves and streaming under slow partial writes. Two complete 24-turn live candidate runs and one final refusal check were reviewed; see `docs/personality-acceptance.md` for actual replies, scope and latency/cost.
+
+Development Worker deployed as `ab6f37c9-16b7-4b2e-a42d-5ce2f0766c6c`; health returned `status:ok`. No database migration or public API changes; no native UI changes in this iteration. Provider evaluations are synthetic, not authenticated end-to-end app tests. No TestFlight or physical-device verification.
+
+## Internal TestFlight build 3 — 11 September 2026
+
+- Signed Release `2.0.0 (3)` archive and internal-only App Store Connect upload succeeded. Existing development backend health returned `ok`; V4 personality is already deployed. No voice recording enabled.
+- Apple displayed build 3 as **Processing**. Later App Store Connect queries stalled/returned empty data, so processing completion and Owner Testing availability remain unverified. This is upload verification, not physical-device acceptance.
+- Version bump persisted in XcodeGen source and generated project. `git diff --check` passed; earlier native/backend/personality test evidence remains recorded in their respective sections.
+
+## Stable disclosure headers — 11 September 2026
+
+Removed pressed-state label dimming from the original-question disclosure button. Paired answer/interviewer spacing now stays constant across disclosure states, removing the 4-point upward header shift while preserving the shared body/document animation. Two iPhone 17 Pro simulator UI tests passed: repeated toggles preserve header Y within 0.5 points, and expanded original content keeps history below it (`/tmp/drillbit-stable-headers.xcresult`). Manually inspected expanded/collapsed simulator layouts; frame-by-frame opacity and physical-device verification remain unclaimed. Simulator only; no new TestFlight upload.
+
+## Text-practice completeness — 11 September 2026
+
+See [implementation and evidence ledger](product-completeness.md). 77 backend/D1 tests, 25 native unit tests and nine targeted simulator journeys passed; latest simulator build succeeds. Appearance persistence, dark typing, largest-text Library/Settings, cached stats, restoration, late-response history, interview completion and new evidence navigation were exercised. OpenAPI/fixtures include additive evidence and export contracts. Live Gemini: 24 personality turns and four final reflection cases reviewed after correcting earlier reflection failures. Physical-device notification/widget delivery, MetricKit delivery, full VoiceOver navigation and multi-device interruption remain unverified. No voice or TestFlight rollout.
+
+### 12 September — voice integration, simulator and D1 only
+
+83 API/D1 tests pass, including paid-start reservation competition, transcript replay/collision/account scope, text/finish blocking while active, frozen completion and post-close delegation rejection. Native tests cover stable overlap grouping, draft preservation and restoration without paid startup. Fixture UI journeys cover voice start, mute/unmute, inline speech, end and preserved draft in light and largest Dynamic Type/dark. Screenshot inspection prompted compact accessibility controls. These are simulated provider events, not verified microphone or GPT-Live behavior. Server gate remains off pending OpenAI credentials and live/device acceptance. No TestFlight upload.
+
+Voice verification artifacts: `/tmp/drillbit-voice-api-verified.log`, `/tmp/drillbit-voice-verified.xcresult` (native lifecycle tests and two UI journeys), plus grouping tests in `/tmp/drillbit-voice-final.xcresult`. Development Worker `4c657ab8-5b46-455f-9b13-960dd2382307`: health 200, anonymous voice startup 401, live gate false. Latest signed simulator app installed; no TestFlight upload.
+
+12 September credential follow-up: OPENAI_API_KEY installed as a development Worker secret. Direct model lookup returned 200 for gpt-live-1; a bounded, silent WebSocket session-start probe returned `credit_balance_exhausted`. No audio was captured. Voice gate remains false pending API credit; model lookup alone does not establish voice-session availability. Simulator rebuild succeeded and the app was reinstalled/relaunched (`/tmp/drillbit-key-build.log`).
+
+12 September billing resolved: a silent direct GPT-Live WebSocket probe received `session.started` followed by `session.closed` (usage seconds 0). Enabled VOICE_ENABLED for the development testing environment. This verifies provider startup, not native WebRTC audio, microphone quality or physical-device behavior. No client rebuild or TestFlight upload required.
+
+12 September empty voice row: suppress rendering for reserved voice blocks with no text, so startup cannot add a second separator beside the draft. The voice UI journey asserts no voice separator before speech; passed in `/tmp/drillbit-voice-divider.xcresult`. Simulator installed. Dedicated voice room remains a proposal in `voice-room-plan.md`, not implemented.
+
+## Dedicated voice room — 12 September 2026
+
+Implemented: stable interview shell owns connection/outbox across writing/voice routing; canonical question disclosure; Question/Conversation selection; shared transcript with manual-scroll precedence and Latest; fixed mute/end controls; synchronous local audio stop on Back/End; connecting cancellation; conservative recovery on the writing page. Empty voice blocks render no separator in either reading surface. Entry uses a 300 ms bottom-leading 0.96-scale/opacity surface transition; Reduced Motion uses 180 ms opacity only. No network, DTO, database, provider or TestFlight change in this iteration.
+
+Evidence:
+- `/tmp/drillbit-voice-room-v2.xcresult`: native InterviewSubmissionTests passed, including persisted voice fragments, account isolation, restored draft and no automatic restart; autosave/offline submission scenarios passed.
+- `/tmp/drillbit-voice-room-v3.xcresult`: all three UI journeys passed on iPhone 17 Pro simulator: normal light; largest Dynamic Type/dark; cancellation during a deliberately suspended startup. Normal/dark journeys exercise mute/unmute, transcript generation, switching both ways without session loss, End, preserved draft and inline transcript. Cancellation waits past suspended startup and verifies no microphone/room resurrection.
+- Inspected exported light/dark Question and Conversation screenshots in `/tmp/drillbit-voice-room-images`. Question/history scroll above the fixed controls; large text remains readable with native scrolling. Fixed controls retain accessible labels; an inherited parent identifier discovered during QA was removed.
+- Final empty-transcript filtering was compiled in `/tmp/drillbit-voice-room-final-build.log` after these journeys.
+
+Not established by these fixture runs: physical-device microphone/audio routing, real provider interruptions/close races in the new page, VoiceOver spoken navigation, Reduced Motion visual playback, extended manual transcript scrolling, or real-time audio/motion performance. Existing backend voice tests/provider evidence remain separate; no new paid provider evaluation was run for this UI change. No TestFlight upload.

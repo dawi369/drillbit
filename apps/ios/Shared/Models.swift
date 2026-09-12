@@ -13,7 +13,7 @@ struct PracticeSettings: Codable, Equatable, Sendable {
   var dailyMinutes = 540
   var reminderEnabled = false
   var aiMode = "managed"
-  var model = "google/gemini-2.5-flash-lite"
+  var model = "google/gemini-3.1-flash-lite"
 }
 struct SessionDraft: Codable, Sendable {
   var answer: String
@@ -26,7 +26,19 @@ struct CoachTurn: Codable, Identifiable, Sendable {
   var text: String
   var state: String
 }
+struct LearningEvidence: Codable, Sendable, Identifiable {
+  var id: String { (sessionId ?? "") + conceptId + signal + quote }
+  var conceptId: String
+  var observation: String
+  var quote: String
+  var signal: String
+  var assistance: String
+  var sessionId: String? = nil
+  var at: String? = nil
+}
 struct Reflection: Codable, Sendable {
+  var evidence: [LearningEvidence]? = nil
+  var nextExercise: String? = nil
   var summary: String
   var worked: [String]
   var improve: String
@@ -112,6 +124,7 @@ struct HistoryPage: Codable, Sendable {
   var nextCursor: String?
 }
 struct MemoryResponse: Codable, Sendable {
+  var evidence: [LearningEvidence]? = nil
   struct Statistics: Codable, Sendable {
     var completed: Int
     var lastSevenDays: Int
@@ -319,6 +332,7 @@ struct InterviewTurn: Codable, Identifiable, Sendable {
   var error: String?
   var result: InterviewResponse?
   var partial: String? = nil
+  var voice: [VoiceFragment]? = nil
   var pending: Bool { ["pending", "running"].contains(status) }
 }
 struct InterviewState: Codable, Sendable {
@@ -395,3 +409,12 @@ struct EligibilityCommand: Codable, Identifiable, Sendable {
   var id: String; var questionId: String; var revision: Int; var eligible: Bool
 }
 struct EligibilityInput: Codable { var revision: Int; var eligible: Bool }
+
+struct VoiceFragment: Codable, Identifiable, Equatable, Sendable {
+  var id: String
+  var sequence: Int
+  var speaker: String
+  var text: String
+  var startMs: Int
+  var endMs: Int
+}

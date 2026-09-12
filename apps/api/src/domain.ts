@@ -3,7 +3,7 @@ import { captureSchema, receiptSchema } from "./companion-contract";
 import { z } from "zod";
 import { Temporal } from "@js-temporal/polyfill";
 
-export const MODEL_ID = "google/gemini-2.5-flash-lite";
+export const MODEL_ID = "google/gemini-3.1-flash-lite";
 export const engineeringLevelSchema = z.enum(["intern", "junior", "mid", "senior", "staff", "principal"]);
 export const levelForDifficulty = (difficulty: string) => difficulty === "easy" ? "junior" : difficulty === "hard" ? "senior" : "mid";
 export const settingsSchema = z.object({
@@ -25,7 +25,7 @@ export const settingsSchema = z.object({
   dailyMinutes: z.number().int().min(0).max(1439).default(540),
   reminderEnabled: z.boolean().default(false),
   aiMode: z.enum(["managed", "byok"]).default("managed"),
-  model: z.enum([MODEL_ID, "google/gemini-3.1-flash-lite"]).default(MODEL_ID),
+  model: z.enum([MODEL_ID, "google/gemini-2.5-flash-lite"]).default(MODEL_ID),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 export const challengeSchema = z.object({
@@ -47,10 +47,19 @@ export const questionGenerationSchema = questionSpecificationSchema.omit({
  if(new Set(ids).size!==ids.length||!ids.includes(value.primaryConceptId))ctx.addIssue({code:"custom",message:"Include the primary concept exactly once and at most two distinct secondary concepts"});
  if(value.tagEvidence.some(e=>e.requirementIndex>value.constraints.length))ctx.addIssue({code:"custom",message:"Tag reference does not exist"});
 });
+export const learningEvidenceSchema = z.object({
+  conceptId,
+  observation: z.string().min(1).max(300),
+  quote: z.string().min(1).max(500),
+  signal: z.enum(["demonstrated", "needs_practice"]),
+  assistance: z.enum(["assisted", "unknown"]),
+});
 export const reflectionSchema = z.object({
+  evidence: z.array(learningEvidenceSchema).max(3).optional(),
+  nextExercise: z.string().min(1).max(400).optional(),
   summary: z.string().min(1).max(1000),
   worked: z.array(z.string().max(300)).max(4),
-  improve: z.string().min(1).max(1000),
+  improve: z.string().max(1000),
   takeaway: z.string().min(1).max(1000),
   strengths: z.array(z.string().max(80)).max(4),
   gaps: z.array(z.string().max(80)).max(4),
@@ -161,8 +170,12 @@ export function helpSchemaFor(kind: string) {
 }
 
 export const reflectionOutputSchema = reflectionSchema.extend({
+  evidence: z.array(learningEvidenceSchema).max(2),
+  nextExercise: z.string().min(1).max(400),
+  strengths: z.array(z.string().max(80)).max(2),
+  gaps: z.array(z.string().max(80)).max(2),
   summary: z.string().min(1).max(350),
   worked: z.array(z.string().max(300)).max(1),
-  improve: z.string().min(1).max(500),
+  improve: z.string().max(500),
   takeaway: z.string().max(300),
 });

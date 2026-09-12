@@ -1,3 +1,4 @@
+import {voiceStartSchema,voiceEventsSchema,voiceFragmentSchema,voiceDelegateSchema} from "../../apps/api/src/voice";
 import { conceptId, eligibilityInput, observationSchema } from "../../apps/api/src/taxonomy";
 import { interviewInputSchema, interviewResultSchema, interviewStyleSchema } from "../../apps/api/src/interview";
 import {
@@ -17,6 +18,7 @@ import {
   questionSpecificationSchema,
   challengeSchema,
   reflectionSchema,
+  learningEvidenceSchema,
   exampleSchema,
   answerSchema,
 } from "../../apps/api/src/domain";
@@ -46,7 +48,7 @@ const companion = z.object({
 });
 const interview = z.object({
   style: interviewStyleSchema, prompt: z.string(), wrapUp: z.boolean(),
-  turns: z.array(z.object({ id: z.string(), ordinal: z.number().int(), kind: z.enum(["answer","clarification","hint","example","continue"]), prompt: z.string(), text: z.string(), createdAt: z.string(), jobId: z.string(), status: z.string(), error: z.string().nullable().optional(), partial: z.string().nullable().optional(), result: interviewResultSchema.nullable() })),
+  turns: z.array(z.object({ id: z.string(), ordinal: z.number().int(), kind: z.enum(["answer","clarification","hint","example","continue","voice"]), prompt: z.string(), text: z.string(), createdAt: z.string(), jobId: z.string(), status: z.string(), error: z.string().nullable().optional(), partial: z.string().nullable().optional(), voice:z.array(voiceFragmentSchema).optional(), result: interviewResultSchema.nullable() })),
 });
 const challenge = challengeSchema.extend({
   questionId: z.string().optional(), scenario:z.string().optional(), primaryConceptId:conceptId.optional(), conceptIds:z.array(conceptId).optional(), selectionReason:z.string().optional(),
@@ -120,12 +122,16 @@ const challenge = challengeSchema.extend({
 });
 const libraryQuestion=z.object({id:z.string(),title:z.string(),prompt:z.string(),scenario:z.string(),engineeringLevel:engineeringLevelSchema,primaryConceptId:conceptId,conceptIds:z.array(conceptId).min(1).max(3),eligible:z.boolean(),eligibilityRevision:z.number().int(),lastActivity:z.string().optional(),attemptCount:z.number().int().optional()});
 export const wire = {
+  VoiceStart:voiceStartSchema, VoiceEvents:voiceEventsSchema, VoiceDelegate:voiceDelegateSchema,
+  VoiceConnection:z.object({id:z.string(),sdp:z.string(),expiresAt:z.string()}),
   Taxonomy:z.object({version:z.literal(1),concepts:z.array(z.object({id:conceptId,label:z.string(),category:z.string(),aliases:z.array(z.string()),description:z.string().optional()}))}),
   LibraryQuestion:libraryQuestion,
   LibraryPage:z.object({questions:z.array(libraryQuestion),nextCursor:z.string().nullable()}),
   LibraryDetail:z.object({question:libraryQuestion,attempts:z.array(challenge),nextCursor:z.string().nullable()}),
   EligibilityInput:eligibilityInput,
   SkillObservation:observationSchema,
+  LearningEvidence: learningEvidenceSchema.extend({sessionId:z.string(),at:z.string()}),
+  AccountExport: z.object({version:z.number().int(),asOf:z.string(),settings:settingsSchema,sessions:z.array(challenge),questions:z.array(libraryQuestion),nextCursor:z.string().nullable()}),
   Coverage:z.object({concepts:z.array(z.object({conceptId,completedAttempts:z.number().int(),distinctQuestions:z.number().int(),lastPractised:z.string().nullable()}))}),
   Companion: companion,
   CompanionUpdate: companionUpdateSchema,
@@ -173,6 +179,7 @@ export const wire = {
     nextCursor: z.string().nullable(),
   }),
   Memory: z.object({
+    evidence:z.array(learningEvidenceSchema.extend({sessionId:z.string(),at:z.string()})).optional(),
     statistics: z.object({ completed: z.number().int().nonnegative(), lastSevenDays: z.number().int().nonnegative(), asOf: z.string() }).optional(),
     sessions: z.array(challenge),
     patterns: z.array(

@@ -1,3 +1,6 @@
+import { startVoice, voiceEvents, delegateVoice } from "./voice";
+import { exportPage } from "./export";
+import { learningEvidence } from "./learning";
 import { concepts } from "./taxonomy";
 import { libraryPage, questionDetail, setEligibility, startQuestion, coverage } from "./library";
 import { interviewStreamSnapshot, interviewInputSchema, requestInterview, retryInterview } from "./interview";
@@ -66,7 +69,10 @@ app.use("*", async (c, next) => {
     c.env = { ...c.env, defer: work => context.waitUntil(work) };
   } catch { /* Direct in-process test requests have no execution context. */ }
   c.set("requestId", uuid());
+  const started = Date.now();
   await next();
+  console.info(JSON.stringify({event: "http_request", method: c.req.method,
+    status: c.res.status, durationMs: Date.now() - started, requestId: c.get("requestId")}));
   c.header("X-Request-ID", c.get("requestId"));
   c.header("Cache-Control", "no-store");
 });
@@ -376,6 +382,9 @@ app.get("/v1/challenges/:id/interview/:turn/stream", async c => {
     }
   });
 });
+app.post("/v1/challenges/:id/voice", async c => c.json(await startVoice(c.env,c.get("account").id,c.req.param("id"),requireCommand(c.req.header("Idempotency-Key")),await c.req.json()),201));
+app.post("/v1/challenges/:id/voice/:voice/events", async c => c.json(await voiceEvents(c.env,c.get("account").id,c.req.param("id"),c.req.param("voice"),await c.req.json())));
+app.post("/v1/challenges/:id/voice/:voice/delegate", async c => c.json(await delegateVoice(c.env,c.get("account").id,c.req.param("id"),c.req.param("voice"),await c.req.json())));
 app.post("/v1/challenges/:id/interview", async c => c.json(await requestInterview(c.env,c.get("account").id,c.req.param("id"),requireCommand(c.req.header("Idempotency-Key")),interviewInputSchema.parse(await c.req.json())),202));
 app.post("/v1/challenges/:id/interview/:turn/retry", async c => c.json(await retryInterview(c.env,c.get("account").id,c.req.param("id"),c.req.param("turn"),requireCommand(c.req.header("Idempotency-Key"))),202));
 app.post("/v1/challenges/:id/start", async (c) => {
@@ -541,6 +550,7 @@ app.get("/v1/sessions", async (c) => {
         : null,
   });
 });
+app.get("/v1/account/export", async c => c.json(await exportPage(c.env,c.get("account").id,c.req.query("cursor"))));
 app.get("/v1/memory", async (c) => {
   const asOf = timestamp();
   const cutoff = new Date(Date.parse(asOf) - 7 * 86400000).toISOString();
@@ -573,6 +583,7 @@ app.get("/v1/memory", async (c) => {
   }
   return c.json({
     statistics: { ...statistics, asOf },
+    evidence: await learningEvidence(c.env, c.get("account").id),
     sessions: rows.results.map((r) => ({
       ...present(r),
       reflection: r.reflection ? parseJSON(r.reflection) : null,

@@ -8,10 +8,13 @@ settings:
     SWIFT_VERSION: '6.0'
     TARGETED_DEVICE_FAMILY: '1'
     MARKETING_VERSION: '2.0.0'
-    CURRENT_PROJECT_VERSION: '2'
+    CURRENT_PROJECT_VERSION: '3'
     GENERATE_INFOPLIST_FILE: YES
     SWIFT_STRICT_CONCURRENCY: complete
 packages:
+  WebRTC:
+    url: https://github.com/stasel/WebRTC.git
+    exactVersion: 153.0.0
   Clerk:
     url: https://github.com/clerk/clerk-ios.git
     revision: 02f98f89a19b6c079517c9aae07df7edd0e600e5
@@ -32,6 +35,7 @@ targets:
       path: Config/AppInfo.plist
       properties:
         CFBundleDisplayName: Drillbit
+        NSMicrophoneUsageDescription: Talk with your practice interviewer using live voice.
         APIBaseURL: $(API_BASE_URL)
         ClerkPublishableKey: $(CLERK_PUBLISHABLE_KEY)
         SharedKeychainGroup: $(AppIdentifierPrefix)dawi.drillbit.shared
@@ -49,6 +53,7 @@ targets:
         com.apple.developer.applesignin: [Default]
         keychain-access-groups: [$(AppIdentifierPrefix)dawi.drillbit, $(AppIdentifierPrefix)dawi.drillbit.shared]
     dependencies:
+      - package: WebRTC
       - package: Clerk
         product: ClerkKit
       - target: DrillbitWidget

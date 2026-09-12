@@ -1,3 +1,4 @@
+import { assertNoVoice } from "./voice";
 import { z } from "zod";
 import { historicalSnapshot } from "./history";
 import { INTERVIEW_PROMPT_VERSION } from "./prompts/interviewer";
@@ -27,7 +28,8 @@ export async function interviewFor(env: Env, account: string, id: string) {
   const challenge = await ownedChallenge(env, account, id);
   const data = JSON.parse(challenge.data);
   const rows = await env.DB.prepare(`SELECT t.*,j.status,j.error,s.text AS partial FROM interview_turns t JOIN jobs j ON j.id=t.job_id LEFT JOIN interview_streams s ON s.job_id=j.id WHERE t.challenge_id=? ORDER BY t.ordinal`).bind(id).all<any>();
-  const turns = rows.results.map(t => ({ id: t.id, ordinal: t.ordinal, kind: t.kind, prompt: t.prompt, text: t.text, createdAt: t.created_at, jobId: t.job_id, status: t.status, error: t.error, partial: t.partial, result: t.result ? JSON.parse(t.result) : null }));
+  const fragments = await env.DB.prepare("SELECT f.* FROM voice_fragments f JOIN voice_sessions v ON v.id=f.session_id WHERE v.challenge_id=? AND v.account_id=? ORDER BY f.sequence").bind(id,account).all<any>();
+  const turns = rows.results.map(t => ({ id: t.id, ordinal: t.ordinal, kind: t.kind, prompt: t.prompt, text: t.text, createdAt: t.created_at, jobId: t.job_id, status: t.status, error: t.error, partial: t.partial, result: t.result ? JSON.parse(t.result) : null, voice: t.kind === "voice" ? fragments.results.filter(f=>f.session_id===t.id).map(f=>({id:f.id,sequence:f.sequence,speaker:f.speaker,text:f.text,startMs:f.start_ms,endMs:f.end_ms})) : undefined }));
   const last = turns.filter(t => ["answer", "continue"].includes(t.kind) && t.result).at(-1);
   return { style: interviewStyleSchema.catch("standard").parse(data.interviewStyle),
     prompt: last?.result?.outcome === "follow_up" ? last.result.text : last?.prompt ?? data.prompt,
@@ -42,6 +44,7 @@ export async function requestInterview(env: Env, account: string, id: string, co
     await dispatch(env, command);
     return interviewFor(env, account, id);
   }
+  await assertNoVoice(env,account,id);
   if (challenge.lifecycle !== "in_progress") throw new Fault("inactive", 409, "Start the interview before sharing.");
   const context = await interviewFor(env, account, id);
   const promptId = context.turns.filter(t => ["answer","continue"].includes(t.kind) && t.result).at(-1)?.id ?? "original";
@@ -59,7 +62,7 @@ export async function requestInterview(env: Env, account: string, id: string, co
   const [settings, history] = await Promise.all([settingsFor(env, account), historicalSnapshot(env, account, id)]);
   const payload = JSON.stringify({ settings, action: input, turnId: command, context: { promptVersion: INTERVIEW_PROMPT_VERSION, historicalSnapshot: history, question: { ...JSON.parse(challenge.data), interviewStyle: context.style }, interview: context } });
   await env.DB.batch([
-    env.DB.prepare(`INSERT OR IGNORE INTO jobs(id,account_id,challenge_id,kind,input,created_at,updated_at) SELECT ?,?,?,'interview',?,?,? WHERE EXISTS(SELECT 1 FROM sessions s JOIN challenges c ON c.id=s.challenge_id WHERE c.id=? AND c.account_id=? AND c.lifecycle='in_progress' AND s.revision=?) AND NOT EXISTS(SELECT 1 FROM jobs WHERE account_id=? AND kind='interview' AND status IN ('pending','running'))`).bind(command,account,id,payload,now,now,id,account,input.revision,account),
+    env.DB.prepare(`INSERT OR IGNORE INTO jobs(id,account_id,challenge_id,kind,input,created_at,updated_at) SELECT ?,?,?,'interview',?,?,? WHERE EXISTS(SELECT 1 FROM sessions s JOIN challenges c ON c.id=s.challenge_id WHERE c.id=? AND c.account_id=? AND c.lifecycle='in_progress' AND s.revision=?) AND NOT EXISTS(SELECT 1 FROM jobs WHERE account_id=? AND kind='interview' AND status IN ('pending','running')) AND NOT EXISTS(SELECT 1 FROM voice_sessions WHERE account_id=? AND status IN ('connecting','active') AND expires_at>?)`).bind(command,account,id,payload,now,now,id,account,input.revision,account,account,now),
     env.DB.prepare(`INSERT INTO interview_turns(id,challenge_id,ordinal,kind,prompt,text,job_id,created_at) SELECT ?,?,COALESCE((SELECT MAX(ordinal)+1 FROM interview_turns WHERE challenge_id=?),0),?,?,?,?,? WHERE EXISTS(SELECT 1 FROM jobs WHERE id=?)`).bind(command,id,id,input.kind,context.prompt,input.text,command,now,command),
     env.DB.prepare(`UPDATE challenges SET data=json_set(data,'$.interviewStyle',?) WHERE id=? AND account_id=? AND EXISTS(SELECT 1 FROM interview_turns WHERE id=?)`).bind(context.style,id,account,command),
     env.DB.prepare(`UPDATE sessions SET answer=CASE WHEN ?='answer' THEN '' ELSE answer END,revision=revision+1,command_id=?,updated_at=? WHERE challenge_id=? AND revision=? AND EXISTS(SELECT 1 FROM interview_turns WHERE id=?)`).bind(input.kind,command,now,id,input.revision,command),
