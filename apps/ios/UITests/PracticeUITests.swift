@@ -427,7 +427,9 @@ final class PracticeUITests: XCTestCase {
     capture("Accessible interview keyboard", app)
     let document = app.scrollViews["interviewDocument"]
     let original = app.buttons["exchange-original"]
-    for _ in 0..<12 where !original.isHittable { document.swipeDown() }
+    for _ in 0..<12 where original.frame.minY < document.frame.minY || !original.isHittable {
+      document.swipeDown()
+    }
     original.tap()
     XCTAssertTrue(original.waitForExistence(timeout: 5))
     XCTAssertTrue(original.isHittable)
@@ -435,7 +437,7 @@ final class PracticeUITests: XCTestCase {
     XCTAssertFalse(app.navigationBars["Original question"].exists)
     capture("Accessible inline question", app)
     original.tap()
-    let editor = app.descendants(matching: .any).matching(identifier: "answerEditor").firstMatch
+    for _ in 0..<8 where !editor.isHittable { document.swipeUp() }
     XCTAssertTrue(editor.isHittable)
     editor.tap()
     editor.typeText("\nWith retries")
