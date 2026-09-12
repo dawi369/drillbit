@@ -1,0 +1,22 @@
+name: Something broke
+description: A rough edge, lost state, or an interviewer behaving strangely.
+body:
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: What happened?
+      description: Steps, expected behaviour, and what happened instead. Please omit credentials and private practice content.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Where did it happen?
+      placeholder: iPhone 15, iOS version, build or commit; physical phone or Simulator
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Anything that helps reproduce it?
+      description: Sanitized screenshots or logs; network and text/voice state if relevant.

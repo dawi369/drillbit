@@ -1,0 +1,15 @@
+name: Make practice better
+description: A small improvement or a bigger idea.
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Where does practice get harder than it needs to be?
+      description: Tell us about the moment, not just the button you want.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would make that better?
+      description: A possible flow, example, or alternative. Rough ideas are welcome.
