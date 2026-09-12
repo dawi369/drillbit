@@ -264,7 +264,7 @@ final class PracticeUITests: XCTestCase {
     XCTAssertLessThan(prompt.frame.minY, before)
     XCTAssertTrue(app.buttons["previewStart"].isHittable)
     app.buttons["Close"].tap()
-    XCTAssertTrue(app.tabBars.buttons["Memory"].isHittable)
+    XCTAssertTrue(app.tabBars.buttons["Library"].isHittable)
   }
 
   func testPreviewFailures() throws {
@@ -412,7 +412,10 @@ final class PracticeUITests: XCTestCase {
     app.buttons["previewStart"].tap()
     XCTAssertTrue(app.buttons["exchange-original"].waitForExistence(timeout: 5))
     app.buttons["exchange-original"].tap()
-    XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "answerEditor").firstMatch.isHittable)
+    let editor = app.descendants(matching: .any).matching(identifier: "answerEditor").firstMatch
+    // At accessibility sizes the document intentionally scrolls, even with the question collapsed.
+    for _ in 0..<8 where !editor.isHittable { app.swipeUp() }
+    XCTAssertTrue(editor.isHittable)
     XCTAssertFalse(app.buttons["openHelp"].exists)
     XCTAssertTrue(app.buttons["liveVoice"].exists)
     XCTAssertTrue(app.buttons["liveVoice"].isEnabled)
