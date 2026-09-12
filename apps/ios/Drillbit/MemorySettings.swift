@@ -177,7 +177,7 @@ struct SettingsView: View {
         Picker("Engineering level", selection: $model.settings.selectedLevel) {
           ForEach(EngineeringLevel.choices, id: \.0) { Text($0.1).tag($0.0) }
         }
-        DatePicker("Daily challenge", selection: time, displayedComponents: .hourAndMinute)
+        DatePicker("Reminder time", selection: time, displayedComponents: .hourAndMinute)
         NavigationLink { TimeZoneSelectionView(selection: $model.settings.timezone) } label: {
           LabeledContent("Time zone", value: TimeZoneSelectionView.label(model.settings.timezone))
         }
@@ -596,12 +596,13 @@ struct LibraryQuestionView: View {
     List {
       Section {
         Text(question.title).font(.title2.weight(.semibold))
-        Text(question.scenario + " · " + question.levelLabel).foregroundStyle(.secondary)
         DisclosureGroup("Original question") { Text(question.prompt).textSelection(.enabled) }
+      }
+      Section {
         ForEach(question.conceptIds, id: \.self) { id in
           NavigationLink(model.taxonomy.first { $0.id == id }?.label ?? id) { LibraryView(model: model, initialConcept: id) }
         }
-      }
+      } header: { Text("Concepts") } footer: { Text("Explore related questions in your library.") }
       Section {
         Button((detail?.attempts.contains { $0.lifecycle == "completed" } ?? false) ? "Try again" : "Practise now") { preview = true }
         Button("Practise this concept") { preparing = true }

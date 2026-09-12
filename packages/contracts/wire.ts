@@ -170,8 +170,10 @@ export const wire = {
       automaticCompanion: z.boolean().optional(),
       managedAI: z.boolean(),
       voiceInterview: z.boolean(),
+      voice: z.object({ available: z.boolean(), reason: z.string().optional(), checkedAt: z.string() }).optional(),
     }),
   }),
+  DailyQuestion: z.object({day:z.string(),challenge:challenge.optional(),job:job.nullable().optional()}),
   Generation: z.union([job, z.object({ challenge })]),
   ExampleOperation: z.union([job, z.object({ example: exampleSchema })]),
   HistoryPage: z.object({

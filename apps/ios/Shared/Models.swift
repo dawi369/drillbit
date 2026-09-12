@@ -106,7 +106,18 @@ struct Job: Codable, Identifiable, Sendable {
   var error: String?
   var challengeId: String?
 }
+struct VoiceCapability: Codable, Sendable {
+  var available: Bool
+  var reason: String?
+  var checkedAt: String
+  func isFresh(at now: Date = Date()) -> Bool {
+    guard let date = Date.fromAPI(checkedAt) else { return false }
+    return (0..<60).contains(now.timeIntervalSince(date))
+  }
+}
 struct Bootstrap: Codable, Sendable {
+  struct Capabilities: Codable, Sendable { var voice: VoiceCapability? }
+  var capabilities: Capabilities? = nil
   var practiceEpoch: String?
   struct Account: Codable, Sendable {
     var id: String
@@ -119,6 +130,7 @@ struct Bootstrap: Codable, Sendable {
   var jobs: [Job]
   var credential: Credential?
 }
+struct DailyQuestionResponse: Codable { var day: String; var challenge: Challenge?; var job: Job? }
 struct HistoryPage: Codable, Sendable {
   var sessions: [Challenge]
   var nextCursor: String?

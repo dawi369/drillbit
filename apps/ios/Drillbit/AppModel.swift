@@ -416,6 +416,49 @@ import WidgetKit
     await loadMemory()
     await preloadLibrary(force: true)
   }
+  private var checkingDailyQuestion = false
+  private var automaticPreparationAccounts: Set<String> = []
+  func ensureHomeQuestion() async {
+    guard let account = bootstrap?.account, account.status == "active", !busy, !checkingDailyQuestion else { return }
+    if fixture {
+      #if DEBUG
+      guard ProcessInfo.processInfo.arguments.contains("--fixture-auto-question"), bootstrap?.challenge == nil,
+        !automaticPreparationAccounts.contains(account.id) else { return }
+      automaticPreparationAccounts.insert(account.id)
+      do { _ = try await generateForPreview() } catch { preparationFailure = error.localizedDescription }
+      #endif
+      return
+    }
+    checkingDailyQuestion = true
+    defer { checkingDailyQuestion = false }
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(identifier: settings.timezone) ?? .gmt
+    let components = calendar.dateComponents([.year, .month, .day], from: Date())
+    let day = String(format: "%04d-%02d-%02d", components.year!, components.month!, components.day!)
+    let key = "daily-visit:" + account.id
+    if let saved = try? await disk.cached(key: key), String(data: saved, encoding: .utf8) == day { return }
+    // Persist the local attempt before networking; failed opens don't repeatedly request generation.
+    try? await disk.cache(key: key, data: Data(day.utf8))
+    do {
+      await sync()
+      guard bootstrap?.account.id == account.id else { return }
+      guard try await disk.pendingSkips(account: account.id).isEmpty else { return }
+      let result: DailyQuestionResponse = try await api.send("daily-question", method: "POST")
+      guard bootstrap?.account.id == account.id else { return }
+      if let challenge = result.challenge { bootstrap?.challenge = challenge }
+      if let job = result.job {
+        busy = true
+        defer { busy = false }
+        try await waitForJob(job.id)
+        guard bootstrap?.account.id == account.id else { return }
+      }
+      await refresh()
+      guard bootstrap?.account.id == account.id else { return }
+      if let bootstrap { try await disk.cache(key: "bootstrap:" + account.id, data: JSONEncoder().encode(bootstrap)) }
+    } catch {
+      if bootstrap?.account.id == account.id { preparationFailure = error.localizedDescription }
+    }
+  }
   func generate(_ preparation: PreparationInput? = nil) async {
     await perform { _ = try await generateForPreview(preparation) }
   }
@@ -469,6 +512,7 @@ import WidgetKit
     } else { throw APIError(code: "missing_question", message: "The question is not available yet. Check Home shortly.", status: 0) }
     guard bootstrap?.account.id == account else { throw CancellationError() }
     bootstrap?.challenge = challenge
+    if let bootstrap { try await disk.cache(key: "bootstrap:" + account, data: JSONEncoder().encode(bootstrap)) }
     Task {
       guard bootstrap?.account.id == account else { return }
       await refresh()
@@ -710,8 +754,8 @@ import WidgetKit
       return
     }
     let content = UNMutableNotificationContent()
-    content.title = "A little space to think"
-    content.body = "Your practice is here whenever you’re ready."
+    content.title = "Your next boss fight"
+    content.body = "A few minutes of interview drilling? Those technical rounds don't pass themselves you know ;)."
     content.userInfo = ["route": "home"]
     try await center.add(UNNotificationRequest(identifier: "daily-practice", content: content,
       trigger: UNCalendarNotificationTrigger(dateMatching: reminderComponents(minutes: settings.dailyMinutes, timezone: settings.timezone), repeats: true)))

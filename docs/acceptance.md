@@ -395,3 +395,28 @@ Evidence:
 - Final empty-transcript filtering was compiled in `/tmp/drillbit-voice-room-final-build.log` after these journeys.
 
 Not established by these fixture runs: physical-device microphone/audio routing, real provider interruptions/close races in the new page, VoiceOver spoken navigation, Reduced Motion visual playback, extended manual transcript scrolling, or real-time audio/motion performance. Existing backend voice tests/provider evidence remain separate; no new paid provider evaluation was run for this UI change. No TestFlight upload.
+
+## Text-first workspace and voice refinement — 12 September 2026
+
+Implementation: [interview workspace](interview-workspace.md). Quick-help actions are inline menu operations, Send always sends, and voice uses a question/latest projection with History/Live and balanced Mute/Use text controls. Availability is checked without consuming usage; unavailable entry preserves the draft. No migration or TestFlight upload.
+
+Verified:
+- Backend typecheck and 84 D1-backed tests passed (`/tmp/workspace-api-tests.log`), including read-only capability limits/account scope plus existing voice concurrency/receipt/completion tests. Contract generation and available/unavailable/limit/legacy fixture parsing passed. `git diff --check` passed.
+- `/tmp/drillbit-workspace-v1.xcresult`: 10 native tests and six UI journeys passed: full text interview with direct hint while retaining unfinished reply, immediate submission/streaming/collapse, normal voice, largest Dynamic Type dark voice, unavailable voice with preserved reply, and cancellation during suspended startup.
+- `/tmp/drillbit-workspace-native-final.xcresult`: eight InterviewTests passed, including the added capability expiry/future-date/legacy omission test and overlap-preserving latest projection; existing submission/restoration tests passed in v1. The earlier single-method selection in `/tmp/drillbit-workspace-final.xcresult` ran zero tests and is not test evidence.
+- Inspected light and largest-text dark captures in `/tmp/drillbit-workspace-images`. Removed the oversized Latest overlay found in review; the 44-point replacement uses a safe-area inset. `/tmp/drillbit-workspace-polish.xcresult` passed the dark/large-text voice journey after that change; captures are in `/tmp/drillbit-workspace-polish-images`.
+- Compatible development backend deployed as `20401975-8283-4142-8284-f824130673da`; deployment succeeded, but this turn did not perform an authenticated live capability/provider session probe.
+
+Remaining verification boundaries: no physical-device microphone/audio interruption test, VoiceOver spoken-navigation pass, or Reduced Motion visual recording in this iteration. Fixture voice does not establish real provider timing or network race behavior. Existing native Reduced Motion, account ownership and interruption handling remain; do not treat source review or simulator screenshots as physical-device acceptance.
+
+Follow-up: `/tmp/drillbit-workspace-scroll.xcresult` passed the largest-text dark journey with an explicit Latest tap and assertion that the interviewer response is hittable. Final simulator app installed and launched normally after fixture tests.
+
+## Owner voice allowance and Library detail cleanup
+
+The simulator owner's exact account is exempt from daily voice starts and technical voice-guidance limits, with usage retained. 85 backend/D1 tests and typecheck passed, including exact-ID matching, unaffected other accounts, disabled service, starts above six and technical guidance above forty. Library detail removes the redundant scenario/level row and labels related-question filters as Concepts. `/tmp/drillbit-library-cleanup.xcresult` passed the Library/skipped restoration journey; its question-detail capture was visually inspected. Simulator build only; no TestFlight upload.
+
+## Daily app-open generation — 12 September 2026
+
+Implemented server-side account/local-day claims and client day caching, existing-question/pending-job reuse, explicit failure recovery, no scheduled generation, and a generic local reminder. 88 D1/backend tests and typecheck passed (`/tmp/daily-tests.log`), including concurrent devices, DST/local midnight, account isolation, preservation of existing work, and no generation from overdue scheduler settings. Daily wire fixture parsing and contract generation passed. `/tmp/drillbit-daily-open.xcresult` passed Home automatic preparation/regeneration; final native build passed (`/tmp/daily-final-build.log`).
+
+D1 migration 0010 applied after private backup. Worker deployed as `465f3af9-8d38-4090-9c43-a13b00e14a95`. Final simulator installed/launched; remote D1 read verified the owner's authenticated app created the `2026-09-12` daily-visit record. This verifies live app-to-backend day registration, not a fresh live inference or physical notification delivery. No TestFlight upload or APNs setup.

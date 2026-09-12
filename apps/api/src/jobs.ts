@@ -19,8 +19,6 @@ import {
   reflectionOutputSchema,
   parseJSON,
   timestamp,
-  nextDaily,
-  settingsSchema,
   type Settings,
 } from "./domain";
 import { structured, streamedInterview } from "./ai";
@@ -30,6 +28,10 @@ export async function runJob(env: Env, id: string) {
   const job = await env.DB.prepare("SELECT j.*,a.status AS account_status,a.subject AS account_subject FROM jobs j JOIN accounts a ON a.id=j.account_id WHERE j.id=?")
     .bind(id).first<Job & {account_status: string; account_subject: string; created_at: string}>();
   if (!job || job.status === "completed" || job.status === "cancelled") return;
+  if (job.kind === "generate" && JSON.parse(job.input).availableAt) {
+    await env.DB.prepare("UPDATE jobs SET status='cancelled' WHERE id=? AND status IN ('pending','running')").bind(id).run();
+    return;
+  }
   const account = {status: job.account_status, subject: job.account_subject};
   const queuedAt = Date.parse(job.created_at);
   if (Number.isFinite(queuedAt)) console.info(JSON.stringify({event: "inference_job_start", kind: job.kind, queuedMs: Math.max(0, Date.now() - queuedAt)}));
@@ -298,14 +300,8 @@ export class PracticeWorkflow extends WorkflowEntrypoint<
 }
 export async function reconcile(env: Env) {
   if ((await env.DB.prepare("SELECT enabled FROM practice_epoch WHERE id=1").first<{enabled:number}>())?.enabled === 0) return;
-  const now = timestamp(),
-    soon = new Date(Date.now() + 15 * 60000).toISOString(),
-    activeSince = new Date(Date.now() - 7 * 86400000).toISOString();
-  await env.DB.prepare(
-    "UPDATE challenges SET lifecycle='expired' WHERE lifecycle='prepared' AND available_at<?",
-  )
-    .bind(new Date(Date.now() - 86400000).toISOString())
-    .run();
+  // Retire queued legacy timer-driven generation. Cron still recovers user-started jobs.
+  await env.DB.prepare("UPDATE jobs SET status='cancelled' WHERE kind='generate' AND status='pending' AND json_extract(input,'$.availableAt') IS NOT NULL").run();
   // Recover dispatch failures. Stable workflow IDs prevent duplicate execution.
   const pending = await env.DB.prepare(
     "SELECT id FROM jobs WHERE status='pending' ORDER BY created_at LIMIT 30",
@@ -316,54 +312,4 @@ export async function reconcile(env: Env) {
   )
     .bind(new Date(Date.now() - 120000).toISOString())
     .run();
-  const candidates = await env.DB.prepare(
-    "SELECT id,account_id,available_at FROM challenges WHERE lifecycle='prepared' AND available_at<=? ORDER BY available_at DESC LIMIT 30",
-  )
-    .bind(now)
-    .all<{ id: string; account_id: string; available_at: string }>();
-  for (const c of candidates.results) {
-    await env.DB.batch([
-      env.DB.prepare(
-        "UPDATE challenges SET lifecycle='expired' WHERE account_id=? AND lifecycle='ready' AND created_at<? AND EXISTS(SELECT 1 FROM challenges WHERE id=? AND lifecycle='prepared')",
-      ).bind(
-        c.account_id,
-        new Date(new Date(c.available_at).getTime() - 15 * 60000).toISOString(),
-        c.id,
-      ),
-      env.DB.prepare(
-        "UPDATE challenges SET lifecycle='ready' WHERE id=? AND lifecycle='prepared' AND NOT EXISTS(SELECT 1 FROM challenges WHERE account_id=? AND lifecycle IN ('ready','in_progress'))",
-      ).bind(c.id, c.account_id),
-    ]);
-  }
-  const due = await env.DB.prepare(
-    "SELECT s.account_id,s.data,s.next_due FROM settings s JOIN accounts a ON a.id=s.account_id WHERE s.next_due<=? AND a.status='active' AND a.last_seen>=? LIMIT 30",
-  )
-    .bind(soon, activeSince)
-    .all<{ account_id: string; data: string; next_due: string }>();
-  for (const row of due.results) {
-    const settings = normalizeSettings(parseJSON(row.data));
-    const next = nextDaily(
-      settings,
-      new Date(Math.max(Date.now(), new Date(row.next_due).getTime() + 1000)),
-    );
-    const id = crypto.randomUUID();
-    const active = await activeChallenge(env, row.account_id);
-    await env.DB.batch([
-      env.DB.prepare(
-        "UPDATE settings SET next_due=? WHERE account_id=? AND next_due=?",
-      ).bind(next, row.account_id, row.next_due),
-      env.DB.prepare(
-        `INSERT OR IGNORE INTO jobs(id,account_id,kind,input,created_at,updated_at) SELECT ?,?,'generate',?,?,? WHERE ?!='in_progress' AND NOT EXISTS(SELECT 1 FROM jobs WHERE account_id=? AND kind='generate' AND status IN ('pending','running'))`,
-      ).bind(
-        id,
-        row.account_id,
-        JSON.stringify({ settings, availableAt: row.next_due }),
-        now,
-        now,
-        active?.lifecycle ?? "",
-        row.account_id,
-      ),
-    ]);
-    await dispatch(env, id);
-  }
 }

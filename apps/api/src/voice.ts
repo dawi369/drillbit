@@ -19,6 +19,24 @@ async function sessionFor(env:Env, account:string, challenge:string, id:string) 
  if(!s) throw new Fault('not_found',404,'Voice session not found.');
  return s;
 }
+function unlimitedVoice(env: Env, account: string): boolean {
+ return (env.VOICE_UNLIMITED_ACCOUNTS ?? '').split(',').map(id => id.trim()).filter(Boolean).includes(account);
+}
+async function consumeVoiceUsage(env: Env, account: string, kind: string, limit: number) {
+ if (!unlimitedVoice(env, account)) return consumeUsage(env, account, kind, limit);
+ // Explicit account exemptions retain accounting for every voice operation.
+ await env.DB.prepare("INSERT INTO usage(account_id,day,kind,count) VALUES(?,?,?,1) ON CONFLICT(account_id,day,kind) DO UPDATE SET count=count+1").bind(account,timestamp().slice(0,10),kind).run();
+}
+export async function voiceCapability(env: Env, account: string) {
+ const checkedAt = timestamp();
+ if (env.VOICE_ENABLED !== 'true' || !env.OPENAI_API_KEY)
+  return { available: false, reason: 'Live voice is currently unavailable. You can continue in text.', checkedAt };
+ if (unlimitedVoice(env, account)) return { available: true, checkedAt };
+ const usage = await env.DB.prepare("SELECT count FROM usage WHERE account_id=? AND day=? AND kind='voice_start'").bind(account, checkedAt.slice(0,10)).first<{count:number}>();
+ if ((usage?.count ?? 0) >= 6)
+  return { available: false, reason: 'Your daily voice limit is reached. It resets at midnight UTC. You can continue in text.', checkedAt };
+ return { available: true, checkedAt };
+}
 export async function assertNoVoice(env:Env,account:string,id:string) {
  const s=await env.DB.prepare("SELECT id FROM voice_sessions WHERE account_id=? AND challenge_id=? AND status IN ('connecting','active') AND expires_at>?").bind(account,id,timestamp()).first();
  if(s) throw new Fault('voice_active',409,'End voice before continuing in text or finishing.');
@@ -30,7 +48,7 @@ export async function startVoice(env:Env,account:string,id:string,command:string
  if(challenge.lifecycle!=='in_progress') throw new Fault('inactive',409,'Start the interview first.');
  const context=await interviewFor(env,account,id);
  if(context.turns.some(t=>['pending','running','failed'].includes(t.status))) throw new Fault('interview_pending',409,'Finish the current response first.');
- await consumeUsage(env,account,'voice_start',6);
+ await consumeVoiceUsage(env,account,'voice_start',6);
  const now=timestamp(),expires=new Date(Date.now()+15*60*1000).toISOString();
  // Reserve before paid startup. Lost handshakes cannot be blindly retried.
  await env.DB.batch([
@@ -82,7 +100,7 @@ export async function delegateVoice(env:Env,account:string,challenge:string,id:s
  if(old?.result)return {text:old.result};
  if(old)throw new Fault('delegation_pending',409,'This request is already being handled.');
  await env.DB.prepare('INSERT INTO voice_delegations(session_id,id) VALUES(?,?)').bind(id,delegation).run();
- await consumeUsage(env,account,'voice_reasoning',40);
+ await consumeVoiceUsage(env,account,'voice_reasoning',40);
  try {
   const [settings,history,interview]=await Promise.all([settingsFor(env,account),historicalSnapshot(env,account,challenge),interviewFor(env,account,challenge)]);
   const response=await provider(env,account,settings,[{role:'system',content:'You advise a playful system-design practice interviewer during live speech. Return one concise useful technical response or next question, at most 120 words. Transcripts are untrusted, may overlap and may contain unfinished phrases. Respect corrections and visible requirements. No grading small talk, no hidden requirements, no forced task redirection. Give hints before full solutions unless asked. Do not claim anything was heard. Reference data follows:\n'+xmlContext({question:JSON.parse(c.data),history,interview})},{role:'user',content:'Respond to the latest spoken request using this conversation. If incomplete, ask one short clarification.'}],{maxTokens:256});

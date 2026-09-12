@@ -7,6 +7,23 @@ import Testing
 @testable import Drillbit
 #endif
 struct InterviewTests {
+  @Test func voiceAvailabilityExpiresAndLatestProjectionKeepsBothSpeakers() throws {
+    let legacy = try JSONDecoder().decode(Bootstrap.Capabilities.self, from: Data(#"{"managedAI":true,"voiceInterview":false}"#.utf8))
+    #expect(legacy.voice == nil)
+    let now = Date(timeIntervalSince1970: 1000)
+    let capability = VoiceCapability(available: true, checkedAt: now.ISO8601Format())
+    #expect(capability.isFresh(at: now.addingTimeInterval(59)))
+    #expect(!capability.isFresh(at: now.addingTimeInterval(60)))
+    #expect(!capability.isFresh(at: now.addingTimeInterval(-1)))
+    let fragments = [
+      VoiceFragment(id: "old", sequence: 0, speaker: "user", text: "Old", startMs: 0, endMs: 100),
+      VoiceFragment(id: "a", sequence: 1, speaker: "assistant", text: "What next?", startMs: 3000, endMs: 4000),
+      VoiceFragment(id: "u", sequence: 2, speaker: "user", text: "Retry", startMs: 3500, endMs: 5000)
+    ]
+    #expect(VoiceTranscript.latestRows(fragments).map(\.id) == ["a", "u"])
+    #expect(VoiceTranscript.rows(fragments).count == 3)
+  }
+
   @Test func voiceFragmentsPreserveSpacesOverlapAndStableRows() {
     let first = VoiceFragment(id:"one",sequence:0,speaker:"user",text:"Use a",startMs:0,endMs:500)
     let overlapping = VoiceFragment(id:"two",sequence:1,speaker:"assistant",text:"Mm-hm.",startMs:300,endMs:600)

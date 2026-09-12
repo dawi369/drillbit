@@ -174,3 +174,11 @@ Feedback runs use low reasoning; social/interview transport policy remains V4. `
 ## Voice development rollout — 12 September 2026
 
 Migration `0009_voice.sql` was applied after a private export at `.local/before-voice-20260912.sql` (mode 0600). The compatible Worker is deployed with `VOICE_ENABLED=false`. Set `OPENAI_API_KEY` in the ignored `apps/api/.dev.vars` for local testing; use `wrangler secret put OPENAI_API_KEY` to install it on the development Worker without putting it in a client build. OpenRouter credentials cannot authenticate GPT-Live. Enable the flag only for the controlled audio trial after confirming project model access. Disable it to stop new voice sessions; it does not terminate sessions already connected to the provider. See the voice foundation document for duration-cap and physical-device acceptance gaps.
+
+### Owner voice allowance — 12 September 2026
+
+`VOICE_UNLIMITED_ACCOUNTS` is an exact, comma-separated internal-account-ID allowlist, configured for the account verified from the owner's simulator bootstrap and remote D1 account record. It removes both daily `voice_start` and `voice_reasoning` ceilings while still recording their usage. It does not bypass service disablement, authentication, account/attempt scope, single-flight or session duration. Remove the ID and redeploy to restore normal limits. No usage rows were deleted/reset; no D1 migration was needed.
+
+### First daily visit generation — 12 September 2026
+
+Migration `0010_daily_visits.sql` adds account-local-date claims, applied after private backup `.local/before-daily-visits-20260912.sql`. Deploy the compatible backend before the native client using `/v1/daily-question`. Cron remains enabled for durable job recovery; it no longer schedules new AI questions. No APNs key is required for the existing local calendar reminder. Notification wording lives in `AppModel.reconcileReminder()`; rebuild the app to distribute copy changes.

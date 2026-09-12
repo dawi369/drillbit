@@ -1,0 +1,6 @@
+{
+  "available": { "available": true, "checkedAt": "2026-09-12T10:00:00.000Z" },
+  "unavailable": { "available": false, "reason": "Live voice is currently unavailable. You can continue in text.", "checkedAt": "2026-09-12T10:00:00.000Z" },
+  "limitReached": { "available": false, "reason": "Your daily voice limit is reached. It resets at midnight UTC. You can continue in text.", "checkedAt": "2026-09-12T10:00:00.000Z" },
+  "legacyCapabilities": { "managedAI": true, "voiceInterview": false }
+}

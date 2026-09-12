@@ -306,3 +306,27 @@ Local voice outboxes are included in account pending-write checks. D1 owns trans
 The room reuses the original-question component and disclosure state. Question and Conversation retain independent scroll positions within the room; transcript rows project the same immutable fragments used in writing. Manual transcript scrolling disables automatic following; Latest returns to the end. There is no additional transcript store, API or migration. A brief bottom-leading surface transition is independent of networking; Reduced Motion uses opacity only. This is a restrained page transition, not a stretched waveform animation.
 
 Mute and End remain in a bottom safe-area inset. Back has the same local audio-stop behavior as End. Draft editing and completion remain gated only while the existing voice closure/outbox conflicts; failed synchronization is recoverable from writing. App/account/attempt lifetime guards remain authoritative. No page appearance reconnects or replays a greeting.
+
+### Text-first interview refinement
+
+See [interview workspace](interview-workspace.md) for the current screen/control decisions, replacing the voice selector described above. Voice now shows a canonical question reference plus latest exchange, with History/Live over the shared transcript and balanced Mute/Use text controls. Quick help is directly in the text menu and retains its existing explicit domain request kinds; the Ask sheet is removed. Send no longer changes meaning to Finish.
+
+Bootstrap’s optional structured voice capability is a read-only service/UTC-day usage projection, cached for at most 60 seconds before explicit entry refresh. It introduces no D1 migration or entitlement system. The start operation remains authoritative. Missing fields remain compatible with older servers, and account identity is checked before applying refreshed capability data. Writing and voice disclosure states are presentation-specific over the same canonical question; only writing disclosure is persisted.
+
+### Home question controls and empty-launch recovery
+
+Home exposes ready-question Regenerate, Choose focus or level, and Skip. In-progress work offers Choose another through explicit Skip confirmation, retaining skipped work rather than silently replacing an interview. Regeneration reuses the existing revision/lifecycle-safe replacement endpoint and keeps the current question until success.
+
+An account with no known question or generation job gets one automatic Home preparation attempt per app-model lifetime; subsequent renders and failures do not loop paid requests. The server remains authoritative and returns any existing question/pending job. Successful non-fixture preparation persists the updated bootstrap before refresh. The auto-entry path never opens preview or starts an interview.
+
+Requested daily generate-then-notify behavior is not implemented by this change. Existing scheduling still prepares ahead of the daily slot, and the local notification is still clock-based. Replacing it requires APNs provisioning plus agreement on handling in-progress daily work; do not describe the local reminder as a generation-completion receipt.
+
+### Automatic questions on the first daily app visit
+
+This supersedes scheduled generation and the earlier once-per-app-model fallback. `POST /v1/daily-question` computes the date in the account's saved IANA timezone and durably claims `daily_visits(account_id,local_day)`. It returns an existing ready/in-progress question or pending generation before considering new work. An already-paid prepared candidate is reused. Only the first claim may enqueue a new generation; completion, failure, midnight on the phone, and a second device do not reset the account-day claim. Manual preparation/retry remains available under existing limits.
+
+The client checks on Home entry and foregrounding, not on background refresh. Its account-scoped persisted day marker suppresses repeated opens and offline retries; the server is authoritative across devices. Cloud state is checked rather than assuming an empty device cache means an empty account. Returned/generated questions update the durable bootstrap cache; no preview or interview starts automatically. A failed local/network attempt needs explicit Retry for that day.
+
+Cron retains recovery of user-started work but creates no daily generation jobs or timer-based replacements. Pending legacy jobs containing `availableAt` are cancelled, and a late scheduled workflow exits before inference. Already running requests cannot have their incurred provider cost reversed. Existing ready/in-progress work is preserved across dates.
+
+The daily notification remains a generic local calendar reminder in the selected timezone. The Settings label is Reminder time. Its title/body are defined in `AppModel.reconcileReminder`; it does not assert question readiness and needs no APNs setup. Legacy `next_due` storage remains compatible but no longer drives generation.

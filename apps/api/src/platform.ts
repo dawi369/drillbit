@@ -11,6 +11,7 @@ export interface Env {
   OPENROUTER_API_KEY?: string;
   OPENAI_API_KEY?: string;
   VOICE_ENABLED?: string;
+  VOICE_UNLIMITED_ACCOUNTS?: string;
   CREDENTIAL_KEY?: string;
   CREDENTIAL_KEY_VERSION: string;
   MODEL_ID: string;

@@ -1,4 +1,5 @@
-import { startVoice, voiceEvents, delegateVoice } from "./voice";
+import { dailyQuestion } from "./daily";
+import { startVoice, voiceEvents, delegateVoice, voiceCapability } from "./voice";
 import { exportPage } from "./export";
 import { learningEvidence } from "./learning";
 import { concepts } from "./taxonomy";
@@ -170,7 +171,8 @@ app.get("/v1/bootstrap", async (c) => {
     credential,
     capabilities: {
       managedAI: c.env.MANAGED_AI_ENABLED === "true",
-      voiceInterview: false,
+      voiceInterview: c.env.VOICE_ENABLED === "true" && !!c.env.OPENAI_API_KEY,
+      voice: await voiceCapability(c.env, a.id),
       automaticCompanion: c.env.COMPANION_AUTO_ENABLED === "true",
     },
   });
@@ -236,6 +238,7 @@ app.put("/v1/settings", async (c) => {
   ]);
   return c.json(settings);
 });
+app.post("/v1/daily-question", async c => c.json(await dailyQuestion(c.env,c.get("account").id)));
 app.post("/v1/challenges", async (c) => {
   const a = c.get("account").id,
     id = requireCommand(c.req.header("Idempotency-Key"));

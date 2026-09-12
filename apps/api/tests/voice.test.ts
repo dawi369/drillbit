@@ -2,7 +2,7 @@ import {env} from 'cloudflare:test';
 import {beforeAll,it,expect,vi} from 'vitest';
 import {initializeDatabase} from './migrations';
 import {accountFor,complete,detail,settingsFor} from '../src/store';
-import {startVoice,voiceEvents,delegateVoice} from '../src/voice';
+import {startVoice,voiceEvents,delegateVoice,voiceCapability} from '../src/voice';
 import {requestInterview} from '../src/interview';
 import type {Env} from '../src/platform';
 const e={...env,VOICE_ENABLED:'true',OPENAI_API_KEY:'test',MANAGED_AI_ENABLED:'true',OPENROUTER_API_KEY:'test',JOBS:{create:async()=>({id:'test'})}} as unknown as Env;
@@ -16,3 +16,36 @@ it('freezes voice content at completion without generating another response',asy
 it('failed configuration performs no paid startup',async()=>{const {a,id}=await fixture(),mock=connection();try{await expect(startVoice({...e,OPENAI_API_KEY:undefined},a,id,crypto.randomUUID(),{sdp:'offer',revision:2})).rejects.toMatchObject({code:'voice_unavailable'});expect(mock).not.toHaveBeenCalled();}finally{mock.mockRestore();}});
 it('closed sessions cannot delegate new paid work',async()=>{const {a,id}=await fixture(),cmd=crypto.randomUUID(),mock=connection();try{await startVoice(e,a,id,cmd,{sdp:'offer',revision:2});await voiceEvents(e,a,id,cmd,{fragments:[],closed:true,finalized:false});await expect(delegateVoice(e,a,id,cmd,{id:'d1'})).rejects.toMatchObject({code:'inactive'});expect(mock).toHaveBeenCalledTimes(1);}finally{mock.mockRestore();}});
 it('does not activate a session if the question was skipped during provider startup',async()=>{const {a,id}=await fixture(),cmd=crypto.randomUUID();const mock=vi.spyOn(globalThis,'fetch').mockImplementation(async()=>{await e.DB.prepare("UPDATE challenges SET lifecycle='skipped' WHERE id=?").bind(id).run();return new Response(JSON.stringify({session:{id:'live_late'},transport:{sdp:'answer'}}));});try{await expect(startVoice(e,a,id,cmd,{sdp:'offer',revision:2})).rejects.toMatchObject({code:'inactive'});const row=await e.DB.prepare('SELECT status FROM voice_sessions WHERE id=?').bind(cmd).first<any>();expect(row.status).toBe('uncertain');}finally{mock.mockRestore();}});
+
+it('voice capability is read-only, account-scoped and reflects the daily limit', async()=>{
+ const {a}=await fixture(), other=await fixture();
+ expect((await voiceCapability(e,a)).available).toBe(true);
+ expect((await voiceCapability({...e,VOICE_ENABLED:'false'},a)).available).toBe(false);
+ const day=new Date().toISOString().slice(0,10);
+ await e.DB.prepare("INSERT INTO usage(account_id,day,kind,count) VALUES(?,?,'voice_start',6)").bind(a,day).run();
+ expect((await voiceCapability(e,a)).available).toBe(false);
+ expect((await voiceCapability(e,other.a)).available).toBe(true);
+ expect((await e.DB.prepare("SELECT count FROM usage WHERE account_id=? AND day=? AND kind='voice_start'").bind(a,day).first<any>()).count).toBe(6);
+});
+
+it('unlimited voice is an exact account override and still records usage', async()=>{
+ const {a,id}=await fixture(), other=await fixture();
+ const owner={...e,VOICE_UNLIMITED_ACCOUNTS: a};
+ const day=new Date().toISOString().slice(0,10);
+ for (const account of [a,other.a]) await e.DB.prepare("INSERT INTO usage(account_id,day,kind,count) VALUES(?,?,'voice_start',6)").bind(account,day).run();
+ expect((await voiceCapability(owner,a)).available).toBe(true);
+ expect((await voiceCapability(owner,other.a)).available).toBe(false);
+ expect((await voiceCapability({...owner,VOICE_ENABLED:'false'},a)).available).toBe(false);
+ expect((await voiceCapability({...owner,VOICE_UNLIMITED_ACCOUNTS:a+'-suffix'},a)).available).toBe(false);
+ const mock=connection();
+ try {
+  const session=crypto.randomUUID();
+  await startVoice(owner,a,id,session,{sdp:'offer',revision:2}); expect(mock).toHaveBeenCalledTimes(1);
+  await e.DB.prepare("INSERT INTO usage(account_id,day,kind,count) VALUES(?,?,'voice_reasoning',40)").bind(a,day).run();
+  mock.mockResolvedValue(new Response(JSON.stringify({choices:[{message:{content:'What happens on a retry?'}}],usage:{prompt_tokens:1,completion_tokens:1}}),{status:200}));
+  expect(await delegateVoice(owner,a,id,session,{id:'over-limit'})).toEqual({text:'What happens on a retry?'});
+  expect((await e.DB.prepare("SELECT count FROM usage WHERE account_id=? AND day=? AND kind='voice_reasoning'").bind(a,day).first<any>()).count).toBe(41);
+ }
+ finally { mock.mockRestore(); }
+ expect((await e.DB.prepare("SELECT count FROM usage WHERE account_id=? AND day=? AND kind='voice_start'").bind(a,day).first<any>()).count).toBe(7);
+});

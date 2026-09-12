@@ -55,7 +55,7 @@ struct RootView: View {
     .task { await model.launch() }
     .onChange(of: scenePhase) { _, phase in
       if phase == .active {
-        Task { await model.refresh() }
+        Task { await model.refresh(); await model.ensureHomeQuestion() }
       } else if phase == .background {
         if !model.fixture { BackgroundRefresh.schedule() }
         Task { await model.sync() }
@@ -120,6 +120,8 @@ struct HomeView: View {
   @Bindable var model: AppModel
   @State private var flow: QuestionFlowEntry?
   @State private var started: Challenge?
+  @State private var skipping: Challenge?
+  @State private var chooseAfterSkip = false
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 24) {
@@ -127,8 +129,26 @@ struct HomeView: View {
         Divider()
         if let challenge = model.bootstrap?.challenge {
           VStack(alignment: .leading, spacing: 12) {
-            Text(challenge.lifecycle == "in_progress" ? "In progress" : "Ready to practise")
-              .font(.caption).foregroundStyle(.secondary)
+            HStack {
+              Text(challenge.lifecycle == "in_progress" ? "In progress" : "Ready to practise")
+                .font(.caption).foregroundStyle(.secondary)
+              Spacer()
+              Menu {
+                if challenge.lifecycle == "ready" {
+                  Button("Regenerate", systemImage: "arrow.clockwise") { Task {
+                    do { _ = try await model.generateForPreview(PreparationInput(focus: "System design", kind: "design", difficulty: model.settings.difficulty, engineeringLevel: challenge.engineeringLevel, replaceId: challenge.id)) }
+                    catch { model.preparationFailure = error.localizedDescription }
+                  } }
+                  Button("Choose focus or level", systemImage: "slider.horizontal.3") { flow = QuestionFlowEntry() }
+                }
+                if challenge.lifecycle == "in_progress" {
+                  Button("Choose another question", systemImage: "arrow.triangle.2.circlepath") { chooseAfterSkip = true; skipping = challenge }
+                }
+                Button("Skip question", systemImage: "forward", role: .destructive) { chooseAfterSkip = false; skipping = challenge }
+              } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
+                .accessibilityLabel("Question actions").accessibilityIdentifier("homeQuestionActions")
+                .disabled(model.busy)
+            }
             Text(challenge.title).font(.headline).lineLimit(2)
             Text("\(challenge.topic) · \(challenge.levelLabel)").font(.subheadline).foregroundStyle(.secondary)
             if challenge.lifecycle == "ready", let reason = challenge.selectionReason { Text(reason).font(.caption).foregroundStyle(.secondary) }
@@ -155,6 +175,11 @@ struct HomeView: View {
         }
       }.frame(maxWidth: 640, alignment: .leading).padding(24)
     }.safeAreaPadding(.bottom, 24)
+      .task(id: model.bootstrap?.account.id) { await model.ensureHomeQuestion() }
+      .alert("Skip this question?", isPresented: Binding(get: { skipping != nil }, set: { if !$0 { skipping = nil } })) {
+        Button("Keep practising", role: .cancel) { skipping = nil }
+        Button("Skip question", role: .destructive) { if let question = skipping { let choose = chooseAfterSkip; Task { await model.skip(question.id); if choose, model.bootstrap?.challenge == nil { flow = QuestionFlowEntry() } } }; skipping = nil }
+      } message: { Text("Keep it in Skipped questions and return to Home. Your saved draft is preserved.") }
       .navigationTitle("Home").navigationBarTitleDisplayMode(.inline)
       .refreshable { await model.refresh() }
       .sheet(item: $flow, onDismiss: {

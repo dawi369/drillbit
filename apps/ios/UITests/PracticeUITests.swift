@@ -20,6 +20,22 @@ final class PracticeUITests: XCTestCase {
     XCTAssertFalse(app.buttons["voiceMute"].waitForExistence(timeout: 4))
     XCTAssertTrue(app.buttons["liveVoice"].isEnabled)
   }
+  func testUnavailableVoicePreservesReply() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures", "--fixture-voice-unavailable"]
+    app.launch()
+    XCTAssertTrue(app.buttons["startPractice"].waitForExistence(timeout: 10))
+    app.buttons["startPractice"].tap(); app.buttons["previewStart"].tap()
+    let editor = app.textViews["answerEditor"]
+    XCTAssertTrue(editor.waitForExistence(timeout: 5))
+    editor.tap(); editor.typeText("Keep this reply")
+    app.buttons["liveVoice"].tap()
+    XCTAssertTrue(app.alerts["Voice"].waitForExistence(timeout: 3))
+    XCTAssertFalse(app.buttons["voiceMute"].exists)
+    app.alerts.buttons["Done"].tap()
+    XCTAssertEqual(editor.value as? String, "Keep this reply")
+    XCTAssertTrue(app.buttons["shareAnswer"].isEnabled)
+  }
   private func voiceJourney(extra:[String]) throws {
     let app = XCUIApplication()
     app.launchArguments = ["--fixtures", "--fixture-voice"] + extra
@@ -37,13 +53,15 @@ final class PracticeUITests: XCTestCase {
     XCTAssertFalse(app.otherElements["voiceSessionDivider"].exists, "An empty voice session has no separator")
     capture("Voice room question", app)
     app.buttons["voiceFixtureSpeech"].tap()
-    app.buttons["Conversation"].tap()
+    app.buttons["voiceHistory"].tap()
     XCTAssertTrue(app.staticTexts["I'd use a durable queue."].waitForExistence(timeout:5))
     XCTAssertTrue(app.staticTexts["Makes sense. What happens when a worker retries?"].exists)
+    if app.buttons["voiceLatestButton"].exists { app.buttons["voiceLatestButton"].tap() }
+    XCTAssertTrue(app.staticTexts["Makes sense. What happens when a worker retries?"].isHittable)
     capture("Voice room conversation", app)
-    app.buttons["Question"].tap()
+    app.buttons["voiceHistory"].tap()
     XCTAssertTrue(app.buttons["voiceMute"].exists)
-    app.buttons["Conversation"].tap()
+    app.buttons["voiceHistory"].tap()
     app.buttons["voiceEnd"].tap()
     XCTAssertTrue(app.buttons["liveVoice"].waitForExistence(timeout:5))
     XCTAssertEqual(editor.value as? String,"Keep my written draft.")
@@ -105,6 +123,18 @@ final class PracticeUITests: XCTestCase {
     }
   }
 
+  func testHomeAutomaticallyPreparesAndRegenerates() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures", "--fixture-dashboard", "--fixture-auto-question", "--fixture-slow-generation"]
+    app.launch()
+    XCTAssertTrue(app.buttons["startPractice"].waitForExistence(timeout: 12))
+    XCTAssertTrue(app.staticTexts["Design a reliable job queue"].exists)
+    app.buttons["homeQuestionActions"].tap()
+    XCTAssertTrue(app.buttons["Choose focus or level"].exists)
+    app.buttons["Regenerate"].tap()
+    XCTAssertTrue(app.staticTexts["Preparing your question…"].waitForExistence(timeout: 3))
+    XCTAssertTrue(app.buttons["startPractice"].exists, "Old question remains available during replacement")
+  }
   func testLibraryAndSkippedQuestionRecovery() throws { try libraryJourney(extra: []) }
   func testLibraryAccessibleDark() throws { try libraryJourney(extra: ["--dark", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]) }
   private func libraryJourney(extra: [String]) throws {
@@ -523,7 +553,7 @@ final class PracticeUITests: XCTestCase {
     capture("Interview writing", app)
     app.buttons["shareAnswer"].tap()
     XCTAssertTrue(app.staticTexts["What happens if a worker stops after completing the operation but before acknowledging it?"].waitForExistence(timeout:5))
-    XCTAssertTrue(["", "Talk through your approach…"].contains(editor.value as? String ?? ""))
+    XCTAssertTrue(["", "Talk through your approach, or ask a question…"].contains(editor.value as? String ?? ""))
     capture("Interviewer follow-up", app)
     XCTAssertEqual(app.buttons["exchange-original"].value as? String, "Collapsed")
     let answerRow = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "answer-")).firstMatch
@@ -539,7 +569,6 @@ final class PracticeUITests: XCTestCase {
     capture("Inline interview history", app)
     editor.tap(); editor.typeText("I need to handle duplicate effects.")
     app.buttons["interviewOptions"].tap()
-    app.buttons["Ask interviewer"].tap()
     app.buttons["Give me a nudge"].tap()
     XCTAssertTrue(app.staticTexts["Consider what a retry can know about an operation that already happened."].waitForExistence(timeout:5))
     XCTAssertFalse(app.navigationBars["Ask interviewer"].exists)

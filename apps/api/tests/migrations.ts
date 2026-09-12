@@ -7,8 +7,9 @@ import sixth from "../migrations/0006_interview.sql?raw";
 import seventh from "../migrations/0007_interview_streams.sql?raw";
 import eighth from "../migrations/0008_question_library.sql?raw";
 import ninth from "../migrations/0009_voice.sql?raw";
+import tenth from "../migrations/0010_daily_visits.sql?raw";
 export async function initializeDatabase(db: D1Database) {
-  for (const sql of [first, second, third, fourth, fifth, sixth, seventh, eighth, ninth])
+  for (const sql of [first, second, third, fourth, fifth, sixth, seventh, eighth, ninth, tenth])
     for (const statement of sql.split(";").filter((s) => s.trim()))
       await db
         .prepare(

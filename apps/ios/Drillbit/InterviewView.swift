@@ -383,10 +383,13 @@ private struct InterviewTurnRow: View {
   }
 }
 
-private enum InterviewSheet: String, Identifiable { case ask, style; var id: String { rawValue } }
+private enum InterviewSheet: String, Identifiable { case style; var id: String { rawValue } }
 struct InterviewView: View {
   @State private var liveVoice: LiveVoice?
   @State private var showingVoiceRoom = false
+  @State private var voiceQuestionCollapsed = true
+  @State private var checkingVoice = false
+  @State private var voiceExplanation: String?
   let model: AppModel
   let challenge: Challenge
   @State private var interview: InterviewController
@@ -395,6 +398,7 @@ struct InterviewView: View {
   @State private var confirmSkip = false
   @State private var reading = InterviewReadingState()
   @State private var arrivingAnswerID: String?
+  @State private var acceptedAnswerID: String?
   @State private var stagingAnswer = false
   @State private var submittedQuestionID: String?
   @State private var position = ScrollPosition(y: 0)
@@ -428,7 +432,7 @@ struct InterviewView: View {
     ZStack {
       if let finished = interview.finished { ReflectionView(model: model, initial: finished) }
       else if showingVoiceRoom, let voice = liveVoice {
-        InterviewVoiceRoom(voice: voice, interview: interview, question: { originalQuestion }, leave: leaveVoiceRoom)
+        InterviewVoiceRoom(voice: voice, interview: interview, question: { questionDisclosure(collapsed: voiceQuestionCollapsed) { voiceQuestionCollapsed.toggle() } }, leave: leaveVoiceRoom)
           .transition(reduceMotion ? .opacity : .scale(scale: 0.96, anchor: .bottomLeading).combined(with: .opacity))
       } else { workspace.transition(.opacity) }
     }
@@ -457,6 +461,9 @@ struct InterviewView: View {
       if value == .background { persistReading(); Task { if !interview.locked { try? await interview.flush() } } }
       if value == .active { interview.acceptsVoiceInput = true; Task { await interview.refresh() } }
     }
+    .alert("Voice", isPresented: Binding(get: { voiceExplanation != nil }, set: { if !$0 { voiceExplanation = nil } })) {
+      Button("Done", role: .cancel) { voiceExplanation = nil }
+    } message: { Text(voiceExplanation ?? "") }
     .onAppear { interview.acceptsVoiceInput = phase == .active }
     .onDisappear { interview.acceptsVoiceInput = false; interview.voice?.interrupt("Voice ended."); persistReading() }
   }
@@ -470,7 +477,7 @@ struct InterviewView: View {
               if showsDraft {
                 VStack(alignment: .leading, spacing: 12) {
                   Divider().accessibilityIdentifier("answerDivider")
-                  InterviewRowLabel(text: "Your answer")
+                  InterviewRowLabel(text: "Your reply")
                   GrowingInterviewEditor(text: Binding(get: { interview.answer }, set: { interview.edit($0) }),
                     focused: Binding(get: { focused }, set: { focused = $0 }),
                     enabled: !interview.locked && interview.failedTurn == nil && interview.voice?.blocksText != true,
@@ -478,7 +485,7 @@ struct InterviewView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { editorFrame = $0 }
                     .overlay(alignment: .topLeading) {
-                      if interview.answer.isEmpty { Text("Talk through your approach…").foregroundStyle(.tertiary).padding(.top, 8).allowsHitTesting(false).accessibilityHidden(true) }
+                      if interview.answer.isEmpty { Text("Talk through your approach, or ask a question…").foregroundStyle(.tertiary).padding(.top, 8).allowsHitTesting(false).accessibilityHidden(true) }
                     }
                 }.id("draft").transition(.identity)
               }
@@ -550,11 +557,14 @@ struct InterviewView: View {
       }
       ToolbarItem(placement: .topBarTrailing) {
         Menu {
-          Button("Finish interview", systemImage: "checkmark") { focused = false; confirmFinish = true }.disabled(!interview.canFinish)
           if interview.state.wrapUp { Button("Continue interview") { Task { await interview.submit("continue") } } }
-          Button("Ask interviewer", systemImage: "bubble.left") { sheet = .ask }.disabled(interview.voice?.blocksText == true)
-            .disabled(interview.locked || interview.failedTurn != nil)
+          Button("Give me a nudge", systemImage: "lightbulb") { Task { await interview.submit("hint") } }
+            .disabled(interview.locked || interview.failedTurn != nil || liveVoice?.blocksText == true)
+          Button("Show an example", systemImage: "text.alignleft") { Task { await interview.submit("example") } }
+            .disabled(interview.locked || interview.failedTurn != nil || liveVoice?.blocksText == true)
           Button("Interview style", systemImage: "slider.horizontal.3") { sheet = .style }.disabled(interview.locked)
+          Button("Finish interview", systemImage: "checkmark") { focused = false; confirmFinish = true }.disabled(!interview.canFinish)
+          Divider()
           Button("Skip question", systemImage: "forward", role: .destructive) { confirmSkip = true }.disabled(interview.voice?.blocksText == true)
         } label: { Image(systemName: "ellipsis") }
           .accessibilityLabel("Interview options").accessibilityIdentifier("interviewOptions")
@@ -572,7 +582,6 @@ struct InterviewView: View {
       NavigationStack {
         Group {
           switch selection {
-          case .ask: InterviewAskView(interview: interview)
           case .style:
             InterviewStylePicker(selection: Binding(get: { interview.style }, set: { value in Task { await interview.selectStyle(value) } }))
           }
@@ -581,13 +590,15 @@ struct InterviewView: View {
     }
   }
   private var originalQuestion: some View {
-    let collapsed = reading.collapsed.contains("original")
-    return VStack(alignment: .leading, spacing: 4) {
-        Button {
-          followingLiveEnd = false
-          if collapsed { reading.collapsed.remove("original") } else { reading.collapsed.insert("original") }
-          persistReading()
-        } label: {
+    questionDisclosure(collapsed: reading.collapsed.contains("original")) {
+      followingLiveEnd = false
+      if reading.collapsed.contains("original") { reading.collapsed.remove("original") } else { reading.collapsed.insert("original") }
+      persistReading()
+    }
+  }
+  private func questionDisclosure(collapsed: Bool, toggle: @escaping () -> Void) -> some View {
+    VStack(alignment: .leading, spacing: 4) {
+        Button(action: toggle) {
           HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
               InterviewRowLabel(text: "Original question")
@@ -603,7 +614,34 @@ struct InterviewView: View {
           .accessibilityIdentifier("exchange-original")
         InterviewDisclosureText(text: challenge.prompt, expanded: !collapsed,
           identifier: "original" == activeID ? "interviewPrompt" : "earlierPrompt-original")
-    }.animation(disclosureMotion, value: reading.collapsed)
+    }.animation(disclosureMotion, value: collapsed)
+  }
+  private func enterVoice() async {
+    guard !checkingVoice, let voice = liveVoice, !voice.blocksText else { return }
+    checkingVoice = true
+    defer { checkingVoice = false }
+    do {
+      var capability = model.bootstrap?.capabilities?.voice
+      if model.fixture {
+        if ProcessInfo.processInfo.arguments.contains("--fixture-voice-unavailable") {
+          voiceExplanation = "Live voice is currently unavailable. You can continue in text."; return
+        }
+      } else if capability?.isFresh() != true {
+        let refreshed: Bootstrap = try await model.api.send("bootstrap")
+        guard interview.currentAccount, refreshed.account.id == interview.account else { return }
+        capability = refreshed.capabilities?.voice
+        model.bootstrap?.capabilities = refreshed.capabilities
+      }
+      guard interview.currentAccount, phase == .active else { return }
+      if let capability, !capability.available {
+        voiceExplanation = capability.reason ?? "Live voice is currently unavailable. You can continue in text."; return
+      }
+      // Older compatible servers may not advertise the field; Start remains authoritative.
+      focused = false
+      voiceQuestionCollapsed = true
+      showingVoiceRoom = true
+      await voice.start()
+    } catch { voiceExplanation = "Couldn’t check voice availability. Check your connection and try again. Your reply is unchanged." }
   }
   private func leaveVoiceRoom() {
     // Route changes never own audio lifetime. End stops local audio before any
@@ -681,8 +719,8 @@ struct InterviewView: View {
         }
         persistReading()
       }
-    .task(id: turn.id) {
-      guard turn.id == arrivingAnswerID else { return }
+    .task(id: turn.id + (acceptedAnswerID == turn.id ? ":accepted" : ":waiting")) {
+      guard turn.id == arrivingAnswerID, acceptedAnswerID == turn.id else { return }
       // Let the submitted snapshot lay out at its full height before compressing.
       // It stays opaque throughout, instead of fading in already collapsed.
       try? await Task.sleep(for: .milliseconds(40))
@@ -690,7 +728,9 @@ struct InterviewView: View {
       stagingAnswer = false
       withAnimation(disclosureMotion) {
         reading.expandedAnswers?.remove(turn.id)
+        reading.collapsed.insert("original")
         if let submittedQuestionID { reading.collapsed.insert(submittedQuestionID) }
+        arrivingAnswerID = nil
       }
       persistReading()
     }
@@ -703,7 +743,7 @@ struct InterviewView: View {
     var answers = reading.expandedAnswers ?? []
     answers.insert(command.uuidString)
     reading.expandedAnswers = answers
-    await interview.submit("answer", command: command)
+    await interview.submit("answer", command: command, onAccepted: { acceptedAnswerID = command.uuidString })
     stagingAnswer = false
   }
 
@@ -728,24 +768,24 @@ struct InterviewView: View {
       }
 
       HStack(spacing: 16) {
-      Button { focused = false; showingVoiceRoom = true; Task { guard showingVoiceRoom else { return }; await liveVoice?.start() } } label: { Image(systemName: "waveform").font(.system(size: 20, weight: .medium)).foregroundStyle(.tertiary)
+      Button { Task { await enterVoice() } } label: { Image(systemName: "waveform").font(.system(size: 20, weight: .medium)).foregroundStyle(.primary)
         .frame(width: 44, height: 44).background(.quaternary, in: RoundedRectangle(cornerRadius: 12)) }
-        .buttonStyle(.plain).disabled(liveVoice == nil || interview.locked || interview.voice?.blocksText == true).accessibilityLabel("Live voice").accessibilityIdentifier("liveVoice")
+        .buttonStyle(.plain).disabled(checkingVoice || liveVoice == nil || interview.locked || interview.voice?.blocksText == true).accessibilityLabel("Live voice").accessibilityIdentifier("liveVoice")
       Spacer(minLength: 0)
         Button {
           focused = false
           followingLiveEnd = true
-          if interview.state.wrapUp { confirmFinish = true } else { Task { await shareAnswer() } }
+          Task { await shareAnswer() }
         } label: {
-          Image(systemName: interview.state.wrapUp ? "checkmark" : "arrow.up")
+          Image(systemName: "arrow.up")
             .font(.system(size: 20, weight: .semibold))
             .frame(width: 44, height: 44)
             .background(Color.primary, in: RoundedRectangle(cornerRadius: 12))
             .foregroundStyle(AppPalette.background)
         }.buttonStyle(.plain)
-          .accessibilityLabel(interview.state.wrapUp ? "Finish and review" : "Share answer")
-          .disabled(interview.voice?.blocksText == true || interview.locked || interview.failedTurn != nil || (!interview.state.wrapUp && interview.answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
-          .opacity(interview.locked || (!interview.state.wrapUp && interview.answer.isEmpty) ? 0.4 : 1)
+          .accessibilityLabel("Send reply")
+          .disabled(interview.voice?.blocksText == true || interview.locked || interview.failedTurn != nil || interview.answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+          .opacity(interview.locked || interview.answer.isEmpty ? 0.4 : 1)
           .accessibilityIdentifier("shareAnswer")
       }
     }.padding(16)
@@ -781,7 +821,7 @@ private struct GrowingInterviewEditor: UIViewRepresentable {
     view.textContainerInset = UIEdgeInsets(top: 8, left: 0, bottom: 8, right: 0)
     view.textContainer.lineFragmentPadding = 0
     view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-    view.accessibilityLabel = "Your answer"
+    view.accessibilityLabel = "Your reply"
     view.accessibilityIdentifier = "answerEditor"
     return view
   }
@@ -835,29 +875,20 @@ private struct InterviewVoiceRoom<Question: View>: View {
   let interview: InterviewController
   @ViewBuilder var question: () -> Question
   var leave: () -> Void
-  @State private var selection = "Question"
+  @State private var showingHistory = false
   var body: some View {
-    VStack(spacing: 0) {
-      Picker("Voice view", selection: $selection) {
-        Text("Question").tag("Question")
-        Text("Conversation").tag("Conversation")
-      }.pickerStyle(.segmented).padding(.horizontal, 24).padding(.vertical, 12)
-      // Both positions survive selector changes, with only the selected content
-      // exposed to interaction and accessibility. No session-start view tasks.
-      ZStack {
-        ScrollView { question().padding(24).frame(maxWidth: .infinity, alignment: .leading) }
-          .opacity(selection == "Question" ? 1 : 0)
-          .allowsHitTesting(selection == "Question").accessibilityHidden(selection != "Question")
-        InterviewConversation(state: interview.displayState)
-          .opacity(selection == "Conversation" ? 1 : 0)
-          .allowsHitTesting(selection == "Conversation").accessibilityHidden(selection != "Conversation")
+    InterviewConversation(state: interview.displayState, latestOnly: !showingHistory, header: question)
+      .background(AppPalette.background)
+      .safeAreaInset(edge: .bottom, spacing: 0) { controls }
+      .navigationTitle(interview.challenge.scenario?.split(whereSeparator: \.isWhitespace).prefix(2).joined(separator: " ") ?? "Voice interview")
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) { Button("Use text", action: leave).accessibilityLabel("Use text; end voice") }
+        ToolbarItem(placement: .topBarTrailing) {
+          Button(showingHistory ? "Live" : "History", systemImage: showingHistory ? "waveform" : "clock.arrow.circlepath") { showingHistory.toggle() }
+            .accessibilityIdentifier("voiceHistory")
+        }
       }
-    }
-    .background(AppPalette.background)
-    .safeAreaInset(edge: .bottom, spacing: 0) { controls }
-    .navigationTitle(interview.challenge.scenario?.split(whereSeparator: \.isWhitespace).prefix(2).joined(separator: " ") ?? "Voice interview")
-    .navigationBarTitleDisplayMode(.inline)
-    .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Back", systemImage: "chevron.left", action: leave).accessibilityLabel("Back to writing; end voice") } }
   }
   private var status: String {
     switch voice.phase {
@@ -872,26 +903,18 @@ private struct InterviewVoiceRoom<Question: View>: View {
     VStack(spacing: 12) {
       Text(status).font(.subheadline).foregroundStyle(.secondary)
       if let message = voice.message { Text(message).font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center) }
-      HStack(spacing: 16) {
+      HStack(alignment: .top, spacing: 40) {
         if voice.phase == .active {
-          Button { voice.toggleMute() } label: {
-            Image(systemName: voice.muted ? "mic.slash.fill" : "mic.fill")
-              .font(.system(size: 20, weight: .medium)).frame(width: 52, height: 52)
-              .background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
-          }.buttonStyle(.plain).accessibilityLabel(voice.muted ? "Unmute microphone" : "Mute microphone").accessibilityIdentifier("voiceMute")
+          voiceControl(voice.muted ? "Unmute" : "Mute", symbol: voice.muted ? "mic.slash.fill" : "mic.fill", id: "voiceMute", action: voice.toggleMute)
+            .accessibilityLabel(voice.muted ? "Unmute microphone" : "Mute microphone")
         }
         if voice.phase == .unavailable {
-          Button(voice.blocksText ? "Sync" : "Retry") { Task {
-            if voice.blocksText { await voice.retrySync() }
-            else { await voice.start() }
-          } }.frame(minWidth: 44, minHeight: 52)
+          voiceControl(voice.blocksText ? "Sync" : "Retry", symbol: "arrow.clockwise", id: "voiceRetry") { Task {
+            if voice.blocksText { await voice.retrySync() } else { await voice.start() }
+          } }
         }
-        Button(action: leave) {
-          Text(voice.phase == .connecting ? "Cancel" : voice.phase == .active ? "End voice" : "Back to writing")
-            .font(.body.weight(.medium)).frame(maxWidth: .infinity, minHeight: 52)
-            .background(Color.primary, in: RoundedRectangle(cornerRadius: 12)).foregroundStyle(AppPalette.background)
-        }.buttonStyle(.plain).accessibilityIdentifier("voiceEnd")
-      }
+        voiceControl(voice.phase == .connecting ? "Cancel" : "Use text", symbol: "keyboard", id: "voiceEnd", action: leave)
+      }.frame(maxWidth: .infinity)
       #if DEBUG
       if interview.model.fixture, ProcessInfo.processInfo.arguments.contains("--fixture-voice"), voice.phase == .active {
         Button("Simulate speech") { Task { await voice.fixtureSpeech() } }.font(.system(size: 17)).accessibilityIdentifier("voiceFixtureSpeech")
@@ -899,23 +922,45 @@ private struct InterviewVoiceRoom<Question: View>: View {
       #endif
     }.padding(24).background(AppPalette.background)
   }
+  private func voiceControl(_ title: String, symbol: String, id: String, action: @escaping () -> Void) -> some View {
+    Button(action: action) {
+      VStack(spacing: 8) {
+        Image(systemName: symbol).font(.system(size: 20, weight: .medium))
+          .frame(width: 52, height: 52).background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
+        Text(title).font(.caption).multilineTextAlignment(.center).contentTransition(.identity).transaction { $0.animation = nil }
+      }.frame(maxWidth: .infinity)
+    }.buttonStyle(.plain).accessibilityIdentifier(id)
+  }
+
 }
 
-struct InterviewConversation: View {
+struct InterviewConversation<Header: View>: View {
   var state: InterviewState
-  @State private var position = ScrollPosition(edge: .bottom)
-  @State private var following = true
+  var latestOnly = false
+  @ViewBuilder var header: () -> Header
+  @State private var livePosition = ScrollPosition(y: 0)
+  @State private var historyPosition = ScrollPosition(y: 0)
+  @State private var liveFollowing = true
+  @State private var historyFollowing = false
+  private var position: Binding<ScrollPosition> { latestOnly ? $livePosition : $historyPosition }
+  private var following: Bool { latestOnly ? liveFollowing : historyFollowing }
+  private func setFollowing(_ value: Bool) { if latestOnly { liveFollowing = value } else { historyFollowing = value } }
   @State private var scrolling = false
+  @State private var observedIdentity: String?
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  private var visibleTurns: [InterviewTurn] { state.turns.filter { $0.kind != "voice" || ($0.voice ?? []).contains { !$0.text.isEmpty } } }
-  private var contentIdentity: String { state.turns.map { $0.id + String($0.voice?.count ?? 0) + ($0.result?.text ?? $0.partial ?? "") }.joined() }
+  private var visibleTurns: [InterviewTurn] {
+    let turns = state.turns.filter { $0.kind != "voice" || ($0.voice ?? []).contains { !$0.text.isEmpty } }
+    return latestOnly ? Array(turns.suffix(1)) : turns
+  }
+  private var contentIdentity: String { visibleTurns.map { $0.id + String($0.voice?.count ?? 0) + ($0.result?.text ?? $0.partial ?? "") }.joined() }
   var body: some View {
     ScrollView {
       LazyVStack(alignment: .leading, spacing: 24) {
+        header()
         ForEach(visibleTurns) { turn in
           VStack(alignment: .leading, spacing: 8) {
             if turn.kind == "voice" {
-              ForEach(VoiceTranscript.rows(turn.voice ?? [])) { row in
+              ForEach(latestOnly ? VoiceTranscript.latestRows(turn.voice ?? []) : VoiceTranscript.rows(turn.voice ?? [])) { row in
                 Text(row.speaker == "user" ? "You" : "Interviewer").font(.caption).foregroundStyle(.secondary)
                 Text(row.text)
               }
@@ -933,48 +978,31 @@ struct InterviewConversation: View {
         Color.clear.frame(height: 1).id("voiceLatest")
       }.frame(maxWidth:.infinity,alignment:.leading).padding(24).textSelection(.enabled)
     }
-    .scrollPosition($position)
+    .scrollPosition(position)
     .onScrollPhaseChange { _, phase in scrolling = phase == .interacting || phase == .decelerating }
     .onScrollGeometryChange(for: Bool.self) { $0.visibleRect.maxY >= $0.contentSize.height - 80 } action: { _, atEnd in
-      if scrolling { following = atEnd }
+      if scrolling { setFollowing(atEnd) }
     }
-    .onChange(of: contentIdentity) { _, _ in
-      guard following, !scrolling else { return }
-      withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) { position.scrollTo(edge: .bottom) }
+    .task(id: contentIdentity) {
+      let isUpdate = observedIdentity != nil
+      observedIdentity = contentIdentity
+      guard isUpdate else { return }
+      await Task.yield()
+      guard following, !scrolling, !Task.isCancelled else { return }
+      withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) { position.wrappedValue.scrollTo(id: "voiceLatest", anchor: .bottom) }
     }
-    .overlay(alignment: .bottomTrailing) {
-      if !following { Button("Latest", systemImage: "arrow.down") { following = true; position.scrollTo(edge: .bottom) }
-        .buttonStyle(.bordered).padding(16) }
+    .safeAreaInset(edge: .bottom, alignment: .trailing, spacing: 0) {
+      if !following {
+        Button { setFollowing(true); position.wrappedValue.scrollTo(id: "voiceLatest", anchor: .bottom) } label: {
+          Image(systemName: "arrow.down").font(.system(size: 20)).frame(width: 44, height: 44)
+            .background(AppPalette.background, in: RoundedRectangle(cornerRadius: 12))
+        }.buttonStyle(.plain).accessibilityLabel("Latest").accessibilityIdentifier("voiceLatestButton").padding(8)
+      }
     }
   }
 }
-struct InterviewAskView: View {
-  @Bindable var interview: InterviewController
-  @Environment(\.dismiss) private var dismiss
-  @State private var question = ""
-  var body: some View {
-    Form {
-      Section {
-        Button("Give me a nudge") { send("hint") }
-        Button("Show an example") { send("example") }
-      }.disabled(interview.locked || interview.failedTurn != nil)
-      Section {
-        TextField("What are you stuck on?", text: $question, axis: .vertical)
-          .lineLimit(2...5).accessibilityIdentifier("interviewerQuestion")
-        Button("Ask question") { send("clarification", text: question.trimmingCharacters(in: .whitespacesAndNewlines)) }
-          .disabled(question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || interview.locked || interview.failedTurn != nil)
-      }
-      if let error = interview.failure ?? interview.failedTurn?.error {
-        Section { Text(error); Button("Retry") { Task { await interview.retry() } } }
-      }
-    }.navigationTitle("Ask interviewer")
-  }
-  private func send(_ kind: String, text: String = "") {
-    Task {
-      // Dismiss only after the command and existing answer are durably saved.
-      await interview.submit(kind, text: text, onAccepted: { dismiss() })
-    }
-  }
+extension InterviewConversation where Header == EmptyView {
+  init(state: InterviewState) { self.state = state; self.header = { EmptyView() } }
 }
 struct InterviewStylePicker: View {
   @Binding var selection: InterviewStyle
