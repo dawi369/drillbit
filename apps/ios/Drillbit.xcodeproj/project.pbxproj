@@ -30,8 +30,10 @@
 		B60776186F24C169754719F2 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDE151C29EEC1990D2C7E840 /* DesignSystem.swift */; };
 		B81F6A3B13FB0CFA73CFCFED /* InterviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92066D96F6C016361FF268E4 /* InterviewView.swift */; };
 		BA66BF7CF5979DAA6AC4E9C5 /* PracticeEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 153D45AC2868C4FBAF088C71 /* PracticeEvidence.swift */; };
+		CEEEB3987FECE2F2B2B61FF0 /* VoiceTranscript.swift in Sources */ = {isa = PBXBuildFile; fileRef = 658B4C2655924F8CC0AE95C3 /* VoiceTranscript.swift */; };
 		D090F4FDF85CBD331AA6CAB7 /* DrillbitWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 150BB0656D2594F45A3E045B /* DrillbitWidget.swift */; };
 		D8B1269DC65D854F474432E6 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8E06A264C65F45E7AD14AD1 /* AppModel.swift */; };
+		E151B6BC51DB2FE7D15DA008 /* VoiceTranscript.swift in Sources */ = {isa = PBXBuildFile; fileRef = 658B4C2655924F8CC0AE95C3 /* VoiceTranscript.swift */; };
 		E4DF89EDCDE360281E583E6A /* DrillbitWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 9A2B037FAEC89AAC90414A59 /* DrillbitWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		EA7151E7DC60BF9B5C5A521E /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 165CE5F9FA389F64A4730557 /* APIClient.swift */; };
 		EAC2A5859464998CB025529A /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BA600A70A653AC369122638 /* WelcomeView.swift */; };
@@ -89,6 +91,7 @@
 		44C89C686607D2F20377EADE /* InterviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterviewTests.swift; sourceTree = "<group>"; };
 		4C0456C5AFA3D9C114B4F80D /* Drillbit.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Drillbit.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5CF83E5C54AF9B2C1262CAB8 /* PracticeWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeWorkspace.swift; sourceTree = "<group>"; };
+		658B4C2655924F8CC0AE95C3 /* VoiceTranscript.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceTranscript.swift; sourceTree = "<group>"; };
 		7ED772ACFEBFA6EBE9753089 /* ContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContractTests.swift; sourceTree = "<group>"; };
 		8049B9471B01CBFBD8C80764 /* SharedStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedStore.swift; sourceTree = "<group>"; };
 		87BD787A61C3C037E268829C /* LiveVoice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveVoice.swift; sourceTree = "<group>"; };
@@ -174,6 +177,7 @@
 			children = (
 				01713294F3436278FCEE46B6 /* Models.swift */,
 				8049B9471B01CBFBD8C80764 /* SharedStore.swift */,
+				658B4C2655924F8CC0AE95C3 /* VoiceTranscript.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -363,6 +367,7 @@
 				D090F4FDF85CBD331AA6CAB7 /* DrillbitWidget.swift in Sources */,
 				7DD8D81CCC22B716F6BA3C47 /* Models.swift in Sources */,
 				AE7741A51A7892B3DB5B5C08 /* SharedStore.swift in Sources */,
+				CEEEB3987FECE2F2B2B61FF0 /* VoiceTranscript.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -388,6 +393,7 @@
 				868D112482709522C36A981D /* PracticeWorkspace.swift in Sources */,
 				2BCD05DC191DB1D3AC6E50FD /* SharedStore.swift in Sources */,
 				F1C52BCF979C4B21823BF045 /* Views.swift in Sources */,
+				E151B6BC51DB2FE7D15DA008 /* VoiceTranscript.swift in Sources */,
 				EAC2A5859464998CB025529A /* WelcomeView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
