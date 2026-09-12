@@ -1,3 +1,5 @@
+import { wire } from "../../../packages/contracts/wire";
+import contractFixture from "../../../packages/contracts/fixtures/library.json";
 import { runJob } from "../src/jobs";
 import { env } from "cloudflare:test";
 import { beforeAll, it, expect } from "vitest";
@@ -227,10 +229,7 @@ it("validates all canonical tags, scenario word limits and distinct evidence", (
     );
 });
 it("validates the shared library fixture and evidence contract", async () => {
-  const { wire } = await import("../../../packages/contracts/wire");
-  const fixture =
-    await import("../../../packages/contracts/fixtures/library.json");
-  expect(wire.LibraryPage.safeParse(fixture.default).success).toBe(true);
+  expect(wire.LibraryPage.safeParse(contractFixture).success).toBe(true);
 });
 
 it("restored questions are reused without a provider call and retain original attempts", async () => {

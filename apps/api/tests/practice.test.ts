@@ -1,3 +1,5 @@
+import { wire } from "../../../packages/contracts/wire";
+import contractFixture from "../../../packages/contracts/fixtures/practice-help.json";
 import { env } from "cloudflare:test";
 import { beforeAll, it, expect, vi } from "vitest";
 import { initializeDatabase } from "./migrations";
@@ -200,10 +202,7 @@ it("normalizes old persisted models but rejects selecting another model", () => 
 });
 
 it("validates the shared help/adoption wire fixture", async () => {
-  const { wire } = await import("../../../packages/contracts/wire");
-  const { default: fixture } =
-    await import("../../../packages/contracts/fixtures/practice-help.json");
-  expect(wire.Challenge.parse(fixture).adoptions?.[0].revision).toBe(3);
+  expect(wire.Challenge.parse(contractFixture).adoptions?.[0].revision).toBe(3);
 });
 it("preserves completion context if a reference answer is viewed later", async () => {
   const { a, id } = await fixture();
