@@ -2,7 +2,7 @@
 
 # Drillbit
 
-**Your next boss fight. Bring a whiteboard.**
+**Your next boss fight.**
 
 System design practice with an AI interviewer who knows this is practice.
 Think out loud, get unstuck, and come back a little better.
@@ -24,13 +24,6 @@ Technical interviews are a skill you can practise. Drillbit makes room for the m
 - **Write first. Talk when you want.** Live voice continues the same interview. Return to text with your draft intact and the conversation in your history.
 - **A library that remembers.** Revisit completed questions, recover skipped ones, and explore related concepts. Generation receives a historical snapshot to help choose what comes next.
 - **Come back without starting over.** Cached Home stats, saved drafts, and resumable interviews. The first visit of the day can prepare a question when nothing is waiting; reminders don't spend inference money while you're away.
-
-<p align="center">
-  <img src="docs/images/interview.png" width="280" alt="Text interview with a collapsible question, your reply and an interviewer follow-up" />
-  &nbsp;&nbsp;
-  <img src="docs/images/library.png" width="280" alt="Question library detail with related concepts, practice actions and previous attempts" />
-</p>
-<p align="center"><sub>Native iOS Simulator captures using synthetic sample data.</sub></p>
 
 ## Under the hood
 
