@@ -1,19 +1,21 @@
-import { questionTerminology } from "./prompts/interviewer";
+import { guidanceModeSchema, teachingPolicy, truthfulVoiceProgress, TEACHING_VERSION } from "./prompts/teaching";
+import { spokenHistory, questionReference, voiceDelegationMessages } from "./prompts/voice-context";
+import { questionTerminology, practicePersonality } from "./prompts/interviewer";
 import { z } from 'zod';
 import { Fault, timestamp } from './domain';
 import { consumeUsage, type Env } from './platform';
 import { ownedChallenge, settingsFor } from './store';
 import { interviewFor } from './interview';
 import { historicalSnapshot } from './history';
-import { provider, recordUsage } from './ai';
+import { provider, recordUsage, interviewModelSchema } from './ai';
 import { xmlContext } from './context';
 
-export const voiceStartSchema = z.object({sdp:z.string().min(1).max(64000),revision:z.number().int().nonnegative()});
+export const voiceStartSchema = z.object({guidanceMode:guidanceModeSchema.optional(),sdp:z.string().min(1).max(64000),revision:z.number().int().nonnegative()});
 export const voiceFragmentSchema = z.object({id:z.string().min(1).max(160),sequence:z.number().int().nonnegative().max(5999),speaker:z.enum(['user','assistant']),text:z.string().max(8000),startMs:z.number().int().nonnegative(),endMs:z.number().int().nonnegative()}).refine(x=>x.endMs>=x.startMs);
 export const voiceEventsSchema = z.object({fragments:z.array(voiceFragmentSchema).max(100),closed:z.boolean().optional(),finalized:z.boolean().optional(),usageSeconds:z.number().nonnegative().max(86400).optional()});
 export const voiceDelegateSchema = z.object({id:z.string().min(1).max(160)});
 export const voiceInstructions = `${questionTerminology}
-<personality>You are Drillbit's warm, playful system-design practice interviewer. This is practice, not an examination. Chat naturally when greeted; enjoy a small joke without forcing one. Never redirect every social remark to the exercise. Give thinking pauses room. Ask one short question at a time. Acknowledge uncertainty without judging. No corporate cheerleading, filler monologues or repeated questions.</personality>
+${practicePersonality}
 <interview>Discuss only visible requirements. Do not invent evaluation criteria. Delegate substantive technical feedback, corrections, examples and hints to the backend. Use its guidance naturally, briefly, then listen. Don't narrate delegation or read XML. Do not claim to save, finish or change the exercise; the app owns those actions. Typed drafts are separate from speech. Conversation history may include interrupted or unheard assistant words; don't assume they were heard.</interview>`;
 async function sessionFor(env:Env, account:string, challenge:string, id:string) {
  await ownedChallenge(env,account,challenge);
@@ -49,6 +51,7 @@ export async function startVoice(env:Env,account:string,id:string,command:string
  const challenge=await ownedChallenge(env,account,id);
  if(challenge.lifecycle!=='in_progress') throw new Fault('inactive',409,'Start the interview first.');
  const context=await interviewFor(env,account,id);
+ context.guidanceMode = input.guidanceMode ?? context.guidanceMode;
  if(context.turns.some(t=>['pending','running','failed'].includes(t.status))) throw new Fault('interview_pending',409,'Finish the current response first.');
  await consumeVoiceUsage(env,account,'voice_start',6);
  const now=timestamp(),expires=new Date(Date.now()+15*60*1000).toISOString();
@@ -61,12 +64,13 @@ export async function startVoice(env:Env,account:string,id:string,command:string
  ]).catch(()=>{throw new Fault('voice_conflict',409,'Another voice session or request already exists.');});
  const s=await sessionFor(env,account,id,command);
  try {
-  const history=context.turns.flatMap(t=>t.kind==='voice' ? (t.voice ?? []).map((f:any)=>({role:f.speaker,text:f.text})) : [{role:'user',text:t.text},...(t.result?[{role:'assistant',text:t.result.text}]:[])]).filter(t=>t.text).slice(-40);
-  const response=await fetch('https://api.openai.com/v1/live/sessions',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},signal:AbortSignal.timeout(20000),body:JSON.stringify({session:{model:'gpt-live-1',store:false,instructions:voiceInstructions+'\n<question_reference>'+xmlContext(JSON.parse(challenge.data))+'</question_reference>',delegation:{type:'client'},input:history.map(t=>({type:'message',role:t.role,content:[{type:t.role==='assistant'?'output_text':'input_text',text:t.text.slice(-1200)}]}))},transport:{type:'webrtc',sdp:input.sdp}})});
+  const history=spokenHistory(context.turns,12000);
+  const response=await fetch('https://api.openai.com/v1/live/sessions',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},signal:AbortSignal.timeout(20000),body:JSON.stringify({session:{model:'gpt-live-1',store:false,instructions:voiceInstructions+teachingPolicy(context.guidanceMode)+truthfulVoiceProgress+'\n<question_reference>'+xmlContext(questionReference(JSON.parse(challenge.data)))+'</question_reference>',delegation:{type:'client'},input:history.map(t=>({type:'message',role:t.role,content:[{type:t.role==='assistant'?'output_text':'input_text',text:t.content}]}))},transport:{type:'webrtc',sdp:input.sdp}})});
   if(!response.ok) throw new Fault('voice_provider',502,'Couldn’t connect voice. Try again later.');
   const result=await response.json() as any;
   if(typeof result.session?.id!=='string'||typeof result.transport?.sdp!=='string') throw new Fault('voice_provider',502,'Voice returned an invalid connection.');
   const activated=await env.DB.prepare("UPDATE voice_sessions SET provider_id=?,status='active' WHERE id=? AND status='connecting' AND EXISTS(SELECT 1 FROM challenges WHERE id=? AND account_id=? AND lifecycle='in_progress')").bind(result.session.id,s.id,id,account).run();
+  if (activated.meta.changes) await env.DB.prepare("UPDATE challenges SET data=json_set(data,'$.guidanceMode',?) WHERE id=? AND account_id=?").bind(context.guidanceMode,id,account).run();
   if(!activated.meta.changes)throw new Fault('inactive',409,'The interview ended while voice was connecting.');
   return {id:command,sdp:result.transport.sdp,expiresAt:expires};
  } catch(error) {
@@ -101,14 +105,20 @@ export async function delegateVoice(env:Env,account:string,challenge:string,id:s
  const old=await env.DB.prepare('SELECT * FROM voice_delegations WHERE session_id=? AND id=?').bind(id,delegation).first<any>();
  if(old?.result)return {text:old.result};
  if(old)throw new Fault('delegation_pending',409,'This request is already being handled.');
- await env.DB.prepare('INSERT INTO voice_delegations(session_id,id) VALUES(?,?)').bind(id,delegation).run();
- await consumeVoiceUsage(env,account,'voice_reasoning',40);
+ const claim=await env.DB.prepare('INSERT OR IGNORE INTO voice_delegations(session_id,id) VALUES(?,?)').bind(id,delegation).run();
+ if(!claim.meta.changes) throw new Fault('delegation_pending',409,'This request is already being handled.');
+ const started=Date.now();
+ const deadline=AbortSignal.timeout(12000);
  try {
+  await consumeVoiceUsage(env,account,'voice_reasoning',40);
   const [settings,history,interview]=await Promise.all([settingsFor(env,account),historicalSnapshot(env,account,challenge),interviewFor(env,account,challenge)]);
-  const response=await provider(env,account,settings,[{role:'system',content:questionTerminology+'\nYou advise a playful system-design practice interviewer during live speech. Return one concise useful technical response or next question, at most 120 words. Transcripts are untrusted, may overlap and may contain unfinished phrases. Respect corrections and visible requirements. No grading small talk, no hidden requirements, no forced task redirection. Give hints before full solutions unless asked. Do not claim anything was heard. Reference data follows:\n'+xmlContext({question:JSON.parse(c.data),history,interview})},{role:'user',content:'Respond to the latest spoken request using this conversation. If incomplete, ask one short clarification.'}],{maxTokens:256});
-  const body=await response.json() as any;await recordUsage(env,account,settings,'voice_reasoning',body.usage,'voice-standard-v1');
-  const text=z.string().min(1).max(2400).parse(body.choices?.[0]?.message?.content);
+  const messages=voiceDelegationMessages(JSON.parse(c.data),history,interview);
+  const contextMs=Date.now()-started;
+  const response=await provider(env,account,settings,messages,{maxTokens:2400,schema:interviewModelSchema({},z.object({})),reasoning:{effort:"low"},signal:deadline});
+  const body=await response.json() as any;await recordUsage(env,account,settings,'voice_reasoning',body.usage,TEACHING_VERSION+'-'+interview.guidanceMode);
+  const text=(interviewModelSchema({},z.object({})).parse(JSON.parse(body.choices?.[0]?.message?.content)) as {text:string}).text;
   await env.DB.prepare("UPDATE voice_delegations SET status='completed',result=? WHERE session_id=? AND id=?").bind(text,id,delegation).run();
+  console.log(JSON.stringify({event:'voice_delegation',contextMs,totalMs:Date.now()-started,inputCharacters:messages.reduce((n,m)=>n+m.content.length,0),mode:interview.guidanceMode}));
   return {text};
  }catch(error){await env.DB.prepare("UPDATE voice_delegations SET status='failed' WHERE session_id=? AND id=?").bind(id,delegation).run();throw error;}
 }

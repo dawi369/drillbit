@@ -600,11 +600,38 @@ final class PracticeUITests: XCTestCase {
     app.buttons["interviewOptions"].tap()
     app.buttons["Finish interview"].tap()
     app.alerts.buttons["Keep writing"].tap()
-    XCTAssertFalse(app.staticTexts["Practice complete"].exists)
+    XCTAssertFalse(app.staticTexts["Boss fight logged."].exists)
     app.buttons["interviewOptions"].tap()
     app.buttons["Finish interview"].tap()
     app.alerts.buttons["Finish interview"].tap()
-    XCTAssertTrue(app.staticTexts["Practice complete"].waitForExistence(timeout:5))
+    XCTAssertTrue(app.staticTexts["Boss fight logged."].waitForExistence(timeout:5))
+    capture("Practice completion", app)
+    app.buttons["Done"].tap()
+    XCTAssertTrue(app.buttons["Dismiss practice completion"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.staticTexts["Practice done. Future you says thanks."].exists)
+    XCTAssertFalse(app.alerts["Drillbit"].exists)
+    capture("Home after practice", app)
+    app.buttons["Dismiss practice completion"].tap()
+    XCTAssertFalse(app.staticTexts["Boss fight logged."].exists)
+  }
+
+  func testPracticeModeLargestLight() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures", "--fixture-dashboard", "-appearance", "light", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+    app.launch()
+    XCTAssertTrue(app.buttons["Prepare question"].waitForExistence(timeout: 10))
+    app.buttons["Prepare question"].tap()
+    let selector = app.buttons["interviewStyle"]
+    for _ in 0..<3 where !selector.isHittable { app.swipeUp() }
+    selector.tap()
+    for title in ["Learn together", "Coach me", "Mock interview"] {
+      let option = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", title)).firstMatch
+      for _ in 0..<3 where !option.isHittable { app.swipeUp() }
+      XCTAssertTrue(option.isHittable)
+      option.tap()
+      XCTAssertTrue(option.isSelected)
+    }
+    capture("Largest practice modes light", app)
   }
 
   func testInterviewStyle() throws {
@@ -615,8 +642,8 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.buttons["Prepare question"].waitForExistence(timeout:10))
     app.buttons["Prepare question"].tap()
     app.buttons["interviewStyle"].tap()
-    let deep = app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@", "In-depth")).firstMatch
-    XCTAssertTrue(deep.waitForExistence(timeout:5)); XCTAssertFalse(deep.isEnabled)
+    let deep = app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@", "Learn together")).firstMatch
+    XCTAssertTrue(deep.waitForExistence(timeout:5)); XCTAssertTrue(deep.isEnabled); deep.tap()
     capture("Interview styles", app)
     app.navigationBars.buttons.element(boundBy:0).tap()
     app.buttons["submitPreparation"].tap()
@@ -625,10 +652,11 @@ final class PracticeUITests: XCTestCase {
     app.buttons["previewStart"].tap()
     XCTAssertTrue(app.buttons["interviewOptions"].waitForExistence(timeout:5))
     app.buttons["interviewOptions"].tap()
-    app.buttons["Interview style"].tap()
-    let quick = app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@", "Quick")).firstMatch
-    XCTAssertTrue(quick.waitForExistence(timeout:5)); XCTAssertFalse(quick.isEnabled)
-    capture("Change active interview style", app)
+    app.buttons["Practice mode"].tap()
+    let quick = app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@", "Mock interview")).firstMatch
+    XCTAssertTrue(quick.waitForExistence(timeout:5)); XCTAssertTrue(quick.isEnabled)
+    quick.tap()
+    capture("Change active practice mode", app)
     app.buttons["Done"].tap()
     let editor = app.descendants(matching: .any).matching(identifier: "answerEditor").firstMatch
     editor.tap(); editor.typeText("Keep a durable queue.")
@@ -636,9 +664,11 @@ final class PracticeUITests: XCTestCase {
     capture("Question stays open while typing", app)
     XCTAssertFalse(app.staticTexts["Saved on this device"].exists)
     app.buttons["interviewOptions"].tap()
-    app.buttons["Interview style"].tap()
-    XCTAssertFalse(quick.isEnabled)
-    let standard = app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@", "Standard")).firstMatch
+    app.buttons["Practice mode"].tap()
+    XCTAssertTrue(quick.isEnabled)
+    let standard = app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@", "Coach me")).firstMatch
+    XCTAssertTrue(quick.isSelected)
+    standard.tap()
     XCTAssertTrue(standard.isSelected)
   }
 

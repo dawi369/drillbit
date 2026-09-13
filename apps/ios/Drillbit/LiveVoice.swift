@@ -3,7 +3,7 @@ import AVFAudio
 @preconcurrency import WebRTC
 
 private struct VoiceConnection: Decodable { var id: String; var sdp: String; var expiresAt: String }
-private struct VoiceStart: Encodable { var sdp: String; var revision: Int }
+private struct VoiceStart: Encodable { var sdp: String; var revision: Int; var guidanceMode: GuidanceMode }
 private struct VoiceEvents: Codable { var fragments: [VoiceFragment]; var closed: Bool; var finalized: Bool; var usageSeconds: Double? }
 private struct VoiceAck: Decodable { var accepted: [String] }
 private struct VoiceDelegation: Encodable { var id: String }
@@ -35,6 +35,7 @@ private struct VoiceOutbox: Codable {
   private var generation = UUID()
   private var seen: Set<String> = []
   private var delegations: Set<String> = []
+  private var guidanceDeliveries: [String: VoiceGuidanceDelivery] = [:]
   private var interruptedObserver: NSObjectProtocol?
   private var routeObserver: NSObjectProtocol?
   private var key: String { interview.key + ":voice-outbox" }
@@ -68,7 +69,7 @@ private struct VoiceOutbox: Codable {
   func start() async {
     guard !blocksText, !interview.locked, interview.currentAccount, interview.acceptsVoiceInput else { return }
     let epoch = UUID(); generation = epoch
-    phase = .connecting; message = nil; muted = false; seen = []; delegations = []; acknowledged = []
+    phase = .connecting; message = nil; muted = false; seen = []; delegations = []; guidanceDeliveries = [:]; acknowledged = []
     do {
       #if DEBUG
       if interview.model.fixture, ProcessInfo.processInfo.arguments.contains("--fixture-voice-connecting") {
@@ -119,7 +120,7 @@ private struct VoiceOutbox: Codable {
       guard generation == epoch else { link.close(); return }
       link.onEvent = { [weak self] data in self?.enqueue(data,epoch:epoch) }
       link.onFailure = { [weak self] in self?.interrupt("Voice disconnected. Your transcript is preserved.") }
-      let result: VoiceConnection = try await interview.model.api.send("challenges/\(interview.challenge.id)/voice",method:"POST",body:VoiceStart(sdp:offer,revision:draft.revision),command:id)
+      let result: VoiceConnection = try await interview.model.api.send("challenges/\(interview.challenge.id)/voice",method:"POST",body:VoiceStart(sdp:offer,revision:draft.revision,guidanceMode:interview.mode),command:id)
       guard generation == epoch else { link.close(); return }
       try await link.answer(result.sdp)
       guard generation == epoch, phase == .connecting || phase == .active else { link.close(); return }
@@ -214,20 +215,45 @@ private struct VoiceOutbox: Codable {
     if type == "session.delegation.created", let d=event["delegation"] as? [String:Any],let id=d["id"] as? String,!delegations.contains(id) {
       delegations.insert(id)
       let epoch=generation
+      // One deadline covers transcript synchronization AND reasoning. A slow
+      // network task may finish later, but cannot speak after this fallback.
+      let deadline = ContinuousClock.now.advanced(by: .seconds(15))
+      guidanceDeliveries[id] = VoiceGuidanceDelivery(deadline: deadline)
+      let timeout = Task {
+        do { try await Task.sleep(until: deadline, clock: .continuous) } catch { return }
+        deliverGuidance("The response didn't arrive. Say briefly that guidance is unavailable right now; offer to continue in text. Don't ask them to keep waiting.", id: id, epoch: epoch)
+      }
       Task {
-        while syncing { try? await Task.sleep(for:.milliseconds(20)) }
-        await sync()
-        guard let pending = outbox, pending.fragments.allSatisfy({ acknowledged.contains($0.id) }), generation == epoch, phase == .active else { return }
+        defer { timeout.cancel() }
         do {
-          let reply:VoiceReply = try await interview.model.api.send("challenges/\(interview.challenge.id)/voice/\(outbox!.id)/delegate",method:"POST",body:VoiceDelegation(id:id))
-          guard generation == epoch,phase == .active else { return }
-          transport?.send(["type":"session.commentary.append","event_id":UUID().uuidString,"delegation_id":id,"content":reply.text])
+          while syncing {
+            guard generation == epoch, phase == .active else { return }
+            if ContinuousClock.now >= deadline {
+              deliverGuidance("The response didn't arrive. Briefly offer to continue in text; don't promise more waiting.", id: id, epoch: epoch)
+              return
+            }
+            try await Task.sleep(for: .milliseconds(20))
+          }
+          await sync()
+          guard generation == epoch, phase == .active, guidanceDeliveries[id]?.resolved == false else { return }
+          guard let pending = outbox, pending.fragments.allSatisfy({ acknowledged.contains($0.id) }) else {
+            deliverGuidance("The latest words couldn't be synced. Acknowledge that once and offer to continue in text; don't invent technical guidance or promise a wait.", id: id, epoch: epoch)
+            return
+          }
+          let reply: VoiceReply = try await interview.model.api.send("challenges/\(interview.challenge.id)/voice/\(pending.id)/delegate", method: "POST", body: VoiceDelegation(id: id))
+          deliverGuidance(reply.text, id: id, epoch: epoch)
         } catch {
-          guard generation == epoch,phase == .active else { return }
-          transport?.send(["type":"session.commentary.append","event_id":UUID().uuidString,"delegation_id":id,"content":"Technical guidance is unavailable. Say so briefly; don't invent a result."])
+          deliverGuidance("Technical guidance is unavailable right now. Say so briefly and offer to continue in text; don't invent a result or ask them to wait.", id: id, epoch: epoch)
         }
       }
     }
+  }
+  private func deliverGuidance(_ text: String, id: String, epoch: UUID) {
+    guard generation == epoch, phase == .active, interview.currentAccount,
+          guidanceDeliveries[id]?.resolved == false else { return }
+    guard let outcome = guidanceDeliveries[id]?.resolve(at: .now) else { return }
+    let content = outcome == .response ? text : "The response didn't arrive in time. Briefly acknowledge guidance is unavailable and offer to continue in text. Don't promise more waiting."
+    transport?.send(["type":"session.commentary.append", "event_id":UUID().uuidString, "delegation_id":id, "content":content])
   }
   private func present(_ fragments:[VoiceFragment],id:String) {
     if let index=interview.state.turns.firstIndex(where:{$0.id==id}) { interview.state.turns[index].voice = fragments }

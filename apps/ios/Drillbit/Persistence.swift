@@ -160,14 +160,14 @@ struct LocalDraft: Sendable {
       ?? []
     try cache(key: key, data: JSONEncoder().encode(receipts.filter { !ids.contains($0.id) }))
   }
-  func prepareInterviewAnswer(account: String, id: String, answer: String, command: String, promptID: String, style: InterviewStyle) throws -> PendingInterviewCommand {
+  func prepareInterviewAnswer(account: String, id: String, answer: String, command: String, promptID: String, style: InterviewStyle, guidanceMode: GuidanceMode? = nil) throws -> PendingInterviewCommand {
     guard let draft = try row(account: account, id: id), !draft.conflict, !["complete", "skipped"].contains(draft.pendingKind) else {
       throw APIError(code: "sync_pending", message: "Review the current draft before sending.", status: 409)
     }
     draft.answer = answer
     draft.pendingKind = "draft"
     draft.command = command
-    let pending = PendingInterviewCommand(command: command, input: InterviewInput(promptId: promptID, kind: "answer", revision: draft.revision, text: answer, style: style, saveDraft: true))
+    let pending = PendingInterviewCommand(command: command, input: InterviewInput(promptId: promptID, kind: "answer", revision: draft.revision, text: answer, style: style, guidanceMode: guidanceMode, saveDraft: true))
     try cache(key: "interview:" + account + ":" + id + ":pending", data: JSONEncoder().encode(pending))
     return pending
   }

@@ -31,3 +31,16 @@ enum VoiceTranscript {
     return rows
   }
 }
+
+/// Resolves once, including when a response and the deadline race on the main
+/// actor. The clock is injected so timeout behavior doesn't need real sleeps.
+struct VoiceGuidanceDelivery {
+  enum Outcome { case response, unavailable }
+  let deadline: ContinuousClock.Instant
+  private(set) var resolved = false
+  mutating func resolve(at now: ContinuousClock.Instant) -> Outcome? {
+    guard !resolved else { return nil }
+    resolved = true
+    return now < deadline ? .response : .unavailable
+  }
+}

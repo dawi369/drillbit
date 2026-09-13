@@ -45,3 +45,12 @@ No blind paid retries: a lost handshake/delegation remains uncertain or failed. 
 Simulator fixtures validate panel/mute/end, transcript grouping, draft preservation and restoration. Actual GPT-Live access, microphone/audio quality, latency, Bluetooth, interruption behavior, VoiceOver interaction and physical iPhone acceptance remain unverified. Live voice must remain gated until those checks pass.
 
 References: [GPT-Live WebRTC](https://developers.openai.com/api/docs/guides/voice-webrtc?api=live), [session and transcript semantics](https://developers.openai.com/api/docs/guides/live-conversations), [client delegation](https://developers.openai.com/api/docs/guides/live-delegation?delegation-mode=client).
+
+
+### Teaching and delegation update — 13 September 2026
+
+The active voice room now inherits Learn together / Coach me / Mock interview from the shared interview. Start sends the selected optional guidanceMode; mode changes between voice sessions leave the draft untouched. Backend reasoning uses the text conversation pipeline and a strict internal move/text schema, returning only the spoken text through the existing delegate contract.
+
+Fragment projection strips transport metadata and joins short overlapping same-speaker continuations; it does not alter persisted receipts. A 15-second native gate admits one response or truthful unavailability message, covering synchronization and the 12-second backend request deadline. Late responses cannot follow that fallback. Session/account guards still apply. No promises of checking, research or imminent results are allowed; see [OpenAI live delegation](https://developers.openai.com/api/docs/guides/live-delegation).
+
+Simulator tests cover the deterministic deadline race and existing text/voice draft/transcript handoff. Live Gemini reasoning was evaluated separately; that does not verify GPT-Live spoken delivery, microphone interruption, or real-phone latency. See [teaching acceptance](teaching-modes.md).

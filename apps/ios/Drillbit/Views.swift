@@ -125,6 +125,20 @@ struct HomeView: View {
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 24) {
+        if let account = model.completionNoticeAccount, account == model.bootstrap?.account.id {
+          HStack(alignment: .top, spacing: 12) {
+            CompletionHeading()
+            Spacer(minLength: 0)
+            Button { model.completionNoticeAccount = nil } label: {
+              Image(systemName: "xmark").frame(width: 44, height: 44)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .accessibilityLabel("Dismiss practice completion")
+          }
+          .accessibilityIdentifier("practiceCompletionNotice")
+          Divider()
+        }
         PracticeOverview(memory: model.memory)
         Divider()
         if let challenge = model.bootstrap?.challenge {
@@ -301,6 +315,14 @@ struct QuestionFlow: View {
     .onChange(of: model.bootstrap?.account.id) { _, value in if value != account { dismiss() } }
   }
 }
+private struct CompletionHeading: View {
+  var body: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Text("Boss fight logged.").font(.title2.weight(.semibold))
+      Text("Practice done. Future you says thanks.").font(.subheadline).foregroundStyle(.secondary)
+    }
+  }
+}
 struct ReflectionView: View {
   @State private var waitingForFeedback = true
   @State private var feedbackCheck = 0
@@ -312,7 +334,7 @@ struct ReflectionView: View {
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 24) {
-        Text("Practice complete").font(.title.weight(.semibold))
+        CompletionHeading()
         AssistanceSummary(challenge: current ?? initial)
         if let reflection = (current ?? initial).reflection {
           ReflectionContent(reflection: reflection)

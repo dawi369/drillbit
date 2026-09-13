@@ -8,7 +8,7 @@ settings:
     SWIFT_VERSION: '6.0'
     TARGETED_DEVICE_FAMILY: '1'
     MARKETING_VERSION: '2.0.0'
-    CURRENT_PROJECT_VERSION: '3'
+    CURRENT_PROJECT_VERSION: '5'
     GENERATE_INFOPLIST_FILE: YES
     SWIFT_STRICT_CONCURRENCY: complete
 packages:
@@ -35,6 +35,7 @@ targets:
       path: Config/AppInfo.plist
       properties:
         CFBundleDisplayName: Drillbit
+        NSCameraUsageDescription: Drillbit’s voice library includes camera support. Drillbit uses audio only and does not request camera access.
         NSMicrophoneUsageDescription: Talk with your practice interviewer using live voice.
         APIBaseURL: $(API_BASE_URL)
         ClerkPublishableKey: $(CLERK_PUBLISHABLE_KEY)

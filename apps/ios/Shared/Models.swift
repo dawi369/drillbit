@@ -68,6 +68,7 @@ struct Challenge: Codable, Identifiable, Sendable {
   var primaryConceptId: String?
   var conceptIds: [String]?
   var selectionReason: String?
+  var guidanceMode: GuidanceMode? = nil
   var interviewStyle: InterviewStyle?
   var interview: InterviewState?
   var engineeringLevel: String?
@@ -256,6 +257,7 @@ struct AdoptionInput: Codable, Sendable {
 }
 struct PreparationInput: Codable {
   var primaryConceptId: String? = nil
+  var guidanceMode: GuidanceMode? = nil
   var interviewStyle: InterviewStyle? = nil
   var focus: String
   var kind: String
@@ -318,6 +320,20 @@ enum PracticeFocus {
   static let choices = ["System design", "Backend", "Frontend", "Debugging", "Algorithms"]
 }
 
+enum GuidanceMode: String, CaseIterable, Codable, Identifiable, Sendable {
+  case learnTogether = "learn_together", coachMe = "coach_me", mockInterview = "mock_interview"
+  var id: String { rawValue }
+  var title: String { switch self {
+    case .learnTogether: "Learn together"
+    case .coachMe: "Coach me"
+    case .mockInterview: "Mock interview"
+  } }
+  var explanation: String { switch self {
+    case .learnTogether: "See an approach, then work through it together."
+    case .coachMe: "Lead the way, with help when it matters."
+    case .mockInterview: "Practise taking the lead, with feedback afterwards."
+  } }
+}
 enum InterviewStyle: String, CaseIterable, Codable, Identifiable, Sendable {
   case quick, standard, inDepth = "in_depth"
   var id: String { rawValue }
@@ -348,6 +364,7 @@ struct InterviewTurn: Codable, Identifiable, Sendable {
   var pending: Bool { ["pending", "running"].contains(status) }
 }
 struct InterviewState: Codable, Sendable {
+  var guidanceMode: GuidanceMode? = nil
   var style: InterviewStyle = .standard
   var prompt: String
   var wrapUp: Bool = false
@@ -359,6 +376,7 @@ struct InterviewInput: Codable, Sendable {
   var revision: Int
   var text: String = ""
   var style: InterviewStyle? = nil
+  var guidanceMode: GuidanceMode? = nil
   var saveDraft: Bool? = nil
 }
 

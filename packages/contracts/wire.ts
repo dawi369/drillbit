@@ -1,3 +1,4 @@
+import { guidanceModeSchema } from "../../apps/api/src/prompts/teaching";
 import {voiceStartSchema,voiceEventsSchema,voiceFragmentSchema,voiceDelegateSchema} from "../../apps/api/src/voice";
 import { conceptId, eligibilityInput, observationSchema } from "../../apps/api/src/taxonomy";
 import { interviewInputSchema, interviewResultSchema, interviewStyleSchema } from "../../apps/api/src/interview";
@@ -47,12 +48,13 @@ const companion = z.object({
   cycle: z.string(),
 });
 const interview = z.object({
-  style: interviewStyleSchema, prompt: z.string(), wrapUp: z.boolean(),
+  guidanceMode: guidanceModeSchema.optional(), style: interviewStyleSchema, prompt: z.string(), wrapUp: z.boolean(),
   turns: z.array(z.object({ id: z.string(), ordinal: z.number().int(), kind: z.enum(["answer","clarification","hint","example","continue","voice"]), prompt: z.string(), text: z.string(), createdAt: z.string(), jobId: z.string(), status: z.string(), error: z.string().nullable().optional(), partial: z.string().nullable().optional(), voice:z.array(voiceFragmentSchema).optional(), result: interviewResultSchema.nullable() })),
 });
 const challenge = challengeSchema.extend({
   questionId: z.string().optional(), scenario:z.string().optional(), primaryConceptId:conceptId.optional(), conceptIds:z.array(conceptId).optional(), selectionReason:z.string().optional(),
   interviewStyle: interviewStyleSchema.optional(),
+  guidanceMode: guidanceModeSchema.optional(),
   interview: interview.optional(),
   difficulty: z.enum(["easy", "medium", "hard"]).optional(),
   engineeringLevel: engineeringLevelSchema.optional(),

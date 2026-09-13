@@ -60,3 +60,43 @@ it("uses low reasoning for substantive v4 turns while social and legacy calls st
  expect(interviewReasoning({action:{kind:'hint',text:'Hi'}})).toEqual({effort:'low'});
  expect(interviewReasoning({promptVersion:'interviewer-standard-v3',action:{kind:'answer',text:'Explain retries'}})).toEqual({enabled:false});
 });
+
+it('shares teaching responsibility across text and voice without changing legacy editions',async()=>{
+ const {voiceDelegationMessages,spokenHistory}=await import('../src/prompts/voice-context');
+ const {voiceInstructions}=await import('../src/voice');
+ const {teachingPolicy}=await import('../src/prompts/teaching');
+ for (const guidanceMode of ['learn_together','coach_me','mock_interview']) {
+  const interview={guidanceMode,turns:[]};
+  const text=messagesFor('interview',{interview,action:{kind:'answer',text:'I will start with three clusters'}});
+  const voice=voiceDelegationMessages({prompt:'Design a queue'}, {},interview);
+  expect(text[0].content).toContain(teachingPolicy(guidanceMode));
+  expect(voice[0].content).toContain(teachingPolicy(guidanceMode));
+ }
+ expect(voiceInstructions).toContain('not submitting answers for inspection');
+ expect(interviewerPrompt('interviewer-standard-v5')).not.toContain('<teaching');
+ const fragments=Array.from({length:3000},(_,sequence)=>({id:'sensitive-id-'+sequence,sequence,speaker:'user',text:'a',startMs:sequence,endMs:sequence+1}));
+ const history=spokenHistory([{kind:'voice',voice:fragments}],1000);
+ expect(history).toHaveLength(1);
+ expect(history[0].content.length).toBeLessThanOrEqual(1000);
+ expect(JSON.stringify(history)).not.toContain('sensitive-id');
+ expect(fragments).toHaveLength(3000);
+ const overlap=spokenHistory([{kind:'voice',voice:[{speaker:'user',text:'10,000 users'}, {speaker:'assistant',text:'Okay.'},{speaker:'user',text:'Actually 10,000 RPS.'}]}]);
+ expect(overlap.at(-1)?.content).toBe('Actually 10,000 RPS.');
+});
+
+
+it('keeps overlapping voice acknowledgements from cutting off the user sentence',async()=>{
+ const {voiceDelegationMessages}=await import('../src/prompts/voice-context');
+ const messages=voiceDelegationMessages({prompt:'Design a queue'}, {},{guidanceMode:'coach_me',turns:[{kind:'voice',voice:[
+  {sequence:0,speaker:'user',text:'Use a',startMs:0,endMs:500},
+  {sequence:1,speaker:'assistant',text:'Mm-hm.',startMs:300,endMs:600},
+  {sequence:2,speaker:'user',text:' durable queue.',startMs:500,endMs:1000},
+ ]}]});
+ expect(messages.at(-1)).toEqual({role:'user',content:'Use a durable queue.'});
+});
+
+it('does not expose internal grading criteria as interview requirements',()=>{
+ const messages=messagesFor('interview',{question:{prompt:'Visible problem',constraints:['Visible constraint'],evaluationCriteria:['HIDDEN RUBRIC'],targetSkill:'HIDDEN OBJECTIVE'},interview:{turns:[]},action:{kind:'answer',text:'Where should I start?'}});
+ expect(JSON.stringify(messages)).toContain('Visible constraint');
+ expect(JSON.stringify(messages)).not.toContain('HIDDEN');
+});

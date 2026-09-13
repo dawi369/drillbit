@@ -18,7 +18,8 @@ import OSLog
   private var refreshing = false
   private var retrySubmission: (kind: String, text: String, command: UUID?)?
   private var saveTask: Task<Void, Never>?
-  var selectedStyle: InterviewStyle?
+  var selectedMode: GuidanceMode?
+  var mode: GuidanceMode { selectedMode ?? state.guidanceMode ?? challenge.guidanceMode ?? .coachMe }
   var style: InterviewStyle { .standard }
   var pending: PendingInterviewCommand?
   var outgoing: InterviewTurn?
@@ -75,19 +76,19 @@ import OSLog
       if let data = try await model.disk.cached(key: key + ":state") {
         state = try JSONDecoder().decode(InterviewState.self, from: data)
       }
-      if let data = try await model.disk.cached(key: key + ":style") {
-        selectedStyle = try JSONDecoder().decode(InterviewStyle.self, from: data)
+      if let data = try await model.disk.cached(key: key + ":guidanceMode") {
+        selectedMode = try JSONDecoder().decode(GuidanceMode.self, from: data)
       }
       loaded = true
       if pending != nil { await recover() }
       else { await refresh() }
     } catch { loaded = true; failure = error.localizedDescription }
   }
-  func selectStyle(_ style: InterviewStyle) async {
-    guard style == .standard, !locked, currentAccount else { return }
+  func selectMode(_ mode: GuidanceMode) async {
+    guard !locked, voice?.blocksText != true, currentAccount else { return }
     do {
-      try await model.disk.cache(key: key + ":style", data: JSONEncoder().encode(style))
-      selectedStyle = style
+      try await model.disk.cache(key: key + ":guidanceMode", data: JSONEncoder().encode(mode))
+      selectedMode = mode
     } catch { failure = error.localizedDescription }
   }
   func edit(_ value: String) {
@@ -146,14 +147,14 @@ import OSLog
         await model.waitForCurrentSync()
         guard currentAccount else { throw CancellationError() }
         let promptID = state.turns.last(where: { ["answer", "continue"].contains($0.kind) && $0.result != nil })?.id ?? "original"
-        pending = try await model.disk.prepareInterviewAnswer(account: account, id: challenge.id, answer: answer, command: command.uuidString, promptID: promptID, style: style)
+        pending = try await model.disk.prepareInterviewAnswer(account: account, id: challenge.id, answer: answer, command: command.uuidString, promptID: promptID, style: style, guidanceMode: mode)
       } else {
         try await flush()
         let local = try await model.disk.load(account: account, challenge: challenge)
         guard model.fixture || (local.kind.isEmpty && !local.conflict) else {
           throw APIError(code: "sync_pending", message: local.conflict ? "Resolve the draft conflict before sharing." : "Couldn’t sync this answer. Check your connection and retry.", status: 0)
         }
-        pending = PendingInterviewCommand(command: command.uuidString, input: InterviewInput(promptId: state.turns.last(where: { ["answer","continue"].contains($0.kind) && $0.result != nil })?.id ?? "original", kind: kind, revision: local.revision, text: kind == "answer" ? answer : text, style: style))
+        pending = PendingInterviewCommand(command: command.uuidString, input: InterviewInput(promptId: state.turns.last(where: { ["answer","continue"].contains($0.kind) && $0.result != nil })?.id ?? "original", kind: kind, revision: local.revision, text: kind == "answer" ? answer : text, style: style, guidanceMode: mode))
         try await persistPending()
       }
       retrySubmission = nil
@@ -214,6 +215,7 @@ import OSLog
         try await Task.sleep(for: .milliseconds(500))
         let input = operation.input
         state.style = input.style ?? state.style
+        state.guidanceMode = input.guidanceMode ?? state.guidanceMode
         if !state.turns.contains(where: { $0.id == operation.command }) {
           let isAnswer = ["answer", "continue"].contains(input.kind)
           let result = InterviewResponse(outcome: isAnswer ? "follow_up" : "reply", text: isAnswer ? "What happens if a worker stops after completing the operation but before acknowledging it?" : "Consider what a retry can know about an operation that already happened.")
@@ -563,7 +565,7 @@ struct InterviewView: View {
             .disabled(interview.locked || interview.failedTurn != nil || liveVoice?.blocksText == true)
           Button("Show an example", systemImage: AppIcon.text.rawValue) { Task { await interview.submit("example") } }
             .disabled(interview.locked || interview.failedTurn != nil || liveVoice?.blocksText == true)
-          Button("Interview style", systemImage: AppIcon.preferences.rawValue) { sheet = .style }.disabled(interview.locked)
+          Button("Practice mode", systemImage: AppIcon.preferences.rawValue) { sheet = .style }.disabled(interview.locked || liveVoice?.blocksText == true)
           Button("Finish interview", systemImage: AppIcon.checkmark.rawValue) { focused = false; confirmFinish = true }.disabled(!interview.canFinish)
           Divider()
           Button("Skip question", systemImage: AppIcon.skip.rawValue, role: .destructive) { confirmSkip = true }.disabled(interview.voice?.blocksText == true)
@@ -584,7 +586,7 @@ struct InterviewView: View {
         Group {
           switch selection {
           case .style:
-            InterviewStylePicker(selection: Binding(get: { interview.style }, set: { value in Task { await interview.selectStyle(value) } }))
+            GuidanceModePicker(selection: Binding(get: { interview.mode }, set: { value in Task { await interview.selectMode(value) } }))
           }
         }.navigationBarTitleDisplayMode(.inline).toolbar { Button("Done") { sheet = nil } }
       }
@@ -1023,18 +1025,18 @@ struct InterviewConversation<Header: View>: View {
 extension InterviewConversation where Header == EmptyView {
   init(state: InterviewState) { self.state = state; self.header = { EmptyView() } }
 }
-struct InterviewStylePicker: View {
-  @Binding var selection: InterviewStyle
+struct GuidanceModePicker: View {
+  @Binding var selection: GuidanceMode
   var body: some View {
-    List(InterviewStyle.allCases) { style in
+    List(GuidanceMode.allCases) { style in
       Button { selection = style } label: {
         HStack(spacing:16) {
-          VStack(alignment:.leading,spacing:4) { Text(style.title).foregroundStyle(.primary); Text(style == .standard ? style.explanation : "Coming later").font(.subheadline).foregroundStyle(.secondary) }
+          VStack(alignment:.leading,spacing:4) { Text(style.title).foregroundStyle(.primary); Text(style.explanation).font(.subheadline).foregroundStyle(.secondary) }
           Spacer()
-          if style == .standard { Image(systemName:AppIcon.checkmark.rawValue).foregroundStyle(.primary) }
+          if style == selection { Image(systemName:AppIcon.checkmark.rawValue).foregroundStyle(.primary) }
         }.padding(.vertical,4)
-      }.disabled(style != .standard).opacity(style == .standard ? 1 : 0.4)
-        .accessibilityAddTraits(style == .standard ? .isSelected : [])
-    }.navigationTitle("Interview style").navigationBarTitleDisplayMode(.inline)
+      }
+        .accessibilityAddTraits(style == selection ? .isSelected : [])
+    }.navigationTitle("Practice mode").navigationBarTitleDisplayMode(.inline)
   }
 }

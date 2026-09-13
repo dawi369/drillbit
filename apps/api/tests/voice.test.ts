@@ -42,10 +42,44 @@ it('unlimited voice is an exact account override and still records usage', async
   const session=crypto.randomUUID();
   await startVoice(owner,a,id,session,{sdp:'offer',revision:2}); expect(mock).toHaveBeenCalledTimes(1);
   await e.DB.prepare("INSERT INTO usage(account_id,day,kind,count) VALUES(?,?,'voice_reasoning',40)").bind(a,day).run();
-  mock.mockResolvedValue(new Response(JSON.stringify({choices:[{message:{content:'What happens on a retry?'}}],usage:{prompt_tokens:1,completion_tokens:1}}),{status:200}));
+  mock.mockResolvedValue(new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({move:'ask_one',text:'What happens on a retry?'})}}],usage:{prompt_tokens:1,completion_tokens:1}}),{status:200}));
   expect(await delegateVoice(owner,a,id,session,{id:'over-limit'})).toEqual({text:'What happens on a retry?'});
   expect((await e.DB.prepare("SELECT count FROM usage WHERE account_id=? AND day=? AND kind='voice_reasoning'").bind(a,day).first<any>()).count).toBe(41);
  }
  finally { mock.mockRestore(); }
  expect((await e.DB.prepare("SELECT count FROM usage WHERE account_id=? AND day=? AND kind='voice_start'").bind(a,day).first<any>()).count).toBe(7);
+});
+
+it('captures selected voice mode and leaves no running delegation after quota failure',async()=>{
+ const {a,id}=await fixture(),session=crypto.randomUUID(),mock=connection();
+ try {
+  await startVoice(e,a,id,session,{sdp:'offer',revision:2,guidanceMode:'learn_together'});
+  const sent=JSON.parse(String(mock.mock.calls[0][1]?.body));
+  expect(sent.session.instructions).toContain('mode="learn_together"');
+  expect(sent.session.instructions).toContain('Never claim you are checking');
+  expect((await detail(e,a,id)).guidanceMode).toBe('learn_together');
+  await e.DB.prepare("INSERT INTO usage(account_id,day,kind,count) VALUES(?,?,'voice_reasoning',40)").bind(a,new Date().toISOString().slice(0,10)).run();
+  await expect(delegateVoice(e,a,id,session,{id:'limited'})).rejects.toBeTruthy();
+  const row=await e.DB.prepare('SELECT status FROM voice_delegations WHERE session_id=? AND id=?').bind(session,'limited').first<any>();
+  expect(row.status).toBe('failed');
+  expect(mock).toHaveBeenCalledTimes(1);
+ }finally{mock.mockRestore();}
+});
+
+it('returns completed delegation once without another inference and marks provider failure',async()=>{
+ const {a,id}=await fixture(),session=crypto.randomUUID(),mock=connection();
+ try {
+  await startVoice(e,a,id,session,{sdp:'offer',revision:2});
+  await voiceEvents(e,a,id,session,{fragments:[fragment]});
+  mock.mockResolvedValue(new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({move:'hint',text:'First clarify what must survive a restart.'})}}],usage:{prompt_tokens:50,completion_tokens:12}})));
+  const reply=await delegateVoice(e,a,id,session,{id:'once'});
+  expect(await delegateVoice(e,a,id,session,{id:'once'})).toEqual(reply);
+  expect(mock).toHaveBeenCalledTimes(2);
+  const request=JSON.parse(String(mock.mock.calls[1][1]?.body));
+  expect(request.messages[1]).toMatchObject({role:'user',content:fragment.text});
+  expect(JSON.stringify(request.messages)).not.toContain('startMs');
+  mock.mockRejectedValue(new DOMException('timed out','TimeoutError'));
+  await expect(delegateVoice(e,a,id,session,{id:'timeout'})).rejects.toBeTruthy();
+  expect((await e.DB.prepare('SELECT status FROM voice_delegations WHERE session_id=? AND id=?').bind(session,'timeout').first<any>()).status).toBe('failed');
+ }finally{mock.mockRestore();}
 });

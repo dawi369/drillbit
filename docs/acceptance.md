@@ -437,3 +437,16 @@ Voice uses a centred, icon-only 72-point microphone control. Muted state has a r
 - WebRTC now uses manual audio-unit control. Use text disables capture/playback synchronously while final receipts drain; late startup cannot re-enable a stopped transport. Refresh guards protect the local transcript until closure is reconciled.
 - Local connection preparation is gated by already-granted microphone permission and fresh positive account capability. No paid API preconnection; explicit Start uses fresh answer context. Preparation failure falls back to a fresh local offer.
 - Physical-device speaker cutoff, route interruption and microphone handoff remain unverified in this pass. Simulator fixtures do not establish live provider audio behavior. No TestFlight upload.
+
+### Completion acknowledgement — 12 September 2026
+
+Reflection and Home now show “Boss fight logged.” / “Practice done. Future you says thanks.” after the existing durable completion flow returns. Home acknowledgement is dismissible, transient and account-scoped; cancelling Finish never sets it. Normal request cancellations (`CancellationError` and `URLError.cancelled`) no longer become global errors from operation/sync coordination; genuine failures remain visible. This does not change completion queuing or offline semantics.
+
+Signed iPhone 17 Pro simulator `testInterviewJourney` passed: Finish cancel, confirmed Finish, reflection, Done to Home, acknowledgement dismissal. Reflection/Home dark screenshots inspected. The reported physical-device kick-to-Home was not reproduced by this fixture journey; its exact cause remains unverified. Simulator only; TestFlight build 5 unchanged.
+
+## Teaching modes and voice wait recovery — 13 September 2026
+
+- Implemented Learn together / Coach me (default) / Mock interview through preparation, the interview menu, durable reply commands and voice startup. Optional additive contracts retain legacy style decoding and existing drafts; no migration.
+- Verification: typecheck, 94 API/D1 tests, 30 native tests and three signed iPhone 17 Pro simulator journeys passed. Inspected dark selection and largest Dynamic Type/light selection screenshots. Simulator voice handoff preserves draft/transcript; real GPT-Live speech and interruptions remain unverified in this pass.
+- Reviewed 96 live Gemini responses across shared-pipeline, holdout and retry-regression batches. Schema/completion passed; product acceptance is partial due to ambiguous-body misinterpretation, an overclaimed retry guarantee, occasional excessive coaching in Mock and remaining stock phrasing. An 18-response medium-reasoning experiment did not reliably resolve these. See [full evidence and limits](teaching-modes.md).
+- Backend version `44fbebe3-d50c-4ae2-a230-78d89493b867` deployed to development. `/health` returned ok; unauthenticated bootstrap returned 401. Signed simulator app relaunched without fixtures. No TestFlight upload.

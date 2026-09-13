@@ -107,3 +107,9 @@ export function xmlContext(input: unknown): string {
   }
   return field("practice_context", boundedContext(input));
 }
+
+/** Interview advice is grounded in requirements the learner can actually read. */
+export function visibleQuestion(question: any = {}) {
+  return {title:question.title, prompt:question.prompt, constraints:question.constraints,
+    engineeringLevel:question.engineeringLevel, scenario:question.scenario};
+}

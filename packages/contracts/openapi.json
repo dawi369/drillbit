@@ -4959,6 +4959,14 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "guidanceMode": {
+            "type": "string",
+            "enum": [
+              "learn_together",
+              "coach_me",
+              "mock_interview"
+            ]
+          },
           "sdp": {
             "type": "string",
             "minLength": 1,
@@ -5636,9 +5644,25 @@
                     "in_depth"
                   ]
                 },
+                "guidanceMode": {
+                  "type": "string",
+                  "enum": [
+                    "learn_together",
+                    "coach_me",
+                    "mock_interview"
+                  ]
+                },
                 "interview": {
                   "type": "object",
                   "properties": {
+                    "guidanceMode": {
+                      "type": "string",
+                      "enum": [
+                        "learn_together",
+                        "coach_me",
+                        "mock_interview"
+                      ]
+                    },
                     "style": {
                       "type": "string",
                       "enum": [
@@ -6754,9 +6778,25 @@
                     "in_depth"
                   ]
                 },
+                "guidanceMode": {
+                  "type": "string",
+                  "enum": [
+                    "learn_together",
+                    "coach_me",
+                    "mock_interview"
+                  ]
+                },
                 "interview": {
                   "type": "object",
                   "properties": {
+                    "guidanceMode": {
+                      "type": "string",
+                      "enum": [
+                        "learn_together",
+                        "coach_me",
+                        "mock_interview"
+                      ]
+                    },
                     "style": {
                       "type": "string",
                       "enum": [
@@ -8135,6 +8175,14 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "guidanceMode": {
+            "type": "string",
+            "enum": [
+              "learn_together",
+              "coach_me",
+              "mock_interview"
+            ]
+          },
           "kind": {
             "type": "string",
             "enum": [
@@ -8172,7 +8220,7 @@
               "standard",
               "in_depth"
             ],
-            "description": "Legacy styles remain accepted; new turns currently use Standard only."
+            "description": "Legacy styles remain accepted; teaching responsibility uses the optional guidanceMode field."
           }
         },
         "required": [
@@ -8187,6 +8235,14 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "guidanceMode": {
+            "type": "string",
+            "enum": [
+              "learn_together",
+              "coach_me",
+              "mock_interview"
+            ]
+          },
           "style": {
             "type": "string",
             "enum": [
@@ -8375,6 +8431,14 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "guidanceMode": {
+            "type": "string",
+            "enum": [
+              "learn_together",
+              "coach_me",
+              "mock_interview"
+            ]
+          },
           "primaryConceptId": {
             "type": "string",
             "enum": [
@@ -8655,9 +8719,25 @@
               "in_depth"
             ]
           },
+          "guidanceMode": {
+            "type": "string",
+            "enum": [
+              "learn_together",
+              "coach_me",
+              "mock_interview"
+            ]
+          },
           "interview": {
             "type": "object",
             "properties": {
+              "guidanceMode": {
+                "type": "string",
+                "enum": [
+                  "learn_together",
+                  "coach_me",
+                  "mock_interview"
+                ]
+              },
               "style": {
                 "type": "string",
                 "enum": [
@@ -9956,9 +10036,25 @@
                       "in_depth"
                     ]
                   },
+                  "guidanceMode": {
+                    "type": "string",
+                    "enum": [
+                      "learn_together",
+                      "coach_me",
+                      "mock_interview"
+                    ]
+                  },
                   "interview": {
                     "type": "object",
                     "properties": {
+                      "guidanceMode": {
+                        "type": "string",
+                        "enum": [
+                          "learn_together",
+                          "coach_me",
+                          "mock_interview"
+                        ]
+                      },
                       "style": {
                         "type": "string",
                         "enum": [
@@ -10903,9 +10999,25 @@
                   "in_depth"
                 ]
               },
+              "guidanceMode": {
+                "type": "string",
+                "enum": [
+                  "learn_together",
+                  "coach_me",
+                  "mock_interview"
+                ]
+              },
               "interview": {
                 "type": "object",
                 "properties": {
+                  "guidanceMode": {
+                    "type": "string",
+                    "enum": [
+                      "learn_together",
+                      "coach_me",
+                      "mock_interview"
+                    ]
+                  },
                   "style": {
                     "type": "string",
                     "enum": [
@@ -11825,9 +11937,25 @@
                       "in_depth"
                     ]
                   },
+                  "guidanceMode": {
+                    "type": "string",
+                    "enum": [
+                      "learn_together",
+                      "coach_me",
+                      "mock_interview"
+                    ]
+                  },
                   "interview": {
                     "type": "object",
                     "properties": {
+                      "guidanceMode": {
+                        "type": "string",
+                        "enum": [
+                          "learn_together",
+                          "coach_me",
+                          "mock_interview"
+                        ]
+                      },
                       "style": {
                         "type": "string",
                         "enum": [
@@ -12773,9 +12901,25 @@
                     "in_depth"
                   ]
                 },
+                "guidanceMode": {
+                  "type": "string",
+                  "enum": [
+                    "learn_together",
+                    "coach_me",
+                    "mock_interview"
+                  ]
+                },
                 "interview": {
                   "type": "object",
                   "properties": {
+                    "guidanceMode": {
+                      "type": "string",
+                      "enum": [
+                        "learn_together",
+                        "coach_me",
+                        "mock_interview"
+                      ]
+                    },
                     "style": {
                       "type": "string",
                       "enum": [
@@ -13719,9 +13863,25 @@
                     "in_depth"
                   ]
                 },
+                "guidanceMode": {
+                  "type": "string",
+                  "enum": [
+                    "learn_together",
+                    "coach_me",
+                    "mock_interview"
+                  ]
+                },
                 "interview": {
                   "type": "object",
                   "properties": {
+                    "guidanceMode": {
+                      "type": "string",
+                      "enum": [
+                        "learn_together",
+                        "coach_me",
+                        "mock_interview"
+                      ]
+                    },
                     "style": {
                       "type": "string",
                       "enum": [
@@ -14605,9 +14765,25 @@
                       "in_depth"
                     ]
                   },
+                  "guidanceMode": {
+                    "type": "string",
+                    "enum": [
+                      "learn_together",
+                      "coach_me",
+                      "mock_interview"
+                    ]
+                  },
                   "interview": {
                     "type": "object",
                     "properties": {
+                      "guidanceMode": {
+                        "type": "string",
+                        "enum": [
+                          "learn_together",
+                          "coach_me",
+                          "mock_interview"
+                        ]
+                      },
                       "style": {
                         "type": "string",
                         "enum": [

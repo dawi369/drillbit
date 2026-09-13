@@ -64,11 +64,13 @@ it("durably generates a valid challenge and replay does not call the provider ag
   const id = crypto.randomUUID();
   await createJob(bindings, account.id, id, "generate", null, {
     settings: await settingsFor(bindings, account.id),
+    guidanceMode: "learn_together",
   });
   await runJob(bindings, id);
   await runJob(bindings, id);
   const result = await detail(bindings, account.id, id);
   expect(result.lifecycle).toBe("ready");
+  expect(result.guidanceMode).toBe("learn_together");
   expect(result.session?.revision).toBe(0);
   expect(
     await bindings.DB.prepare("SELECT status FROM jobs WHERE id=?")

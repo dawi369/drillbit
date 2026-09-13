@@ -1,3 +1,4 @@
+import { guidanceModeSchema } from "./prompts/teaching";
 import { conceptId, questionMetadata } from "./taxonomy";
 import { captureSchema, receiptSchema } from "./companion-contract";
 import { z } from "zod";
@@ -125,6 +126,7 @@ export function normalizeSettings(value: unknown): Settings {
   return { ...settings, focus: "System design", engineeringLevel: settings.engineeringLevel ?? levelForDifficulty(settings.difficulty) };
 }
 export const generationSchema = z.object({
+  guidanceMode: guidanceModeSchema.optional(),
   primaryConceptId: conceptId.optional(),
   interviewStyle: z.enum(["quick", "standard", "in_depth"]).optional(),
   focus: z.string().trim().min(1).max(4000).optional(),

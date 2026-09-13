@@ -40,6 +40,8 @@
 	<string>$(CLERK_PUBLISHABLE_KEY)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSCameraUsageDescription</key>
+	<string>Drillbit’s voice library includes camera support. Drillbit uses audio only and does not request camera access.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Talk with your practice interviewer using live voice.</string>
 	<key>SharedKeychainGroup</key>

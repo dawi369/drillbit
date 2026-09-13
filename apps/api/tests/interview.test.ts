@@ -116,7 +116,7 @@ it("captures bounded account-scoped historical evidence with a pinned prompt edi
  const cmd=crypto.randomUUID(); await requestInterview(e,a,id,cmd,{kind:'answer',text:'Use a queue',revision:2});
  const job=await e.DB.prepare("SELECT input FROM jobs WHERE id=?").bind(cmd).first<{input:string}>();
  const context=JSON.parse(job!.input).context;
- expect(context.promptVersion).toBe('interviewer-standard-v5');
+ expect(context.promptVersion).toBe('interviewer-teaching-v1');
  expect(context.historicalSnapshot.attempts).toHaveLength(8);
  expect(context.historicalSnapshot.attempts.every((x:any)=>x.status==='skipped' && x.feedback===null)).toBe(true);
  expect(JSON.stringify(context.historicalSnapshot)).not.toContain(other.id);
@@ -148,4 +148,24 @@ it("drains provider tokens while a partial write is slow, with only one writer",
    await vi.waitFor(()=>expect(reads).toBe(chunks.length));
  } finally { release(); }
  try { expect((await result).text).toBe("Hello there from this streamed reply today.");expect(peak).toBe(1);expect(writes.at(-1)).toBe("Hello there from this streamed reply today."); } finally {mock.mockRestore();}
+});
+
+it('pins teaching mode per job and preserves it through legacy updates and replay', async()=>{
+ for (const mode of ['learn_together','coach_me','mock_interview']) {
+  const {a,id}=await fixture('in_depth'),cmd=crypto.randomUUID();
+  expect((await interviewFor(e,a,id)).guidanceMode).toBe('coach_me');
+  const input={kind:'clarification',text:'Where should I start?',revision:2,guidanceMode:mode};
+  await requestInterview(e,a,id,cmd,input);
+  await requestInterview(e,a,id,cmd,input);
+  const job=await e.DB.prepare('SELECT input FROM jobs WHERE id=?').bind(cmd).first<any>();
+  expect(JSON.parse(job.input).context.interview.guidanceMode).toBe(mode);
+  expect((await detail(e,a,id)).guidanceMode).toBe(mode);
+  await expect(requestInterview(e,a,id,cmd,{...input,guidanceMode:mode==='coach_me'?'mock_interview':'coach_me'})).rejects.toMatchObject({code:'command_reused'});
+  const mock=provider({outcome:'reply',text:'Begin with the visible requirements.'});
+  try{await runJob(e,cmd);}finally{mock.mockRestore();}
+  await requestInterview(e,a,id,crypto.randomUUID(),{kind:'clarification',text:'What scale?',revision:3,style:'quick'});
+  expect((await interviewFor(e,a,id)).guidanceMode).toBe(mode);
+  await expect(requestInterview(e,a,id,crypto.randomUUID(),{...input,revision:2,guidanceMode:'mock_interview'})).rejects.toBeTruthy();
+  expect((await interviewFor(e,a,id)).guidanceMode).toBe(mode);
+ }
 });

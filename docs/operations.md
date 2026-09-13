@@ -182,3 +182,25 @@ Migration `0009_voice.sql` was applied after a private export at `.local/before-
 ### First daily visit generation — 12 September 2026
 
 Migration `0010_daily_visits.sql` adds account-local-date claims, applied after private backup `.local/before-daily-visits-20260912.sql`. Deploy the compatible backend before the native client using `/v1/daily-question`. Cron remains enabled for durable job recovery; it no longer schedules new AI questions. No APNs key is required for the existing local calendar reminder. Notification wording lives in `AppModel.reconcileReminder()`; rebuild the app to distribute copy changes.
+
+### Internal TestFlight upload — 12 September 2026
+
+Signed Release `2.0.0 (4)`, source `878096b`, archived with automatic signing for team `7M4NDAAP73` and uploaded using `testFlightInternalTestingOnly=true`. Archive: `/tmp/drillbit-testflight/Drillbit-build4.xcarchive`; upload log: `/tmp/drillbit-testflight/upload.log`. Xcode reported **Upload succeeded**, **Uploaded package is processing**, and **EXPORT SUCCEEDED**. Development API URL and configured Clerk publishable key were checked in the archived app; backend health returned HTTP 200.
+
+Apple browser sign-in expired, so Testing status and internal-group availability are not yet verified. Upload emitted a nonfatal missing-WebRTC-dSYM warning; framework crash symbolication may be incomplete. App/device audio handoff acceptance remains separate from successful distribution.
+
+Build 4 processing subsequently failed: Apple email reported `ITMS-90683`, missing `NSCameraUsageDescription`. The bundled WebRTC binary exports `RTCCameraVideoCapturer` even though Drillbit creates only audio tracks. Added a truthful camera declaration to the XcodeGen source and generated app plist without enabling camera capture. Raised the checked-in build number to 5. Signed build 5 archive passed camera/microphone purpose-string checks.
+
+Build 5 has **not uploaded**: two export attempts failed with `Failed to Use Accounts`; distribution diagnostics could not find an App Store Connect account for team `7M4NDAAP73`. Xcode's configured Apple account list was empty. Reauthenticate in Xcode, then export `/tmp/drillbit-testflight/Drillbit-build5.xcarchive` using the existing internal-only options. Verify Apple processing after upload; local metadata checks alone do not establish acceptance.
+
+Build 5 follow-up: authenticated through Xcode Apple Accounts and uploaded using Organizer → TestFlight Internal Only. Organizer confirms **Uploaded to Apple**, version `2.0.0 (5)`, on 12 September 2026 at 17:44 local time. The command-line account credential lookup still failed, so the successful distribution used the authenticated GUI. Organizer archive: `~/Library/Developer/Xcode/Archives/2026-09-12/Drillbit-build5.xcarchive`. Only the known nonfatal WebRTC dSYM warning remained. Processing/Testing availability still requires separate confirmation.
+
+**Processing confirmed:** Apple's TestFlight email at 15:46:23 UTC on 12 September 2026 states “Drillbit Practice 2.0.0 (5) for iOS is now available to test.” Internal distribution is complete; the owner can install the update in TestFlight. This supersedes the pending-processing status above.
+
+### Teaching modes development rollout — 13 September 2026
+
+Development Worker `44fbebe3-d50c-4ae2-a230-78d89493b867` introduces additive guidanceMode contracts, shared text/voice teaching policy, compact voice context and bounded delegation recovery. No migration or secret changes. Health returned ok and unauthenticated bootstrap remained 401 after deployment.
+
+Simulator build only: the owner’s existing phone build receives Coach me behavior by default from the new backend; selecting the three modes and the native 15-second delivery gate require the updated native build. No TestFlight upload was performed. The independent 12-second backend inference deadline also protects older clients. Full voice speech-to-answer timing is not bounded by those delegation deadlines.
+
+Run `bun scripts/evaluate-teaching.ts` from the repo root with the existing OpenRouter environment key for synthetic text/voice-reasoning evaluation. Output is ignored under `.local/`. `EVAL_CASE` filters scenarios and `EVAL_REASONING` is experiment-only. Do not mistake these direct provider calls for real-phone GPT-Live acceptance; see [teaching modes](teaching-modes.md).

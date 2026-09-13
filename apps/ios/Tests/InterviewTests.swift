@@ -218,6 +218,7 @@ struct InterviewTests {
         let input = try JSONDecoder().decode(InterviewInput.self,from:request.httpBody!)
         #expect(input.text == "Latest answer")
         #expect(input.style == .standard)
+        #expect(input.guidanceMode == .learnTogether)
         #expect(input.revision == remote.session?.revision)
         shares += 1
         remote.session = SessionDraft(answer:"",revision:input.revision+1)
@@ -230,10 +231,10 @@ struct InterviewTests {
     model.bootstrap = Bootstrap(account:.init(id:"a",status:"active"),settings:PracticeSettings(),challenge:remote,jobs:[])
     let interview = InterviewController(model:model,challenge:remote)
     await interview.load()
-    await interview.selectStyle(.quick)
+    await interview.selectMode(.learnTogether)
     let restored = InterviewController(model:model,challenge:remote)
     await restored.load()
-    #expect(restored.style == .standard)
+    #expect(restored.mode == .learnTogether)
     var autosave: Task<Void, Never>?
     if scenario == "autosave" {
       try await model.save(remote,answer:"Earlier answer")
@@ -283,5 +284,29 @@ struct InterviewDocumentTests {
     #expect(value.collapsed == saved.collapsed)
     #expect(value.offset == 340)
     #expect(try await reopened.cached(key:"interview:b:q:reading") == nil)
+  }
+}
+
+struct TeachingModeTests {
+  @Test func legacyModeIsOptionalAndNewModesSurviveEncoding() throws {
+    let old = try JSONDecoder().decode(InterviewState.self, from: Data(#"{"style":"in_depth","prompt":"Queue","wrapUp":false,"turns":[]}"#.utf8))
+    #expect(old.guidanceMode == nil)
+    for mode in GuidanceMode.allCases {
+      let input = InterviewInput(kind: "answer", revision: 2, text: "My draft", guidanceMode: mode)
+      let restored = try JSONDecoder().decode(InterviewInput.self, from: JSONEncoder().encode(input))
+      #expect(restored.guidanceMode == mode)
+      #expect(restored.text == "My draft")
+    }
+  }
+  @Test func voiceDeadlineAndLateResponseResolveOnlyOnce() {
+    let now = ContinuousClock.now
+    var fast = VoiceGuidanceDelivery(deadline: now.advanced(by: .seconds(15)))
+    #expect(fast.resolve(at: now.advanced(by: .seconds(2))) == .response)
+    #expect(fast.resolve(at: now.advanced(by: .seconds(15))) == nil)
+    var slow = VoiceGuidanceDelivery(deadline: now.advanced(by: .seconds(15)))
+    #expect(slow.resolve(at: now.advanced(by: .seconds(15))) == .unavailable)
+    #expect(slow.resolve(at: now.advanced(by: .seconds(17))) == nil)
+    var delayedTimer = VoiceGuidanceDelivery(deadline: now.advanced(by: .seconds(15)))
+    #expect(delayedTimer.resolve(at: now.advanced(by: .seconds(20))) == .unavailable)
   }
 }

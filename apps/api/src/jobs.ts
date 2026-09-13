@@ -1,3 +1,4 @@
+import { guidanceMode } from "./prompts/teaching";
 import { groundReflection } from "./learning";
 import { z } from "zod";
 import { historicalSnapshot } from "./history";
@@ -70,6 +71,7 @@ export async function runJob(env: Env, id: string) {
     context?: unknown;
     instruction?: string;
     interviewStyle?: string;
+    guidanceMode?: string;
     turnId?: string;
     primaryConceptId?: string;
     followUp?: unknown;
@@ -156,6 +158,7 @@ export async function runJob(env: Env, id: string) {
           difficulty: input.settings.difficulty,
           engineeringLevel: input.settings.engineeringLevel,
           interviewStyle: "standard",
+          guidanceMode: guidanceMode(input.guidanceMode),
         }),
         now,
         input.availableAt ?? now,

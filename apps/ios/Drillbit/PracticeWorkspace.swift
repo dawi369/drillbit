@@ -664,7 +664,7 @@ struct PreparationView: View {
   @State private var kind = "auto"
   @State private var engineeringLevel = "mid"
   @State private var instruction = ""
-  @State private var interviewStyle = InterviewStyle.standard
+  @State private var guidanceMode = GuidanceMode.coachMe
   @State private var includeSource = true
   @State private var initialized = false
   @Environment(\.dismiss) private var dismiss
@@ -688,9 +688,9 @@ struct PreparationView: View {
       }
       Section {
         NavigationLink {
-          InterviewStylePicker(selection: $interviewStyle)
+          GuidanceModePicker(selection: $guidanceMode)
         } label: {
-          LabeledContent("Interview style", value: interviewStyle.title)
+          LabeledContent("Practice mode", value: guidanceMode.title)
         }.accessibilityIdentifier("interviewStyle")
       }
       Section {
@@ -700,7 +700,7 @@ struct PreparationView: View {
       Section {
         Button("Prepare question") {
           let input = PreparationInput(
-            primaryConceptId: practiceArea.isEmpty ? nil : practiceArea, interviewStyle: interviewStyle, focus: "System design", kind: "design", difficulty: model.settings.difficulty,
+            primaryConceptId: practiceArea.isEmpty ? nil : practiceArea, guidanceMode: guidanceMode, interviewStyle: .standard, focus: "System design", kind: "design", difficulty: model.settings.difficulty,
             engineeringLevel: engineeringLevel,
             replaceId: model.bootstrap?.challenge?.lifecycle == "ready" ? model.bootstrap?.challenge?.id : nil,
             instruction: instruction,
@@ -730,7 +730,7 @@ struct PreparationView: View {
       focus = "System design"
       engineeringLevel = model.settings.selectedLevel
       if let recovery {
-        interviewStyle = .standard
+        guidanceMode = .coachMe
         practiceArea = recovery.primaryConceptId ?? ""
         engineeringLevel = recovery.engineeringLevel ?? EngineeringLevel.legacy(recovery.difficulty)
         kind = recovery.kind

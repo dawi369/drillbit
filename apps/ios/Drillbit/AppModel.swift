@@ -18,6 +18,7 @@ import WidgetKit
   var settings = PracticeSettings()
   var presented: Challenge?
   var error: String?
+  var completionNoticeAccount: String?
   var busy = false
   var preparationFailure: String?
   var failedPreparation: PreparationInput?
@@ -233,7 +234,7 @@ import WidgetKit
     }
   }
   func perform(_ action: () async throws -> Void) async {
-    do { try await action() } catch is CancellationError {} catch {
+    do { try await action() } catch is CancellationError {} catch let error as URLError where error.code == .cancelled {} catch {
       self.error = error.localizedDescription
       logger.error("Operation failed; details shown in UI")
     }
@@ -491,7 +492,7 @@ import WidgetKit
         throw APIError(code: "generation_failed", message: "Question preparation failed. Your previous question is safe.", status: 503)
       }
       #endif
-      let challenge = Challenge(interviewStyle: preparation?.interviewStyle ?? .standard, engineeringLevel: preparation?.engineeringLevel ?? settings.selectedLevel,
+      let challenge = Challenge(guidanceMode: preparation?.guidanceMode ?? .coachMe, interviewStyle: preparation?.interviewStyle ?? .standard, engineeringLevel: preparation?.engineeringLevel ?? settings.selectedLevel,
         id: UUID().uuidString, lifecycle: "ready", title: "Design a reliable job queue",
         prompt: "Design a reliable job queue. Explain retries, ordering, and how failures are handled.",
         topic: preparation?.focus ?? settings.focus, session: SessionDraft(answer: "", revision: 0))
@@ -679,7 +680,7 @@ import WidgetKit
       let pendingEligibility = try await disk.cached(key: "eligibility:" + account).flatMap { try JSONDecoder().decode([EligibilityCommand].self, from: $0) } ?? []
       let pendingVoice = try await disk.hasPendingVoice(account: account)
       hasPendingWrites = pendingDrafts || pendingSkips || !pendingEligibility.isEmpty || pendingVoice
-    } catch { self.error = error.localizedDescription }
+    } catch is CancellationError {} catch let error as URLError where error.code == .cancelled {} catch { self.error = error.localizedDescription }
   }
   func resolveConflict(keepLocal: Bool) async {
     guard let account = bootstrap?.account.id, let challenge = conflict else { return }
@@ -710,6 +711,7 @@ import WidgetKit
       memory.sessions.insert(completed, at: 0)
     }
     bootstrap?.challenge = nil
+    completionNoticeAccount = bootstrap?.account.id
     return completed
   }
   func skip(_ id: String, answer: String? = nil) async {
@@ -796,6 +798,7 @@ import WidgetKit
     libraryWarmTask?.cancel(); libraryWarmTask = nil; libraryWarmAccount = nil
     librarySnapshots = [:]; libraryDetailSnapshots = [:]; librarySessions = [:]; libraryCoverage = []
     bootstrap = nil
+    completionNoticeAccount = nil
     preparationFailure = nil
     failedPreparation = nil
     failedPreparationSource = nil

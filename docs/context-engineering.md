@@ -1,6 +1,6 @@
 # Interviewer context engineering
 
-Implemented 10 September 2026. Standard is the only active style; Quick and In-depth remain visible but disabled. Existing style values remain readable; new generation and new turns normalize to Standard.
+Current implementation: 13 September 2026. **Learn together / Coach me (default) / Mock interview** replace the depth-style picker. Text and voice reasoning use one XML conversation pipeline. See [teaching modes and evaluation](teaching-modes.md). The dated sections below document earlier editions and their limitations.
 
 ## Voice source and interpretation
 
@@ -47,6 +47,6 @@ Reviewed multiple live batches, including the original screenshot's multi-turn e
 
 Known failures: an occasional joke still gets a technical pivot; routine praise persists; one response assumed a single table that the user had not committed to; 'retries guarantee at-least-once' is too absolute without availability/retry bounds. Some anthropomorphic phrasing and refusal copy remain awkward. Do not claim this meets the final personality bar. An experimental minimal-reasoning batch did not eliminate pivoting, so it is not enabled. No automatic paid repair calls or brittle keyword-to-canned-reply router were added.
 
-## Current edition: V4
+## Historical edition: V4
 
 The V3 partial acceptance above is historical. V4 separates pure social context, uses a model-internal conversational move plus text, and assigns the existing public outcome server-side. Full context returns on substantive messages. Escaped reference XML is now marked untrusted inside the system message, while actual turns use native conversation roles. Low reasoning is enabled only for substantive V4 interview calls. See [V4 personality acceptance](personality-acceptance.md) for the two 24-turn candidate reviews, timing/cost tradeoff and limits. No new user-facing mode or model picker is added.
