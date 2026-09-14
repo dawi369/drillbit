@@ -1,20 +1,22 @@
-# Teaching modes — 13 September 2026
+# Session styles — 13 September 2026
+
+Current product labels: Guided / Practice (default) / Mock interview. Wire values remain learn_together / coach_me / mock_interview; teaching behavior is unchanged. Earlier evaluation labels below refer to those same policies.
 
 ## Behavior
 
 | Mode | Responsibility |
 |---|---|
-| Learn together | Demonstrate one small worked step, explain why it helps, then let the learner try a decision. |
-| Coach me — default | Learner leads; catch consequential mistakes, poor ordering and unnecessary complexity. Explain a better next step and hand control back. |
+| Guided | Demonstrate one small worked step, explain why it helps, then let the learner try a decision. |
+| Practice — default | Learner leads; catch consequential mistakes, poor ordering and unnecessary complexity. Explain a better next step and hand control back. |
 | Mock interview | Probe decisions and assumptions without proactively supplying a framework. Answer explicit help requests; retain feedback at completion. |
 
 All three retain the playful, patient practice-partner character. Banter need not become a technical question. Humor targets imaginary systems, not the learner. No hidden requirements, invented progress, automatic finishing or inference of independent mastery from coached work. A valid alternative is not a mistake merely because the model prefers another design.
 
-Choose **Practice mode** in Prepare or the interview’s … menu. Choices apply to that attempt, not global difficulty. Changing modes preserves the draft and sends no paid request. A pending reply or live audio blocks mode changes. Text and voice share the same conversation policy; voice adds spoken-delivery constraints.
+Choose **Session style** in Prepare or the interview’s … menu. Choices apply to that attempt, not global difficulty. Changing modes preserves the draft and sends no paid request. A pending reply or live audio blocks mode changes. Text and voice share the same conversation policy; voice adds spoken-delivery constraints.
 
 ## Implementation
 
-- `apps/api/src/prompts/interviewer.ts`: shared character and immutable edition resolver; new default `interviewer-teaching-v1`.
+- `apps/api/src/prompts/interviewer.ts`: shared character and immutable edition resolver; new default `interviewer-teaching-v3`, with bounded current-draft policies for ephemeral Nudge and Example assistance.
 - `apps/api/src/prompts/teaching.ts`: three teaching policies and truthful-progress policy, edition `teaching-v1`.
 - `apps/api/src/prompts/voice-context.ts`: bounded dialogue projection and the same message builder used by text. Fragment timing/IDs do not become model context.
 - `guidanceMode` is optional/additive. Existing quick/standard/in_depth values remain accepted for old clients, but do not represent teaching responsibility. Missing mode resolves to Coach me; old requests preserve a recorded mode. No migration.

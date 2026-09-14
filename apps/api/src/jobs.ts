@@ -97,7 +97,7 @@ export async function runJob(env: Env, id: string) {
       "generate",
       {
         settings: input.settings,
-        historicalSnapshot: await historicalSnapshot(env, job.account_id),
+        historicalSnapshot: await historicalSnapshot(env, job.account_id, "", [selection.primaryConceptId]),
         kind: "design",
         selection,
         taxonomy: concepts,
@@ -206,7 +206,7 @@ export async function runJob(env: Env, id: string) {
       job.account_id,
       input.settings,
       input.action!.kind,
-      { ...(input.context as object), action: input.action },
+      { ...(input.context as object), practiceProfile: input.settings.practiceProfile, action: input.action },
       ["nudge", "guide"].includes(input.action!.kind)
         ? interventionFor(input.action!.kind)
         : helpSchemaFor(input.action!.kind),
@@ -238,9 +238,9 @@ export async function runJob(env: Env, id: string) {
           .bind(job.challenge_id)
           .first<{ data: string }>()
       : null;
-  const context = frozen
+  const context = { ...(frozen
     ? JSON.parse(frozen.data)
-    : await detail(env, job.account_id, job.challenge_id);
+    : await detail(env, job.account_id, job.challenge_id)), practiceProfile: input.settings.practiceProfile };
   if (job.kind === "summarize")
     data = await structured(
       env,

@@ -112,6 +112,22 @@ it("publishes a bootstrap matching the cross-platform wire schema", async () => 
   expect(response.status).toBe(200);
   expect(wire.Bootstrap.safeParse(await response.json()).success).toBe(true);
 });
+it("keeps the development reset owner-only and preserves account configuration", async () => {
+  const owner = await accountFor(bindings, "reset-owner");
+  const other = await accountFor(bindings, "other-person");
+  await bindings.DB.prepare("UPDATE accounts SET status='active' WHERE id IN (?,?)").bind(owner.id, other.id).run();
+  const challenge = crypto.randomUUID();
+  await bindings.DB.prepare("INSERT INTO challenges(id,account_id,lifecycle,data,created_at,available_at) VALUES(?,?,'skipped','{}','now','now')").bind(challenge, owner.id).run();
+  await bindings.DB.prepare("INSERT INTO questions(id,account_id,data,created_at,eligibility_updated_at) VALUES(?,?,'{}','now','now')").bind(crypto.randomUUID(), owner.id).run();
+  bindings.DEVELOPER_ACCOUNTS = owner.id;
+
+  expect((await request("developer/practice", "other-person", "DELETE")).status).toBe(404);
+  expect((await request("developer/practice", "reset-owner", "DELETE")).status).toBe(200);
+  expect(await bindings.DB.prepare("SELECT count(*) count FROM challenges WHERE account_id=?").bind(owner.id).first<{count:number}>()).toMatchObject({count:0});
+  expect(await bindings.DB.prepare("SELECT count(*) count FROM questions WHERE account_id=?").bind(owner.id).first<{count:number}>()).toMatchObject({count:0});
+  expect(await bindings.DB.prepare("SELECT count(*) count FROM settings WHERE account_id=?").bind(owner.id).first<{count:number}>()).toMatchObject({count:1});
+  delete bindings.DEVELOPER_ACCOUNTS;
+});
 it("paginates history without repeating sessions and supports topic search", async () => {
   const account = await accountFor(bindings, "history-person");
   await bindings.DB.prepare("UPDATE accounts SET status='active' WHERE id=?")
@@ -308,4 +324,33 @@ it("serves revision-checked interview turns through the authenticated public con
  const snapshots=await import("../../../packages/contracts/fixtures/interview-stream.json");for(const snapshot of snapshots.default)expect(wire.InterviewStreamSnapshot.safeParse(snapshot).success).toBe(true);
  const fixture=await import("../../../packages/contracts/fixtures/interview.json");expect(wire.InterviewState.safeParse(fixture.default).success).toBe(true);
  const inputFixture=await import("../../../packages/contracts/fixtures/interview-input.json");expect(wire.InterviewInput.parse(inputFixture.default).style).toBe("in_depth");expect(wire.InterviewInput.parse(inputFixture.default).guidanceMode).toBe("learn_together");
+});
+
+it('older settings clients preserve personalization and an explicit empty profile clears it',async()=>{
+ const subject=crypto.randomUUID();const account=await accountFor(bindings,subject);
+ await bindings.DB.prepare("UPDATE accounts SET status='active' WHERE id=?").bind(account.id).run();
+ const profile={goals:'Senior interviews',background:'Backend',preferences:'Pirate humor'};
+ let response=await request('settings',subject,'PUT',{practiceProfile:profile});
+ expect(response.status).toBe(200);
+ response=await request('settings',subject,'PUT',{difficulty:'hard'});
+ expect((await response.json() as any).practiceProfile).toEqual(profile);
+ response=await request('settings',subject,'PUT',{practiceProfile:{goals:'',background:'',preferences:''}});
+ expect((await response.json() as any).practiceProfile.preferences).toBe('');
+ expect((await request('settings/preview',undefined,'POST',profile)).status).toBe(401);
+});
+
+it('personalization preview is explicit, bounded and does not save settings or create jobs',async()=>{
+ const subject=crypto.randomUUID(); const account=await accountFor(bindings,subject);
+ await bindings.DB.prepare("UPDATE accounts SET status='active' WHERE id=?").bind(account.id).run();
+ const oldEnabled=bindings.MANAGED_AI_ENABLED,oldKey=bindings.OPENROUTER_API_KEY;
+ bindings.MANAGED_AI_ENABLED='true';bindings.OPENROUTER_API_KEY='test-key';
+ fetchMock.get('https://openrouter.ai').intercept({path:'/api/v1/chat/completions',method:'POST'}).reply(200,{choices:[{message:{content:JSON.stringify({body:'Ahoy. Start by deciding how a worker claims a job.',suggestedAnswer:null})}}]});
+ try {
+  const response=await request('settings/preview',subject,'POST',{goals:'Senior interviews',preferences:'Pirate'});
+  expect(response.status).toBe(200);
+  expect((await response.json() as any).text).toContain('Ahoy');
+  const settings=await request('bootstrap',subject);
+  expect((await settings.json() as any).settings.practiceProfile).toBeUndefined();
+  expect(await bindings.DB.prepare('SELECT id FROM jobs WHERE account_id=?').bind(account.id).first()).toBeNull();
+ }finally{bindings.MANAGED_AI_ENABLED=oldEnabled;bindings.OPENROUTER_API_KEY=oldKey;}
 });

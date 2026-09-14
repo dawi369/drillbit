@@ -156,6 +156,7 @@ struct SettingsView: View {
   @Environment(\.dismiss) private var dismiss
   @State private var deleting = false
   @State private var discarding = false
+  @State private var resettingPractice = false
   @State private var saving = false
   @AppStorage("appearance") private var appearance = "system"
   private var time: Binding<Date> {
@@ -173,6 +174,7 @@ struct SettingsView: View {
   }
   var body: some View {
     Form {
+      Section { NavigationLink("About your practice") { PracticeProfileView(model: model) } }
       Section("Practice") {
         Picker("Engineering level", selection: $model.settings.selectedLevel) {
           ForEach(EngineeringLevel.choices, id: \.0) { Text($0.1).tag($0.0) }
@@ -190,7 +192,7 @@ struct SettingsView: View {
           Text("System").tag("system")
           Text("Light").tag("light")
           Text("Dark").tag("dark")
-        }
+        }.pickerStyle(.menu).accessibilityIdentifier("appearancePicker")
       }
       Section("Account") {
         NavigationLink("Export practice data") { PracticeExportView(model: model) }
@@ -200,10 +202,13 @@ struct SettingsView: View {
               try await model.signOut()
               dismiss()
             }
-            if model.hasPendingWrites { discarding = true }
+            if model.hasPendingWrites || model.pendingSettings != nil { discarding = true }
           }
         }
         Button("Delete account", role: .destructive) { deleting = true }
+      }
+      if model.bootstrap?.capabilities?.developerTools == true {
+        DeveloperSettingsSection(resetRequested: $resettingPractice)
       }
     }.navigationTitle("Settings")
       .toolbar {
@@ -213,7 +218,7 @@ struct SettingsView: View {
               saving = true
               defer { saving = false }
               await model.perform {
-                try await model.updateSettings()
+                try await model.saveSettingsLocally()
                 dismiss()
               }
             }
@@ -242,31 +247,31 @@ struct SettingsView: View {
           }
         }
       }
-  }
-}
-struct FocusView: View {
-  @Bindable var model: AppModel
-  var body: some View {
-    Form {
-      Section("Start with a focus") {
-        ForEach(PracticeFocus.choices, id: \.self) {
-          focus in
-          Button {
-            model.settings.focus = focus
-          } label: {
-            HStack {
-              Text(focus)
-              Spacer()
-              if model.settings.focus == focus { Image(systemName: AppIcon.checkmark.rawValue) }
+      .confirmationDialog("Reset all Drillbit practice data?", isPresented: $resettingPractice) {
+        Button("Reset Drillbit", role: .destructive) {
+          Task {
+            await model.perform {
+              try await model.resetDeveloperPractice()
+              dismiss()
             }
           }
         }
+        Button("Cancel", role: .cancel) {}
+      } message: {
+        Text("This permanently removes your questions, attempts, skipped items and feedback. Your sign-in, settings and LLM key are preserved.")
       }
-      Section("Make it specific") {
-        TextEditor(text: $model.settings.focus).frame(minHeight: 160).accessibilityLabel(
-          "Practice focus")
-      }
-    }.navigationTitle("Focus")
+  }
+}
+private struct DeveloperSettingsSection: View {
+  @Binding var resetRequested: Bool
+  var body: some View {
+    Section {
+      Button("Reset Drillbit", role: .destructive) { resetRequested = true }
+    } header: {
+      Text("Developer")
+    } footer: {
+      Text("Clears questions, attempts, skipped items, feedback and local practice state. Sign-in, settings and your LLM key stay intact.")
+    }
   }
 }
 struct AIAccessView: View {
@@ -333,10 +338,6 @@ struct SetupView: View {
   @State private var saving = false
   var body: some View {
     Form {
-      Section {
-        Text("Practise designing systems and explaining your decisions.")
-          .foregroundStyle(.secondary)
-      }
       Section("Your practice") {
         Picker("Engineering level", selection: $model.settings.selectedLevel) {
           ForEach(EngineeringLevel.choices, id: \.0) { Text($0.1).tag($0.0) }
@@ -405,17 +406,25 @@ struct TimeZoneSelectionView: View {
 struct PracticeAreaPicker: View {
   var model: AppModel
   @Binding var selection: String
+  @Binding var customTopic: String
   @State private var search = ""
   @Environment(\.dismiss) private var dismiss
   var body: some View {
     List {
-      Button { selection = ""; dismiss() } label: {
+      Button { selection = ""; customTopic = ""; dismiss() } label: {
         HStack { Text("Automatic"); Spacer(); if selection.isEmpty { Image(systemName: AppIcon.checkmark.rawValue) } }
       }.foregroundStyle(.primary)
-      ForEach(model.taxonomy.filter { search.isEmpty || $0.label.localizedCaseInsensitiveContains(search) }) { concept in
-        Button { selection = concept.id; dismiss() } label: {
+      ForEach(PracticeAreaCatalog.curated(model.taxonomy).filter { search.isEmpty || $0.label.localizedCaseInsensitiveContains(search) }) { concept in
+        Button { selection = concept.id; customTopic = ""; dismiss() } label: {
           HStack { Text(concept.label); Spacer(); if selection == concept.id { Image(systemName: AppIcon.checkmark.rawValue) } }
         }.foregroundStyle(.primary).accessibilityAddTraits(selection == concept.id ? .isSelected : [])
+      }
+      Section("Your own topic") {
+        TextField("For example, collaborative editing", text: $customTopic)
+          .textInputAutocapitalization(.sentences)
+          .onChange(of: customTopic) { if !customTopic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { selection = "" } }
+        Button("Use this topic") { dismiss() }
+          .disabled(customTopic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
       }
     }.navigationTitle("Practice area").searchable(text: $search).task { await model.loadTaxonomy() }
   }
@@ -683,5 +692,60 @@ struct ReminderPermissionRow: View {
     }.task(id: phase) {
       denied = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus == .denied
     }
+  }
+}
+
+struct PracticeProfileView: View {
+  @Bindable var model: AppModel
+  @State private var preview: String?
+  @State private var previewing = false
+  @State private var failure: String?
+  private func field(_ path: WritableKeyPath<PracticeProfile, String>) -> Binding<String> {
+    Binding(get: { (model.settings.practiceProfile ?? PracticeProfile())[keyPath: path] }, set: { value in
+      var profile = model.settings.practiceProfile ?? PracticeProfile()
+      var bounded = String(value.prefix(600))
+      while bounded.utf16.count > 600 { bounded.removeLast() }
+      profile[keyPath: path] = bounded
+      model.settings.practiceProfile = profile
+      preview = nil
+    })
+  }
+  var body: some View {
+    Form {
+      Section {
+        TextField("Preparing for senior interviews, getting better at trade-offs…", text: field(\.goals), axis: .vertical).lineLimit(3...6)
+          .accessibilityLabel("Your goals").accessibilityIdentifier("practiceGoals")
+      } header: { Text("What are you working toward?") }
+      Section {
+        TextField("Backend engineer, comfortable with SQL, new to distributed systems…", text: field(\.background), axis: .vertical).lineLimit(3...6)
+          .accessibilityLabel("Your background")
+      } header: { Text("What should I know about you?") }
+      Section {
+        TextField("Be direct, use examples, challenge my assumptions. Pirate voice welcome…", text: field(\.preferences), axis: .vertical).lineLimit(3...6)
+          .accessibilityLabel("Your preferences").accessibilityIdentifier("practicePreferences")
+      } header: { Text("What works for you?") } footer: {
+        Text("Goals and background inform practice questions. Preferences shape your interviewer in text and voice. Save with Done in Settings; restart voice to apply changes to an active session.")
+      }
+      Section {
+        Button(previewing ? "Trying it…" : "Try it") {
+          let profile = model.settings.practiceProfile ?? PracticeProfile()
+          let account = model.bootstrap?.account.id
+          previewing = true; failure = nil
+          Task {
+            defer { previewing = false }
+            do {
+              let result: PersonalizationPreview = try await model.api.send("settings/preview", method: "POST", body: profile)
+              guard account == model.bootstrap?.account.id, profile == (model.settings.practiceProfile ?? PracticeProfile()) else { return }
+              preview = result.text
+            } catch { if account == model.bootstrap?.account.id { failure = error.localizedDescription } }
+          }
+        }.disabled(previewing)
+        if let preview { Text(preview).textSelection(.enabled) }
+        if let failure { Text(failure).foregroundStyle(.secondary) }
+      } footer: { Text("A short sample using AI. It won’t save your changes or create a practice session.") }
+      Section {
+        Button("Reset personalization", role: .destructive) { model.settings.practiceProfile = PracticeProfile(); preview = nil; failure = nil }
+      }
+    }.navigationTitle("About your practice").navigationBarTitleDisplayMode(.inline)
   }
 }

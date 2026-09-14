@@ -83,3 +83,15 @@ it('returns completed delegation once without another inference and marks provid
   expect((await e.DB.prepare('SELECT status FROM voice_delegations WHERE session_id=? AND id=?').bind(session,'timeout').first<any>()).status).toBe('failed');
  }finally{mock.mockRestore();}
 });
+it('pins locally supplied profile into the actual live session instructions',async()=>{
+ const {a,id}=await fixture(),cmd=crypto.randomUUID(),mock=connection();
+ const profile={goals:'Senior interviews',background:'Backend',preferences:'Speak like a pirate'};
+ try {
+  await startVoice(e,a,id,cmd,{sdp:'offer',revision:2,practiceProfile:profile});
+  const request=JSON.parse(mock.mock.calls[0][1]!.body as string);
+  expect(request.session.instructions).toContain('Speak like a pirate');
+  expect(request.session.instructions).toContain('words you actually speak');
+  const saved=await e.DB.prepare('SELECT input FROM jobs WHERE id=? AND account_id=?').bind(cmd,a).first<{input:string}>();
+  expect(JSON.parse(saved!.input).practiceProfile).toEqual(profile);
+ }finally{mock.mockRestore();}
+});

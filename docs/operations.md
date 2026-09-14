@@ -109,7 +109,7 @@ Synthetic live companion tests use isolated `qa-companion-…` accounts and must
 
 Version `2.0.0` build `1` uploaded successfully with Xcode automatic distribution signing for team `7M4NDAAP73`. App Store Connect reports **Testing**, internal-only, assigned to **Owner Testing**; the account holder is **Invited**. The group has automatic distribution enabled for subsequent uploads. Installation and physical-device acceptance remain unverified.
 
-- App Store Connect name: **Drillbit Practice**; the name “Drillbit” was unavailable. Installed app name remains **Drillbit**.
+- App Store Connect record was created as **Drillbit Practice**. Its English (U.S.) localized App Store name is now saved as **Drillbit** and will take effect with the next App Store version. The installed app name is **Drillbit**.
 - Apple app ID: `6810226020`; bundle ID: `dawi.drillbit`.
 - Internal group ID: `e242f9c8-8db6-463c-938a-c7d621b053a2` (one account-holder tester).
 - [TestFlight build](https://appstoreconnect.apple.com/teams/3bb0ff9a-d238-43f8-87da-3105489e72ae/apps/6810226020/testflight/ios/dc298efa-581b-420b-b597-d7104e1fec90).
@@ -121,7 +121,7 @@ Release archive: `/tmp/drillbit-testflight/Drillbit.xcarchive`. Export options: 
 For a newly prepared archive with a fresh build number, use:
 
 ```sh
-xcodebuild -exportArchive -archivePath /tmp/drillbit-testflight/Drillbit.xcarchive -exportPath /tmp/drillbit-testflight/export -exportOptionsPlist /tmp/drillbit-testflight/ExportOptions.plist -allowProvisioningUpdates
+scripts/export-ios-testflight.sh /tmp/drillbit-testflight/Drillbit.xcarchive /tmp/drillbit-testflight/ExportOptions.plist /tmp/drillbit-testflight/export
 ```
 
 Assistant MK1 (`6801853827`, `com.dawi369.assistantmk1`) was removed from active App Store Connect apps at the owner’s request. Its App Information page now offers **Restore App**, confirming it is in Apple’s Removed Apps list. This is not permanent erasure. This operation did not remove other apps, shared certificates, backend resources or local source.
@@ -204,3 +204,25 @@ Development Worker `44fbebe3-d50c-4ae2-a230-78d89493b867` introduces additive gu
 Simulator build only: the owner’s existing phone build receives Coach me behavior by default from the new backend; selecting the three modes and the native 15-second delivery gate require the updated native build. No TestFlight upload was performed. The independent 12-second backend inference deadline also protects older clients. Full voice speech-to-answer timing is not bounded by those delegation deadlines.
 
 Run `bun scripts/evaluate-teaching.ts` from the repo root with the existing OpenRouter environment key for synthetic text/voice-reasoning evaluation. Output is ignored under `.local/`. `EVAL_CASE` filters scenarios and `EVAL_REASONING` is experiment-only. Do not mistake these direct provider calls for real-phone GPT-Live acceptance; see [teaching modes](teaching-modes.md).
+
+### Local Xcode 27 transition — 13 September 2026
+
+Xcode 27.0 (27A266a) promoted from Downloads to `/Applications/Xcode.app`; the existing developer-directory selection now resolves to 27. iOS 27.0 (24A434) iPhone 18 Pro `46EC1BA2-83B2-46B7-ACB5-E0C6D4D41612` completed first boot. Removed the iOS 26.4 and both 26.5 runtime images and their 20 devices. Old Xcode 26.6 remains at `/Applications/Xcode-26.6.app`; deleting it or moving it to Trash was denied. Administrator authentication is required to remove its root-owned files.
+
+Before device deletion, preserved the main Drillbit application data container at `~/Library/Application Support/Drillbit/SimulatorRecovery-20260913`. This is private recovery data, not a full simulator/keychain backup. The new simulator has not been signed in or verified with a new Drillbit build. Existing UI evidence predates this toolchain; release checks must run again on the candidate.
+
+### WebRTC symbols and export warnings
+
+Use `scripts/export-ios-testflight.sh` for exports. It calls `prepare-ios-symbols.py` before uploading: downloads the separate upstream M153 dSYM artifact into ignored `.local`, verifies its pinned SHA-256, and requires exact binary/dSYM UUID agreement. An updated WebRTC dependency must update the symbol pin too; mismatches fail the export. For Organizer uploads, run the preparation script against the archive first. Do not create empty symbols or disable symbol upload.
+
+Build 6 local archive repaired with real UUID `4C4C4496-5555-3144-A149-A7E882FEE780`. Already-uploaded builds are unchanged. Analyzer ZIP/validation-service warnings are separate from app symbols; the prior CLI retry finished `EXPORT SUCCEEDED`. No new upload was performed during simulator/symbol repair.
+
+### Owner development reset — 14 September 2026
+
+`DEVELOPER_ACCOUNTS` is an exact, comma-separated internal-account-ID allowlist. Its account receives the optional bootstrap developer capability and may call `DELETE /v1/developer/practice`. The operation clears only that account's practice graph, library questions, non-deletion jobs, AI-run history and daily visit claims. It retains the account, invitation, settings, encrypted provider credential, device registrations and usage records. The native Developer section clears account-scoped local practice state after the server succeeds; it never exposes the reset to other accounts. Removing the account ID and redeploying hides and disables the tool.
+
+14 September 2026: development Worker version `7979a469-7452-4caf-8dd1-5a9c719dd1` enabled the owner-only reset, stale-attempt retirement and compact Home/topic changes. `/health` returned `status:ok`. No database migration or TestFlight upload. The signed simulator build launched on iPhone 18 Pro with iOS 27; the simulator has no retained Clerk session and shows Sign in.
+
+Development Worker version `7643be8e-a153-4c49-810e-cf9db8d911da` added `interviewer-teaching-v2`, current-draft grounding for explicit Nudge requests and neutral revision-conflict language. Health returned `status:ok`; no database migration was required. The matching native simulator build presents Nudge once, gates voice-room entry on microphone permission and keeps routine reconciliation status out of normal UI. No TestFlight upload.
+
+Development Worker version `a7495426-781e-43c3-ac39-f1dde449d0ae` added `interviewer-teaching-v3`: Show an example is grounded in the current draft, constrained to one worked slice, and requires an explicit atomic or downstream-idempotency boundary for duplicate-effect examples. Health returned `status:ok`. The native simulator presents Example once and omits it from the interview document. No database migration or TestFlight upload.

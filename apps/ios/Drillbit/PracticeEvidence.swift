@@ -51,7 +51,7 @@ struct PracticeExportView: View {
   @State private var failure: String?
   var body: some View {
     Form {
-      Text("Export your cloud questions, answers, conversations, feedback and practice settings as JSON. Local edits must sync first. Provider keys and sign-in credentials are excluded.")
+      Text("Export your questions, answers, conversations, feedback and practice settings as JSON. Provider keys and sign-in credentials are excluded.")
       Button(working ? "Preparing export…" : "Export practice data") {
         Task {
           working = true; failure = nil
@@ -59,7 +59,7 @@ struct PracticeExportView: View {
           let account = model.bootstrap?.account.id
           do {
             await model.sync()
-            guard !model.hasPendingWrites else { throw APIError(code: "pending_writes", message: "Connect and sync your pending edits before exporting.", status: 0) }
+            guard !model.hasPendingWrites else { throw APIError(code: "pending_writes", message: "Recent changes are still being saved. Try exporting again shortly.", status: 0) }
             var pages: [[String: Any]] = []
             var cursor: String?
             repeat {

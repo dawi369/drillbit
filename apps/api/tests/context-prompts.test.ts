@@ -31,6 +31,21 @@ it("pins queued v2 prompts while new turns get the conversational edition", () =
  expect(interviewerPrompt()).toContain('<drillbit>');
  expect(interviewerPrompt()).toContain('not submitting answers for inspection');
  expect(interviewerPrompt()).toContain("No grades, mastery claims");
+ expect(interviewerPrompt()).toContain("temporary one-time popup");
+ expect(interviewerPrompt()).toContain("two to five short sentences");
+});
+
+it("grounds a temporary example in the unfinished draft", () => {
+ const messages = messagesFor("interview", {promptVersion:"interviewer-teaching-v3", question:{prompt:"Design a queue"}, currentDraft:"Workers claim jobs with a lease", interview:{guidanceMode:"coach_me",turns:[]}, action:{kind:"example",text:""}});
+ expect(messages[0].content).toContain("one-time popup");
+ expect(messages[0].content).toContain("under 120 words");
+ expect(JSON.stringify(messages)).toContain("Workers claim jobs with a lease");
+});
+
+it("grounds a temporary nudge in the unfinished draft", () => {
+ const messages = messagesFor("interview", {promptVersion:"interviewer-teaching-v2", question:{prompt:"Design a queue"}, currentDraft:"Workers claim a durable job", interview:{guidanceMode:"coach_me",turns:[]}, action:{kind:"hint",text:""}});
+ expect(messages[0].content).toContain("one to four short sentences");
+ expect(JSON.stringify(messages)).toContain("Workers claim a durable job");
 });
 
 it("routes only whole social messages and restores technical context on readiness", () => {

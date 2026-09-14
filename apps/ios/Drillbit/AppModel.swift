@@ -16,6 +16,11 @@ import WidgetKit
   private(set) var launchError: String?
   private var cacheGeneration = 0
   var settings = PracticeSettings()
+  var pendingSettings: PendingSettings?
+  var settingsSyncError: String?
+  private var settingsSyncTask: Task<Void, Never>?
+  private var settingsSyncID: UUID?
+  private var settingsSaveGeneration = 0
   var presented: Challenge?
   var error: String?
   var completionNoticeAccount: String?
@@ -59,6 +64,19 @@ import WidgetKit
   func isLocallySkipped(account: String, id: String) -> Bool { locallySkipped[account]?.contains(id) == true }
   var libraryVersion = 0
   var libraryCoverage: [CoverageResponse.Entry] = []
+  var libraryCoverageLoaded = false
+  var dismissedHomeRevisits: Set<String> = []
+  var homeRevisit: HomeRevisit? { HomeRevisit.select(memory: memory, dismissed: dismissedHomeRevisits) }
+  func dismissHomeRevisit(_ item: HomeRevisit) async {
+    guard let account = bootstrap?.account.id else { return }
+    dismissedHomeRevisits.insert(item.id)
+    do { try await disk.cache(key: "home-revisits:" + account, data: JSONEncoder().encode(dismissedHomeRevisits)) }
+    catch {
+      guard bootstrap?.account.id == account else { return }
+      dismissedHomeRevisits.remove(item.id)
+      self.error = "Couldn’t save that dismissal. Please try again."
+    }
+  }
 
   /// Warm the first 25 completed and skipped questions, including their attempt lists.
   /// Navigation consumes these snapshots; only committed mutations invalidate them.
@@ -111,7 +129,10 @@ import WidgetKit
         }
       }
       guard self.bootstrap?.account.id == account else { return }
-      if !onlySkipped, !self.fixture, let value: CoverageResponse = try? await self.api.send("library/coverage") { self.libraryCoverage = value.concepts }
+      if !onlySkipped, !self.fixture, let value: CoverageResponse = try? await self.api.send("library/coverage"), self.bootstrap?.account.id == account {
+        self.libraryCoverage = value.concepts; self.libraryCoverageLoaded = true
+        try? await self.disk.cache(key: "home-coverage:" + account, data: JSONEncoder().encode(value))
+      }
       guard self.bootstrap?.account.id == account else { return }
       for detail in details.values { for attempt in detail.attempts where attempt.session != nil { self.librarySessions[account + ":" + attempt.id] = attempt } }
       let pending = (try? await self.disk.cached(key: "eligibility:" + account)).flatMap { try? JSONDecoder().decode([EligibilityCommand].self, from: $0) } ?? []
@@ -180,11 +201,16 @@ import WidgetKit
     let key = "epoch:" + result.account.id
     let old = try await disk.cached(key: key).flatMap { String(data: $0, encoding: .utf8) }
     if old != epoch {
+      let savedPreferences = try await disk.cached(key: "settings-pending:" + result.account.id)
       try await disk.clearPractice(account: result.account.id)
+      if let savedPreferences { try await disk.cache(key: "settings-pending:" + result.account.id, data: savedPreferences) }
       librarySnapshots = [:]; libraryDetailSnapshots = [:]; libraryWarmAccount = nil; librarySessions = [:]
       presented = nil; conflict = nil; hasPendingWrites = false
       if bootstrap?.account.id == result.account.id { bootstrap?.challenge = result.challenge; bootstrap?.jobs = result.jobs }
       try SharedStore.save(WidgetSnapshot(challenge: result.challenge, updatedAt: Date().ISO8601Format()))
+      libraryCoverage = []; libraryCoverageLoaded = false; dismissedHomeRevisits = []
+      try await disk.cache(key: "home-coverage:" + result.account.id, data: Data())
+      try await disk.cache(key: "home-revisits:" + result.account.id, data: Data())
       memory = MemoryResponse(sessions: [], patterns: [])
       homeCacheAccount = nil; memoryRequestVersion += 1; cacheGeneration += 1
       UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
@@ -264,7 +290,12 @@ import WidgetKit
       for key in pages.keys where key.hasSuffix("true") { pages[key]?.questions.removeAll { $0.id == command.questionId && command.eligible } }
     }
     let cachedTaxonomy = (try? await disk.cached(key: "taxonomy:" + account)).flatMap { try? JSONDecoder().decode(TaxonomyResponse.self, from: $0) }
+    let coverage = (try? await disk.cached(key: "home-coverage:" + account)).flatMap { try? JSONDecoder().decode(CoverageResponse.self, from: $0) }
+    let dismissals = (try? await disk.cached(key: "home-revisits:" + account)).flatMap { try? JSONDecoder().decode(Set<String>.self, from: $0) } ?? []
     guard cacheGeneration == generation else { return }
+    pendingSettings = (try? await disk.cached(key: "settings-pending:" + account)).flatMap { try? JSONDecoder().decode(PendingSettings.self, from: $0) }
+    dismissedHomeRevisits = dismissals
+    libraryCoverage = coverage?.concepts ?? []; libraryCoverageLoaded = coverage != nil
     memory = restoredMemory
     librarySnapshots = pages
     libraryDetailSnapshots = details
@@ -317,7 +348,8 @@ import WidgetKit
       guard Clerk.shared.user?.id == subject else { launching = false; return }
       bootstrap = cached
       if let id = cached.challenge?.id, (try? await disk.pendingSkips(account: account).contains(id)) == true { bootstrap?.challenge = nil }
-      settings = cached.settings
+      settings = pendingSettings?.value ?? cached.settings
+      bootstrap?.settings = settings
       restoringSession = false
     }
     launching = false
@@ -350,6 +382,10 @@ import WidgetKit
   func refresh() async {
     guard !fixture, !refreshing, !launching else { return }
     let subject = Clerk.shared.user?.id
+    let settingsAtStart = settings
+    let hadLocalEdits = bootstrap.map { settings != $0.settings } ?? false
+    let saveGeneration = settingsSaveGeneration
+    let pendingAtStart = pendingSettings
     refreshing = true
     defer { refreshing = false }
     do {
@@ -362,7 +398,10 @@ import WidgetKit
       bootstrap = result
       let queuedSkips = try await disk.pendingSkips(account: result.account.id)
       if let id = result.challenge?.id, locallySkipped[result.account.id]?.contains(id) == true || queuedSkips.contains(id) { bootstrap?.challenge = nil }
-      settings = result.settings
+      if let pendingSettings { settings = pendingSettings.value }
+      else if !hadLocalEdits && pendingAtStart == nil && saveGeneration == settingsSaveGeneration && settings == settingsAtStart { settings = result.settings }
+      if pendingSettings != nil || pendingAtStart != nil || saveGeneration != settingsSaveGeneration { bootstrap?.settings = pendingSettings?.value ?? settings }
+      syncSettingsInBackground()
       try? await reconcileReminder()
       try SharedStore.setSecret(result.account.id, key: "account")
       try SharedStore.setSecret(Clerk.shared.user?.id, key: "subject")
@@ -391,7 +430,7 @@ import WidgetKit
       if bootstrap == nil {
         error = nil
       } else {
-        error = "Sign in again to sync. Your local draft is safe."
+        error = "Sign in again to continue. Your local draft is safe."
       }
     } catch { if bootstrap == nil { self.error = error.localizedDescription } }
   }
@@ -412,10 +451,35 @@ import WidgetKit
     if let task = libraryWarmTask { await task.value }
     guard bootstrap?.account.id == account else { return }
     try await disk.invalidateLibrary(account: account)
+    try await disk.cache(key: "home-coverage:" + account, data: Data())
     libraryDetailSnapshots = [:]; librarySessions = [:]; librarySnapshots = [:]
-    libraryCoverage = []; libraryVersion += 1
+    libraryCoverage = []; libraryCoverageLoaded = false; libraryVersion += 1
     await loadMemory()
     await preloadLibrary(force: true)
+  }
+  func resetDeveloperPractice() async throws {
+    guard let account = bootstrap?.account.id,
+      bootstrap?.capabilities?.developerTools == true || fixture
+    else { throw APIError(code: "not_found", message: "This tool is unavailable.", status: 404) }
+    if !fixture {
+      let _: EmptyResponse = try await api.send("developer/practice", method: "DELETE")
+    }
+    let savedPreferences = try await disk.cached(key: "settings-pending:" + account)
+    try await disk.clearPractice(account: account)
+    if let savedPreferences { try await disk.cache(key: "settings-pending:" + account, data: savedPreferences) }
+    libraryWarmTask?.cancel(); libraryWarmTask = nil; libraryWarmAccount = nil
+    librarySnapshots = [:]; libraryDetailSnapshots = [:]; librarySessions = [:]
+    libraryCoverage = []; libraryCoverageLoaded = false; dismissedHomeRevisits = []
+    locallySkipped[account] = []
+    memory = MemoryResponse(sessions: [], patterns: [])
+    memoryRequestVersion += 1; cacheGeneration += 1; libraryVersion += 1
+    bootstrap?.challenge = nil
+    bootstrap?.jobs = []
+    presented = nil; conflict = nil; hasPendingWrites = false
+    completionNoticeAccount = nil; preparationFailure = nil
+    failedPreparation = nil; failedPreparationSource = nil
+    if !fixture { await refresh() }
+    await ensureHomeQuestion()
   }
   private var checkingDailyQuestion = false
   private var automaticPreparationAccounts: Set<String> = []
@@ -473,7 +537,7 @@ import WidgetKit
       await sync()
       guard bootstrap?.account.id == account else { throw CancellationError() }
       guard try await disk.pendingSkips(account: account).isEmpty else {
-        throw APIError(code: "skip_pending", message: "Your skip is saved. Connect to prepare the next question.", status: 0)
+        throw APIError(code: "skip_pending", message: "Your skip is saved. The next question will be prepared shortly.", status: 0)
       }
     }
     preparationFailure = nil
@@ -500,8 +564,8 @@ import WidgetKit
       return challenge
     }
     guard bootstrap?.account.id == account else { throw CancellationError() }
-    if hasPendingWrites {
-      throw APIError(code: "sync_pending", message: "Connect and sync your saved answer before starting another challenge.", status: 0)
+    if try await !disk.pending(account: account).isEmpty {
+      throw APIError(code: "practice_pending", message: "Couldn’t prepare a new question right now. Try again shortly.", status: 0)
     }
     let result: GenerationResponse = try await api.send("challenges", method: "POST", body: preparation, command: UUID().uuidString)
     let challenge: Challenge
@@ -666,6 +730,9 @@ import WidgetKit
             try await disk.acknowledge(account: account, sent: draft, revision: result.revision)
           }
           saveStatus = "Saved"
+        } catch let failure as APIError where failure.status == 404 {
+          try await disk.retireMissingAttempt(account: account, id: draft.challengeID)
+          saveStatus = "Saved on this device"
         } catch let failure as APIError where failure.status == 409 {
           try await disk.markConflict(account: account, id: draft.challengeID)
           conflict = try await api.send("challenges/\(draft.challengeID)")
@@ -680,7 +747,10 @@ import WidgetKit
       let pendingEligibility = try await disk.cached(key: "eligibility:" + account).flatMap { try JSONDecoder().decode([EligibilityCommand].self, from: $0) } ?? []
       let pendingVoice = try await disk.hasPendingVoice(account: account)
       hasPendingWrites = pendingDrafts || pendingSkips || !pendingEligibility.isEmpty || pendingVoice
-    } catch is CancellationError {} catch let error as URLError where error.code == .cancelled {} catch { self.error = error.localizedDescription }
+    } catch is CancellationError {} catch let error as URLError where error.code == .cancelled {} catch {
+      hasPendingWrites = true
+      saveStatus = "Saved"
+    }
   }
   func resolveConflict(keepLocal: Bool) async {
     guard let account = bootstrap?.account.id, let challenge = conflict else { return }
@@ -729,14 +799,65 @@ import WidgetKit
       }
     }
   }
-  func updateSettings() async throws {
+  /// Done waits for durable local storage, never for the network.
+  func saveSettingsLocally() async throws {
+    guard let account = bootstrap?.account.id else { return }
     settings.model = "google/gemini-3.1-flash-lite"
     settings.engineeringLevel = settings.selectedLevel
-    if !fixture {
-      let _: PracticeSettings = try await api.send("settings", method: "PUT", body: settings)
+    let command = PendingSettings(value: settings)
+    settingsSaveGeneration += 1
+    try await disk.cache(key: "settings-pending:" + account, data: JSONEncoder().encode(command))
+    guard bootstrap?.account.id == account else { return }
+    pendingSettings = command
+    bootstrap?.settings = command.value
+    settingsSyncError = nil
+    syncSettingsInBackground()
+    Task { try? await reconcileReminder(requestPermission: true) }
+  }
+  func syncSettingsInBackground() {
+    guard settingsSyncTask == nil, let account = bootstrap?.account.id, pendingSettings != nil else { return }
+    let syncID = UUID()
+    settingsSyncID = syncID
+    settingsSyncTask = Task { @MainActor in
+      defer { if self.settingsSyncID == syncID { self.settingsSyncTask = nil; self.settingsSyncID = nil } }
+      while let command = self.pendingSettings, self.bootstrap?.account.id == account, !Task.isCancelled {
+        do {
+          #if DEBUG
+          if self.fixture && ProcessInfo.processInfo.arguments.contains("--fixture-settings-offline") {
+            throw APIError(code: "offline", message: "Offline", status: 0)
+          }
+          #endif
+          if !self.fixture {
+            let _: PracticeSettings = try await self.api.send("settings", method: "PUT", body: command.value)
+          }
+          guard self.bootstrap?.account.id == account, !Task.isCancelled else { return }
+          // A newer edit supersedes this acknowledgement; send it next.
+          guard self.pendingSettings?.id == command.id else { continue }
+          if var cached = self.bootstrap {
+            cached.settings = command.value
+            try await self.disk.cache(key: "bootstrap:" + account, data: JSONEncoder().encode(cached))
+          }
+          guard self.pendingSettings?.id == command.id else { continue }
+          let acknowledged = try await self.disk.acknowledgeSettings(account: account, id: command.id)
+          guard acknowledged, self.pendingSettings?.id == command.id else { continue }
+          self.pendingSettings = nil
+          self.settingsSyncError = nil
+        } catch {
+          guard self.bootstrap?.account.id == account else { return }
+          self.settingsSyncError = nil
+          return
+        }
+      }
+    }
+  }
+  /// Credential setup/onboarding still require confirmed cloud settings before their next operation.
+  func updateSettings() async throws {
+    try await saveSettingsLocally()
+    await settingsSyncTask?.value
+    if pendingSettings != nil {
+      throw APIError(code: "settings_pending", message: "Your settings are kept on this device. Connect and retry to continue setup.", status: 0)
     }
     try await reconcileReminder(requestPermission: true)
-    await refresh()
   }
   func reconcileReminder(requestPermission: Bool = false) async throws {
     guard !fixture else { return }
@@ -771,8 +892,8 @@ import WidgetKit
     }
   }
   func signOut(discard: Bool = false, deleting: Bool = false) async throws {
-    if !deleting { await sync() }
-    if hasPendingWrites && !discard {
+    if !deleting { await sync(); syncSettingsInBackground(); await settingsSyncTask?.value }
+    if (hasPendingWrites || pendingSettings != nil) && !discard {
       throw APIError(
         code: "unsynced",
         message: "Some edits have not synced. Try again online, or explicitly discard local edits.",
@@ -788,6 +909,7 @@ import WidgetKit
         try await Clerk.shared.auth.signOut()
       }
     }
+    settingsSyncTask?.cancel(); settingsSyncTask = nil; settingsSyncID = nil; pendingSettings = nil; settingsSyncError = nil
     try await disk.clear()
     for key in ["account", "subject", "widgetToken", "widgetTokenExpires", "deviceID", "apiURL"] {
       try SharedStore.setSecret(nil, key: key)
@@ -796,7 +918,7 @@ import WidgetKit
     WidgetCenter.shared.reloadAllTimelines()
     UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
     libraryWarmTask?.cancel(); libraryWarmTask = nil; libraryWarmAccount = nil
-    librarySnapshots = [:]; libraryDetailSnapshots = [:]; librarySessions = [:]; libraryCoverage = []
+    librarySnapshots = [:]; libraryDetailSnapshots = [:]; librarySessions = [:]; libraryCoverage = []; libraryCoverageLoaded = false; dismissedHomeRevisits = []
     bootstrap = nil
     completionNoticeAccount = nil
     preparationFailure = nil
@@ -833,6 +955,13 @@ import WidgetKit
     }
     #endif
     #if DEBUG
+    if ProcessInfo.processInfo.arguments.contains("--fixture-home-rich") {
+      let evidence = LearningEvidence(conceptId: "queues", observation: "Consider what happens when a worker finishes a job but its acknowledgement is lost.", quote: "The worker deletes the job when it finishes.", signal: "needs_practice", assistance: "unknown", sessionId: "recent")
+      var source = Challenge(id: "recent", lifecycle: "completed", title: "Design a reliable job queue", prompt: "Design a job queue that recovers from worker failures.", topic: "System design", session: SessionDraft(answer: evidence.quote, revision: 1))
+      source.reflection = Reflection(summary: "A useful start on worker ownership.", worked: ["Defined worker ownership"], improve: evidence.observation, takeaway: "Acknowledgements can be lost.", strengths: [], gaps: [])
+      memory = MemoryResponse(evidence: [evidence], statistics: .init(completed: 12, lastSevenDays: 4, asOf: Date().ISO8601Format()), sessions: [source], patterns: [])
+      libraryCoverage = [.init(conceptId: "queues", completedAttempts: 3, distinctQuestions: 2)]; libraryCoverageLoaded = true
+    }
     if ProcessInfo.processInfo.arguments.contains("--fixture-interview-history") {
       challenge.lifecycle = "in_progress"
       var current = challenge.prompt
@@ -849,7 +978,7 @@ import WidgetKit
     }
     #endif
     bootstrap = Bootstrap(
-      account: .init(id: "fixture", status: "active"), settings: settings, challenge: challenge,
+      capabilities: .init(voice: nil, developerTools: true), account: .init(id: "fixture", status: "active"), settings: settings, challenge: challenge,
       jobs: [])
     #if DEBUG
     if ProcessInfo.processInfo.arguments.contains("--fixture-dashboard") { bootstrap?.challenge = nil }

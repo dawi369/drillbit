@@ -3,7 +3,7 @@ import AVFAudio
 @preconcurrency import WebRTC
 
 private struct VoiceConnection: Decodable { var id: String; var sdp: String; var expiresAt: String }
-private struct VoiceStart: Encodable { var sdp: String; var revision: Int; var guidanceMode: GuidanceMode }
+private struct VoiceStart: Encodable { var sdp: String; var revision: Int; var guidanceMode: GuidanceMode; var practiceProfile: PracticeProfile? }
 private struct VoiceEvents: Codable { var fragments: [VoiceFragment]; var closed: Bool; var finalized: Bool; var usageSeconds: Double? }
 private struct VoiceAck: Decodable { var accepted: [String] }
 private struct VoiceDelegation: Encodable { var id: String }
@@ -80,13 +80,13 @@ private struct VoiceOutbox: Codable {
       try await interview.flush()
       let draft = try await interview.model.disk.load(account:interview.account,challenge:interview.challenge)
       guard interview.model.fixture || (draft.kind.isEmpty && !draft.conflict) else {
-        throw APIError(code:"sync_pending",message:"Sync your draft before starting voice.",status:0)
+        throw APIError(code:"draft_pending",message:"Voice couldn’t start yet. Try again shortly.",status:0)
       }
       guard generation == epoch, interview.currentAccount, interview.acceptsVoiceInput else { return }
       if !interview.model.fixture {
-        let allowed = await AVAudioApplication.requestRecordPermission()
-        guard generation == epoch else { return }
-        guard allowed else { throw APIError(code:"microphone_denied",message:"Allow microphone access in iPhone Settings to use voice.",status:0) }
+        guard AVAudioApplication.shared.recordPermission == .granted else {
+          throw APIError(code:"microphone_denied",message:"Microphone access is required for live voice.",status:0)
+        }
       }
       let id = UUID().uuidString
       outbox = VoiceOutbox(id:id)
@@ -96,6 +96,15 @@ private struct VoiceOutbox: Codable {
         phase = .active
         present([],id:id)
         return
+      }
+      interruptedObserver = NotificationCenter.default.addObserver(forName:AVAudioSession.interruptionNotification,object:nil,queue:.main) { [weak self] _ in
+        Task { @MainActor in self?.interrupt("Voice paused by an audio interruption. You can start it again.") }
+      }
+      routeObserver = NotificationCenter.default.addObserver(forName:AVAudioSession.routeChangeNotification,object:nil,queue:.main) { [weak self] note in
+        let reason = note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt
+        if reason == AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue {
+          Task { @MainActor in self?.interrupt("Your audio device disconnected. Voice has stopped.") }
+        }
       }
       let audio = AVAudioSession.sharedInstance()
       try audio.setCategory(.playAndRecord,mode:.voiceChat,options:[.defaultToSpeaker,.allowBluetoothHFP])
@@ -120,7 +129,7 @@ private struct VoiceOutbox: Codable {
       guard generation == epoch else { link.close(); return }
       link.onEvent = { [weak self] data in self?.enqueue(data,epoch:epoch) }
       link.onFailure = { [weak self] in self?.interrupt("Voice disconnected. Your transcript is preserved.") }
-      let result: VoiceConnection = try await interview.model.api.send("challenges/\(interview.challenge.id)/voice",method:"POST",body:VoiceStart(sdp:offer,revision:draft.revision,guidanceMode:interview.mode),command:id)
+      let result: VoiceConnection = try await interview.model.api.send("challenges/\(interview.challenge.id)/voice",method:"POST",body:VoiceStart(sdp:offer,revision:draft.revision,guidanceMode:interview.mode,practiceProfile:interview.model.settings.practiceProfile),command:id)
       guard generation == epoch else { link.close(); return }
       try await link.answer(result.sdp)
       guard generation == epoch, phase == .connecting || phase == .active else { link.close(); return }
@@ -136,20 +145,14 @@ private struct VoiceOutbox: Codable {
         guard !Task.isCancelled else { return }
         await self?.end()
       }
-      interruptedObserver = NotificationCenter.default.addObserver(forName:AVAudioSession.interruptionNotification,object:nil,queue:.main) { [weak self] _ in
-        Task { @MainActor in self?.interrupt("Voice paused by an audio interruption. You can start it again.") }
-      }
-      routeObserver = NotificationCenter.default.addObserver(forName:AVAudioSession.routeChangeNotification,object:nil,queue:.main) { [weak self] note in
-        let reason = note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt
-        if reason == AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue {
-          Task { @MainActor in self?.interrupt("Your audio device disconnected. Voice has stopped.") }
-        }
-      }
+
     } catch {
       guard generation == epoch else { return }
+      // Release audio before disk/network recovery, which may be slow or offline.
+      cleanup()
       // Startup may have created a server reservation even when its answer was lost.
       if outbox != nil { outbox?.closed = true; try? await persist(); await sync() }
-      cleanup(); phase = .unavailable; message = error.localizedDescription
+      phase = .unavailable; message = error.localizedDescription
     }
   }
   func toggleMute() {
@@ -237,7 +240,7 @@ private struct VoiceOutbox: Codable {
           await sync()
           guard generation == epoch, phase == .active, guidanceDeliveries[id]?.resolved == false else { return }
           guard let pending = outbox, pending.fragments.allSatisfy({ acknowledged.contains($0.id) }) else {
-            deliverGuidance("The latest words couldn't be synced. Acknowledge that once and offer to continue in text; don't invent technical guidance or promise a wait.", id: id, epoch: epoch)
+            deliverGuidance("The latest words couldn't be saved remotely. Acknowledge that once and offer to continue in text; don't invent technical guidance or promise a wait.", id: id, epoch: epoch)
             return
           }
           let reply: VoiceReply = try await interview.model.api.send("challenges/\(interview.challenge.id)/voice/\(pending.id)/delegate", method: "POST", body: VoiceDelegation(id: id))
@@ -284,7 +287,7 @@ private struct VoiceOutbox: Codable {
       }
     } catch let error as APIError where error.status == 404 && captured.fragments.isEmpty {
       outbox = nil; try? await persist()
-    } catch { message = "Transcript saved on this device. Reconnect to sync before continuing." }
+    } catch { message = "Your transcript is safe. Try again when the connection is back." }
   }
   private func finalize(confirmed:Bool) async {
     guard phase != .idle else { return }

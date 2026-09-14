@@ -1,5 +1,7 @@
 import SwiftUI
 import OSLog
+import AVFAudio
+import UIKit
 
 @MainActor @Observable final class InterviewController {
   let model: AppModel
@@ -128,7 +130,7 @@ import OSLog
       model.bootstrap?.challenge = fresh
       try await model.disk.cache(key: key + ":state", data: JSONEncoder().encode(state))
       if !fresh.isActive { finished = fresh }
-    } catch { if waiting { failure = "Your answer is saved. Reconnect to get the interviewer's response." } }
+    } catch { if waiting { failure = "The response couldn’t load. Try again." } }
   }
   func submit(_ kind: String, text: String = "", command: UUID? = nil, onAccepted: (() -> Void)? = nil) async {
     guard !locked, failedTurn == nil else { return }
@@ -152,7 +154,7 @@ import OSLog
         try await flush()
         let local = try await model.disk.load(account: account, challenge: challenge)
         guard model.fixture || (local.kind.isEmpty && !local.conflict) else {
-          throw APIError(code: "sync_pending", message: local.conflict ? "Resolve the draft conflict before sharing." : "Couldn’t sync this answer. Check your connection and retry.", status: 0)
+          throw APIError(code: "draft_pending", message: local.conflict ? "Review the draft conflict before continuing." : "This action couldn’t finish. Try again shortly.", status: 0)
         }
         pending = PendingInterviewCommand(command: command.uuidString, input: InterviewInput(promptId: state.turns.last(where: { ["answer","continue"].contains($0.kind) && $0.result != nil })?.id ?? "original", kind: kind, revision: local.revision, text: kind == "answer" ? answer : text, style: style, guidanceMode: mode))
         try await persistPending()
@@ -209,16 +211,22 @@ import OSLog
     defer { busy = false }
     do {
       if model.fixture {
+        let input = operation.input
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--fixture-slow-interview") { try await Task.sleep(for: .seconds(6)) }
+        if ProcessInfo.processInfo.arguments.contains("--fixture-slow-assistance"), ["hint", "example"].contains(input.kind) {
+          try await Task.sleep(for: .seconds(2))
+        }
         #endif
         try await Task.sleep(for: .milliseconds(500))
-        let input = operation.input
         state.style = input.style ?? state.style
         state.guidanceMode = input.guidanceMode ?? state.guidanceMode
         if !state.turns.contains(where: { $0.id == operation.command }) {
           let isAnswer = ["answer", "continue"].contains(input.kind)
-          let result = InterviewResponse(outcome: isAnswer ? "follow_up" : "reply", text: isAnswer ? "What happens if a worker stops after completing the operation but before acknowledging it?" : "Consider what a retry can know about an operation that already happened.")
+          let helpText = input.kind == "example"
+            ? "For example, give each logical operation a stable key and store its result in the same transaction as the state change."
+            : "Consider what a retry can know about an operation that already happened."
+          let result = InterviewResponse(outcome: isAnswer ? "follow_up" : "reply", text: isAnswer ? "What happens if a worker stops after completing the operation but before acknowledging it?" : helpText)
           do {
             state.turns.append(InterviewTurn(id: operation.command, ordinal: state.turns.count, kind: input.kind, prompt: state.prompt, text: input.text, createdAt: Date().ISO8601Format(), jobId: operation.command, status: "running"))
             outgoing = nil
@@ -385,13 +393,19 @@ private struct InterviewTurnRow: View {
   }
 }
 
-private enum InterviewSheet: String, Identifiable { case style; var id: String { rawValue } }
+private enum InterviewSheet: String, Identifiable { case style, assistance; var id: String { rawValue } }
 struct InterviewView: View {
   @State private var liveVoice: LiveVoice?
   @State private var showingVoiceRoom = false
   @State private var voiceQuestionCollapsed = true
   @State private var checkingVoice = false
   @State private var voiceExplanation: String?
+  @State private var voicePermissionNeedsSettings = false
+  @State private var assistanceRequestID: String?
+  @State private var assistanceTitle = "Help"
+  @State private var assistanceText: String?
+  @State private var assistanceError: String?
+  @State private var requestingAssistance = false
   let model: AppModel
   let challenge: Challenge
   @State private var interview: InterviewController
@@ -425,6 +439,10 @@ struct InterviewView: View {
   }
   private var exchanges: [InterviewExchange] { InterviewExchange.document(original: challenge.prompt, state: interview.displayState) }
   private var activeID: String { exchanges.last?.id ?? "original" }
+  private var completedAssistance: String? {
+    guard let assistanceRequestID else { return nil }
+    return interview.state.turns.first(where: { $0.id == assistanceRequestID })?.result?.text
+  }
   private var acceptedPending: Bool { interview.pending.map { pending in pending.input.kind == "answer" && interview.state.turns.contains { $0.id == pending.command } } ?? false }
   private var waitingForAnswer: Bool { interview.displayState.turns.contains { ["answer", "continue"].contains($0.kind) && $0.pending } }
   private var documentMotion: Animation? { reduceMotion || !sessionRestored || stagingAnswer ? nil : .smooth(duration: 0.3, extraBounce: 0) }
@@ -465,8 +483,20 @@ struct InterviewView: View {
       if value == .active { interview.acceptsVoiceInput = true; Task { await interview.refresh() } }
     }
     .alert("Voice", isPresented: Binding(get: { voiceExplanation != nil }, set: { if !$0 { voiceExplanation = nil } })) {
+      if voicePermissionNeedsSettings {
+        Button("Open Settings") {
+          if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+          voiceExplanation = nil
+        }
+      }
       Button("Done", role: .cancel) { voiceExplanation = nil }
     } message: { Text(voiceExplanation ?? "") }
+    .onChange(of: completedAssistance) { _, value in
+      guard let value, !value.isEmpty else { return }
+      assistanceText = value
+      assistanceRequestID = nil
+      requestingAssistance = false
+    }
     .onAppear { interview.acceptsVoiceInput = phase == .active }
     .onDisappear { interview.acceptsVoiceInput = false; interview.voice?.discardPreparation(); interview.voice?.interrupt("Voice ended."); persistReading() }
   }
@@ -553,19 +583,20 @@ struct InterviewView: View {
     } } }
     .toolbar {
       ToolbarItem(placement: .cancellationAction) {
-        Button("Close") { Task {
-          do { persistReading(); if !interview.locked { try await interview.flush() }; model.presented = nil }
-          catch { interview.failure = error.localizedDescription }
-        } }
+        Button("Close") {
+          persistReading()
+          model.presented = nil
+          Task { if !interview.locked { try? await interview.flush() } }
+        }
       }
       ToolbarItem(placement: .topBarTrailing) {
         Menu {
           if interview.state.wrapUp { Button("Continue interview") { Task { await interview.submit("continue") } } }
-          Button("Give me a nudge", systemImage: AppIcon.hint.rawValue) { Task { await interview.submit("hint") } }
-            .disabled(interview.locked || interview.failedTurn != nil || liveVoice?.blocksText == true)
-          Button("Show an example", systemImage: AppIcon.text.rawValue) { Task { await interview.submit("example") } }
-            .disabled(interview.locked || interview.failedTurn != nil || liveVoice?.blocksText == true)
-          Button("Practice mode", systemImage: AppIcon.preferences.rawValue) { sheet = .style }.disabled(interview.locked || liveVoice?.blocksText == true)
+          Button("Give me a nudge", systemImage: AppIcon.hint.rawValue) { requestAssistance("hint", title: "Nudge") }
+            .disabled(requestingAssistance || interview.locked || interview.failedTurn != nil || liveVoice?.blocksText == true)
+          Button("Show an example", systemImage: AppIcon.text.rawValue) { requestAssistance("example", title: "Example") }
+            .disabled(requestingAssistance || interview.locked || interview.failedTurn != nil || liveVoice?.blocksText == true)
+          Button("Session style", systemImage: AppIcon.preferences.rawValue) { sheet = .style }.disabled(interview.locked || liveVoice?.blocksText == true)
           Button("Finish interview", systemImage: AppIcon.checkmark.rawValue) { focused = false; confirmFinish = true }.disabled(!interview.canFinish)
           Divider()
           Button("Skip question", systemImage: AppIcon.skip.rawValue, role: .destructive) { confirmSkip = true }.disabled(interview.voice?.blocksText == true)
@@ -582,15 +613,47 @@ struct InterviewView: View {
       Button("Finish interview") { Task { await interview.finish() } }
     } message: { Text("Your shared answers and current draft will be saved for review.") }
     .sheet(item: $sheet) { selection in
-      NavigationStack {
-        Group {
-          switch selection {
-          case .style:
+      switch selection {
+      case .style:
+        NavigationStack {
             GuidanceModePicker(selection: Binding(get: { interview.mode }, set: { value in Task { await interview.selectMode(value) } }))
-          }
         }.navigationBarTitleDisplayMode(.inline).toolbar { Button("Done") { sheet = nil } }
+      case .assistance:
+        assistancePopup
       }
     }
+  }
+  private var assistancePopup: some View {
+    VStack(spacing: 20) {
+      Text(assistanceTitle).font(.headline)
+      if requestingAssistance {
+        ProgressView()
+          .controlSize(.small)
+          .accessibilityLabel("Preparing \(assistanceTitle.lowercased())")
+          .accessibilityIdentifier("assistanceLoading")
+      } else if let assistanceText {
+        ScrollView {
+          Text(assistanceText)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .textSelection(.enabled)
+        }
+        .frame(maxHeight: 240)
+      } else {
+        Text(assistanceError ?? "That didn’t load. Your reply is unchanged.")
+          .foregroundStyle(.secondary)
+          .frame(maxWidth: .infinity, alignment: .leading)
+      }
+      Button(requestingAssistance ? "Cancel" : "Got it") { dismissAssistance() }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+    }
+    .padding(24)
+    .frame(maxWidth: 420)
+    .presentationDetents([requestingAssistance ? .height(220) : .height(360)])
+    .presentationDragIndicator(.visible)
+    .interactiveDismissDisabled(requestingAssistance)
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("assistancePopup")
   }
   private var originalQuestion: some View {
     questionDisclosure(collapsed: reading.collapsed.contains("original")) {
@@ -622,6 +685,7 @@ struct InterviewView: View {
   private func enterVoice() async {
     guard !checkingVoice, let voice = liveVoice, !voice.blocksText else { return }
     checkingVoice = true
+    voicePermissionNeedsSettings = false
     defer { checkingVoice = false }
     do {
       var capability = model.bootstrap?.capabilities?.voice
@@ -639,12 +703,52 @@ struct InterviewView: View {
       if let capability, !capability.available {
         voiceExplanation = capability.reason ?? "Live voice is currently unavailable. You can continue in text."; return
       }
+      if !model.fixture {
+        let allowed = await AVAudioApplication.requestRecordPermission()
+        guard interview.currentAccount, phase == .active else { return }
+        guard allowed else {
+          voicePermissionNeedsSettings = true
+          voiceExplanation = "Allow microphone access to use live voice."
+          return
+        }
+        voice.prepareIfAllowed()
+      }
       // Older compatible servers may not advertise the field; Start remains authoritative.
       focused = false
       voiceQuestionCollapsed = true
       showingVoiceRoom = true
       voice.dismiss()
-    } catch { voiceExplanation = "Couldn’t check voice availability. Check your connection and try again. Your reply is unchanged." }
+    } catch { voiceExplanation = "Voice isn’t reachable right now. Your reply is unchanged." }
+  }
+  private func requestAssistance(_ kind: String, title: String) {
+    guard !requestingAssistance else { return }
+    focused = false
+    requestingAssistance = true
+    assistanceTitle = title
+    assistanceText = nil
+    assistanceError = nil
+    let command = UUID()
+    assistanceRequestID = command.uuidString
+    sheet = .assistance
+    Task {
+      await interview.submit(kind, command: command)
+      if let failure = interview.failure {
+        assistanceError = failure
+        assistanceRequestID = nil
+        requestingAssistance = false
+      } else if let completedAssistance {
+        assistanceText = completedAssistance
+        assistanceRequestID = nil
+        requestingAssistance = false
+      }
+    }
+  }
+  private func dismissAssistance() {
+    assistanceRequestID = nil
+    assistanceText = nil
+    assistanceError = nil
+    requestingAssistance = false
+    sheet = nil
   }
   private func leaveVoiceRoom() {
     // Route changes never own audio lifetime. End stops local audio before any
@@ -766,14 +870,17 @@ struct InterviewView: View {
       if let voice = liveVoice, voice.phase == .unavailable {
         HStack {
           Text(voice.message ?? "Voice could not connect.").font(.footnote).foregroundStyle(.secondary)
-          Button(voice.blocksText ? "Sync" : "Dismiss") { Task { if voice.blocksText { await voice.retrySync() } else { voice.dismiss() } } }
+          Button(voice.blocksText ? "Try again" : "Dismiss") { Task { if voice.blocksText { await voice.retrySync() } else { voice.dismiss() } } }
         }
       }
 
       HStack(spacing: 16) {
-      Button { Task { await enterVoice() } } label: { Image(systemName: AppIcon.voice.rawValue).font(.system(size: 20, weight: .medium)).foregroundStyle(.primary)
-        .frame(width: 44, height: 44).background(.quaternary, in: RoundedRectangle(cornerRadius: 12)) }
-        .buttonStyle(.plain).disabled(checkingVoice || liveVoice == nil || interview.locked || interview.voice?.blocksText == true).accessibilityLabel("Live voice").accessibilityIdentifier("liveVoice")
+      Button { Task { await enterVoice() } } label: {
+        Image(systemName: AppIcon.voice.rawValue).font(.system(size: 20, weight: .medium))
+          .frame(width: 24, height: 24)
+      }
+        .buttonStyle(.bordered).buttonBorderShape(.circle).controlSize(.large).tint(AppPalette.primary)
+        .disabled(checkingVoice || liveVoice == nil || interview.locked || interview.voice?.blocksText == true).accessibilityLabel("Live voice").accessibilityIdentifier("liveVoice")
       Spacer(minLength: 0)
         Button {
           focused = false
@@ -782,13 +889,11 @@ struct InterviewView: View {
         } label: {
           Image(systemName: AppIcon.send.rawValue)
             .font(.system(size: 20, weight: .semibold))
-            .frame(width: 44, height: 44)
-            .background(Color.primary, in: RoundedRectangle(cornerRadius: 12))
+            .frame(width: 24, height: 24)
             .foregroundStyle(AppPalette.background)
-        }.buttonStyle(.plain)
+        }.buttonStyle(.borderedProminent).buttonBorderShape(.circle).controlSize(.large).tint(AppPalette.primary)
           .accessibilityLabel("Send reply")
           .disabled(interview.voice?.blocksText == true || interview.locked || interview.failedTurn != nil || interview.answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-          .opacity(interview.locked || interview.answer.isEmpty ? 0.4 : 1)
           .accessibilityIdentifier("shareAnswer")
       }
     }.padding(16)
@@ -931,7 +1036,7 @@ private struct InterviewVoiceRoom<Question: View>: View {
           .accessibilityValue(voice.phase == .active ? (voice.muted ? "Muted" : "Microphone on") : "Microphone off")
         }
         if voice.phase == .unavailable {
-          voiceControl(voice.blocksText ? "Sync" : "Retry", symbol: AppIcon.retry.rawValue, id: "voiceRetry") { Task {
+          voiceControl("Retry", symbol: AppIcon.retry.rawValue, id: "voiceRetry") { Task {
             if voice.blocksText { await voice.retrySync() } else { await voice.start() }
           } }
         }
@@ -1037,6 +1142,6 @@ struct GuidanceModePicker: View {
         }.padding(.vertical,4)
       }
         .accessibilityAddTraits(style == selection ? .isSelected : [])
-    }.navigationTitle("Practice mode").navigationBarTitleDisplayMode(.inline)
+    }.navigationTitle("Session style").navigationBarTitleDisplayMode(.inline)
   }
 }

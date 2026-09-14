@@ -7,6 +7,79 @@ import Testing
 @testable import Drillbit
 #endif
 struct InterviewTests {
+  @Test func lateSettingsAcknowledgementCannotEraseNewerOfflineChoice() async throws {
+    let container = try ModelContainer(for: Schema(StoreV1.models), configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+    let store = DiskStore(modelContainer: container)
+    let first = PendingSettings(value: PracticeSettings())
+    var settings = PracticeSettings(); settings.selectedLevel = "senior"; settings.timezone = "Asia/Tokyo"
+    let latest = PendingSettings(value: settings)
+    try await store.cache(key: "settings-pending:a", data: JSONEncoder().encode(latest))
+    #expect(try await !store.acknowledgeSettings(account: "a", id: first.id))
+    let reopened = DiskStore(modelContainer: container)
+    let data = try #require(await reopened.cached(key: "settings-pending:a"))
+    #expect(try JSONDecoder().decode(PendingSettings.self, from: data) == latest)
+    #expect(try await !reopened.acknowledgeSettings(account: "b", id: latest.id))
+    #expect(try await reopened.acknowledgeSettings(account: "a", id: latest.id))
+  }
+  @Test func homeTopicsFavorBreadthThenOlderPractice() {
+    let concepts = ["a", "b", "c"].map { PracticeConcept(id: $0, label: $0, category: "Design", aliases: []) }
+    let coverage: [CoverageResponse.Entry] = [.init(conceptId: "a", completedAttempts: 8, distinctQuestions: 4, lastPractised: "2026-08-01"), .init(conceptId: "b", completedAttempts: 1, distinctQuestions: 1, lastPractised: "2026-09-01")]
+    #expect(HomeTopicRanking.ranked(concepts, coverage: coverage).map(\.id) == ["c", "b", "a"])
+  }
+  @Test func practiceAreaMenuStaysSmallWhileCanonicalTagsRemainAvailable() {
+    let concepts = (PracticeAreaCatalog.ids + ["partitioning", "rate-limiting"]).map {
+      PracticeConcept(id: $0, label: $0, category: "Design", aliases: [])
+    }
+    #expect(PracticeAreaCatalog.curated(concepts).map(\.id) == PracticeAreaCatalog.ids)
+    #expect(PracticeAreaCatalog.curated(concepts).count == 10)
+  }
+  @Test func newerPositiveEvidenceRetiresOldRevisit() {
+    var source = Challenge(id: "q", lifecycle: "completed", title: "Queue", prompt: "Queue", topic: "System design")
+    source.reflection = Reflection(summary: "Queue", worked: [], improve: "Retries", takeaway: "Retries", strengths: [], gaps: [])
+    let old = LearningEvidence(conceptId: "queues", observation: "Consider retries", quote: "Delete it", signal: "needs_practice", assistance: "unknown", sessionId: "q", at: "2026-08-01")
+    let newer = LearningEvidence(conceptId: "queues", observation: "Handled retries", quote: "Deduplicate", signal: "demonstrated", assistance: "unknown", sessionId: "q", at: "2026-09-01")
+    #expect(HomeRevisit.select(memory: MemoryResponse(evidence: [old, newer], sessions: [source], patterns: []), dismissed: []) == nil)
+  }
+
+  @Test func homeCachesSurviveReopeningAndResetOnlyTheirAccount() async throws {
+    let container = try ModelContainer(for: Schema(StoreV1.models), configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+    let store = DiskStore(modelContainer: container)
+    for account in ["a", "b"] {
+      try await store.cache(key: "home-coverage:" + account, data: JSONEncoder().encode(CoverageResponse(concepts: [.init(conceptId: "queues", completedAttempts: 3, distinctQuestions: 2)])))
+      try await store.cache(key: "home-revisits:" + account, data: JSONEncoder().encode(Set(["dismissed"])))
+    }
+    let reopened = DiskStore(modelContainer: container)
+    let data = try #require(await reopened.cached(key: "home-coverage:a"))
+    #expect(try JSONDecoder().decode(CoverageResponse.self, from: data).concepts.first?.completedAttempts == 3)
+    let dismissed = try #require(await reopened.cached(key: "home-revisits:a"))
+    #expect(try JSONDecoder().decode(Set<String>.self, from: dismissed).contains("dismissed"))
+    try await reopened.clearPractice(account: "a")
+    #expect(try await reopened.cached(key: "home-coverage:a") == nil)
+    #expect(try await reopened.cached(key: "home-revisits:a") == nil)
+    #expect(try await reopened.cached(key: "home-coverage:b") != nil)
+    #expect(try await reopened.cached(key: "home-revisits:b") != nil)
+  }
+
+  @Test func homeRevisitRequiresSavedEvidenceAndSupportsDismissal() {
+    var source = Challenge(id: "q", lifecycle: "completed", title: "Queue", prompt: "Design a queue", topic: "System design")
+    let evidence = LearningEvidence(conceptId: "queues", observation: "Consider lost acknowledgements.", quote: "Delete after processing", signal: "needs_practice", assistance: "unknown", sessionId: "q")
+    var memory = MemoryResponse(evidence: [evidence], sessions: [source], patterns: [])
+    #expect(HomeRevisit.select(memory: memory, dismissed: []) == nil)
+    source.reflection = Reflection(summary: "Queue", worked: [], improve: "Retry safely", takeaway: "Use idempotency", strengths: [], gaps: [])
+    memory.sessions = [source]
+    let item = HomeRevisit.select(memory: memory, dismissed: [])!
+    #expect(HomeRevisit.select(memory: memory, dismissed: [item.id]) == nil)
+    memory.evidence?[0].observation = "Changed feedback"
+    #expect(HomeRevisit.select(memory: memory, dismissed: [item.id]) != nil)
+    memory.evidence?[0].signal = "demonstrated"
+    #expect(HomeRevisit.select(memory: memory, dismissed: []) == nil)
+    memory.evidence?[0].signal = "needs_practice"
+    memory.evidence?[0].quote = " "
+    #expect(HomeRevisit.select(memory: memory, dismissed: []) == nil)
+    memory.sessions = []
+    #expect(HomeRevisit.select(memory: memory, dismissed: []) == nil)
+  }
+
   @Test func voiceAvailabilityExpiresAndLatestProjectionKeepsBothSpeakers() throws {
     let legacy = try JSONDecoder().decode(Bootstrap.Capabilities.self, from: Data(#"{"managedAI":true,"voiceInterview":false}"#.utf8))
     #expect(legacy.voice == nil)
@@ -66,6 +139,18 @@ struct InterviewTests {
     #expect(try await reopened.pendingSkips(account: "a").isEmpty)
     #expect(try await reopened.pending(account: "a").isEmpty)
     #expect(try await reopened.load(account: "a", challenge: challenge).answer == "Keep this reasoning")
+  }
+  @Test func missingRemoteAttemptStopsBlockingNewPracticeButKeepsRecoveryText() async throws {
+    let container = try ModelContainer(for: Schema(StoreV1.models), configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+    let disk = DiskStore(modelContainer: container)
+    let challenge = Challenge(id: "retired", lifecycle: "in_progress", title: "Queue", prompt: "How?", topic: "System design", session: SessionDraft(answer: "", revision: 0))
+    _ = try await disk.load(account: "a", challenge: challenge)
+    try await disk.save(account: "a", id: challenge.id, answer: "Keep this local reasoning")
+
+    try await disk.retireMissingAttempt(account: "a", id: challenge.id)
+
+    #expect(try await disk.pending(account: "a").isEmpty)
+    #expect(try await disk.load(account: "a", challenge: challenge).answer == "Keep this local reasoning")
   }
   @Test func practiceResetIsAccountScopedAndClearsPendingCommands() async throws {
     let container = try ModelContainer(for: Schema(StoreV1.models), configurations: ModelConfiguration(isStoredInMemoryOnly: true))
@@ -262,14 +347,15 @@ struct InterviewTests {
 #endif
 
 struct InterviewDocumentTests {
-  @Test func eachFollowUpAppearsOnceAndHelpStaysWithItsQuestion() throws {
+  @Test func eachFollowUpAppearsOnceAndEphemeralHelpStaysOutOfTheDocument() throws {
     let help = InterviewTurn(id:"help",ordinal:0,kind:"hint",prompt:"Original",text:"",createdAt:"now",jobId:"help",status:"completed",result:InterviewResponse(outcome:"reply",text:"Consider retries"))
     let answer = InterviewTurn(id:"answer",ordinal:1,kind:"answer",prompt:"Original",text:"Use a queue",createdAt:"now",jobId:"answer",status:"completed",result:InterviewResponse(outcome:"follow_up",text:"What if it fails?"))
     let second = InterviewTurn(id:"second",ordinal:2,kind:"answer",prompt:"What if it fails?",text:"Retry",createdAt:"now",jobId:"second",status:"failed")
-    let groups = InterviewExchange.document(original:"Original",state:InterviewState(prompt:"What if it fails?",turns:[second,answer,help]))
+    let example = InterviewTurn(id:"example",ordinal:3,kind:"example",prompt:"What if it fails?",text:"",createdAt:"",jobId:"example",status:"completed",result:InterviewResponse(outcome:"reply",text:"A worked slice"))
+    let groups = InterviewExchange.document(original:"Original",state:InterviewState(prompt:"What if it fails?",turns:[example,second,answer,help]))
     #expect(groups.map(\.id) == ["original","answer","second"])
     #expect(groups.map(\.prompt) == ["Original","What if it fails?",""])
-    #expect(groups[0].turns.map(\.id) == ["help","answer"])
+    #expect(groups[0].turns.map(\.id) == ["answer"])
     #expect(groups[1].turns.map(\.id) == ["second"])
     #expect(groups[1].hasAnswer)
   }

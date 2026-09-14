@@ -1,6 +1,13 @@
 import Foundation
 
+struct PracticeProfile: Codable, Equatable, Sendable {
+  var goals = ""
+  var background = ""
+  var preferences = ""
+}
+struct PersonalizationPreview: Codable { var text: String }
 struct PracticeSettings: Codable, Equatable, Sendable {
+  var practiceProfile: PracticeProfile? = nil
   var onboardingComplete = false
   var focus = "System design"
   var difficulty = "medium"
@@ -117,7 +124,10 @@ struct VoiceCapability: Codable, Sendable {
   }
 }
 struct Bootstrap: Codable, Sendable {
-  struct Capabilities: Codable, Sendable { var voice: VoiceCapability? }
+  struct Capabilities: Codable, Sendable {
+    var voice: VoiceCapability?
+    var developerTools: Bool? = nil
+  }
   var capabilities: Capabilities? = nil
   var practiceEpoch: String?
   struct Account: Codable, Sendable {
@@ -316,22 +326,18 @@ func reminderComponents(minutes: Int, timezone: String) -> DateComponents {
   DateComponents(calendar: Calendar(identifier: .gregorian), timeZone: TimeZone(identifier: timezone), hour: minutes / 60, minute: minutes % 60)
 }
 
-enum PracticeFocus {
-  static let choices = ["System design", "Backend", "Frontend", "Debugging", "Algorithms"]
-}
-
 enum GuidanceMode: String, CaseIterable, Codable, Identifiable, Sendable {
   case learnTogether = "learn_together", coachMe = "coach_me", mockInterview = "mock_interview"
   var id: String { rawValue }
   var title: String { switch self {
-    case .learnTogether: "Learn together"
-    case .coachMe: "Coach me"
+    case .learnTogether: "Guided"
+    case .coachMe: "Practice"
     case .mockInterview: "Mock interview"
   } }
   var explanation: String { switch self {
-    case .learnTogether: "See an approach, then work through it together."
-    case .coachMe: "Lead the way, with help when it matters."
-    case .mockInterview: "Practise taking the lead, with feedback afterwards."
+    case .learnTogether: "Work through an approach together, with examples along the way."
+    case .coachMe: "Take the lead. Get useful pointers when you’re stuck or missing something."
+    case .mockInterview: "Put your approach to the test. Save the coaching for the debrief."
   } }
 }
 enum InterviewStyle: String, CaseIterable, Codable, Identifiable, Sendable {
@@ -405,6 +411,8 @@ struct InterviewExchange: Identifiable, Sendable {
   static func document(original: String, state: InterviewState) -> [Self] {
     var result = [Self(id: "original", prompt: original)]
     for turn in state.turns.sorted(by: { $0.ordinal < $1.ordinal }) {
+      // Explicit help is a one-time overlay, not part of the interview document.
+      if ["hint", "example"].contains(turn.kind) { continue }
       result[result.count - 1].turns.append(turn)
       if ["answer", "continue"].contains(turn.kind), turn.result?.outcome != "wrap_up" {
         result.append(Self(id: turn.id, prompt: turn.result?.text ?? turn.partial ?? ""))
@@ -422,6 +430,13 @@ struct InterviewReadingState: Codable, Sendable {
 struct InterviewStreamSnapshot: Decodable { var status: String; var text: String }
 
 struct PracticeConcept: Codable, Identifiable, Sendable { var id: String; var label: String; var category: String; var aliases: [String] }
+enum PracticeAreaCatalog {
+  /// A small learning-facing menu over the richer canonical taxonomy used for tagging.
+  static let ids = ["data-modeling", "consistency", "api-design", "caching", "queues", "coordination", "fault-tolerance", "capacity-planning", "authorization", "observability"]
+  static func curated(_ concepts: [PracticeConcept]) -> [PracticeConcept] {
+    ids.compactMap { id in concepts.first { $0.id == id } }
+  }
+}
 struct TaxonomyResponse: Codable, Sendable { var version: Int; var concepts: [PracticeConcept] }
 struct LibraryQuestion: Codable, Identifiable, Sendable, Equatable {
   var id: String; var title: String; var prompt: String; var scenario: String; var engineeringLevel: String
@@ -447,4 +462,43 @@ struct VoiceFragment: Codable, Identifiable, Equatable, Sendable {
   var text: String
   var startMs: Int
   var endMs: Int
+}
+
+struct HomeRevisit: Identifiable {
+  var evidence: LearningEvidence
+  var source: Challenge
+  var id: String { evidence.id + evidence.observation + (source.reflection?.improve ?? "") }
+  static func select(memory: MemoryResponse, dismissed: Set<String>) -> HomeRevisit? {
+    var checkedConcepts: Set<String> = []
+    let evidence = (memory.evidence ?? []).enumerated().sorted {
+      if $0.element.at != $1.element.at { return ($0.element.at ?? "") > ($1.element.at ?? "") }
+      return $0.offset < $1.offset
+    }.map(\.element)
+    for item in evidence {
+      guard checkedConcepts.insert(item.conceptId).inserted else { continue }
+      guard item.signal == "needs_practice" && !item.quote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !item.observation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+      guard let source = memory.sessions.first(where: { $0.id == item.sessionId && $0.lifecycle == "completed" }),
+            source.reflection != nil else { continue }
+      let candidate = HomeRevisit(evidence: item, source: source)
+      if !dismissed.contains(candidate.id) { return candidate }
+    }
+    return nil
+  }
+}
+
+struct PendingSettings: Codable, Equatable, Sendable {
+  var id = UUID().uuidString
+  var value: PracticeSettings
+}
+
+enum HomeTopicRanking {
+  static func ranked(_ concepts: [PracticeConcept], coverage: [CoverageResponse.Entry]) -> [PracticeConcept] {
+    let counts = Dictionary(coverage.map { ($0.conceptId, $0) }, uniquingKeysWith: { _, latest in latest })
+    return concepts.sorted {
+      let a = counts[$0.id], b = counts[$1.id]
+      if (a?.completedAttempts ?? 0) != (b?.completedAttempts ?? 0) { return (a?.completedAttempts ?? 0) < (b?.completedAttempts ?? 0) }
+      if a?.lastPractised != b?.lastPractised { return (a?.lastPractised ?? "") < (b?.lastPractised ?? "") }
+      return $0.id < $1.id
+    }
+  }
 }

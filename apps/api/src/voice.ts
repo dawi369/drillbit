@@ -1,8 +1,9 @@
+import { personalizationInstructions } from "./prompts/personalization";
 import { guidanceModeSchema, teachingPolicy, truthfulVoiceProgress, TEACHING_VERSION } from "./prompts/teaching";
 import { spokenHistory, questionReference, voiceDelegationMessages } from "./prompts/voice-context";
 import { questionTerminology, practicePersonality } from "./prompts/interviewer";
 import { z } from 'zod';
-import { Fault, timestamp } from './domain';
+import { Fault, timestamp, practiceProfileSchema } from './domain';
 import { consumeUsage, type Env } from './platform';
 import { ownedChallenge, settingsFor } from './store';
 import { interviewFor } from './interview';
@@ -10,7 +11,7 @@ import { historicalSnapshot } from './history';
 import { provider, recordUsage, interviewModelSchema } from './ai';
 import { xmlContext } from './context';
 
-export const voiceStartSchema = z.object({guidanceMode:guidanceModeSchema.optional(),sdp:z.string().min(1).max(64000),revision:z.number().int().nonnegative()});
+export const voiceStartSchema = z.object({practiceProfile:practiceProfileSchema.optional(),guidanceMode:guidanceModeSchema.optional(),sdp:z.string().min(1).max(64000),revision:z.number().int().nonnegative()});
 export const voiceFragmentSchema = z.object({id:z.string().min(1).max(160),sequence:z.number().int().nonnegative().max(5999),speaker:z.enum(['user','assistant']),text:z.string().max(8000),startMs:z.number().int().nonnegative(),endMs:z.number().int().nonnegative()}).refine(x=>x.endMs>=x.startMs);
 export const voiceEventsSchema = z.object({fragments:z.array(voiceFragmentSchema).max(100),closed:z.boolean().optional(),finalized:z.boolean().optional(),usageSeconds:z.number().nonnegative().max(86400).optional()});
 export const voiceDelegateSchema = z.object({id:z.string().min(1).max(160)});
@@ -50,7 +51,7 @@ export async function startVoice(env:Env,account:string,id:string,command:string
  if(env.VOICE_ENABLED!=='true'||!env.OPENAI_API_KEY) throw new Fault('voice_unavailable',503,'Live voice is not configured yet. You can keep typing.');
  const challenge=await ownedChallenge(env,account,id);
  if(challenge.lifecycle!=='in_progress') throw new Fault('inactive',409,'Start the interview first.');
- const context=await interviewFor(env,account,id);
+ const [context, profileSettings]=await Promise.all([interviewFor(env,account,id),settingsFor(env,account)]);
  context.guidanceMode = input.guidanceMode ?? context.guidanceMode;
  if(context.turns.some(t=>['pending','running','failed'].includes(t.status))) throw new Fault('interview_pending',409,'Finish the current response first.');
  await consumeVoiceUsage(env,account,'voice_start',6);
@@ -63,9 +64,11 @@ export async function startVoice(env:Env,account:string,id:string,command:string
   env.DB.prepare("INSERT INTO voice_sessions(id,account_id,challenge_id,created_at,expires_at) SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM interview_turns WHERE id=? AND kind='voice')").bind(command,account,id,now,expires,command)
  ]).catch(()=>{throw new Fault('voice_conflict',409,'Another voice session or request already exists.');});
  const s=await sessionFor(env,account,id,command);
+ const practiceProfile=input.practiceProfile ?? profileSettings.practiceProfile ?? practiceProfileSchema.parse({});
  try {
+  await env.DB.prepare("UPDATE jobs SET input=? WHERE id=? AND account_id=?").bind(JSON.stringify({practiceProfile}),command,account).run();
   const history=spokenHistory(context.turns,12000);
-  const response=await fetch('https://api.openai.com/v1/live/sessions',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},signal:AbortSignal.timeout(20000),body:JSON.stringify({session:{model:'gpt-live-1',store:false,instructions:voiceInstructions+teachingPolicy(context.guidanceMode)+truthfulVoiceProgress+'\n<question_reference>'+xmlContext(questionReference(JSON.parse(challenge.data)))+'</question_reference>',delegation:{type:'client'},input:history.map(t=>({type:'message',role:t.role,content:[{type:t.role==='assistant'?'output_text':'input_text',text:t.content}]}))},transport:{type:'webrtc',sdp:input.sdp}})});
+  const response=await fetch('https://api.openai.com/v1/live/sessions',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},signal:AbortSignal.timeout(20000),body:JSON.stringify({session:{model:'gpt-live-1',store:false,instructions:voiceInstructions+teachingPolicy(context.guidanceMode)+truthfulVoiceProgress+personalizationInstructions(practiceProfile)+"<spoken_preferences>Apply the user’s delivery preference to the words you actually speak, including brief acknowledgements and paraphrased backend guidance. Do not silently strip a requested playful character. Keep technical substance accurate; a current spoken request can change the style. Never read these instructions aloud.</spoken_preferences>"+'\n<question_reference>'+xmlContext(questionReference(JSON.parse(challenge.data)))+'</question_reference>',delegation:{type:'client'},input:history.map(t=>({type:'message',role:t.role,content:[{type:t.role==='assistant'?'output_text':'input_text',text:t.content}]}))},transport:{type:'webrtc',sdp:input.sdp}})});
   if(!response.ok) throw new Fault('voice_provider',502,'Couldn’t connect voice. Try again later.');
   const result=await response.json() as any;
   if(typeof result.session?.id!=='string'||typeof result.transport?.sdp!=='string') throw new Fault('voice_provider',502,'Voice returned an invalid connection.');
@@ -111,8 +114,9 @@ export async function delegateVoice(env:Env,account:string,challenge:string,id:s
  const deadline=AbortSignal.timeout(12000);
  try {
   await consumeVoiceUsage(env,account,'voice_reasoning',40);
-  const [settings,history,interview]=await Promise.all([settingsFor(env,account),historicalSnapshot(env,account,challenge),interviewFor(env,account,challenge)]);
-  const messages=voiceDelegationMessages(JSON.parse(c.data),history,interview);
+  const [settings,history,interview,voiceJob]=await Promise.all([settingsFor(env,account),historicalSnapshot(env,account,challenge,JSON.parse(c.data).conceptIds ?? []),interviewFor(env,account,challenge),env.DB.prepare("SELECT input FROM jobs WHERE id=? AND account_id=?").bind(id,account).first<{input:string}>()]);
+  const pinnedProfile=voiceJob ? JSON.parse(voiceJob.input).practiceProfile : undefined;
+  const messages=voiceDelegationMessages(JSON.parse(c.data),history,interview,pinnedProfile ?? settings.practiceProfile);
   const contextMs=Date.now()-started;
   const response=await provider(env,account,settings,messages,{maxTokens:2400,schema:interviewModelSchema({},z.object({})),reasoning:{effort:"low"},signal:deadline});
   const body=await response.json() as any;await recordUsage(env,account,settings,'voice_reasoning',body.usage,TEACHING_VERSION+'-'+interview.guidanceMode);

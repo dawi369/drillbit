@@ -7,6 +7,7 @@ struct RootView: View {
   @State private var selectedTab = "home"
   @AppStorage("appearance") private var appearance = "system"
   @Environment(\.scenePhase) private var scenePhase
+  @Environment(\.colorScheme) private var systemColorScheme
   var body: some View {
     Group {
       if model.restoringSession || model.launchError != nil {
@@ -62,7 +63,10 @@ struct RootView: View {
       }
     }
     .sheet(isPresented: $settingsOpen) {
-      NavigationStack { SettingsView(model: model) }.interactiveDismissDisabled()
+      NavigationStack { SettingsView(model: model) }
+        .environment(\.colorScheme, appearance == "dark" ? .dark : appearance == "light" ? .light : systemColorScheme)
+        .preferredColorScheme(appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
+        .interactiveDismissDisabled()
     }
     .fullScreenCover(item: $model.presented) { challenge in
       NavigationStack { InterviewView(model: model, challenge: challenge) }
@@ -139,14 +143,15 @@ struct HomeView: View {
           .accessibilityIdentifier("practiceCompletionNotice")
           Divider()
         }
-        PracticeOverview(memory: model.memory)
-        Divider()
-        if let challenge = model.bootstrap?.challenge {
-          VStack(alignment: .leading, spacing: 12) {
-            HStack {
-              Text(challenge.lifecycle == "in_progress" ? "In progress" : "Ready to practise")
-                .font(.caption).foregroundStyle(.secondary)
-              Spacer()
+        VStack(alignment: .leading, spacing: 12) {
+          Text("Your practice").font(.title3.weight(.semibold))
+          PracticeOverview(memory: model.memory)
+        }
+        VStack(alignment: .leading, spacing: 12) {
+          HStack {
+            Text("Next question").font(.title3.weight(.semibold))
+            Spacer()
+            if let challenge = model.bootstrap?.challenge {
               Menu {
                 if challenge.lifecycle == "ready" {
                   Button("Regenerate", systemImage: AppIcon.retry.rawValue) { Task {
@@ -163,31 +168,38 @@ struct HomeView: View {
                 .accessibilityLabel("Question actions").accessibilityIdentifier("homeQuestionActions")
                 .disabled(model.busy)
             }
-            Text(challenge.title).font(.headline).lineLimit(2)
-            Text("\(challenge.topic) · \(challenge.levelLabel)").font(.subheadline).foregroundStyle(.secondary)
-            if challenge.lifecycle == "ready", let reason = challenge.selectionReason { Text(reason).font(.caption).foregroundStyle(.secondary) }
-            Button(challenge.lifecycle == "in_progress" ? "Resume" : "Preview question") {
-              if challenge.lifecycle == "in_progress" { Task { await model.open(challenge) } }
-              else { flow = QuestionFlowEntry(challenge: challenge) }
-            }.buttonStyle(PracticeButtonStyle()).accessibilityIdentifier("startPractice")
           }
-        } else if !model.busy {
-          Button("Prepare question") { flow = QuestionFlowEntry() }.buttonStyle(PracticeButtonStyle())
-        }
-        if model.busy || model.bootstrap?.jobs.contains(where: { $0.kind == "generate" && ["pending", "running"].contains($0.status) }) == true {
-          LoadingStatus("Preparing your question…")
-        }
-        if let failure = model.preparationFailure {
-          Text(failure).font(.subheadline).foregroundStyle(.secondary)
-          Button("Review preparation") { flow = QuestionFlowEntry(recovery: model.failedPreparation, source: model.failedPreparationSource) }
-        }
-        ForEach(model.bootstrap?.jobs.filter { $0.status == "failed" && $0.kind != "help" } ?? []) { job in
-          VStack(alignment: .leading, spacing: 8) {
-            Text(job.error ?? "Preparation could not finish.").foregroundStyle(.secondary)
-            Button("Retry") { Task { await model.retry(job) } }
+          VStack(alignment: .leading, spacing: 16) {
+          if let challenge = model.bootstrap?.challenge {
+            VStack(alignment: .leading, spacing: 12) {
+              Text(challenge.title).font(.title2.weight(.semibold)).lineLimit(2)
+              Text("\(challenge.topic) · \(challenge.levelLabel)").font(.subheadline).foregroundStyle(.secondary)
+              Button(challenge.lifecycle == "in_progress" ? "Resume" : "Open question") {
+                if challenge.lifecycle == "in_progress" { Task { await model.open(challenge) } }
+                else { flow = QuestionFlowEntry(challenge: challenge) }
+              }.buttonStyle(PracticeButtonStyle()).accessibilityIdentifier("startPractice")
+            }
+          } else if !model.busy {
+            Button("Choose a question") { flow = QuestionFlowEntry() }.buttonStyle(PracticeButtonStyle())
           }
+          if model.busy || model.bootstrap?.jobs.contains(where: { $0.kind == "generate" && ["pending", "running"].contains($0.status) }) == true {
+            LoadingStatus("Preparing your question…")
+          }
+          if let failure = model.preparationFailure {
+            Text(failure).font(.subheadline).foregroundStyle(.secondary)
+            Button("Review preparation") { flow = QuestionFlowEntry(recovery: model.failedPreparation, source: model.failedPreparationSource) }
+          }
+          ForEach(model.bootstrap?.jobs.filter { $0.status == "failed" && $0.kind != "help" } ?? []) { job in
+            VStack(alignment: .leading, spacing: 8) {
+              Text(job.error ?? "Preparation could not finish.").foregroundStyle(.secondary)
+              Button("Retry") { Task { await model.retry(job) } }
+            }
+          }
+          }.padding(20).background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 12))
         }
-      }.frame(maxWidth: 640, alignment: .leading).padding(24)
+        if let revisit = model.homeRevisit { revisitSection(revisit) }
+        exploreSection
+      }.frame(maxWidth: 640, alignment: .leading).frame(maxWidth: .infinity).padding(20)
     }.safeAreaPadding(.bottom, 24)
       .task(id: model.bootstrap?.account.id) { await model.ensureHomeQuestion() }
       .alert("Skip this question?", isPresented: Binding(get: { skipping != nil }, set: { if !$0 { skipping = nil } })) {
@@ -199,7 +211,7 @@ struct HomeView: View {
       .sheet(item: $flow, onDismiss: {
         if let started { model.presented = started; self.started = nil }
       }) { entry in
-        QuestionFlow(model: model, initial: entry.challenge, source: entry.source, recovery: entry.recovery, onStart: { started = $0 })
+        QuestionFlow(model: model, initial: entry.challenge, source: entry.source, recovery: entry.recovery, browseTopics: entry.browseTopics, onStart: { started = $0 })
       }
       .task {
         while !Task.isCancelled {
@@ -208,19 +220,67 @@ struct HomeView: View {
         }
       }
   }
+  private func prepare(_ concept: PracticeConcept, source: Challenge? = nil) {
+    flow = QuestionFlowEntry(recovery: PreparationInput(primaryConceptId: concept.id, focus: "System design", kind: "design", difficulty: model.settings.difficulty, engineeringLevel: model.settings.selectedLevel, replaceId: model.bootstrap?.challenge?.lifecycle == "ready" ? model.bootstrap?.challenge?.id : nil, followUpId: source?.id), source: source)
+  }
+  private func revisitSection(_ item: HomeRevisit) -> some View {
+    VStack(alignment: .leading, spacing: 12) {
+      HStack {
+        Text("Revisit").font(.title3.weight(.semibold))
+        Spacer()
+        Button { Task { await model.dismissHomeRevisit(item) } } label: {
+          Image(systemName: "xmark").foregroundStyle(.secondary).frame(width: 44, height: 44)
+        }.buttonStyle(.plain).accessibilityLabel("Dismiss revisit suggestion")
+      }
+      VStack(alignment: .leading, spacing: 12) {
+        Text(model.taxonomy.first(where: { $0.id == item.evidence.conceptId })?.label ?? "From your practice")
+          .font(.headline)
+        Text(item.evidence.observation).font(.subheadline).foregroundStyle(.secondary)
+        NavigationLink("Review reasoning") { SessionDetailView(model: model, initial: item.source) }
+          .frame(minHeight: 44)
+        if let concept = model.taxonomy.first(where: { $0.id == item.evidence.conceptId }) {
+          Button("Practise this concept") { prepare(concept, source: item.source) }
+            .buttonStyle(PracticeButtonStyle(secondary: true))
+        }
+      }.padding(20).background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 12))
+    }
+  }
+  private var exploreSection: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Text("Explore system design").font(.title3.weight(.semibold))
+      VStack(spacing: 0) {
+        let ranked = HomeTopicRanking.ranked(PracticeAreaCatalog.curated(model.taxonomy), coverage: model.libraryCoverage)
+        ForEach(Array(ranked.prefix(3))) { concept in
+          Button { prepare(concept) } label: {
+            HomeTopicRow(concept: concept, coverage: model.libraryCoverage.first(where: { $0.conceptId == concept.id }), loaded: model.libraryCoverageLoaded)
+          }.buttonStyle(.plain)
+          if concept.id != ranked.prefix(3).last?.id { Divider().padding(.horizontal, 16) }
+        }
+      }.background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 12))
+      Button("See all topics", systemImage: "arrow.right") { flow = QuestionFlowEntry(browseTopics: true) }
+        .frame(minHeight: 44)
+    }.task { await model.loadTaxonomy() }
+  }
+
 }
 struct QuestionFlowEntry: Identifiable {
   let id = UUID()
   var challenge: Challenge? = nil
   var recovery: PreparationInput? = nil
   var source: Challenge? = nil
+  var browseTopics = false
 }
 struct QuestionFlow: View {
   @Bindable var model: AppModel
   var initial: Challenge? = nil
   var source: Challenge? = nil
   var recovery: PreparationInput? = nil
+  var browseTopics = false
   var onStart: (Challenge) -> Void
+  @State private var selectedTopic: PracticeConcept?
+  @State private var topicSearch = ""
+  @State private var customTopic = ""
+  @State private var selectedCustomTopic: String?
   @State private var showingPreview = false
   @State private var question: Challenge?
   @State private var loading = false
@@ -234,7 +294,27 @@ struct QuestionFlow: View {
   @Environment(\.scenePhase) private var scenePhase
   var body: some View {
     NavigationStack {
-      if showingPreview {
+      if browseTopics && selectedTopic == nil && selectedCustomTopic == nil {
+        List {
+          Section("Core areas") {
+            ForEach(PracticeAreaCatalog.curated(model.taxonomy).filter { topicSearch.isEmpty || $0.label.localizedCaseInsensitiveContains(topicSearch) }) { concept in
+              Button {
+                selectedTopic = concept
+                retryInput = PreparationInput(primaryConceptId: concept.id, focus: "System design", kind: "design", difficulty: model.settings.difficulty, engineeringLevel: model.settings.selectedLevel, replaceId: model.bootstrap?.challenge?.lifecycle == "ready" ? model.bootstrap?.challenge?.id : nil)
+              } label: {
+                HomeTopicRow(concept: concept, coverage: model.libraryCoverage.first(where: { $0.conceptId == concept.id }), loaded: model.libraryCoverageLoaded)
+              }.buttonStyle(.plain)
+            }
+          }
+          Section("Your own topic") {
+            TextField("For example, search ranking", text: $customTopic)
+            Button("Continue") { selectedCustomTopic = customTopic.trimmingCharacters(in: .whitespacesAndNewlines) }
+              .disabled(customTopic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+          }
+        }.searchable(text: $topicSearch, prompt: "Find a core area")
+          .navigationTitle("System design").navigationBarTitleDisplayMode(.inline)
+          .toolbar { Button("Close") { dismiss() } }
+      } else if showingPreview {
         Group {
           if loading {
             LoadingStatus("Preparing your question…")
@@ -277,10 +357,10 @@ struct QuestionFlow: View {
               }
             }.padding(16).background(AppPalette.background)
           }
-        }.navigationTitle("Question preview").navigationBarTitleDisplayMode(.inline)
+        }.navigationTitle("Question").navigationBarTitleDisplayMode(.inline)
           .toolbar { Button("Close") { dismiss() } }
       } else {
-        PreparationView(model: model, source: source, submit: { input in
+        PreparationView(model: model, source: source, initialCustomTopic: selectedCustomTopic, submit: { input in
           showingPreview = true
           loading = true
           question = nil
@@ -457,23 +537,29 @@ struct ExampleView: View {
 struct PracticeOverview: View {
   var memory: MemoryResponse
   @Environment(\.dynamicTypeSize) private var typeSize
+  private var headline: String {
+    guard let stats = memory.statistics else { return "Ready when you are." }
+    if stats.completed == 0 { return "Let’s make the first one count." }
+    if stats.lastSevenDays >= 4 { return "You’re building real momentum." }
+    if stats.lastSevenDays > 0 { return "Nice work showing up." }
+    return "Your next rep is waiting."
+  }
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
-      Text("Your practice").font(.title2.weight(.semibold))
+      Text(headline).font(.title2.weight(.semibold))
       let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 16)) : AnyLayout(HStackLayout(alignment: .top, spacing: 24))
       if let statistics = memory.statistics {
         layout {
           metric("Completed", value: statistics.completed)
           metric("Last 7 days", value: statistics.lastSevenDays)
         }
-      } else {
-        Text("Loading practice…").font(.subheadline).foregroundStyle(.secondary)
       }
       if let value = memory.statistics, let date = Date.fromAPI(value.asOf), Date().timeIntervalSince(date) > 300 {
         Text("Updated \(date.formatted(date: .abbreviated, time: .shortened))")
           .font(.caption).foregroundStyle(.secondary)
       }
-    }.frame(maxWidth: .infinity, alignment: .leading)
+    }.padding(20).frame(maxWidth: .infinity, alignment: .leading)
+      .background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 12))
   }
   private func metric(_ title: String, value: Int) -> some View {
     VStack(alignment: .leading, spacing: 4) {
@@ -482,5 +568,24 @@ struct PracticeOverview: View {
     }.frame(maxWidth: .infinity, alignment: .leading)
       .accessibilityElement(children: .ignore)
       .accessibilityLabel("\(title), \(value)")
+  }
+}
+
+private struct HomeTopicRow: View {
+  var concept: PracticeConcept
+  var coverage: CoverageResponse.Entry?
+  var loaded: Bool
+  var body: some View {
+    HStack(spacing: 12) {
+      VStack(alignment: .leading, spacing: 4) {
+        Text(concept.label).font(.body.weight(.medium)).foregroundStyle(.primary)
+        if loaded {
+          Text((coverage?.completedAttempts ?? 0) == 0 ? "Not explored yet" : "\((coverage?.completedAttempts ?? 0)) completed sessions")
+            .font(.caption).foregroundStyle(.secondary)
+        }
+      }
+      Spacer(minLength: 0)
+      Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+    }.padding(16).frame(maxWidth: .infinity, minHeight: 60, alignment: .leading).contentShape(Rectangle())
   }
 }

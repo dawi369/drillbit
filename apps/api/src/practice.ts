@@ -46,7 +46,7 @@ export async function requestHelp(
     throw new Fault(
       "revision_conflict",
       409,
-      "Sync your answer before requesting help.",
+      "The answer changed. Try the request again.",
     );
   if (
     action.mode !== "guided" &&

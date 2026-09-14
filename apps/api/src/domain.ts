@@ -7,7 +7,13 @@ import { Temporal } from "@js-temporal/polyfill";
 export const MODEL_ID = "google/gemini-3.1-flash-lite";
 export const engineeringLevelSchema = z.enum(["intern", "junior", "mid", "senior", "staff", "principal"]);
 export const levelForDifficulty = (difficulty: string) => difficulty === "easy" ? "junior" : difficulty === "hard" ? "senior" : "mid";
+export const practiceProfileSchema = z.object({
+  goals: z.string().trim().max(600).default(""),
+  background: z.string().trim().max(600).default(""),
+  preferences: z.string().trim().max(600).default(""),
+});
 export const settingsSchema = z.object({
+  practiceProfile: practiceProfileSchema.optional(),
   onboardingComplete: z.boolean().default(false),
   focus: z.string().trim().min(1).max(4000).default("System design"),
   engineeringLevel: engineeringLevelSchema.optional(),

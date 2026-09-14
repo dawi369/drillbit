@@ -87,7 +87,7 @@ struct LocalDraft: Sendable {
   func pending(account: String) throws -> [LocalDraft] {
     try modelContext.fetch(
       FetchDescriptor<StoredDraft>(
-        predicate: #Predicate { $0.account == account && $0.pendingKind != "" && $0.pendingKind != "skipped" })
+        predicate: #Predicate { $0.account == account && $0.pendingKind != "" && $0.pendingKind != "skipped" && $0.pendingKind != "retired" })
     ).map(snapshot)
   }
   func acknowledge(account: String, sent: LocalDraft, revision: Int) throws {
@@ -100,6 +100,14 @@ struct LocalDraft: Sendable {
   func markConflict(account: String, id: String) throws {
     guard let value = try row(account: account, id: id) else { return }
     value.conflict = true
+    try modelContext.save()
+  }
+  /// A server-confirmed missing attempt can no longer accept writes. Keep its text for local
+  /// recovery, but retire the outbox command so unrelated practice is not held hostage.
+  func retireMissingAttempt(account: String, id: String) throws {
+    guard let value = try row(account: account, id: id) else { return }
+    value.pendingKind = "retired"
+    value.conflict = false
     try modelContext.save()
   }
   func resolve(account: String, challenge: Challenge, keepLocal: Bool) throws {
@@ -138,6 +146,14 @@ struct LocalDraft: Sendable {
     }
     try modelContext.save()
   }
+  /// Compare and clear on the storage actor so a late acknowledgement cannot erase a newer edit.
+  func acknowledgeSettings(account: String, id: String) throws -> Bool {
+    let key = "settings-pending:" + account
+    guard let data = try cached(key: key),
+          let pending = try? JSONDecoder().decode(PendingSettings.self, from: data), pending.id == id else { return false }
+    try cache(key: key, data: Data())
+    return true
+  }
   func cached(key: String) throws -> Data? {
     try modelContext.fetch(FetchDescriptor<CachedPayload>(predicate: #Predicate { $0.key == key }))
       .first?.payload
@@ -161,7 +177,7 @@ struct LocalDraft: Sendable {
     try cache(key: key, data: JSONEncoder().encode(receipts.filter { !ids.contains($0.id) }))
   }
   func prepareInterviewAnswer(account: String, id: String, answer: String, command: String, promptID: String, style: InterviewStyle, guidanceMode: GuidanceMode? = nil) throws -> PendingInterviewCommand {
-    guard let draft = try row(account: account, id: id), !draft.conflict, !["complete", "skipped"].contains(draft.pendingKind) else {
+    guard let draft = try row(account: account, id: id), !draft.conflict, !["complete", "skipped", "retired"].contains(draft.pendingKind) else {
       throw APIError(code: "sync_pending", message: "Review the current draft before sending.", status: 409)
     }
     draft.answer = answer

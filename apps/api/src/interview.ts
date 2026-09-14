@@ -57,13 +57,13 @@ export async function requestInterview(env: Env, account: string, id: string, co
   if (input.kind === "clarification" && !input.text) throw new Fault("empty_question", 400, "What would you like to ask?");
   if (input.kind === "continue" && !context.wrapUp) throw new Fault("not_wrapping_up", 409, "Answer the current question first.");
   const session = await env.DB.prepare("SELECT answer,revision FROM sessions WHERE challenge_id=?").bind(id).first<{answer:string; revision:number}>();
-  if (!session || session.revision !== input.revision || (input.kind === "answer" && !input.saveDraft && session.answer.trim() !== input.text)) throw new Fault("revision_conflict", 409, "Sync your current answer before sharing.");
+  if (!session || session.revision !== input.revision || (input.kind === "answer" && !input.saveDraft && session.answer.trim() !== input.text)) throw new Fault("revision_conflict", 409, "The draft changed. Review it and try again.");
   await consumeUsage(env, account, "interview", 50);
   const now = timestamp();
   context.style = "standard";
   context.guidanceMode = input.guidanceMode ?? context.guidanceMode;
-  const [settings, history] = await Promise.all([settingsFor(env, account), historicalSnapshot(env, account, id)]);
-  const payload = JSON.stringify({ settings, action: input, turnId: command, context: { promptVersion: INTERVIEW_PROMPT_VERSION, historicalSnapshot: history, question: { ...JSON.parse(challenge.data), interviewStyle: context.style }, interview: context } });
+  const [settings, history] = await Promise.all([settingsFor(env, account), historicalSnapshot(env, account, id, JSON.parse(challenge.data).conceptIds ?? [])]);
+  const payload = JSON.stringify({ settings, action: input, turnId: command, context: { practiceProfile: settings.practiceProfile, promptVersion: INTERVIEW_PROMPT_VERSION, historicalSnapshot: history, currentDraft: session.answer, question: { ...JSON.parse(challenge.data), interviewStyle: context.style }, interview: context } });
   await env.DB.batch([
     env.DB.prepare(`INSERT OR IGNORE INTO jobs(id,account_id,challenge_id,kind,input,created_at,updated_at) SELECT ?,?,?,'interview',?,?,? WHERE EXISTS(SELECT 1 FROM sessions s JOIN challenges c ON c.id=s.challenge_id WHERE c.id=? AND c.account_id=? AND c.lifecycle='in_progress' AND s.revision=?) AND NOT EXISTS(SELECT 1 FROM jobs WHERE account_id=? AND kind='interview' AND status IN ('pending','running')) AND NOT EXISTS(SELECT 1 FROM voice_sessions WHERE account_id=? AND status IN ('connecting','active') AND expires_at>?)`).bind(command,account,id,payload,now,now,id,account,input.revision,account,account,now),
     env.DB.prepare(`INSERT INTO interview_turns(id,challenge_id,ordinal,kind,prompt,text,job_id,created_at) SELECT ?,?,COALESCE((SELECT MAX(ordinal)+1 FROM interview_turns WHERE challenge_id=?),0),?,?,?,?,? WHERE EXISTS(SELECT 1 FROM jobs WHERE id=?)`).bind(command,id,id,input.kind,context.prompt,input.text,command,now,command),

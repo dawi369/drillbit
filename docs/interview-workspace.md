@@ -6,7 +6,7 @@ Implemented 12 September 2026. This supersedes the Question/Conversation selecto
 
 Start opens the existing writing document with no keyboard focus; restored interviews retain reading state. The canonical question collapses to its title and three description lines. Each answer stays paired with its response. One-line content has no disclosure control. Local durable acceptance triggers the existing 300 ms coordinated collapse once; subsequent response updates cannot re-collapse a manually reopened answer.
 
-The inline field is “Your reply”, with “Talk through your approach, or ask a question…” as placeholder. Send always submits, never finishes. The menu exposes Give me a nudge, Show an example, Interview style, Finish interview and separated Skip question. Legacy wrap-up sessions retain their Continue recovery action. Quick help uses existing explicit request kinds, preserves unfinished text and streams into the document; no separate Ask sheet remains. Historical assistance remains conservative rather than treating ordinary conversation as independent work.
+The inline field is “Your reply”, with “Talk through your approach, or ask a question…” as placeholder. Send always submits, never finishes. The menu exposes Give me a nudge, Show an example, Interview style, Finish interview and separated Skip question. Legacy wrap-up sessions retain their Continue recovery action. Explicit help preserves unfinished text and opens a compact sheet immediately with a progress indicator; its result appears there once and stays out of the document. Historical assistance remains conservative rather than treating ordinary conversation as independent work.
 
 ## Voice
 

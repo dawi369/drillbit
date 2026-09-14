@@ -1,3 +1,5 @@
+import { structured } from "./ai";
+import { practiceProfileSchema } from "./domain";
 import { dailyQuestion } from "./daily";
 import { startVoice, voiceEvents, delegateVoice, voiceCapability } from "./voice";
 import { exportPage } from "./export";
@@ -174,8 +176,22 @@ app.get("/v1/bootstrap", async (c) => {
       voiceInterview: c.env.VOICE_ENABLED === "true" && !!c.env.OPENAI_API_KEY,
       voice: await voiceCapability(c.env, a.id),
       automaticCompanion: c.env.COMPANION_AUTO_ENABLED === "true",
+      developerTools: (c.env.DEVELOPER_ACCOUNTS ?? "").split(",").map(id => id.trim()).filter(Boolean).includes(a.id),
     },
   });
+});
+app.delete("/v1/developer/practice", async (c) => {
+  const account = c.get("account").id;
+  const permitted = (c.env.DEVELOPER_ACCOUNTS ?? "").split(",").map(id => id.trim()).filter(Boolean);
+  if (!permitted.includes(account)) throw new Fault("not_found", 404, "Not found.");
+  await c.env.DB.batch([
+    c.env.DB.prepare("DELETE FROM challenges WHERE account_id=?").bind(account),
+    c.env.DB.prepare("DELETE FROM questions WHERE account_id=?").bind(account),
+    c.env.DB.prepare("DELETE FROM jobs WHERE account_id=? AND kind!='delete_account'").bind(account),
+    c.env.DB.prepare("DELETE FROM ai_runs WHERE account_id=?").bind(account),
+    c.env.DB.prepare("DELETE FROM daily_visits WHERE account_id=?").bind(account),
+  ]);
+  return c.json({ ok: true });
 });
 app.post("/v1/invite", async (c) => {
   const { code } = z
@@ -204,10 +220,22 @@ app.post("/v1/invite", async (c) => {
     );
   return c.json({ ok: true });
 });
+app.post("/v1/settings/preview", async (c) => {
+  const profile = practiceProfileSchema.parse(await c.req.json());
+  const account = c.get("account").id;
+  await consumeUsage(c.env, account, "personalization_preview", 10);
+  const settings = await settingsFor(c.env, account);
+  const result = await structured(c.env, account, settings, "question", {
+    practiceProfile: profile,
+    action: {question: "Give a short sample of how you would help me begin a system-design practice question about a job queue. Suggest one concrete first decision. This is a settings preview, not a real interview or assessment. Use my delivery preferences. Do not claim to have seen my work."},
+  }, z.object({body: z.string().max(1200), suggestedAnswer: z.null()}));
+  return c.json({text: result.body});
+});
 app.put("/v1/settings", async (c) => {
   const settings = settingsSchema.parse(await c.req.json());
   settings.model = MODEL_ID;
   const account = c.get("account").id;
+  settings.practiceProfile ??= (await settingsFor(c.env, account)).practiceProfile;
   settings.engineeringLevel ??= (await settingsFor(c.env, account)).engineeringLevel;
   if (
     JSON.stringify(settings) ===

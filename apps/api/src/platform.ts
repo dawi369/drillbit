@@ -12,6 +12,7 @@ export interface Env {
   OPENAI_API_KEY?: string;
   VOICE_ENABLED?: string;
   VOICE_UNLIMITED_ACCOUNTS?: string;
+  DEVELOPER_ACCOUNTS?: string;
   CREDENTIAL_KEY?: string;
   CREDENTIAL_KEY_VERSION: string;
   MODEL_ID: string;

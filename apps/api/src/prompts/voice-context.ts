@@ -47,11 +47,11 @@ export function spokenHistory(turns: any[], budget = 16000): ModelMessage[] {
 export function questionReference(question: any) {
   return visibleQuestion(question);
 }
-export function voiceDelegationMessages(question: any, history: unknown, interview: any): ModelMessage[] {
+export function voiceDelegationMessages(question: any, history: unknown, interview: any, practiceProfile?: unknown): ModelMessage[] {
   const dialogue = spokenHistory(interview.turns);
   const latestUser = dialogue.map(m => m.role).lastIndexOf('user');
   const messages = messagesFor('interview', {
-    question: questionReference(question), historicalSnapshot: history,
+    practiceProfile, question: questionReference(question), historicalSnapshot: history,
     interview: {guidanceMode:interview.guidanceMode, turns:[{kind:'voice',voice:dialogue.slice(0, Math.max(0, latestUser)).map(m=>({speaker:m.role,text:m.content}))}]},
     action:{kind:'answer',text:latestUser >= 0 ? dialogue[latestUser].content : '[No spoken request yet. Invite me to begin briefly.]'},
   });

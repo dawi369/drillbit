@@ -450,3 +450,64 @@ Signed iPhone 17 Pro simulator `testInterviewJourney` passed: Finish cancel, con
 - Verification: typecheck, 94 API/D1 tests, 30 native tests and three signed iPhone 17 Pro simulator journeys passed. Inspected dark selection and largest Dynamic Type/light selection screenshots. Simulator voice handoff preserves draft/transcript; real GPT-Live speech and interruptions remain unverified in this pass.
 - Reviewed 96 live Gemini responses across shared-pipeline, holdout and retry-regression batches. Schema/completion passed; product acceptance is partial due to ambiguous-body misinterpretation, an overclaimed retry guarantee, occasional excessive coaching in Mock and remaining stock phrasing. An 18-response medium-reasoning experiment did not reliably resolve these. See [full evidence and limits](teaching-modes.md).
 - Backend version `44fbebe3-d50c-4ae2-a230-78d89493b867` deployed to development. `/health` returned ok; unauthenticated bootstrap returned 401. Signed simulator app relaunched without fixtures. No TestFlight upload.
+
+### Session-style copy — 13 September 2026
+
+Renamed the native selector to Session style and its options to Guided / Practice / Mock interview, with the approved explanatory copy. Wire identifiers, defaults and model behavior are unchanged. Signed iPhone 17 Pro simulator tests passed for preparation/current-interview selection with an unfinished draft and for all selections at largest Dynamic Type. Inspected the dark selector screenshot. No backend deployment or TestFlight upload for this copy change. Home remains unchanged; its proposed direction is documented separately in `docs/home-direction.md`.
+
+## Home practice hub — 13 September 2026
+
+Implemented current-question-first Home, compact cached statistics, a single source-linked Revisit, and three topic entry points with searchable browsing. No extra inference or contract change. Revisit dismissal and coverage restore per account/device; practice reset clears both. Preparing another topic is disabled during an active interview. Weekly activity strips and readiness scores are not part of this pass.
+
+Verification: `swift test --package-path apps/ios -j 2` passed 28 tests, including evidence eligibility/dismissal and account-scoped cache recreation/reset. Signed iPhone 17 Pro simulator journeys cover empty Home, rich Home/topic preparation in light appearance, largest Dynamic Type in dark appearance, and active-interview preservation plus Revisit dismissal. Screenshots inspected for reading hierarchy, wrapping and reachable bottom actions. The large-text test was corrected to scroll the native Form before looking for Prepare; no application failure was found there. Physical-device and live VoiceOver navigation have not been reverified in this pass. Simulator distribution only.
+
+## Local-first settings and ranking — 13 September 2026
+
+31 core tests pass, including late settings acknowledgement versus a newer offline choice, store reopening/account isolation, breadth ordering, and newer positive evidence retiring old feedback. Signed simulator verification covers immediate appearance changes, Done returning Home despite injected network failure, retained preference/Retry UI, and existing level/timezone/provider navigation. The first theme test incorrectly pinned appearance through a launch-argument override; the corrected test changes the actual preference through the control. Physical-device/offline-network delivery and competing real devices have not been verified. No backend deployment or TestFlight upload.
+
+Theme follow-up: restored the native menu picker. Color-scheme preference and environment now apply at the Settings sheet's NavigationStack boundary, rather than only its Form. The simulator test switches Light → Dark while the sheet stays open, checks the selected value and offline-save recovery, and passes. Both full-sheet screenshots were inspected (navigation, Form surfaces, controls and text). No physical-device verification this pass.
+
+Native interview actions: replaced custom rectangular Send/Voice backgrounds with matching native circular bordered/bordered-prominent buttons. System controls own press/disabled rendering; the footer remains transparent. Simulator voice handoff and unavailable-voice draft-preservation journeys passed; the latter verifies equal control heights and at least 44-point targets. Keyboard-open screenshot inspected. Live microphone behavior and personality changes are outside this pass; personalization remains a proposal in `interviewer-personalization.md`.
+
+Practice personalization (13 September 2026): 98 API/D1 tests, 32 core tests and simulator edit/save/reopen/reset pass. Live Gemini reviewed six profile scenarios in text/delegated-spoken formatting, including conflicting and current-message overrides. See `interviewer-personalization.md` for scope and remaining verbosity/technical-wording risks. Simulator screenshot inspected; physical microphone and largest Dynamic Type on this new destination are not yet verified. Compatible development backend deployed; no D1 migration or TestFlight upload.
+
+## Personalization scope / build 6 — 13 September 2026
+
+100 API/D1 tests, 32 Swift core tests, TypeScript validation and signed Release archive pass. Question generation strips conversational preferences from policy and reference data; reflection excludes the profile. Voice-start tests verify local profile capture, outgoing spoken instructions and pinned delegation context. No new physical microphone or accessibility claim is made.
+
+Compatible development backend deployed as `a87b9975-fb6c-4a5c-8cc5-5cbc82eb8f2b`; health returned HTTP 200. No database migration. Archive: `/tmp/drillbit-testflight/Drillbit-build6.xcarchive`, version 2.0.0 (6). TestFlight upload is blocked: CLI export reports `Failed to Use Accounts`, and computer use could not launch Xcode (application resolution/capture failure). Apple processing and tester availability are not verified. Release gates are in `1.0-release-checklist.md`.
+
+## Release code review — 13 September 2026
+
+Owner waived physical interruption/recovery testing and deferred account/data and operations gates for this TestFlight iteration. Reviewed voice stop/background/disconnect/restoration, durable interview submission/retry, completion flush and settings revision acknowledgement. Moved audio interruption/route observers before audio activation; failed-start cleanup now releases audio before potentially slow persistence/network recovery. Typecheck and 100 API/D1 tests pass. Native tests/archive blocked by unaccepted Xcode 27 license/first-launch setup; upload has not occurred.
+
+### Xcode 27 archive verification
+
+Xcode 27 native core suite passed all 32 tests; Release archive 2.0.0 (6) succeeded with the audio-startup cleanup changes. Both CLI and Organizer upload report missing App Store Connect access. Xcode Apple Accounts is empty; signed-in account setup is required. No upload or Apple processing claim yet.
+
+### TestFlight upload — 13 September 2026, build 6
+
+After Apple account sign-in, Xcode 27 CLI export/upload succeeded for 2.0.0 (6) at 21:30 CEST. Apple accepted the package for processing. Internal-only distribution; 32 native core tests and signed archive passed. Missing WebRTC dSYM warning limits symbolication inside that dependency; upload was not rejected. Apple also reported creating a replacement buildUpload after a buildUploadFiles issue, followed by successful export. Tester availability and physical installation are not yet verified.
+
+### Symbol repair and simulator launch — 13 September 2026
+
+Downloaded upstream WebRTC M153 separate symbols, verified SHA-256 `147c6d00a747bd58dc865f44afd8866bc18d9000c3b7fb51b0c5884cb7f68214`, and attached the genuine device dSYM matching UUID `4C4C4496-5555-3144-A149-A7E882FEE780` to the local build-6 archive. Export wrapper now checks and attaches symbols before upload; no replacement binary uploaded. Apple's 19:32 UTC TestFlight email confirms build 6 available; a separate ITMS-90189 email identifies a redundant build-6 upload, not an application rejection. Future uploads require a new build number.
+
+Xcode 27 Debug simulator build succeeded. Installed/launched `dawi.drillbit` on iPhone 18 Pro/iOS 27; captured screenshot shows the sign-in screen. Device Hub launched but its accessibility interface times out, so visible-window interaction is not verified. Fresh simulator requires sign-in; old recovery data remains preserved.
+
+## Home and recovery refinement — 14 September 2026
+
+Implemented a stat-informed Home welcome, retained the separate Question-before-Start route, limited learning-facing selection to ten broad areas, and added a custom topic field. The canonical 24-tag taxonomy and historical filters remain intact. Removed the unused legacy Focus editor and multi-discipline choices.
+
+The stale-draft regression test proves that a server-confirmed missing attempt stops blocking new practice while its answer remains locally recoverable. Full Swift core tests pass (34 tests). API contract/type validation and the owner/non-owner reset integration test pass. Xcode 27 iPhone 18 Pro simulator compilation passes. Live Worker deployment and signed-in simulator interaction are recorded separately in operations; physical-device behavior is not claimed.
+## 14 September 2026 — ephemeral assistance, permission-gated voice and quiet reconciliation
+
+- Nudge is a one-time native alert and no longer appears in the interview document after dismissal. The server retains the help turn for usage, retry and assistance evidence.
+- Prompt edition `interviewer-teaching-v3` receives the current saved draft as bounded reference data. Nudge remains one to four short sentences under 90 words; Example is one concrete slice in two to five sentences under 120 words. Both open a compact native sheet before inference completes, replace its progress indicator in place, and stay out of the interview document after dismissal. Older prompt editions remain resolvable.
+- Voice requests microphone permission before leaving text. Denial preserves the draft and workspace; the voice room still requires explicit Start after permission, so no paid session begins on the permission tap.
+- Normal background persistence no longer raises sync instructions. Local actions remain durable and reconcile against the server; revision conflicts still require explicit review.
+- Contract generation, TypeScript checking and all 103 API tests passed. All 34 Swift tests passed. The Nudge, Example and unavailable-voice draft-preservation UI journeys passed on iPhone 18 Pro, iOS 27.
+- Example now uses the same ephemeral assistance journey: the current draft survives, the compact sheet is dismissible, and the result never enters the interview document. The updated interview journey passed on iPhone 18 Pro/iOS 27. Three live Gemini 3.1 Flash Lite iterations exposed and corrected an unsafe check-before-work idempotency example; final samples were 47 and 80 words, scoped to one worked slice, and stated the atomic transaction boundary. Backend totals after the change: 103 tests; Swift: 34 tests.
+- Immediate-assistance presentation is simulator-verified with a deliberately delayed fixture: both Nudge and Example sheets appeared with an observable progress indicator before their result, then retained the draft through dismissal. The final visual check confirmed the compact loading detent. Result: `/tmp/drillbit-assistance-loading-20260914-1803.xcresult`.
+- Live Gemini 3.1 Flash-Lite evaluation covered blank, partial, technically incorrect and established drafts. Each response was grounded in the supplied draft and used two sentences; the idempotency wording was tightened after review.
+- Development Worker `7643be8e-a153-4c49-810e-cf9db8d911da` deployed successfully and `/health` returned `status:ok`. No migration or TestFlight upload.

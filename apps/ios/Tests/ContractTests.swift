@@ -29,6 +29,14 @@ struct ContractTests {
   }
 
   #endif
+  @Test func practiceProfileIsOptionalAndRoundTrips() throws {
+    let old = try JSONDecoder().decode(PracticeSettings.self, from: JSONEncoder().encode(PracticeSettings()))
+    #expect(old.practiceProfile == nil)
+    var current = old
+    current.practiceProfile = PracticeProfile(goals: "Senior interviews", background: "Backend", preferences: "Pirate")
+    let restored = try JSONDecoder().decode(PracticeSettings.self, from: JSONEncoder().encode(current))
+    #expect(restored.practiceProfile == current.practiceProfile)
+  }
   @Test func historicalChallengeLevels() throws {
     for (difficulty, expected) in [("easy", "Junior"), ("medium", "Mid-level"), ("hard", "Senior")] {
       let json = "{\"id\":\"old\",\"lifecycle\":\"completed\",\"title\":\"Notification service\",\"prompt\":\"Design it\",\"topic\":\"Backend\",\"difficulty\":\"\(difficulty)\"}"

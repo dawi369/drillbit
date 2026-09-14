@@ -471,6 +471,105 @@
         }
       }
     },
+    "/v1/developer/practice": {
+      "delete": {
+        "summary": "Clear owner development practice data while preserving account configuration",
+        "operationId": "delete_developer_practice",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OK"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invite required or account unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not owned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision or lifecycle conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid invitation or provider credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Usage limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Provider temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/taxonomy": {
       "get": {
         "summary": "Get the versioned system-design concept vocabulary",
@@ -1942,6 +2041,115 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OK"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invite required or account unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not owned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision or lifecycle conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid invitation or provider credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Usage limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Provider temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/settings/preview": {
+      "post": {
+        "summary": "Preview practice personalization without saving or creating an attempt",
+        "operationId": "post_settings_preview",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PracticeProfile"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonalizationPreview"
                 }
               }
             }
@@ -4959,6 +5167,32 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "practiceProfile": {
+            "type": "object",
+            "properties": {
+              "goals": {
+                "default": "",
+                "type": "string",
+                "maxLength": 600
+              },
+              "background": {
+                "default": "",
+                "type": "string",
+                "maxLength": 600
+              },
+              "preferences": {
+                "default": "",
+                "type": "string",
+                "maxLength": 600
+              }
+            },
+            "required": [
+              "goals",
+              "background",
+              "preferences"
+            ],
+            "additionalProperties": false
+          },
           "guidanceMode": {
             "type": "string",
             "enum": [
@@ -6607,6 +6841,32 @@
           "settings": {
             "type": "object",
             "properties": {
+              "practiceProfile": {
+                "type": "object",
+                "properties": {
+                  "goals": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 600
+                  },
+                  "background": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 600
+                  },
+                  "preferences": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 600
+                  }
+                },
+                "required": [
+                  "goals",
+                  "background",
+                  "preferences"
+                ],
+                "additionalProperties": false
+              },
               "onboardingComplete": {
                 "default": false,
                 "type": "boolean"
@@ -7955,6 +8215,32 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "practiceProfile": {
+            "type": "object",
+            "properties": {
+              "goals": {
+                "default": "",
+                "type": "string",
+                "maxLength": 600
+              },
+              "background": {
+                "default": "",
+                "type": "string",
+                "maxLength": 600
+              },
+              "preferences": {
+                "default": "",
+                "type": "string",
+                "maxLength": 600
+              }
+            },
+            "required": [
+              "goals",
+              "background",
+              "preferences"
+            ],
+            "additionalProperties": false
+          },
           "onboardingComplete": {
             "default": false,
             "type": "boolean"
@@ -8025,6 +8311,46 @@
           "reminderEnabled",
           "aiMode",
           "model"
+        ],
+        "additionalProperties": false
+      },
+      "PracticeProfile": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "goals": {
+            "default": "",
+            "type": "string",
+            "maxLength": 600
+          },
+          "background": {
+            "default": "",
+            "type": "string",
+            "maxLength": 600
+          },
+          "preferences": {
+            "default": "",
+            "type": "string",
+            "maxLength": 600
+          }
+        },
+        "required": [
+          "goals",
+          "background",
+          "preferences"
+        ],
+        "additionalProperties": false
+      },
+      "PersonalizationPreview": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
         ],
         "additionalProperties": false
       },
@@ -9865,6 +10191,32 @@
           "settings": {
             "type": "object",
             "properties": {
+              "practiceProfile": {
+                "type": "object",
+                "properties": {
+                  "goals": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 600
+                  },
+                  "background": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 600
+                  },
+                  "preferences": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 600
+                  }
+                },
+                "required": [
+                  "goals",
+                  "background",
+                  "preferences"
+                ],
+                "additionalProperties": false
+              },
               "onboardingComplete": {
                 "default": false,
                 "type": "boolean"
@@ -10877,6 +11229,9 @@
                   "checkedAt"
                 ],
                 "additionalProperties": false
+              },
+              "developerTools": {
+                "type": "boolean"
               }
             },
             "required": [

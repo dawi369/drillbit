@@ -11,6 +11,7 @@ import {
 import { z } from "../../apps/api/node_modules/zod";
 import {
   settingsSchema,
+  practiceProfileSchema,
   engineeringLevelSchema,
   helpInputSchema,
   helpOutputSchema,
@@ -140,6 +141,8 @@ export const wire = {
   DeliveryInput: receiptsSchema,
   Intervention: interventionSchema,
   Settings: settingsSchema,
+  PracticeProfile: practiceProfileSchema,
+  PersonalizationPreview: z.object({text:z.string()}),
   HelpInput: helpInputSchema,
   HelpOutput: helpOutputSchema,
   AdoptionInput: adoptionSchema,
@@ -173,6 +176,7 @@ export const wire = {
       managedAI: z.boolean(),
       voiceInterview: z.boolean(),
       voice: z.object({ available: z.boolean(), reason: z.string().optional(), checkedAt: z.string() }).optional(),
+      developerTools: z.boolean().optional(),
     }),
   }),
   DailyQuestion: z.object({day:z.string(),challenge:challenge.optional(),job:job.nullable().optional()}),
