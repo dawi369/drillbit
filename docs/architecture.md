@@ -352,6 +352,12 @@ Voice entry checks server capability and requests microphone permission before c
 
 Voice context projects immutable fragments into dialogue using the native 1.5-second same-speaker grouping, including overlapping backchannels. The model receives no fragment IDs/timestamps or repeated per-turn question payloads. Startup history is capped at 12,000 characters; delegated dialogue at 16,000, alongside the existing eight-attempt historical snapshot and visible question. Older context may be omitted, but the stored transcript stays intact.
 
+### Latency-sensitive interview execution — 14 September 2026
+
+Interactive interview turns retain their D1 job, idempotency key, revision checks and final transcript commit, but begin inside the accepting Worker's `waitUntil` lifetime instead of waiting for a Workflow instance. A server flag can restore Workflow-first dispatch. Workflow and cron remain the recovery path: an interrupted inline job is failed when possible, and a running job abandoned for two minutes is returned to the pending queue. Replaying a running command cannot launch a second provider call.
+
+Text and delegated voice interview calls disable hidden reasoning and cap the short one-move response envelope at 900 output tokens. OpenRouter still chooses providers by measured latency and requires schema support. The native assistance sheet replaces its spinner with the first safely decoded `text` fragment while final schema validation and durable completion continue in the background.
+
 A delegation has a 12-second backend inference deadline and a 15-second native deadline from receipt of the delegation event, including transcript synchronization. Exactly one commentary result/fallback is admitted locally; late results, ended sessions and switched accounts cannot present another result. These deadlines are not a guarantee about speech-to-answer latency. Provider claims are duplicate-safe in D1; quota/provider failures leave failed records, not stranded running records. No automatic paid repair/retry. Logs contain timings, mode and input size only. Interrupted/unheard speech remains conservatively uncertain.
 
 See [teaching modes](teaching-modes.md) for live model findings and remaining correctness limits. Physical GPT-Live delivery and interruption behavior need a fresh phone pass; simulator fixtures do not verify audio.
@@ -381,6 +387,10 @@ History-v2 reads lifetime exposure grouped by level/concept (at most 18 relevant
 ### Home hierarchy, practice areas and stale-draft recovery — 14 September 2026
 
 Home begins with a deterministic, cached-stat-informed welcome, followed by the current/next question, evidence-linked revisit when available, and Explore. Ready questions open the existing standalone Question route before Start; in-progress work still resumes directly. The UI exposes ten broad practice areas plus a free-text product/system topic. The server-owned 24-concept taxonomy remains authoritative for question metadata, history and filtering; custom topics guide scenario selection and do not create unstable tag identifiers.
+
+### Native visual system — 14 September 2026
+
+Drillbit uses system fonts, controls and semantic colors with monochrome primary actions. Structural surfaces use a 12-point radius, a half-point semantic separator and no decorative shadow. Progress numerals use the rounded system design and compact question metadata uses the monospaced system design. The reusable three-cut Drillbit mark is rendered in SwiftUI and mirrored by a deterministic 1024-point app-icon generator. Primary and icon actions share a 0.96 pressed scale with a 140 ms ease-out response; Reduced Motion removes it. Interview transcript typography and disclosure geometry remain intentionally neutral so branding never competes with reading.
 
 New-question gating now inspects pending answer drafts rather than the aggregate background-write flag. A 404 while syncing an attempt proves that the remote write target is gone: the local row becomes `retired`, remains recoverable on device, and leaves the active outbox. Pending skips retain their separate explicit gate; eligibility and voice receipts can reconcile without blocking unrelated preparation.
 

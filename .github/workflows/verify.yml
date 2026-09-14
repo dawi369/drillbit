@@ -20,4 +20,4 @@ jobs:
       - uses: actions/checkout@v4
       - run: xcodebuild -version
       - run: brew install xcodegen
-      - run: scripts/check-ios.sh
+      - run: scripts/check-ios-ci.sh

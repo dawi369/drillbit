@@ -37,13 +37,15 @@ export async function interviewFor(env: Env, account: string, id: string) {
     prompt: last?.result?.outcome === "follow_up" ? last.result.text : last?.prompt ?? data.prompt,
     wrapUp: last?.result?.outcome === "wrap_up", turns };
 }
-export async function requestInterview(env: Env, account: string, id: string, command: string, raw: unknown) {
+export async function requestInterview(env: Env, account: string, id: string, command: string, raw: unknown, runImmediately?: (id: string) => void) {
   const input = interviewInputSchema.parse(raw);
   const challenge = await ownedChallenge(env, account, id);
   const replay = await env.DB.prepare("SELECT * FROM jobs WHERE id=?").bind(command).first<Job>();
   if (replay) {
     if (replay.account_id !== account || replay.challenge_id !== id || replay.kind !== "interview" || JSON.stringify(JSON.parse(replay.input).action) !== JSON.stringify(input)) throw new Fault("command_reused", 409, "This command belongs to another request.");
-    await dispatch(env, command);
+    // A running inline execution already owns this command. Re-dispatching it
+    // would create a second provider call for the same durable turn.
+    if (replay.status === "pending") runImmediately ? runImmediately(command) : await dispatch(env, command);
     return interviewFor(env, account, id);
   }
   await assertNoVoice(env,account,id);
@@ -71,7 +73,7 @@ export async function requestInterview(env: Env, account: string, id: string, co
     env.DB.prepare(`UPDATE sessions SET answer=CASE WHEN ?='answer' THEN '' ELSE answer END,revision=revision+1,command_id=?,updated_at=? WHERE challenge_id=? AND revision=? AND EXISTS(SELECT 1 FROM interview_turns WHERE id=?)`).bind(input.kind,command,now,id,input.revision,command),
   ]);
   if (!(await env.DB.prepare("SELECT id FROM interview_turns WHERE id=?").bind(command).first())) throw new Fault("revision_conflict",409,"The interview changed. Refresh before continuing.");
-  await dispatch(env, command);
+  runImmediately ? runImmediately(command) : await dispatch(env, command);
   return interviewFor(env, account, id);
 }
 export async function retryInterview(env: Env, account: string, id: string, turn: string, command: string) {

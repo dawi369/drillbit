@@ -118,7 +118,7 @@ export async function delegateVoice(env:Env,account:string,challenge:string,id:s
   const pinnedProfile=voiceJob ? JSON.parse(voiceJob.input).practiceProfile : undefined;
   const messages=voiceDelegationMessages(JSON.parse(c.data),history,interview,pinnedProfile ?? settings.practiceProfile);
   const contextMs=Date.now()-started;
-  const response=await provider(env,account,settings,messages,{maxTokens:2400,schema:interviewModelSchema({},z.object({})),reasoning:{effort:"low"},signal:deadline});
+  const response=await provider(env,account,settings,messages,{maxTokens:900,schema:interviewModelSchema({},z.object({})),reasoning:{enabled:false},signal:deadline});
   const body=await response.json() as any;await recordUsage(env,account,settings,'voice_reasoning',body.usage,TEACHING_VERSION+'-'+interview.guidanceMode);
   const text=(interviewModelSchema({},z.object({})).parse(JSON.parse(body.choices?.[0]?.message?.content)) as {text:string}).text;
   await env.DB.prepare("UPDATE voice_delegations SET status='completed',result=? WHERE session_id=? AND id=?").bind(text,id,delegation).run();

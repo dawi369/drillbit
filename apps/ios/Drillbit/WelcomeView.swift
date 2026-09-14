@@ -9,11 +9,9 @@ struct WelcomeView: View {
   var body: some View {
     GeometryReader { geometry in
       ScrollView {
-        VStack(spacing: 32) {
+        VStack(spacing: 36) {
           VStack(spacing: 12) {
-            Text("Drillbit")
-              .font(.largeTitle.weight(.semibold))
-              .accessibilityAddTraits(.isHeader)
+            DrillbitLogo()
             Text(
               model.bootstrap == nil
                 ? "A little interview practice, every day."
@@ -31,6 +29,7 @@ struct WelcomeView: View {
                 .autocorrectionDisabled()
                 .padding(16)
                 .background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 12))
+                .overlay { RoundedRectangle(cornerRadius: 12).stroke(AppPalette.hairline, lineWidth: 0.5) }
                 .accessibilityLabel("Invite code")
               Button("Start practicing") {
                 authenticate {

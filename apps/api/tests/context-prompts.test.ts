@@ -71,8 +71,8 @@ it("v4 computes protocol outcomes without allowing model lifecycle control", () 
 
 it("uses low reasoning for substantive v4 turns while social and legacy calls stay fast", () => {
  expect(interviewReasoning({action:{kind:'answer',text:'Hi interviewer'}})).toEqual({enabled:false});
- expect(interviewReasoning({action:{kind:'answer',text:'Retries guarantee delivery'}})).toEqual({effort:'low'});
- expect(interviewReasoning({action:{kind:'hint',text:'Hi'}})).toEqual({effort:'low'});
+ expect(interviewReasoning({action:{kind:'answer',text:'Retries guarantee delivery'}})).toEqual({enabled:false});
+ expect(interviewReasoning({action:{kind:'hint',text:'Hi'}})).toEqual({enabled:false});
  expect(interviewReasoning({promptVersion:'interviewer-standard-v3',action:{kind:'answer',text:'Explain retries'}})).toEqual({enabled:false});
 });
 

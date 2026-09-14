@@ -443,6 +443,12 @@ struct InterviewView: View {
     guard let assistanceRequestID else { return nil }
     return interview.state.turns.first(where: { $0.id == assistanceRequestID })?.result?.text
   }
+  private var assistanceProgress: String {
+    guard let assistanceRequestID,
+      let turn = interview.state.turns.first(where: { $0.id == assistanceRequestID })
+    else { return "" }
+    return turn.result?.text ?? turn.partial ?? ""
+  }
   private var acceptedPending: Bool { interview.pending.map { pending in pending.input.kind == "answer" && interview.state.turns.contains { $0.id == pending.command } } ?? false }
   private var waitingForAnswer: Bool { interview.displayState.turns.contains { ["answer", "continue"].contains($0.kind) && $0.pending } }
   private var documentMotion: Animation? { reduceMotion || !sessionRestored || stagingAnswer ? nil : .smooth(duration: 0.3, extraBounce: 0) }
@@ -496,6 +502,10 @@ struct InterviewView: View {
       assistanceText = value
       assistanceRequestID = nil
       requestingAssistance = false
+    }
+    .onChange(of: assistanceProgress) { _, value in
+      guard !value.isEmpty else { return }
+      assistanceText = value
     }
     .onAppear { interview.acceptsVoiceInput = phase == .active }
     .onDisappear { interview.acceptsVoiceInput = false; interview.voice?.discardPreparation(); interview.voice?.interrupt("Voice ended."); persistReading() }
@@ -569,6 +579,8 @@ struct InterviewView: View {
     }
     .safeAreaInset(edge: .bottom, spacing: 0) { footer }
     .navigationTitle(challenge.scenario?.split(whereSeparator: \.isWhitespace).prefix(2).joined(separator: " ") ?? "System design").navigationBarTitleDisplayMode(.inline)
+    .toolbarBackground(AppPalette.background, for: .navigationBar)
+    .toolbarBackground(.visible, for: .navigationBar)
     .task(id: activeID) {
       guard sessionRestored, followingLiveEnd, sheet == nil, phase == .active else { return }
       // Let the keyboard and document settle before revealing the new block.
@@ -626,18 +638,18 @@ struct InterviewView: View {
   private var assistancePopup: some View {
     VStack(spacing: 20) {
       Text(assistanceTitle).font(.headline)
-      if requestingAssistance {
-        ProgressView()
-          .controlSize(.small)
-          .accessibilityLabel("Preparing \(assistanceTitle.lowercased())")
-          .accessibilityIdentifier("assistanceLoading")
-      } else if let assistanceText {
+      if let assistanceText {
         ScrollView {
           Text(assistanceText)
             .frame(maxWidth: .infinity, alignment: .leading)
             .textSelection(.enabled)
         }
         .frame(maxHeight: 240)
+      } else if requestingAssistance {
+        ProgressView()
+          .controlSize(.small)
+          .accessibilityLabel("Preparing \(assistanceTitle.lowercased())")
+          .accessibilityIdentifier("assistanceLoading")
       } else {
         Text(assistanceError ?? "That didn’t load. Your reply is unchanged.")
           .foregroundStyle(.secondary)
@@ -879,7 +891,7 @@ struct InterviewView: View {
         Image(systemName: AppIcon.voice.rawValue).font(.system(size: 20, weight: .medium))
           .frame(width: 24, height: 24)
       }
-        .buttonStyle(.bordered).buttonBorderShape(.circle).controlSize(.large).tint(AppPalette.primary)
+        .buttonStyle(DrillbitIconButtonStyle())
         .disabled(checkingVoice || liveVoice == nil || interview.locked || interview.voice?.blocksText == true).accessibilityLabel("Live voice").accessibilityIdentifier("liveVoice")
       Spacer(minLength: 0)
         Button {
@@ -890,8 +902,7 @@ struct InterviewView: View {
           Image(systemName: AppIcon.send.rawValue)
             .font(.system(size: 20, weight: .semibold))
             .frame(width: 24, height: 24)
-            .foregroundStyle(AppPalette.background)
-        }.buttonStyle(.borderedProminent).buttonBorderShape(.circle).controlSize(.large).tint(AppPalette.primary)
+        }.buttonStyle(DrillbitIconButtonStyle(prominent: true))
           .accessibilityLabel("Send reply")
           .disabled(interview.voice?.blocksText == true || interview.locked || interview.failedTurn != nil || interview.answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
           .accessibilityIdentifier("shareAnswer")

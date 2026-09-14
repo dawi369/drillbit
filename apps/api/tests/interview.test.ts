@@ -30,6 +30,15 @@ it("commits exactly one answer snapshot and rejects stale or competing devices",
  await expect(requestInterview(e,a,id,crypto.randomUUID(),input)).rejects.toBeTruthy();
  const other=await fixture();await expect(interviewFor(e,other.a,id)).rejects.toMatchObject({status:404});
 });
+it("starts latency-sensitive work inline and does not reschedule a running replay",async()=>{
+ const {a,id}=await fixture(),cmd=crypto.randomUUID(),started:string[]=[];
+ const input={kind:"answer",text:"Use a queue",revision:2};
+ await requestInterview(e,a,id,cmd,input,value=>started.push(value));
+ expect(started).toEqual([cmd]);
+ await e.DB.prepare("UPDATE jobs SET status='running' WHERE id=?").bind(cmd).run();
+ await requestInterview(e,a,id,cmd,input,value=>started.push(value));
+ expect(started).toEqual([cmd]);
+});
 it("clarification preserves the draft and prompt; answers advance only through a completed follow-up",async()=>{
  const {a,id}=await fixture();const cmd=crypto.randomUUID();
  await requestInterview(e,a,id,cmd,{kind:"clarification",text:"What scale?",revision:2});

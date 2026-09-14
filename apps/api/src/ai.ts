@@ -355,9 +355,10 @@ export function partialInterviewText(raw: string): string {
 // The app owns turn routing. Do not ask the model to classify social replies
 // into protocol labels: it should generate the words, not choose lifecycle state.
 export function interviewReasoning(context: unknown): { enabled: false } | { effort: "low" } {
-  const c = context as { promptVersion?: string; action?: { kind?: string; text?: string } };
-  const social = ["answer", "continue"].includes(c.action?.kind ?? "answer") && isSocialOpening(c.action?.text ?? "");
-  return contextualInterviewVersions.includes((c.promptVersion ?? INTERVIEW_PROMPT_VERSION)) && !social ? { effort: "low" } : { enabled: false };
+  // Conversation is latency-sensitive and already constrained by grounded,
+  // versioned teaching policy. Hidden reasoning delayed the first visible token
+  // without improving the short one-move response contract.
+  return { enabled: false };
 }
 export function interviewModelSchema(context: unknown, legacySchema: z.ZodType): z.ZodType {
   const version = (context as { promptVersion?: string }).promptVersion ?? INTERVIEW_PROMPT_VERSION;
@@ -371,7 +372,7 @@ export function parseInterviewModelResult(context: unknown, schema: z.ZodType, v
 }
 export async function streamedInterview(env: Env, account: string, settings: Settings, context: unknown, schema: z.ZodType, publish: (text: string) => Promise<void>) {
   const controller = new AbortController();
-  const response = await provider(env, account, settings, messagesFor("interview", context), { schema: interviewModelSchema(context, schema), reasoning: interviewReasoning(context), stream: true, signal: AbortSignal.any([controller.signal, AbortSignal.timeout(60000)]) });
+  const response = await provider(env, account, settings, messagesFor("interview", context), { maxTokens: 900, schema: interviewModelSchema(context, schema), reasoning: interviewReasoning(context), stream: true, signal: AbortSignal.any([controller.signal, AbortSignal.timeout(60000)]) });
   if (!response.body) throw new Error("missing_stream");
   let raw = "", last = "", updated = 0;
   const started = Date.now();

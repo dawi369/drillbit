@@ -78,7 +78,7 @@ swift test --package-path apps/ios -j 2
 scripts/check-ios.sh
 ```
 
-`bun run test` runs the backend's Vitest/D1 suite. `scripts/check-ios.sh` also builds and tests the native app in Simulator. Contract generation should leave checked-in contracts unchanged.
+`bun run test` runs the backend's Vitest/D1 suite. `scripts/check-ios-ci.sh` runs the isolated release smoke journeys used by GitHub Actions; `scripts/check-ios.sh` runs the complete screenshot-heavy Simulator suite for local visual acceptance. Contract generation should leave checked-in contracts unchanged.
 
 ## Engineering notes
 

@@ -42,7 +42,7 @@ import {
 } from "./store";
 import { messagesFor, provider, textDeltas, recordUsage } from "./ai";
 import { requestHelp, adopt } from "./practice";
-import { reconcile } from "./jobs";
+import { reconcile, runJobSafely } from "./jobs";
 export { PracticeWorkflow } from "./jobs";
 export const app = new Hono<{
   Bindings: Env;
@@ -416,7 +416,12 @@ app.get("/v1/challenges/:id/interview/:turn/stream", async c => {
 app.post("/v1/challenges/:id/voice", async c => c.json(await startVoice(c.env,c.get("account").id,c.req.param("id"),requireCommand(c.req.header("Idempotency-Key")),await c.req.json()),201));
 app.post("/v1/challenges/:id/voice/:voice/events", async c => c.json(await voiceEvents(c.env,c.get("account").id,c.req.param("id"),c.req.param("voice"),await c.req.json())));
 app.post("/v1/challenges/:id/voice/:voice/delegate", async c => c.json(await delegateVoice(c.env,c.get("account").id,c.req.param("id"),c.req.param("voice"),await c.req.json())));
-app.post("/v1/challenges/:id/interview", async c => c.json(await requestInterview(c.env,c.get("account").id,c.req.param("id"),requireCommand(c.req.header("Idempotency-Key")),interviewInputSchema.parse(await c.req.json())),202));
+app.post("/v1/challenges/:id/interview", async c => {
+  const runImmediately = c.env.INTERACTIVE_INLINE_ENABLED === "true"
+    ? (id: string) => c.executionCtx.waitUntil(runJobSafely(c.env, id))
+    : undefined;
+  return c.json(await requestInterview(c.env,c.get("account").id,c.req.param("id"),requireCommand(c.req.header("Idempotency-Key")),interviewInputSchema.parse(await c.req.json()),runImmediately),202);
+});
 app.post("/v1/challenges/:id/interview/:turn/retry", async c => c.json(await retryInterview(c.env,c.get("account").id,c.req.param("id"),c.req.param("turn"),requireCommand(c.req.header("Idempotency-Key"))),202));
 app.post("/v1/challenges/:id/start", async (c) => {
   const a = c.get("account").id,

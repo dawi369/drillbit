@@ -12,7 +12,7 @@ struct RootView: View {
     Group {
       if model.restoringSession || model.launchError != nil {
         VStack(spacing: 16) {
-          Text("Drillbit").font(.title2.weight(.semibold))
+          DrillbitLogo(compact: true)
           if let message = model.launchError {
             Text(message).foregroundStyle(.secondary).multilineTextAlignment(.center)
             Button("Try again") { Task { await model.launch() } }
@@ -144,12 +144,12 @@ struct HomeView: View {
           Divider()
         }
         VStack(alignment: .leading, spacing: 12) {
-          Text("Your practice").font(.title3.weight(.semibold))
+          DrillbitSectionHeader(title: "Your practice")
           PracticeOverview(memory: model.memory)
         }
         VStack(alignment: .leading, spacing: 12) {
           HStack {
-            Text("Next question").font(.title3.weight(.semibold))
+            DrillbitSectionHeader(title: "Next question")
             Spacer()
             if let challenge = model.bootstrap?.challenge {
               Menu {
@@ -173,14 +173,14 @@ struct HomeView: View {
           if let challenge = model.bootstrap?.challenge {
             VStack(alignment: .leading, spacing: 12) {
               Text(challenge.title).font(.title2.weight(.semibold)).lineLimit(2)
-              Text("\(challenge.topic) · \(challenge.levelLabel)").font(.subheadline).foregroundStyle(.secondary)
+              DrillbitMetadata(text: "\(challenge.topic) · \(challenge.levelLabel)")
               Button(challenge.lifecycle == "in_progress" ? "Resume" : "Open question") {
                 if challenge.lifecycle == "in_progress" { Task { await model.open(challenge) } }
                 else { flow = QuestionFlowEntry(challenge: challenge) }
               }.buttonStyle(PracticeButtonStyle()).accessibilityIdentifier("startPractice")
             }
           } else if !model.busy {
-            Button("Choose a question") { flow = QuestionFlowEntry() }.buttonStyle(PracticeButtonStyle())
+            Button("Prepare question") { flow = QuestionFlowEntry() }.buttonStyle(PracticeButtonStyle())
           }
           if model.busy || model.bootstrap?.jobs.contains(where: { $0.kind == "generate" && ["pending", "running"].contains($0.status) }) == true {
             LoadingStatus("Preparing your question…")
@@ -195,7 +195,7 @@ struct HomeView: View {
               Button("Retry") { Task { await model.retry(job) } }
             }
           }
-          }.padding(20).background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 12))
+          }.drillbitHeroSurface()
         }
         if let revisit = model.homeRevisit { revisitSection(revisit) }
         exploreSection
@@ -207,6 +207,7 @@ struct HomeView: View {
         Button("Skip question", role: .destructive) { if let question = skipping { let choose = chooseAfterSkip; Task { await model.skip(question.id); if choose, model.bootstrap?.challenge == nil { flow = QuestionFlowEntry() } } }; skipping = nil }
       } message: { Text("Keep it in Skipped questions and return to Home. Your saved draft is preserved.") }
       .navigationTitle("Home").navigationBarTitleDisplayMode(.inline)
+      .background(AppPalette.background)
       .refreshable { await model.refresh() }
       .sheet(item: $flow, onDismiss: {
         if let started { model.presented = started; self.started = nil }
@@ -226,7 +227,7 @@ struct HomeView: View {
   private func revisitSection(_ item: HomeRevisit) -> some View {
     VStack(alignment: .leading, spacing: 12) {
       HStack {
-        Text("Revisit").font(.title3.weight(.semibold))
+        DrillbitSectionHeader(title: "Revisit")
         Spacer()
         Button { Task { await model.dismissHomeRevisit(item) } } label: {
           Image(systemName: "xmark").foregroundStyle(.secondary).frame(width: 44, height: 44)
@@ -242,12 +243,12 @@ struct HomeView: View {
           Button("Practise this concept") { prepare(concept, source: item.source) }
             .buttonStyle(PracticeButtonStyle(secondary: true))
         }
-      }.padding(20).background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 12))
+      }.drillbitSurface()
     }
   }
   private var exploreSection: some View {
     VStack(alignment: .leading, spacing: 12) {
-      Text("Explore system design").font(.title3.weight(.semibold))
+      DrillbitSectionHeader(title: "Explore system design")
       VStack(spacing: 0) {
         let ranked = HomeTopicRanking.ranked(PracticeAreaCatalog.curated(model.taxonomy), coverage: model.libraryCoverage)
         ForEach(Array(ranked.prefix(3))) { concept in
@@ -257,6 +258,7 @@ struct HomeView: View {
           if concept.id != ranked.prefix(3).last?.id { Divider().padding(.horizontal, 16) }
         }
       }.background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 12))
+        .overlay { RoundedRectangle(cornerRadius: 12).stroke(AppPalette.hairline, lineWidth: 0.5) }
       Button("See all topics", systemImage: "arrow.right") { flow = QuestionFlowEntry(browseTopics: true) }
         .frame(minHeight: 44)
     }.task { await model.loadTaxonomy() }
@@ -317,12 +319,15 @@ struct QuestionFlow: View {
       } else if showingPreview {
         Group {
           if loading {
-            LoadingStatus("Preparing your question…")
+            LoadingStatus("Preparing your question…", centered: true)
               .frame(maxWidth: .infinity, maxHeight: .infinity)
           } else {
             ScrollView {
               VStack(alignment: .leading, spacing: 16) {
                 if let question {
+                  Text("YOUR NEXT BOSS FIGHT")
+                    .font(.caption2.weight(.semibold)).tracking(0.8)
+                    .foregroundStyle(AppPalette.accent)
                   Text(question.title).font(.title2.weight(.semibold))
                     .fixedSize(horizontal: false, vertical: true)
                   Text(question.prompt)
@@ -357,7 +362,7 @@ struct QuestionFlow: View {
               }
             }.padding(16).background(AppPalette.background)
           }
-        }.navigationTitle("Question").navigationBarTitleDisplayMode(.inline)
+        }.navigationTitle("Question preview").navigationBarTitleDisplayMode(.inline)
           .toolbar { Button("Close") { dismiss() } }
       } else {
         PreparationView(model: model, source: source, initialCustomTopic: selectedCustomTopic, submit: { input in
@@ -545,8 +550,8 @@ struct PracticeOverview: View {
     return "Your next rep is waiting."
   }
   var body: some View {
-    VStack(alignment: .leading, spacing: 16) {
-      Text(headline).font(.title2.weight(.semibold))
+    VStack(alignment: .leading, spacing: 20) {
+      Text(headline).font(.subheadline).foregroundStyle(.secondary)
       let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 16)) : AnyLayout(HStackLayout(alignment: .top, spacing: 24))
       if let statistics = memory.statistics {
         layout {
@@ -558,12 +563,11 @@ struct PracticeOverview: View {
         Text("Updated \(date.formatted(date: .abbreviated, time: .shortened))")
           .font(.caption).foregroundStyle(.secondary)
       }
-    }.padding(20).frame(maxWidth: .infinity, alignment: .leading)
-      .background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 12))
+    }.frame(maxWidth: .infinity, alignment: .leading)
   }
   private func metric(_ title: String, value: Int) -> some View {
     VStack(alignment: .leading, spacing: 4) {
-      Text(String(value)).font(.title.weight(.semibold)).monospacedDigit()
+      Text(String(value)).font(.system(.title, design: .rounded, weight: .bold)).monospacedDigit()
       Text(title).font(.subheadline).foregroundStyle(.secondary)
     }.frame(maxWidth: .infinity, alignment: .leading)
       .accessibilityElement(children: .ignore)
@@ -580,8 +584,7 @@ private struct HomeTopicRow: View {
       VStack(alignment: .leading, spacing: 4) {
         Text(concept.label).font(.body.weight(.medium)).foregroundStyle(.primary)
         if loaded {
-          Text((coverage?.completedAttempts ?? 0) == 0 ? "Not explored yet" : "\((coverage?.completedAttempts ?? 0)) completed sessions")
-            .font(.caption).foregroundStyle(.secondary)
+          DrillbitMetadata(text: (coverage?.completedAttempts ?? 0) == 0 ? "Not explored yet" : "\((coverage?.completedAttempts ?? 0)) completed sessions")
         }
       }
       Spacer(minLength: 0)

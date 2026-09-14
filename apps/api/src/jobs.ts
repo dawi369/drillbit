@@ -271,6 +271,15 @@ export async function runJob(env: Env, id: string) {
     ).bind(now, id),
   ]);
 }
+export async function runJobSafely(env: Env, id: string) {
+  try {
+    await runJob(env, id);
+  } catch {
+    await env.DB.prepare(
+      "UPDATE jobs SET status='failed',error='The operation could not finish. Retry when connected.',updated_at=? WHERE id=? AND status NOT IN ('completed','cancelled')",
+    ).bind(timestamp(), id).run();
+  }
+}
 export class PracticeWorkflow extends WorkflowEntrypoint<
   Env,
   { jobId: string }
@@ -305,6 +314,11 @@ export async function reconcile(env: Env) {
   if ((await env.DB.prepare("SELECT enabled FROM practice_epoch WHERE id=1").first<{enabled:number}>())?.enabled === 0) return;
   // Retire queued legacy timer-driven generation. Cron still recovers user-started jobs.
   await env.DB.prepare("UPDATE jobs SET status='cancelled' WHERE kind='generate' AND status='pending' AND json_extract(input,'$.availableAt') IS NOT NULL").run();
+  // Inline interactive work normally finishes in seconds. If an isolate is
+  // terminated mid-request, return the durable command to the Workflow-backed
+  // recovery path after a conservative timeout.
+  await env.DB.prepare("UPDATE jobs SET status='pending',updated_at=? WHERE kind='interview' AND status='running' AND updated_at<?")
+    .bind(timestamp(), new Date(Date.now() - 120000).toISOString()).run();
   // Recover dispatch failures. Stable workflow IDs prevent duplicate execution.
   const pending = await env.DB.prepare(
     "SELECT id FROM jobs WHERE status='pending' ORDER BY created_at LIMIT 30",

@@ -18,6 +18,7 @@ export interface Env {
   MODEL_ID: string;
   MANAGED_AI_ENABLED: string;
   COMPANION_AUTO_ENABLED?: string;
+  INTERACTIVE_INLINE_ENABLED?: string;
 }
 const jwks = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
 export async function identity(env: Env, authorization?: string) {

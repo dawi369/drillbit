@@ -488,9 +488,9 @@ struct LibraryView: View {
           NavigationLink { LibraryQuestionView(model: model, initial: question) } label: {
             VStack(alignment: .leading, spacing: 4) {
               Text(question.title).foregroundStyle(.primary).lineLimit(2)
-              Text(question.scenario + " · " + question.levelLabel).font(.caption).foregroundStyle(.secondary)
+              DrillbitMetadata(text: question.scenario + " · " + question.levelLabel)
               if let date = question.lastActivity.flatMap({ Date.fromAPI($0) }) {
-                Text(date.formatted(date: .abbreviated, time: .omitted) + ((question.attemptCount ?? 0) > 1 ? " · \(question.attemptCount!) attempts" : "")).font(.caption).foregroundStyle(.secondary)
+                DrillbitMetadata(text: date.formatted(date: .abbreviated, time: .omitted) + ((question.attemptCount ?? 0) > 1 ? " · \(question.attemptCount!) attempts" : ""))
               }
             }
           }.accessibilityIdentifier("library-question-" + question.id)
