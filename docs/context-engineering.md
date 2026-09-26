@@ -1,6 +1,6 @@
 # Interviewer context engineering
 
-Current implementation: 13 September 2026. **Learn together / Coach me (default) / Mock interview** replace the depth-style picker. Text and voice reasoning use one XML conversation pipeline. See [teaching modes and evaluation](teaching-modes.md). The dated sections below document earlier editions and their limitations.
+The current client uses **Learn together / Coach me (default) / Mock interview**. Text and delegated voice reasoning share one XML conversation pipeline. Text calls now use GPT-6 Luna with reasoning disabled for interview turns; the dated Gemini evaluations below remain historical and do not establish Luna's product quality. See [teaching modes and evaluation](teaching-modes.md).
 
 ## Voice source and interpretation
 
@@ -37,7 +37,7 @@ Drillbit interpretation: a relaxed practice partner with light situational wit, 
 
 V3 moves the XML reference snapshot BEFORE conversation history, uses natural user/assistant text roles for committed turns, and puts the actual current utterance last. Policy and reference metadata stay XML; literal user text stays untrusted in user-role messages. Allowlisted action metadata in the system policy determines the existing output type. V2 policy and message assembly remain available for explicitly pinned queued jobs. Unknown prompt editions still fail. Prompt administration remains deferred.
 
-Single model now Gemini 3.1 Flash-Lite, reasoning disabled. 2.5 remains accepted as a legacy settings value and normalizes to the active model. This trades token price and some latency for more consistent behavior in the synthetic evaluation; it is not a claim of flawless instruction following. Listed OpenRouter prices checked 11 September: [2.5](https://openrouter.ai/google/gemini-2.5-flash-lite) $0.10/$0.40 and [3.1](https://openrouter.ai/compare/google/gemini-3.1-flash-lite/tencent/hy3) $0.25/$1.50 per million input/output tokens. Provider routing prices can vary.
+At the time of this V3 evaluation, the fixed model was Gemini 3.1 Flash-Lite with reasoning disabled. The 2.5 identifier remained a legacy settings value. These results and listed prices are historical, not acceptance evidence for the current GPT-6 Luna configuration.
 
 Reproducible evaluator: `bun scripts/evaluate-personality.ts` with an environment-provided key. `EVAL_MODEL`, `SKIP_BASELINE` and `EVAL_REASONING` are evaluation-only options. Synthetic outputs are written to ignored `.local/personality-evaluation.json`; no real candidate data is sent by this script.
 
@@ -49,4 +49,4 @@ Known failures: an occasional joke still gets a technical pivot; routine praise 
 
 ## Historical edition: V4
 
-The V3 partial acceptance above is historical. V4 separates pure social context, uses a model-internal conversational move plus text, and assigns the existing public outcome server-side. Full context returns on substantive messages. Escaped reference XML is now marked untrusted inside the system message, while actual turns use native conversation roles. Low reasoning is enabled only for substantive V4 interview calls. See [V4 personality acceptance](personality-acceptance.md) for the two 24-turn candidate reviews, timing/cost tradeoff and limits. No new user-facing mode or model picker is added.
+The V3 partial acceptance above is historical. V4 separates pure social context, uses a model-internal conversational move plus text, and assigns the existing public outcome server-side. Full context returns on substantive messages. Escaped reference XML is marked untrusted inside the system message, while actual turns use native conversation roles. The V4 candidate reviews used low reasoning; current GPT-6 Luna interview calls disable it. See [V4 personality acceptance](personality-acceptance.md) for the historical timing and quality limits. No new user-facing mode or model picker is added.

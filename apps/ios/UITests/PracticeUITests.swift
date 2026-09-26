@@ -2,6 +2,27 @@ import XCTest
 
 @MainActor
 final class PracticeUITests: XCTestCase {
+  func testRecallTemporaryDeck() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures"]
+    app.launch()
+    XCTAssertTrue(app.tabBars.buttons["Recall"].waitForExistence(timeout: 10))
+    app.tabBars.buttons["Recall"].tap()
+    XCTAssertTrue(app.navigationBars["Recall"].waitForExistence(timeout: 3))
+    XCTAssertFalse(app.staticTexts["Loading Recall…"].exists)
+    XCTAssertFalse(app.buttons["recallAreaPicker"].exists)
+    XCTAssertFalse(app.buttons["recallDepthPicker"].exists)
+    XCTAssertTrue(app.staticTexts["Your first idea starts with a practice."].exists)
+    app.buttons["Map"].tap()
+    XCTAssertTrue(app.staticTexts["Your system design map"].waitForExistence(timeout: 2))
+    app.buttons["Paths"].tap()
+    XCTAssertTrue(app.staticTexts["Choose a path"].waitForExistence(timeout: 2))
+    app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Reliable async systems")).firstMatch.tap()
+    XCTAssertTrue(app.buttons["recallReveal"].waitForExistence(timeout: 2))
+    app.buttons["recallReveal"].tap()
+    XCTAssertTrue(app.descendants(matching: .any)["recallAnswer"].waitForExistence(timeout: 2))
+  }
+
   func testHomePreservesActiveQuestionAndDismissesRevisit() throws {
     let app = XCUIApplication()
     app.launchArguments = ["--fixtures", "--fixture-home-rich", "--fixture-interview-history"]
@@ -29,8 +50,8 @@ final class PracticeUITests: XCTestCase {
     app.buttons["appearancePicker"].tap(); app.buttons["Dark"].tap()
     XCTAssertTrue(app.buttons["appearancePicker"].label.contains("Dark"))
     capture("Settings immediate dark", app)
-    app.buttons["Done"].tap()
-    XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 3))
+    app.buttons["Done for today"].firstMatch.tap()
+    XCTAssertTrue(app.buttons["homeSettings"].waitForExistence(timeout: 3))
     app.buttons["Settings"].tap()
     XCTAssertTrue(app.buttons["appearancePicker"].label.contains("Dark"))
     XCTAssertFalse(app.buttons["Retry sync"].exists)
@@ -88,11 +109,27 @@ final class PracticeUITests: XCTestCase {
     app.buttons["voiceStart"].tap()
     XCTAssertTrue(app.staticTexts["Connecting…"].waitForExistence(timeout: 2))
     capture("Voice room connecting", app)
-    app.buttons["voiceEnd"].tap()
+    app.buttons["voiceBack"].tap()
     XCTAssertTrue(app.buttons["liveVoice"].waitForExistence(timeout: 2))
     // Allow the suspended startup to resume; it must not resurrect audio/a room.
     XCTAssertFalse(app.buttons["voiceMute"].waitForExistence(timeout: 4))
     XCTAssertTrue(app.buttons["liveVoice"].isEnabled)
+  }
+  func testVoiceLiveHidesEarlierExample() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures", "--fixture-voice", "--fixture-voice-example"]
+    app.launch()
+    XCTAssertTrue(app.buttons["startPractice"].waitForExistence(timeout: 10))
+    app.buttons["startPractice"].tap()
+    XCTAssertTrue(app.buttons["liveVoice"].waitForExistence(timeout: 5))
+    app.buttons["liveVoice"].tap()
+    XCTAssertTrue(app.buttons["voiceStart"].waitForExistence(timeout: 5))
+    capture("Voice live without earlier example", app)
+    XCTAssertFalse(app.staticTexts["You · Example"].exists)
+    XCTAssertFalse(app.staticTexts["For example, give each logical operation a stable key and store its result in the same transaction as the state change."].exists)
+    app.buttons["voiceHistory"].tap()
+    XCTAssertFalse(app.staticTexts["You · Example"].exists)
+    app.buttons["voiceBack"].tap()
   }
   func testUnavailableVoicePreservesReply() throws {
     let app = XCUIApplication()
@@ -130,11 +167,13 @@ final class PracticeUITests: XCTestCase {
     capture("Voice ready before Start", app)
     app.buttons["voiceStart"].tap()
     XCTAssertTrue(app.buttons["voiceMute"].waitForExistence(timeout:5))
-    XCTAssertEqual(app.buttons.matching(identifier: "voiceEnd").count, 1)
+    XCTAssertEqual(app.buttons.matching(identifier: "voiceBack").count, 1)
+    XCTAssertFalse(app.buttons["voiceUseText"].exists)
+    XCTAssertFalse(app.buttons["voiceEndControl"].exists)
     app.buttons["voiceMute"].tap()
     XCTAssertEqual(app.buttons["voiceMute"].label,"Unmute microphone")
     XCTAssertEqual(app.buttons["voiceMute"].value as? String, "Muted")
-    XCTAssertFalse(app.staticTexts["Microphone muted"].exists)
+    XCTAssertTrue(app.staticTexts["MICROPHONE MUTED"].exists)
     capture("Voice microphone muted", app)
     app.buttons["voiceMute"].tap()
     XCTAssertFalse(app.otherElements["voiceSessionDivider"].exists, "An empty voice session has no separator")
@@ -150,14 +189,14 @@ final class PracticeUITests: XCTestCase {
     app.buttons["voiceHistory"].tap()
     XCTAssertTrue(app.buttons["voiceMute"].exists)
     app.buttons["voiceHistory"].tap()
-    app.buttons["voiceEnd"].tap()
+    app.buttons["voiceBack"].tap()
     XCTAssertTrue(app.buttons["liveVoice"].waitForExistence(timeout:5))
     XCTAssertEqual(editor.value as? String,"Keep my written draft.")
     XCTAssertTrue(app.staticTexts["I'd use a durable queue."].exists)
     app.buttons["liveVoice"].tap()
     XCTAssertTrue(app.buttons["voiceStart"].waitForExistence(timeout: 5))
     XCTAssertFalse(app.buttons["voiceMute"].exists)
-    app.buttons["voiceEnd"].tap()
+    app.buttons["voiceBack"].tap()
   }
 
   func testAppearanceAndLearningEvidence() throws {
@@ -190,7 +229,7 @@ final class PracticeUITests: XCTestCase {
     app.launch()
     XCTAssertTrue(app.otherElements["sessionRestoration"].waitForExistence(timeout: 2))
     XCTAssertFalse(app.buttons["Sign in with Apple"].exists)
-    XCTAssertTrue(app.staticTexts["Your practice"].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.buttons["homeSettings"].waitForExistence(timeout: 10))
     XCTAssertFalse(app.buttons["Sign in with Apple"].exists)
     app.terminate()
     app.launchArguments = ["--fixtures", "--fixture-slow-launch", "--fixture-signed-out"]
@@ -205,7 +244,7 @@ final class PracticeUITests: XCTestCase {
     app.launchArguments = ["--fixtures", "--fixture-dashboard", "--fixture-cached-home"]
     for _ in 0..<2 {
       app.launch()
-      XCTAssertTrue(app.staticTexts["Your practice"].waitForExistence(timeout: 10))
+      XCTAssertTrue(app.buttons["homeSettings"].waitForExistence(timeout: 10))
       XCTAssertTrue(app.otherElements["Completed, 12"].exists || app.staticTexts["12"].exists)
       XCTAssertTrue(app.otherElements["Last 7 days, 4"].exists || app.staticTexts["4"].exists)
       XCTAssertFalse(app.staticTexts["—"].exists)
@@ -306,7 +345,7 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.navigationBars["Question preview"].waitForExistence(timeout: 5))
     XCUIDevice.shared.press(.home)
     app.activate()
-    XCTAssertTrue(app.staticTexts["Your practice"].waitForExistence(timeout: 8))
+    XCTAssertTrue(app.buttons["homeSettings"].waitForExistence(timeout: 8))
     XCTAssertFalse(app.navigationBars["Question preview"].exists)
   }
 
@@ -326,7 +365,7 @@ final class PracticeUITests: XCTestCase {
     editor.tap()
     editor.typeText("Keep retries bounded.")
     app.buttons["Close"].tap()
-    XCTAssertTrue(app.staticTexts["Your practice"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.buttons["homeSettings"].waitForExistence(timeout: 5))
     XCTAssertTrue(app.buttons["startPractice"].label == "Resume")
     app.buttons["startPractice"].tap()
     XCTAssertTrue(editor.waitForExistence(timeout: 5))
@@ -338,7 +377,7 @@ final class PracticeUITests: XCTestCase {
     let app = XCUIApplication()
     app.launchArguments = ["--fixtures", "--fixture-long-question", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
     app.launch()
-    XCTAssertTrue(app.staticTexts["Your practice"].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.buttons["homeSettings"].waitForExistence(timeout: 10))
     let preview = app.buttons["startPractice"]
     for _ in 0..<8 where !preview.isHittable { app.swipeUp() }
     XCTAssertTrue(preview.isHittable)
@@ -375,8 +414,8 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.buttons["Back to preparation"].waitForExistence(timeout: 8))
     capture("Failed replacement", app)
     app.buttons["Close"].tap()
-    XCTAssertTrue(app.staticTexts["Your practice"].exists)
-    XCTAssertTrue(app.staticTexts["Design a feature-flag control plane"].exists)
+    XCTAssertTrue(app.buttons["homeSettings"].exists)
+    XCTAssertTrue(app.staticTexts["Design a reliable job queue"].exists)
   }
 
   func testTodayPreviewLifecycle() throws {
@@ -384,20 +423,20 @@ final class PracticeUITests: XCTestCase {
     let app = XCUIApplication()
     app.launchArguments = ["--fixtures"]
     app.launch()
-    XCTAssertTrue(app.staticTexts["Your practice"].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.buttons["homeSettings"].waitForExistence(timeout: 10))
     XCTAssertTrue(app.buttons["startPractice"].exists)
     capture("Persistent Today", app)
     app.buttons["startPractice"].tap()
     XCTAssertTrue(app.buttons["previewStart"].waitForExistence(timeout: 5))
     capture("Question preview", app)
     app.buttons["Close"].tap()
-    XCTAssertTrue(app.staticTexts["Your practice"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.buttons["homeSettings"].waitForExistence(timeout: 5))
     app.buttons["startPractice"].tap()
     app.buttons["Choose another question"].tap()
     app.buttons["Prepare question"].tap()
     XCTAssertTrue(app.navigationBars["Question preview"].waitForExistence(timeout: 5))
     app.buttons["Close"].tap()
-    XCTAssertTrue(app.staticTexts["Your practice"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.buttons["homeSettings"].waitForExistence(timeout: 5))
     sleep(3)
     XCTAssertFalse(app.navigationBars["Question preview"].exists)
     app.buttons["startPractice"].tap()
@@ -433,11 +472,11 @@ final class PracticeUITests: XCTestCase {
     let app = XCUIApplication()
     app.launchArguments = ["--fixtures", "--fixture-dashboard"]
     app.launch()
-    XCTAssertTrue(app.staticTexts["Your practice"].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.buttons["homeSettings"].waitForExistence(timeout: 10))
     XCTAssertTrue(app.staticTexts["12"].exists)
     XCTAssertTrue(app.staticTexts["4"].exists)
     XCTAssertFalse(app.staticTexts["Last session"].exists)
-    XCTAssertTrue(app.navigationBars["Home"].exists)
+    XCTAssertTrue(app.buttons["homeSettings"].exists)
     XCTAssertTrue(app.tabBars.buttons["Home"].exists)
     XCTAssertTrue(app.buttons["Prepare question"].exists)
     capture("Practice dashboard", app)
@@ -458,11 +497,32 @@ final class PracticeUITests: XCTestCase {
     app.terminate()
     app.launchArguments = ["--fixtures", "--fixture-onboarding"]
     app.launch()
-    XCTAssertTrue(app.navigationBars["Make it your practice"].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.staticTexts["Make this yours."].waitForExistence(timeout: 10))
+    capture("Onboarding goal", app)
+    app.buttons["Continue"].tap()
+    XCTAssertTrue(app.staticTexts["Role and level"].waitForExistence(timeout: 5))
     capture("Onboarding levels", app)
     app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Engineering level")).firstMatch.tap()
     for level in ["Intern", "Junior", "Mid-level", "Senior", "Staff", "Principal"] { XCTAssertTrue(app.buttons[level].exists) }
     capture("All engineering levels", app)
+  }
+
+  func testDeveloperResetReturnsToOnboarding() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures"]
+    app.launch()
+
+    XCTAssertTrue(app.buttons["Settings"].waitForExistence(timeout: 10))
+    app.buttons["Settings"].tap()
+    let reset = app.buttons["Reset Drillbit"]
+    for _ in 0..<5 where !reset.exists { app.swipeUp() }
+    XCTAssertTrue(reset.waitForExistence(timeout: 3))
+    reset.tap()
+    XCTAssertTrue(app.sheets.buttons["Reset Drillbit"].waitForExistence(timeout: 3))
+    app.sheets.buttons["Reset Drillbit"].tap()
+
+    XCTAssertTrue(app.staticTexts["Make this yours."].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.buttons["Continue"].exists)
   }
 
   func testSettingsSelections() throws {
@@ -592,7 +652,7 @@ final class PracticeUITests: XCTestCase {
     app.buttons["interviewOptions"].tap()
     app.buttons["Skip question"].tap()
     alert.buttons["Skip question"].tap()
-    XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 2))
+    XCTAssertTrue(app.buttons["homeSettings"].waitForExistence(timeout: 2))
     XCTAssertFalse(app.buttons["startPractice"].exists)
   }
 
@@ -650,7 +710,7 @@ final class PracticeUITests: XCTestCase {
     capture("Interview writing", app)
     app.buttons["shareAnswer"].tap()
     XCTAssertTrue(app.staticTexts["What happens if a worker stops after completing the operation but before acknowledging it?"].waitForExistence(timeout:5))
-    XCTAssertTrue(["", "Talk through your approach, or ask a question…"].contains(editor.value as? String ?? ""))
+    XCTAssertTrue(["", "Answer or ask a question…"].contains(editor.value as? String ?? ""))
     capture("Interviewer follow-up", app)
     XCTAssertEqual(app.buttons["exchange-original"].value as? String, "Collapsed")
     let answerRow = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "answer-")).firstMatch
@@ -661,12 +721,13 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(sent.isHittable, "The complete sent answer expands beside its response")
     let followUp = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier != %@", "exchange-", "exchange-original")).firstMatch
     followUp.tap()
-    XCTAssertTrue(sent.isHittable, "Folding a question never hides the sent answer")
+    XCTAssertTrue(sent.exists, "Folding a question never removes the sent answer")
     followUp.tap()
     capture("Inline interview history", app)
     editor.tap(); editor.typeText("I need to handle duplicate effects.")
     app.buttons["interviewOptions"].tap()
-    app.buttons["Give me a nudge"].tap()
+    XCTAssertTrue(app.buttons["Need a nudge?"].exists)
+    app.buttons["Need a nudge?"].tap()
     XCTAssertTrue(app.otherElements["assistancePopup"].waitForExistence(timeout: 1))
     XCTAssertTrue(app.descendants(matching: .any)["assistanceLoading"].exists)
     capture("Assistance loading", app)
@@ -692,19 +753,19 @@ final class PracticeUITests: XCTestCase {
     app.buttons["interviewOptions"].tap()
     app.buttons["Finish interview"].tap()
     app.alerts.buttons["Keep writing"].tap()
-    XCTAssertFalse(app.staticTexts["Boss fight logged."].exists)
+    XCTAssertFalse(app.staticTexts["One idea to carry forward."].exists)
     app.buttons["interviewOptions"].tap()
     app.buttons["Finish interview"].tap()
     app.alerts.buttons["Finish interview"].tap()
-    XCTAssertTrue(app.staticTexts["Boss fight logged."].waitForExistence(timeout:5))
+    XCTAssertTrue(app.staticTexts["One idea to carry forward."].waitForExistence(timeout:5))
     capture("Practice completion", app)
-    app.buttons["Done"].tap()
+    app.buttons["Done for today"].firstMatch.tap()
     XCTAssertTrue(app.buttons["Dismiss practice completion"].waitForExistence(timeout: 5))
-    XCTAssertTrue(app.staticTexts["Practice done. Future you says thanks."].exists)
+    XCTAssertTrue(app.staticTexts["One idea to carry forward."].exists)
     XCTAssertFalse(app.alerts["Drillbit"].exists)
     capture("Home after practice", app)
     app.buttons["Dismiss practice completion"].tap()
-    XCTAssertFalse(app.staticTexts["Boss fight logged."].exists)
+    XCTAssertFalse(app.staticTexts["One idea to carry forward."].exists)
   }
 
   func testPracticeModeLargestLight() throws {
@@ -747,10 +808,11 @@ final class PracticeUITests: XCTestCase {
     app.buttons["Session style"].tap()
     let quick = app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@", "Mock interview")).firstMatch
     XCTAssertTrue(quick.waitForExistence(timeout:5)); XCTAssertTrue(quick.isEnabled)
+    XCTAssertTrue(app.buttons["Back"].exists)
     quick.tap()
     capture("Change active practice mode", app)
-    app.buttons["Done"].tap()
     let editor = app.descendants(matching: .any).matching(identifier: "answerEditor").firstMatch
+    XCTAssertTrue(editor.waitForExistence(timeout: 5))
     editor.tap(); editor.typeText("Keep a durable queue.")
     XCTAssertEqual(app.buttons["exchange-original"].value as? String, "Expanded")
     capture("Question stays open while typing", app)
@@ -761,7 +823,12 @@ final class PracticeUITests: XCTestCase {
     let standard = app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@", "Practice")).firstMatch
     XCTAssertTrue(quick.isSelected)
     standard.tap()
+    XCTAssertTrue(editor.waitForExistence(timeout: 5))
+    app.buttons["interviewOptions"].tap()
+    app.buttons["Session style"].tap()
     XCTAssertTrue(standard.isSelected)
+    app.buttons["Back"].tap()
+    XCTAssertTrue(editor.exists)
   }
 
   func testInterviewDarkKeyboard() throws {
@@ -772,11 +839,46 @@ final class PracticeUITests: XCTestCase {
     app.buttons["startPractice"].tap(); app.buttons["previewStart"].tap()
     let editor = app.descendants(matching: .any).matching(identifier: "answerEditor").firstMatch
     XCTAssertTrue(editor.waitForExistence(timeout:5))
+    XCTAssertFalse(app.otherElements["interviewParameters"].exists)
     capture("Dark interview question", app)
     editor.tap(); editor.typeText("Start with a durable queue.")
     XCTAssertTrue(app.buttons["shareAnswer"].isHittable)
     XCTAssertTrue(app.buttons["interviewOptions"].isHittable)
     capture("Dark interview keyboard", app)
+  }
+
+  func testQuestionUsesSameComposerWithoutAdvancingPrompt() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures"]
+    app.launch()
+    XCTAssertTrue(app.buttons["startPractice"].waitForExistence(timeout: 10))
+    app.buttons["startPractice"].tap(); app.buttons["previewStart"].tap()
+    let editor = app.descendants(matching: .any).matching(identifier: "answerEditor").firstMatch
+    XCTAssertTrue(editor.waitForExistence(timeout: 5))
+    editor.tap(); editor.typeText("What scale?")
+    app.buttons["shareAnswer"].tap()
+    XCTAssertTrue(app.staticTexts["Consider what a retry can know about an operation that already happened."].waitForExistence(timeout: 8))
+    XCTAssertTrue(["", "Answer or ask a question…"].contains(editor.value as? String ?? ""))
+    XCTAssertFalse(app.buttons["Ask interviewer"].exists)
+  }
+
+  func testOnboardingStartsWithGuidedFirstQuestion() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures", "--fixture-onboarding"]
+    app.launch()
+    XCTAssertTrue(app.staticTexts["Make this yours."].waitForExistence(timeout: 10))
+    for _ in 0..<4 { app.buttons["Continue"].tap() }
+    XCTAssertTrue(app.buttons["Start practice"].exists)
+    app.buttons["Start practice"].tap()
+    XCTAssertTrue(app.buttons["previewStart"].waitForExistence(timeout: 10))
+    app.buttons["previewStart"].tap()
+    XCTAssertTrue(app.descendants(matching: .any)["starterGuideTip"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.descendants(matching: .any)["answerEditor"].exists)
+    app.buttons["Skip tips"].tap()
+    XCTAssertFalse(app.descendants(matching: .any)["starterGuideTip"].exists)
+    XCTAssertEqual(app.otherElements.matching(identifier: "answerDivider").count, 1)
+    XCTAssertFalse(app.otherElements["interviewParameters"].exists)
+    capture("Guided interview after tips", app)
   }
 
   func testSingleLineTurnsHaveNoDisclosure() throws {
@@ -911,6 +1013,22 @@ final class PracticeUITests: XCTestCase {
     editor.tap(); editor.typeText("A durable queue")
     XCTAssertTrue(app.buttons["shareAnswer"].isHittable)
     capture("Accessible document keyboard", app)
+  }
+
+  func testLocalWalkthroughShowsTheLearningLoopBeforeSignIn() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures", "--fixture-signed-out", "--fixture-walkthrough"]
+    app.launch()
+    XCTAssertTrue(app.staticTexts["A better answer\nstarts in motion."].waitForExistence(timeout: 8))
+    app.buttons["Continue"].tap()
+    XCTAssertTrue(app.staticTexts["One request ID.\nOne delivery."].exists)
+    app.buttons["Continue"].tap()
+    XCTAssertTrue(app.staticTexts["One useful idea\nat a time."].exists)
+    app.buttons["Continue"].tap()
+    let field = app.textFields["Type or use keyboard dictation…"]
+    XCTAssertTrue(field.exists)
+    field.tap(); field.typeText("Clarify delivery guarantees.")
+    XCTAssertTrue(app.staticTexts["Clarify delivery guarantees."].exists)
   }
 
   private func capture(_ name: String, _ app: XCUIApplication) {

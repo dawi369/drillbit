@@ -42,6 +42,18 @@ it("grounds a temporary example in the unfinished draft", () => {
  expect(JSON.stringify(messages)).toContain("Workers claim jobs with a lease");
 });
 
+it("accepts only explicitly stated parameters from durable conversation turns", () => {
+ const context = {promptVersion:"interviewer-teaching-v4", action:{kind:"clarification",text:"Can we assume 10,000 requests per second?"}};
+ const result = parseInterviewModelResult(context, interviewSchemaFor("clarification"), {
+  move:"answer_question", text:"Yes, assume 10,000 requests per second. Work out the storage trade-off.",
+  parameters:[{label:"Traffic",value:"10,000 requests per second"},{label:"Latency",value:"sub-millisecond"}],
+ });
+ expect(result).toEqual({outcome:"reply",text:"Yes, assume 10,000 requests per second. Work out the storage trade-off.",parameters:[{label:"Traffic",value:"10,000 requests per second"}]});
+ expect(parseInterviewModelResult({...context,action:{kind:"hint",text:""}},interviewSchemaFor("hint"),{
+  move:"hint",text:"Consider retries.",parameters:[{label:"Traffic",value:"retries"}],
+ })).toEqual({outcome:"reply",text:"Consider retries.",parameters:[]});
+});
+
 it("grounds a temporary nudge in the unfinished draft", () => {
  const messages = messagesFor("interview", {promptVersion:"interviewer-teaching-v2", question:{prompt:"Design a queue"}, currentDraft:"Workers claim a durable job", interview:{guidanceMode:"coach_me",turns:[]}, action:{kind:"hint",text:""}});
  expect(messages[0].content).toContain("one to four short sentences");
@@ -61,7 +73,7 @@ it("v4 computes protocol outcomes without allowing model lifecycle control", () 
  for(const kind of ['answer','continue','hint','example','clarification']) {
   const context={action:{kind}};
   const schema=interviewSchemaFor(kind);
-  expect(parseInterviewModelResult(context,schema,{move:'chat',text:'Hey!',outcome:'wrap_up'})).toEqual({text:'Hey!',outcome:['answer','continue'].includes(kind)?'follow_up':'reply'});
+  expect(parseInterviewModelResult(context,schema,{move:'chat',text:'Hey!',outcome:'wrap_up'})).toEqual({text:'Hey!',outcome:['answer','continue'].includes(kind)?'follow_up':'reply',parameters:[]});
   expect(()=>parseInterviewModelResult(context,schema,{move:'chat',text:''})).toThrow();
   expect(()=>parseInterviewModelResult(context,schema,{move:'finish',text:'Done'})).toThrow();
  }

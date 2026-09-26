@@ -17,9 +17,14 @@ export const interviewInputSchema = z.object({
   text: z.string().trim().max(20000).default(""),
   style: interviewStyleSchema.describe("Legacy styles remain accepted; teaching responsibility uses the optional guidanceMode field.").optional(),
 });
+export const interviewParameterSchema = z.object({
+  label: z.string().trim().min(1).max(32),
+  value: z.string().trim().min(1).max(120),
+});
 export const interviewResultSchema = z.object({
   outcome: z.enum(["follow_up", "reply", "wrap_up"]),
   text: z.string().trim().min(1).max(2400),
+  parameters: z.array(interviewParameterSchema).max(3).optional(),
 });
 export function interviewSchemaFor(kind: string) {
   return interviewResultSchema.extend({ outcome: ["answer", "continue"].includes(kind) ? z.literal("follow_up") : z.literal("reply") });

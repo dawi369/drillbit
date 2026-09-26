@@ -1,0 +1,348 @@
+- generic [active] [ref=f2e1]:
+  - banner [ref=f2e2]:
+    - generic [ref=f2e3]: Drillbit / Product design study / 22 September 2026
+    - heading "Clarity, with a point of view." [level=1] [ref=f2e4]
+    - paragraph [ref=f2e5]: "Three directions for the same experience: a focused interview, feedback grounded in your words, and a clear reason to return. Compare the whole journey before choosing a visual language."
+    - navigation "Design directions" [ref=f2e6]:
+      - link "Precision" [ref=f2e7] [cursor=pointer]:
+        - /url: "#precision"
+      - link "Studio" [ref=f2e8] [cursor=pointer]:
+        - /url: "#studio"
+      - link "Depth" [ref=f2e9] [cursor=pointer]:
+        - /url: "#depth"
+      - link "Onboarding storyboard" [ref=f2e10] [cursor=pointer]:
+        - /url: "#onboarding"
+      - button "Try the onboarding" [ref=f2e11] [cursor=pointer]
+    - paragraph [ref=f2e12]: Exploratory mockups · identical content across directions · simulated AI and account states · no production changes
+  - main [ref=f2e13]:
+    - generic [ref=f2e14]:
+      - generic [ref=f2e15]:
+        - generic [ref=f2e16]:
+          - heading "Precision" [level=2] [ref=f2e17]
+          - paragraph [ref=f2e18]: Crisp hierarchy. Cool neutrals. Evidence is the visual signature.
+          - generic "Precision palette" [ref=f2e19]:
+            - generic "#152337" [ref=f2e20]
+            - generic "#285ed4" [ref=f2e21]
+            - generic "#eaf0fc" [ref=f2e22]
+            - generic "#fff" [ref=f2e23]
+        - button "Try Precision" [ref=f2e24] [cursor=pointer]
+      - generic [ref=f2e25]:
+        - article [ref=f2e26]:
+          - generic [ref=f2e27]: Welcome
+          - generic [ref=f2e28]:
+            - generic [ref=f2e29]: 9:41
+            - generic [ref=f2e37]:
+              - generic [ref=f2e38]: drillbit
+              - button "Sign in" [ref=f2e43] [cursor=pointer]
+            - generic [ref=f2e44]:
+              - paragraph [ref=f2e45]: AI interview practice
+              - heading "Think it through. Say it clearly." [level=1] [ref=f2e46]: Think it through.Say it clearly.
+              - paragraph [ref=f2e47]: A focused interview. Feedback tied to your words. A clear next step.
+              - generic [ref=f2e48]:
+                - generic [ref=f2e49]: A moment from practice
+                - blockquote [ref=f2e50]: “I’d retry every failed delivery.”
+                - heading "Make retries safe" [level=3] [ref=f2e52]
+                - paragraph [ref=f2e53]: Define an idempotency key so a retry cannot send the same notification twice.
+              - paragraph [ref=f2e54]: Illustrative feedback · not an assessment of you
+            - generic [ref=f2e55]:
+              - button "Build my practice" [ref=f2e56] [cursor=pointer]
+              - paragraph [ref=f2e57]: About a minute to get started
+          - paragraph [ref=f2e59]: One promise, followed by one concrete example. The primary action is clear at a glance.
+        - article [ref=f2e60]:
+          - generic [ref=f2e61]: Home
+          - generic [ref=f2e62]:
+            - generic [ref=f2e63]: 9:41
+            - generic [ref=f2e71]:
+              - generic [ref=f2e72]: Home
+              - button "Settings" [ref=f2e73] [cursor=pointer]
+            - generic [ref=f2e74]:
+              - heading "A little clearer, every day." [level=1] [ref=f2e75]: A little clearer,every day.
+              - generic [ref=f2e76]:
+                - paragraph [ref=f2e77]: Your next practice · 5 min
+                - heading "Design notification delivery" [level=2] [ref=f2e78]: Design notificationdelivery
+                - paragraph [ref=f2e79]: Choose delivery guarantees before choosing the queue.
+                - generic [ref=f2e80]:
+                  - generic [ref=f2e81]: System design
+                  - generic [ref=f2e82]: Guided
+                - button "Open question" [ref=f2e83] [cursor=pointer]
+              - generic [ref=f2e84]:
+                - heading "Keep it with you" [level=3] [ref=f2e86]
+                - button [ref=f2e89] [cursor=pointer]:
+                  - strong [ref=f2e90]: 2 moments to revisit
+                  - text: From your practice · about 2 min
+                - button "Explore your library" [ref=f2e91] [cursor=pointer]
+            - generic "App navigation" [ref=f2e92]:
+              - button "Home" [ref=f2e93] [cursor=pointer]
+              - button "Recall" [ref=f2e94] [cursor=pointer]
+              - button "Library" [ref=f2e95] [cursor=pointer]
+          - paragraph [ref=f2e97]: One recommended session leads. Recall is secondary; Library remains available without competing.
+        - article [ref=f2e98]:
+          - generic [ref=f2e99]: Interview
+          - generic [ref=f2e100]:
+            - generic [ref=f2e101]: 9:41
+            - generic [ref=f2e109]:
+              - button "Back" [ref=f2e110] [cursor=pointer]
+              - generic [ref=f2e111]: Interview
+              - button "Interview options" [ref=f2e112] [cursor=pointer]
+            - generic [ref=f2e113]:
+              - generic [ref=f2e114]:
+                - paragraph [ref=f2e115]: System design · Guided
+                - strong [ref=f2e116]: Design notification delivery
+                - paragraph [ref=f2e117]: Reliable delivery without duplicate sends.
+              - generic [ref=f2e118]:
+                - generic [ref=f2e119]: Interviewer
+                - paragraph [ref=f2e124]: Before choosing a queue, what would you clarify about delivery?
+              - generic [ref=f2e125]:
+                - generic [ref=f2e126]: You
+                - paragraph [ref=f2e127]: I’d clarify which notifications can tolerate duplicates, and how quickly they need to arrive.
+              - generic [ref=f2e128]:
+                - generic [ref=f2e129]: Interviewer
+                - paragraph [ref=f2e134]: Take a payment receipt. A send times out, but it may have succeeded. How would you retry safely?
+              - button "Give me a nudge" [ref=f2e135] [cursor=pointer]
+            - generic [ref=f2e136]:
+              - generic [ref=f2e137]:
+                - textbox "Your answer" [ref=f2e138]:
+                  - /placeholder: Think it through…
+                - generic [ref=f2e139]:
+                  - generic [ref=f2e140]: Only sent when you tap ↑
+                  - button "Send answer" [ref=f2e141] [cursor=pointer]
+              - paragraph [ref=f2e142]: Write or use your keyboard’s dictation.
+          - paragraph [ref=f2e144]: A readable conversation with a stable question reference and an explicit send action.
+    - generic [ref=f2e145]:
+      - generic [ref=f2e146]:
+        - generic [ref=f2e147]:
+          - heading "Studio" [level=2] [ref=f2e148]
+          - paragraph [ref=f2e149]: A quieter coaching presence. Tonal grouping. Softer typography.
+          - generic "Studio palette" [ref=f2e150]:
+            - generic "#233c38" [ref=f2e151]
+            - generic "#306f63" [ref=f2e152]
+            - generic "#e3ece5" [ref=f2e153]
+            - generic "#f3f6f3" [ref=f2e154]
+        - button "Try Studio" [ref=f2e155] [cursor=pointer]
+      - generic [ref=f2e156]:
+        - article [ref=f2e157]:
+          - generic [ref=f2e158]: Welcome
+          - generic [ref=f2e159]:
+            - generic [ref=f2e160]: 9:41
+            - generic [ref=f2e168]:
+              - generic [ref=f2e169]: drillbit
+              - button "Sign in" [ref=f2e174] [cursor=pointer]
+            - generic [ref=f2e175]:
+              - paragraph [ref=f2e176]: AI interview practice
+              - heading "Think it through. Say it clearly." [level=1] [ref=f2e177]: Think it through.Say it clearly.
+              - paragraph [ref=f2e178]: A focused interview. Feedback tied to your words. A clear next step.
+              - generic [ref=f2e179]:
+                - generic [ref=f2e180]: A moment from practice
+                - blockquote [ref=f2e181]: “I’d retry every failed delivery.”
+                - heading "Make retries safe" [level=3] [ref=f2e183]
+                - paragraph [ref=f2e184]: Define an idempotency key so a retry cannot send the same notification twice.
+              - paragraph [ref=f2e185]: Illustrative feedback · not an assessment of you
+            - generic [ref=f2e186]:
+              - button "Build my practice" [ref=f2e187] [cursor=pointer]
+              - paragraph [ref=f2e188]: About a minute to get started
+          - paragraph [ref=f2e190]: Softer type and a tonal evidence surface make the first interaction feel less evaluative.
+        - article [ref=f2e191]:
+          - generic [ref=f2e192]: Home
+          - generic [ref=f2e193]:
+            - generic [ref=f2e194]: 9:41
+            - generic [ref=f2e202]:
+              - generic [ref=f2e203]: Home
+              - button "Settings" [ref=f2e204] [cursor=pointer]
+            - generic [ref=f2e205]:
+              - heading "A little clearer, every day." [level=1] [ref=f2e206]: A little clearer,every day.
+              - generic [ref=f2e207]:
+                - paragraph [ref=f2e208]: Your next practice · 5 min
+                - heading "Design notification delivery" [level=2] [ref=f2e209]: Design notificationdelivery
+                - paragraph [ref=f2e210]: Choose delivery guarantees before choosing the queue.
+                - generic [ref=f2e211]:
+                  - generic [ref=f2e212]: System design
+                  - generic [ref=f2e213]: Guided
+                - button "Open question" [ref=f2e214] [cursor=pointer]
+              - generic [ref=f2e215]:
+                - heading "Keep it with you" [level=3] [ref=f2e217]
+                - button [ref=f2e220] [cursor=pointer]:
+                  - strong [ref=f2e221]: 2 moments to revisit
+                  - text: From your practice · about 2 min
+                - button "Explore your library" [ref=f2e222] [cursor=pointer]
+            - generic "App navigation" [ref=f2e223]:
+              - button "Home" [ref=f2e224] [cursor=pointer]
+              - button "Recall" [ref=f2e225] [cursor=pointer]
+              - button "Library" [ref=f2e226] [cursor=pointer]
+          - paragraph [ref=f2e228]: A muted practice surface gives the daily session a calm, approachable presence.
+        - article [ref=f2e229]:
+          - generic [ref=f2e230]: Interview
+          - generic [ref=f2e231]:
+            - generic [ref=f2e232]: 9:41
+            - generic [ref=f2e240]:
+              - button "Back" [ref=f2e241] [cursor=pointer]
+              - generic [ref=f2e242]: Interview
+              - button "Interview options" [ref=f2e243] [cursor=pointer]
+            - generic [ref=f2e244]:
+              - generic [ref=f2e245]:
+                - paragraph [ref=f2e246]: System design · Guided
+                - strong [ref=f2e247]: Design notification delivery
+                - paragraph [ref=f2e248]: Reliable delivery without duplicate sends.
+              - generic [ref=f2e249]:
+                - generic [ref=f2e250]: Interviewer
+                - paragraph [ref=f2e255]: Before choosing a queue, what would you clarify about delivery?
+              - generic [ref=f2e256]:
+                - generic [ref=f2e257]: You
+                - paragraph [ref=f2e258]: I’d clarify which notifications can tolerate duplicates, and how quickly they need to arrive.
+              - generic [ref=f2e259]:
+                - generic [ref=f2e260]: Interviewer
+                - paragraph [ref=f2e265]: Take a payment receipt. A send times out, but it may have succeeded. How would you retry safely?
+              - button "Give me a nudge" [ref=f2e266] [cursor=pointer]
+            - generic [ref=f2e267]:
+              - generic [ref=f2e268]:
+                - textbox "Your answer" [ref=f2e269]:
+                  - /placeholder: Think it through…
+                - generic [ref=f2e270]:
+                  - generic [ref=f2e271]: Only sent when you tap ↑
+                  - button "Send answer" [ref=f2e272] [cursor=pointer]
+              - paragraph [ref=f2e273]: Write or use your keyboard’s dictation.
+          - paragraph [ref=f2e275]: Learner statements occupy a soft surface; interviewer prompts remain on the page.
+    - generic [ref=f2e276]:
+      - generic [ref=f2e277]:
+        - generic [ref=f2e278]:
+          - heading "Depth" [level=2] [ref=f2e279]
+          - paragraph [ref=f2e280]: Focused dark surfaces. Translucent navigation. Controlled depth.
+          - generic "Depth palette" [ref=f2e281]:
+            - generic "#111923" [ref=f2e282]
+            - generic "#1c2835" [ref=f2e283]
+            - generic "#a9c9ff" [ref=f2e284]
+            - generic "#344556" [ref=f2e285]
+        - button "Try Depth" [ref=f2e286] [cursor=pointer]
+      - generic [ref=f2e287]:
+        - article [ref=f2e288]:
+          - generic [ref=f2e289]: Welcome
+          - generic [ref=f2e290]:
+            - generic [ref=f2e291]: 9:41
+            - generic [ref=f2e299]:
+              - generic [ref=f2e300]: drillbit
+              - button "Sign in" [ref=f2e305] [cursor=pointer]
+            - generic [ref=f2e306]:
+              - paragraph [ref=f2e307]: AI interview practice
+              - heading "Think it through. Say it clearly." [level=1] [ref=f2e308]: Think it through.Say it clearly.
+              - paragraph [ref=f2e309]: A focused interview. Feedback tied to your words. A clear next step.
+              - generic [ref=f2e310]:
+                - generic [ref=f2e311]: A moment from practice
+                - blockquote [ref=f2e312]: “I’d retry every failed delivery.”
+                - heading "Make retries safe" [level=3] [ref=f2e314]
+                - paragraph [ref=f2e315]: Define an idempotency key so a retry cannot send the same notification twice.
+              - paragraph [ref=f2e316]: Illustrative feedback · not an assessment of you
+            - generic [ref=f2e317]:
+              - button "Build my practice" [ref=f2e318] [cursor=pointer]
+              - paragraph [ref=f2e319]: About a minute to get started
+          - paragraph [ref=f2e321]: Dark tonal layers give the evidence example more presence without obscuring the copy.
+        - article [ref=f2e322]:
+          - generic [ref=f2e323]: Home
+          - generic [ref=f2e324]:
+            - generic [ref=f2e325]: 9:41
+            - generic [ref=f2e333]:
+              - generic [ref=f2e334]: Home
+              - button "Settings" [ref=f2e335] [cursor=pointer]
+            - generic [ref=f2e336]:
+              - heading "A little clearer, every day." [level=1] [ref=f2e337]: A little clearer,every day.
+              - generic [ref=f2e338]:
+                - paragraph [ref=f2e339]: Your next practice · 5 min
+                - heading "Design notification delivery" [level=2] [ref=f2e340]: Design notificationdelivery
+                - paragraph [ref=f2e341]: Choose delivery guarantees before choosing the queue.
+                - generic [ref=f2e342]:
+                  - generic [ref=f2e343]: System design
+                  - generic [ref=f2e344]: Guided
+                - button "Open question" [ref=f2e345] [cursor=pointer]
+              - generic [ref=f2e346]:
+                - heading "Keep it with you" [level=3] [ref=f2e348]
+                - button [ref=f2e351] [cursor=pointer]:
+                  - strong [ref=f2e352]: 2 moments to revisit
+                  - text: From your practice · about 2 min
+                - button "Explore your library" [ref=f2e353] [cursor=pointer]
+            - generic "App navigation" [ref=f2e354]:
+              - button "Home" [ref=f2e355] [cursor=pointer]
+              - button "Recall" [ref=f2e356] [cursor=pointer]
+              - button "Library" [ref=f2e357] [cursor=pointer]
+          - paragraph [ref=f2e359]: Elevated practice content and a translucent tab bar establish foreground and background.
+        - article [ref=f2e360]:
+          - generic [ref=f2e361]: Interview
+          - generic [ref=f2e362]:
+            - generic [ref=f2e363]: 9:41
+            - generic [ref=f2e371]:
+              - button "Back" [ref=f2e372] [cursor=pointer]
+              - generic [ref=f2e373]: Interview
+              - button "Interview options" [ref=f2e374] [cursor=pointer]
+            - generic [ref=f2e375]:
+              - generic [ref=f2e376]:
+                - paragraph [ref=f2e377]: System design · Guided
+                - strong [ref=f2e378]: Design notification delivery
+                - paragraph [ref=f2e379]: Reliable delivery without duplicate sends.
+              - generic [ref=f2e380]:
+                - generic [ref=f2e381]: Interviewer
+                - paragraph [ref=f2e386]: Before choosing a queue, what would you clarify about delivery?
+              - generic [ref=f2e387]:
+                - generic [ref=f2e388]: You
+                - paragraph [ref=f2e389]: I’d clarify which notifications can tolerate duplicates, and how quickly they need to arrive.
+              - generic [ref=f2e390]:
+                - generic [ref=f2e391]: Interviewer
+                - paragraph [ref=f2e396]: Take a payment receipt. A send times out, but it may have succeeded. How would you retry safely?
+              - button "Give me a nudge" [ref=f2e397] [cursor=pointer]
+            - generic [ref=f2e398]:
+              - generic [ref=f2e399]:
+                - textbox "Your answer" [ref=f2e400]:
+                  - /placeholder: Think it through…
+                - generic [ref=f2e401]:
+                  - generic [ref=f2e402]: Only sent when you tap ↑
+                  - button "Send answer" [ref=f2e403] [cursor=pointer]
+              - paragraph [ref=f2e404]: Write or use your keyboard’s dictation.
+          - paragraph [ref=f2e406]: Blur belongs at navigation boundaries. The conversation and composer stay readable.
+  - generic [ref=f2e407]:
+    - generic [ref=f2e408]: Proposed first-session journey
+    - heading "Show the value. Ask only what helps." [level=2] [ref=f2e409]
+    - paragraph [ref=f2e410]: A single promise replaces the four-page introduction. Two relevant choices shape the first session. A local input preview sets expectations before authentication. Invitations remain a separate access gate.
+    - generic [ref=f2e411]:
+      - article [ref=f2e412]:
+        - text: "01"
+        - heading "The promise" [level=3] [ref=f2e413]
+        - paragraph [ref=f2e414]: A concrete quote and useful feedback show what Drillbit does. One action starts setup.
+        - generic [ref=f2e415]: No carousel
+      - article [ref=f2e416]:
+        - text: "02"
+        - heading "Goal and level" [level=3] [ref=f2e417]
+        - paragraph [ref=f2e418]: Choose the practice goal and current level. Use sensible defaults; both remain editable.
+        - generic [ref=f2e419]: Two relevant choices
+      - article [ref=f2e420]:
+        - text: "03"
+        - heading "Try the input" [level=3] [ref=f2e421]
+        - paragraph [ref=f2e422]: Type or use keyboard dictation. A local preview is clearly labelled and never graded.
+        - generic [ref=f2e423]: No inference call
+      - article [ref=f2e424]:
+        - text: "04"
+        - heading "Sign in" [level=3] [ref=f2e425]
+        - paragraph [ref=f2e426]: Account creation follows the preview. Preserve the goal, level, and input when returning.
+        - generic [ref=f2e427]: System authentication
+      - article [ref=f2e428]:
+        - text: "05"
+        - heading "Invitation access" [level=3] [ref=f2e429]
+        - paragraph [ref=f2e430]: Existing access continues immediately. New users redeem an invite; failure keeps setup intact.
+        - generic [ref=f2e431]: Separate access gate
+      - article [ref=f2e432]:
+        - text: "06"
+        - heading "First guided session" [level=3] [ref=f2e433]
+        - paragraph [ref=f2e434]: Open the question before starting. Show the chosen focus, a short duration, and what to expect.
+        - generic [ref=f2e435]: First personalized AI
+      - article [ref=f2e436]:
+        - text: "07"
+        - heading "Feedback and return" [level=3] [ref=f2e437]
+        - paragraph [ref=f2e438]: Quote a learner statement, explain one improvement, and offer a focused retry or Recall.
+        - generic [ref=f2e439]: Show learning payoff
+    - button "Walk through the prototype" [ref=f2e440] [cursor=pointer]
+    - generic [ref=f2e441]:
+      - article [ref=f2e442]:
+        - heading "Evidence is the signature" [level=3] [ref=f2e443]
+        - paragraph [ref=f2e444]: Quote → observation → next action. Repeat the same visual grammar in onboarding, feedback, and Recall. Avoid invented scores or mastery claims.
+      - article [ref=f2e445]:
+        - heading "Every state has a next action" [level=3] [ref=f2e446]
+        - paragraph [ref=f2e447]: Keep drafts during interruption. Explain pending feedback. Show recoverable errors in place. Design these states before broad implementation.
+      - article [ref=f2e448]:
+        - heading "Material follows hierarchy" [level=3] [ref=f2e449]
+        - paragraph [ref=f2e450]: Use blur at navigation boundaries. Keep reading and editing surfaces legible. An opaque fallback must preserve hierarchy and contrast.
+  - contentinfo [ref=f2e451]: "Review scope: Welcome, Home, Interview, and the first-session storyboard. Browser rendering illustrates visual intent; native controls, keyboard, Dynamic Type, VoiceOver, and expo-backdrop performance still need device validation."

@@ -80,7 +80,7 @@ A signed TestFlight release requires real Apple sign-in, both AI modes, cold wid
 - Apple Developer app `dawi.drillbit` has Sign in with Apple enabled. App and widget share the existing `group.dawi.drillbit`. Xcode automatic signing uses team `7M4NDAAP73`.
 - A single-use development invitation is saved in the ignored `.local/drillbit-invite.txt` and its hash is installed in D1. Redeem it after the first real sign-in.
 
-For real authentication in Simulator, run a **signed** build from Xcode. `CODE_SIGNING_ALLOWED=NO` remains suitable for compilation and isolated unit tests, but the Clerk SDK can assert when its startup Keychain operations lack entitlements. Do not launch the unsigned test artifact for authentication acceptance.
+For real authentication in Simulator, run a **signed** build from Xcode or `scripts/check-ios-launch.sh` (optionally pass a simulator UDID). The script builds, installs and checks a normal launch without fixture arguments. `CODE_SIGNING_ALLOWED=NO` remains suitable for compilation and isolated unit tests, but the Clerk SDK asserts on startup when its Keychain operations lack entitlements. Do not launch the unsigned test artifact for authentication acceptance.
 
 Clerk CLI is linked to the project. `clerk doctor` verifies the account/application; its root `.env` warning is expected because the app/API deliberately keep their configuration in separate locations. Production Clerk and custom production Google/GitHub OAuth credentials remain separate release work.
 
@@ -219,7 +219,7 @@ Build 6 local archive repaired with real UUID `4C4C4496-5555-3144-A149-A7E882FEE
 
 ### Owner development reset — 14 September 2026
 
-`DEVELOPER_ACCOUNTS` is an exact, comma-separated internal-account-ID allowlist. Its account receives the optional bootstrap developer capability and may call `DELETE /v1/developer/practice`. The operation clears only that account's practice graph, library questions, non-deletion jobs, AI-run history and daily visit claims. It retains the account, invitation, settings, encrypted provider credential, device registrations and usage records. The native Developer section clears account-scoped local practice state after the server succeeds; it never exposes the reset to other accounts. Removing the account ID and redeploying hides and disables the tool.
+`DEVELOPER_ACCOUNTS` is an exact, comma-separated internal-account-ID allowlist. Its account receives the optional bootstrap developer capability and may call `DELETE /v1/developer/practice`. The operation clears that account's practice graph, library questions, Recall data, non-deletion jobs, AI-run history, daily visit claims, settings, encrypted provider credential and device registrations. It retains Clerk identity, invitation redemption and usage accounting, then restores default settings with onboarding incomplete. The native Developer section clears every account-scoped local cache and outbox, removes pending reminders, resets appearance and returns directly to onboarding after the server succeeds. Removing the account ID and redeploying hides and disables the tool.
 
 14 September 2026: development Worker version `7979a469-7452-4caf-8dd1-5a9c719dd1` enabled the owner-only reset, stale-attempt retirement and compact Home/topic changes. `/health` returned `status:ok`. No database migration or TestFlight upload. The signed simulator build launched on iPhone 18 Pro with iOS 27; the simulator has no retained Clerk session and shows Sign in.
 
@@ -229,4 +229,12 @@ Development Worker version `a7495426-781e-43c3-ac39-f1dde449d0ae` added `intervi
 
 Development Worker version `ccfaea8a-ddf4-4696-acec-3292c8785375` enables `INTERACTIVE_INLINE_ENABLED=true` for interview turns. Set the flag false and redeploy to restore Workflow-first execution without changing stored jobs or clients. D1/Workflow recovery remains active for interrupted work. No migration or secret change. Health returned `status:ok`.
 
+17 September 2026: private backup `.local/before-learning-loop-20260917-100203.sql` precedes additive migration `0011_learning_loop.sql`. Development Worker `da1b54d3-c8e3-44cf-9427-2bd6fa8048b9` serves account-scoped recall scheduling and completed-interview retry branches. Health returned `status:ok`; unauthenticated Recall returned 401. The migration is forward-only and remains compatible with older clients. No TestFlight upload.
+
 Build 7 packages the latency-sensitive interview pipeline, ephemeral Nudge/Example presentation, permission-gated voice entry, Home/recovery refinements and the monochrome native visual pass. Commit `b8dff03` passed both GitHub Actions jobs. Signed archive `/tmp/drillbit-testflight/Drillbit-build7-b8dff03.xcarchive` includes the authentic UUID-matched WebRTC dSYM. The internal-only export completed at 22:43 CEST with `Upload succeeded`; Apple reported the package is processing. Processing completion and phone availability remain separate checks.
+
+### Internal TestFlight build 8 — 26 September 2026
+
+Version `2.0.0 (8)` was archived from the current uncommitted checkout atop `d2df042` at `/tmp/drillbit-testflight/Drillbit-build8.xcarchive`. The archive uses the development API and Clerk environment, automatic team `7M4NDAAP73` signing, and authentic UUID-matched WebRTC symbols. Export options in `/tmp/drillbit-testflight/ExportOptions-build8.plist` restrict the upload to TestFlight Internal Only. Xcode reported `Upload succeeded`, `Uploaded package is processing`, and `EXPORT SUCCEEDED` at 18:30 CEST; `/tmp/drillbit-testflight/build8-export.log` records the upload. Apple's final processing and tester availability have not yet been confirmed.
+
+The matching development Worker is version `370de182-0b46-4107-a372-5638cad44c81`; remote D1 reported no pending migrations, `/health` returned `ok`, and unauthenticated bootstrap returned 401. Candidate checks: 112 API/D1 tests, 36 Swift core tests, the signed simulator launch and targeted interview/voice UI tests passed. Live OpenRouter structured-output checks covered Luna interview turns, help, generation and reflection. These do not establish physical-device acceptance or a fully processed TestFlight build.

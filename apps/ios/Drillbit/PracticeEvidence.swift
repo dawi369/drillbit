@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 struct PracticeEvidenceView: View {
   var model: AppModel
   var body: some View {
-    List {
+    SignalList {
       Section {
         Text("Feedback from your latest 100 sessions, linked to your answers. Counts track practice, not mastery.")
           .foregroundStyle(.secondary)
@@ -50,7 +50,7 @@ struct PracticeExportView: View {
   @State private var exporting = false
   @State private var failure: String?
   var body: some View {
-    Form {
+    SignalList {
       Text("Export your questions, answers, conversations, feedback and practice settings as JSON. Provider keys and sign-in credentials are excluded.")
       Button(working ? "Preparing export…" : "Export practice data") {
         Task {

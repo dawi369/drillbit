@@ -5,9 +5,18 @@ struct PracticeProfile: Codable, Equatable, Sendable {
   var background = ""
   var preferences = ""
 }
+struct LearningPlan: Codable, Equatable, Sendable {
+  var version = 1
+  var objective = "learn"
+  var roleTrack = "general"
+  var weakAreas: [String] = []
+  var dailyGoalMinutes = 10
+  var targetDate: String? = nil
+}
 struct PersonalizationPreview: Codable { var text: String }
 struct PracticeSettings: Codable, Equatable, Sendable {
   var practiceProfile: PracticeProfile? = nil
+  var learningPlan: LearningPlan? = nil
   var onboardingComplete = false
   var focus = "System design"
   var difficulty = "medium"
@@ -20,7 +29,7 @@ struct PracticeSettings: Codable, Equatable, Sendable {
   var dailyMinutes = 540
   var reminderEnabled = false
   var aiMode = "managed"
-  var model = "google/gemini-3.1-flash-lite"
+  var model = "openai/gpt-6-luna"
 }
 struct SessionDraft: Codable, Sendable {
   var answer: String
@@ -33,7 +42,7 @@ struct CoachTurn: Codable, Identifiable, Sendable {
   var text: String
   var state: String
 }
-struct LearningEvidence: Codable, Sendable, Identifiable {
+struct LearningEvidence: Codable, Sendable, Identifiable, Equatable {
   var id: String { (sessionId ?? "") + conceptId + signal + quote }
   var conceptId: String
   var observation: String
@@ -42,6 +51,7 @@ struct LearningEvidence: Codable, Sendable, Identifiable {
   var assistance: String
   var sessionId: String? = nil
   var at: String? = nil
+  var sourceTurnId: String? = nil
 }
 struct Reflection: Codable, Sendable {
   var evidence: [LearningEvidence]? = nil
@@ -75,6 +85,7 @@ struct Challenge: Codable, Identifiable, Sendable {
   var primaryConceptId: String?
   var conceptIds: [String]?
   var selectionReason: String?
+  var constraints: [String]? = nil
   var guidanceMode: GuidanceMode? = nil
   var interviewStyle: InterviewStyle?
   var interview: InterviewState?
@@ -90,6 +101,11 @@ struct Challenge: Codable, Identifiable, Sendable {
   var lifecycle: String
   var title: String
   var prompt: String
+  var displayPrompt: String {
+    guard let constraints, !constraints.isEmpty else { return prompt }
+    let appendix = "\n\nConstraints\n" + constraints.map { "• " + $0 }.joined(separator: "\n")
+    return prompt.hasSuffix(appendix) ? String(prompt.dropLast(appendix.count)) : prompt
+  }
   var topic: String
   var createdAt: String?
   var completedAt: String?
@@ -140,6 +156,17 @@ struct Bootstrap: Codable, Sendable {
   var challenge: Challenge?
   var jobs: [Job]
   var credential: Credential?
+  var todayPlan: TodayPlan?
+}
+struct TodayPlan: Codable, Sendable, Equatable {
+  var state: String
+  var completedTotal: Int
+  var completedLastSevenDays: Int
+  var completedToday: Int
+  var dueRecallCount: Int
+  var recommendedRecallCount: Int
+  var estimatedRecallMinutes: Int
+  var dailyGoalMinutes: Int
 }
 struct DailyQuestionResponse: Codable { var day: String; var challenge: Challenge?; var job: Job? }
 struct HistoryPage: Codable, Sendable {
@@ -163,6 +190,28 @@ struct MemoryResponse: Codable, Sendable {
   var sessions: [Challenge]
   var patterns: [Pattern]
 }
+struct RecallCardDTO: Codable, Identifiable, Sendable, Equatable {
+  var id: String
+  var sourceChallengeId: String
+  var conceptId: String
+  var question: String
+  var answer: String
+  var dueAt: String
+  var intervalDays: Int
+  var repetitions: Int
+  var lapses: Int
+  var createdAt: String
+  var updatedAt: String
+  var sourceTitle: String? = nil
+  var sourceCompletedAt: String? = nil
+  var evidence: LearningEvidence? = nil
+}
+struct RecallDeckResponse: Codable, Sendable {
+  var cards: [RecallCardDTO]
+  var dueCount: Int
+}
+struct RecallReviewInput: Codable, Sendable { var rating: String; var responseMs: Int? }
+struct RecallReviewResponse: Codable, Sendable { var card: RecallCardDTO }
 struct WidgetSnapshot: Codable, Sendable {
   var challenge: Challenge?
   var updatedAt: String
@@ -353,6 +402,17 @@ enum InterviewStyle: String, CaseIterable, Codable, Identifiable, Sendable {
 struct InterviewResponse: Codable, Sendable {
   var outcome: String
   var text: String
+  var parameters: [InterviewParameter]? = nil
+}
+struct InterviewParameter: Codable, Hashable, Sendable {
+  var label: String
+  var value: String
+}
+enum InterviewComposerIntent {
+  static func isQuestion(_ text: String) -> Bool {
+    let message = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    return message.count <= 240 && !message.contains("\n") && message.hasSuffix("?")
+  }
 }
 struct InterviewTurn: Codable, Identifiable, Sendable {
   var id: String
@@ -429,7 +489,7 @@ struct InterviewReadingState: Codable, Sendable {
 
 struct InterviewStreamSnapshot: Decodable { var status: String; var text: String }
 
-struct PracticeConcept: Codable, Identifiable, Sendable { var id: String; var label: String; var category: String; var aliases: [String] }
+struct PracticeConcept: Codable, Identifiable, Sendable { var id: String; var label: String; var category: String; var aliases: [String]; var description: String? = nil }
 enum PracticeAreaCatalog {
   /// A small learning-facing menu over the richer canonical taxonomy used for tagging.
   static let ids = ["data-modeling", "consistency", "api-design", "caching", "queues", "coordination", "fault-tolerance", "capacity-planning", "authorization", "observability"]

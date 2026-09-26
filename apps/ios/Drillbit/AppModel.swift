@@ -9,9 +9,14 @@ import WidgetKit
 @MainActor @Observable final class AppModel {
   var bootstrap: Bootstrap?
   var memory = MemoryResponse(sessions: [], patterns: [])
+  var recall = RecallDeckResponse(cards: [], dueCount: 0)
+  private(set) var recallLoaded = false
+  private(set) var recallFetchedAt: Date?
+  private var recallRequestVersion = 0
   private var homeCacheAccount: String?
   private var memoryRequestVersion = 0
   private var launching = true
+  private var accountResetGeneration = 0
   private(set) var restoringSession = true
   private(set) var launchError: String?
   private var cacheGeneration = 0
@@ -22,6 +27,7 @@ import WidgetKit
   private var settingsSyncID: UUID?
   private var settingsSaveGeneration = 0
   var presented: Challenge?
+  var starterPreview: Challenge?
   var error: String?
   var completionNoticeAccount: String?
   var busy = false
@@ -88,6 +94,7 @@ import WidgetKit
         guard !Task.isCancelled, self.bootstrap?.account.id == account else { return }
         if let result: Challenge = try? await self.api.send("challenges/" + challengeID), result.lifecycle == "completed", result.reflection != nil {
           await self.loadMemory()
+          await self.loadRecall()
           await self.preloadLibrary(force: true)
           return
         }
@@ -212,6 +219,7 @@ import WidgetKit
       try await disk.cache(key: "home-coverage:" + result.account.id, data: Data())
       try await disk.cache(key: "home-revisits:" + result.account.id, data: Data())
       memory = MemoryResponse(sessions: [], patterns: [])
+      recall = RecallDeckResponse(cards: [], dueCount: 0); recallLoaded = false; recallFetchedAt = nil; recallRequestVersion += 1
       homeCacheAccount = nil; memoryRequestVersion += 1; cacheGeneration += 1
       UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
       try await disk.cache(key: key, data: Data(epoch.utf8))
@@ -292,11 +300,16 @@ import WidgetKit
     let cachedTaxonomy = (try? await disk.cached(key: "taxonomy:" + account)).flatMap { try? JSONDecoder().decode(TaxonomyResponse.self, from: $0) }
     let coverage = (try? await disk.cached(key: "home-coverage:" + account)).flatMap { try? JSONDecoder().decode(CoverageResponse.self, from: $0) }
     let dismissals = (try? await disk.cached(key: "home-revisits:" + account)).flatMap { try? JSONDecoder().decode(Set<String>.self, from: $0) } ?? []
+    let cachedRecall = (try? await disk.cached(key: "recall:" + account)).flatMap { try? JSONDecoder.api.decode(RecallDeckResponse.self, from: $0) }
     guard cacheGeneration == generation else { return }
     pendingSettings = (try? await disk.cached(key: "settings-pending:" + account)).flatMap { try? JSONDecoder().decode(PendingSettings.self, from: $0) }
     dismissedHomeRevisits = dismissals
     libraryCoverage = coverage?.concepts ?? []; libraryCoverageLoaded = coverage != nil
     memory = restoredMemory
+    recall = cachedRecall ?? RecallDeckResponse(cards: [], dueCount: 0)
+    recallLoaded = cachedRecall != nil
+    recallFetchedAt = nil
+    recallRequestVersion += 1
     librarySnapshots = pages
     libraryDetailSnapshots = details
     librarySessions = [:]
@@ -381,6 +394,7 @@ import WidgetKit
   }
   func refresh() async {
     guard !fixture, !refreshing, !launching else { return }
+    let resetGeneration = accountResetGeneration
     let subject = Clerk.shared.user?.id
     let settingsAtStart = settings
     let hadLocalEdits = bootstrap.map { settings != $0.settings } ?? false
@@ -390,7 +404,7 @@ import WidgetKit
     defer { refreshing = false }
     do {
       let result: Bootstrap = try await api.send("bootstrap")
-      guard Clerk.shared.user?.id == subject else { return }
+      guard Clerk.shared.user?.id == subject, accountResetGeneration == resetGeneration else { return }
       try await acceptEpoch(result)
       if bootstrap?.account.id != result.account.id { bootstrap = nil }
       await restoreHomeCache(account: result.account.id)
@@ -408,8 +422,11 @@ import WidgetKit
       try await disk.cache(
         key: "bootstrap:" + result.account.id, data: JSONEncoder().encode(bootstrap ?? result))
       if result.account.status == "active" {
-        await loadMemory()
-        await preloadLibrary()
+        await withTaskGroup(of: Void.self) { group in
+          group.addTask { await self.loadMemory() }
+          group.addTask { await self.preloadRecallIfNeeded() }
+          group.addTask { await self.preloadLibrary() }
+        }
         if SharedStore.secret("widgetToken") == nil
           || (SharedStore.secret("widgetTokenExpires").flatMap { Date.fromAPI($0) } ?? .distantPast)
             < Date().addingTimeInterval(86400)
@@ -446,6 +463,75 @@ import WidgetKit
       try await disk.cache(key: "memory:" + account, data: JSONEncoder().encode(updated))
     } catch { /* Keep the already-published snapshot during failed refreshes. */ }
   }
+  func loadRecall() async {
+    guard let account = bootstrap?.account.id else { return }
+    recallRequestVersion += 1
+    let version = recallRequestVersion
+    let epoch = bootstrap?.practiceEpoch
+    if fixture {
+      recall = RecallDeckResponse(cards: [], dueCount: 0); recallLoaded = true; recallFetchedAt = Date(); return
+    }
+    do {
+      let updated: RecallDeckResponse = try await api.send("recall")
+      guard bootstrap?.account.id == account, bootstrap?.practiceEpoch == epoch, recallRequestVersion == version else { return }
+      recall = updated; recallLoaded = true; recallFetchedAt = Date()
+      try await disk.cache(key: "recall:" + account, data: JSONEncoder().encode(updated))
+    } catch {
+      if bootstrap?.account.id == account, recallRequestVersion == version { recallLoaded = true }
+    }
+  }
+  func preloadRecallIfNeeded(maxAge: TimeInterval = 45) async {
+    guard bootstrap?.account.status == "active" else { return }
+    if let recallFetchedAt, Date().timeIntervalSince(recallFetchedAt) < maxAge { return }
+    await loadRecall()
+  }
+  func reviewRecall(_ card: RecallCardDTO, rating: String, responseMs: Int?) async throws {
+    recallRequestVersion += 1
+    let account = bootstrap?.account.id
+    let epoch = bootstrap?.practiceEpoch
+    let resetGeneration = accountResetGeneration
+    let previous = recall
+    let previousPlan = bootstrap?.todayPlan
+    recall.cards.removeAll { $0.id == card.id }
+    recall.dueCount = max(0, recall.dueCount - (Date.fromAPI(card.dueAt).map { $0 <= Date() } == true ? 1 : 0))
+    if var plan = bootstrap?.todayPlan {
+      plan.dueRecallCount = recall.dueCount
+      plan.recommendedRecallCount = min(plan.dueRecallCount, plan.dailyGoalMinutes * 2)
+      plan.estimatedRecallMinutes = Int(ceil(Double(plan.recommendedRecallCount) / 2.0))
+      if plan.dueRecallCount == 0 { plan.state = plan.completedToday > 0 ? "complete_today" : (bootstrap?.challenge == nil ? "prepare" : "question_ready") }
+      bootstrap?.todayPlan = plan
+    }
+    do {
+      let result: RecallReviewResponse = try await api.send("recall/\(card.id)/review", method: "POST",
+        body: RecallReviewInput(rating: rating, responseMs: responseMs), command: UUID().uuidString)
+      guard bootstrap?.account.id == account, bootstrap?.practiceEpoch == epoch,
+        accountResetGeneration == resetGeneration else { throw CancellationError() }
+      recall.cards.append(result.card)
+      recall.cards.sort { $0.dueAt == $1.dueAt ? $0.id < $1.id : $0.dueAt < $1.dueAt }
+      try? await disk.cache(key: "recall:" + (account ?? ""), data: JSONEncoder().encode(recall))
+    } catch {
+      guard bootstrap?.account.id == account, bootstrap?.practiceEpoch == epoch,
+        accountResetGeneration == resetGeneration else { throw error }
+      recall = previous
+      bootstrap?.todayPlan = previousPlan
+      throw error
+    }
+  }
+  func retryMoment(challenge: Challenge, turn: InterviewTurn) async throws -> Challenge {
+    if fixture {
+      let branch = Challenge(questionId: challenge.questionId, scenario: challenge.scenario,
+        primaryConceptId: challenge.primaryConceptId, conceptIds: challenge.conceptIds,
+        engineeringLevel: challenge.engineeringLevel, id: UUID().uuidString, lifecycle: "in_progress",
+        title: challenge.title + " · Retry", prompt: turn.prompt, topic: challenge.topic,
+        session: SessionDraft(answer: "", revision: 0))
+      bootstrap?.challenge = branch
+      return branch
+    }
+    let branch: Challenge = try await api.send("challenges/\(challenge.id)/retry-moment/\(turn.id)", method: "POST", command: UUID().uuidString)
+    bootstrap?.challenge = branch
+    if let current = bootstrap { try? await disk.cache(key: "bootstrap:" + current.account.id, data: JSONEncoder().encode(current)) }
+    return branch
+  }
   func refreshAfterSessionDeletion() async throws {
     guard let account = bootstrap?.account.id else { return }
     if let task = libraryWarmTask { await task.value }
@@ -455,36 +541,53 @@ import WidgetKit
     libraryDetailSnapshots = [:]; librarySessions = [:]; librarySnapshots = [:]
     libraryCoverage = []; libraryCoverageLoaded = false; libraryVersion += 1
     await loadMemory()
+    await loadRecall()
     await preloadLibrary(force: true)
   }
   func resetDeveloperPractice() async throws {
     guard let account = bootstrap?.account.id,
       bootstrap?.capabilities?.developerTools == true || fixture
     else { throw APIError(code: "not_found", message: "This tool is unavailable.", status: 404) }
+    accountResetGeneration += 1
+    settingsSyncTask?.cancel()
+    await settingsSyncTask?.value
+    settingsSyncTask = nil; settingsSyncID = nil
     if !fixture {
       let _: EmptyResponse = try await api.send("developer/practice", method: "DELETE")
     }
-    let savedPreferences = try await disk.cached(key: "settings-pending:" + account)
     try await disk.clearPractice(account: account)
-    if let savedPreferences { try await disk.cache(key: "settings-pending:" + account, data: savedPreferences) }
+    pendingSettings = nil; settingsSyncError = nil; settingsSaveGeneration += 1
     libraryWarmTask?.cancel(); libraryWarmTask = nil; libraryWarmAccount = nil
     librarySnapshots = [:]; libraryDetailSnapshots = [:]; librarySessions = [:]
     libraryCoverage = []; libraryCoverageLoaded = false; dismissedHomeRevisits = []
     locallySkipped[account] = []
     memory = MemoryResponse(sessions: [], patterns: [])
+    recall = RecallDeckResponse(cards: [], dueCount: 0); recallLoaded = false; recallFetchedAt = nil; recallRequestVersion += 1
     memoryRequestVersion += 1; cacheGeneration += 1; libraryVersion += 1
-    bootstrap?.challenge = nil
+    settings = PracticeSettings()
+    bootstrap?.settings = settings
+    bootstrap?.challenge = nil; bootstrap?.todayPlan = nil
     bootstrap?.jobs = []
     presented = nil; conflict = nil; hasPendingWrites = false
     completionNoticeAccount = nil; preparationFailure = nil
     failedPreparation = nil; failedPreparationSource = nil
-    if !fixture { await refresh() }
-    await ensureHomeQuestion()
+    homeCacheAccount = nil
+    for key in ["widgetToken", "widgetTokenExpires", "deviceID"] { try SharedStore.setSecret(nil, key: key) }
+    try SharedStore.save(WidgetSnapshot(challenge: nil, updatedAt: ""))
+    WidgetCenter.shared.reloadAllTimelines()
+    UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+    if !fixture {
+      Task { @MainActor in
+        while self.refreshing { try? await Task.sleep(for: .milliseconds(50)) }
+        await self.refresh()
+      }
+    }
   }
   private var checkingDailyQuestion = false
   private var automaticPreparationAccounts: Set<String> = []
   func ensureHomeQuestion() async {
-    guard let account = bootstrap?.account, account.status == "active", !busy, !checkingDailyQuestion else { return }
+    guard let account = bootstrap?.account, account.status == "active", settings.onboardingComplete,
+      !busy, !checkingDailyQuestion else { return }
     if fixture {
       #if DEBUG
       guard ProcessInfo.processInfo.arguments.contains("--fixture-auto-question"), bootstrap?.challenge == nil,
@@ -773,11 +876,11 @@ import WidgetKit
     completed.session = SessionDraft(answer: answer, revision: challenge.session?.revision ?? 0)
     if fixture {
       completed.reflection = Reflection(
-        summary: "You separated the control plane from evaluation.",
-        worked: ["Clear service boundaries"],
-        improve: "Explain what happens when a rollback reaches only some clients.",
-        takeaway: "Trace one stale configuration through the system.",
-        strengths: ["Service boundaries"], gaps: ["Rollback consistency"])
+        summary: "You gave workers durable ownership of queued jobs.",
+        worked: ["Used leases and durable records"],
+        improve: "Explain what happens when work finishes but its acknowledgement is lost.",
+        takeaway: "Make retries safe before making them automatic.",
+        strengths: ["Queue durability"], gaps: ["Retry safety"])
       memory.sessions.insert(completed, at: 0)
     }
     bootstrap?.challenge = nil
@@ -791,6 +894,7 @@ import WidgetKit
       guard bootstrap?.account.id == account else { return }
       locallySkipped[account, default: []].insert(id)
       if bootstrap?.challenge?.id == id { bootstrap?.challenge = nil }
+      if var plan = bootstrap?.todayPlan { plan.state = plan.dueRecallCount > 0 ? "review_due" : "prepare"; bootstrap?.todayPlan = plan }
       presented = nil
       if let bootstrap { try? await disk.cache(key: "bootstrap:" + account, data: JSONEncoder().encode(bootstrap)) }
       if !fixture {
@@ -802,7 +906,7 @@ import WidgetKit
   /// Done waits for durable local storage, never for the network.
   func saveSettingsLocally() async throws {
     guard let account = bootstrap?.account.id else { return }
-    settings.model = "google/gemini-3.1-flash-lite"
+    settings.model = "openai/gpt-6-luna"
     settings.engineeringLevel = settings.selectedLevel
     let command = PendingSettings(value: settings)
     settingsSaveGeneration += 1
@@ -857,7 +961,7 @@ import WidgetKit
     if pendingSettings != nil {
       throw APIError(code: "settings_pending", message: "Your settings are kept on this device. Connect and retry to continue setup.", status: 0)
     }
-    try await reconcileReminder(requestPermission: true)
+    try? await reconcileReminder(requestPermission: true)
   }
   func reconcileReminder(requestPermission: Bool = false) async throws {
     guard !fixture else { return }
@@ -882,6 +986,16 @@ import WidgetKit
     content.userInfo = ["route": "home"]
     try await center.add(UNNotificationRequest(identifier: "daily-practice", content: content,
       trigger: UNCalendarNotificationTrigger(dateMatching: reminderComponents(minutes: settings.dailyMinutes, timezone: settings.timezone), repeats: true)))
+  }
+  func requestReminderPermission() async -> Bool {
+    guard !fixture else { return true }
+    let center = UNUserNotificationCenter.current()
+    var status = await center.notificationSettings().authorizationStatus
+    if status == .notDetermined {
+      _ = try? await center.requestAuthorization(options: [.alert, .sound])
+      status = await center.notificationSettings().authorizationStatus
+    }
+    return status == .authorized || status == .provisional
   }
   func retry(_ job: Job) async {
     await perform {
@@ -919,6 +1033,7 @@ import WidgetKit
     UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
     libraryWarmTask?.cancel(); libraryWarmTask = nil; libraryWarmAccount = nil
     librarySnapshots = [:]; libraryDetailSnapshots = [:]; librarySessions = [:]; libraryCoverage = []; libraryCoverageLoaded = false; dismissedHomeRevisits = []
+    recall = RecallDeckResponse(cards: [], dueCount: 0); recallLoaded = false; recallFetchedAt = nil; recallRequestVersion += 1
     bootstrap = nil
     completionNoticeAccount = nil
     preparationFailure = nil
@@ -935,10 +1050,11 @@ import WidgetKit
     if ProcessInfo.processInfo.arguments.contains("--fixture-long-focus") { settings.focus = "Distributed backend systems, database performance, cache consistency, and safe cross-team migrations" }
     #endif
     var challenge = Challenge(
+      primaryConceptId: "queues", conceptIds: ["queues", "retry-safety"], engineeringLevel: "mid",
       id: "11111111-1111-4111-8111-111111111111", lifecycle: "ready",
-      title: "Design a feature-flag control plane",
+      title: "Design a reliable job queue",
       prompt:
-        "Design a feature-flag platform that supports staged rollouts, low-latency evaluation, audit trails and emergency rollback. How would you keep evaluation available when the control plane is unreachable?",
+        "Design a durable job queue that survives worker failures. Explain how workers claim jobs, how retries avoid duplicate side effects and how accepted work is recovered after a crash.",
       topic: "System design", session: SessionDraft(answer: "", revision: 0), turns: [])
     #if DEBUG
     if ProcessInfo.processInfo.arguments.contains("--fixture-long-question") {
@@ -976,10 +1092,21 @@ import WidgetKit
       }
       challenge.interview = InterviewState(prompt: current, turns: turns)
     }
+    if ProcessInfo.processInfo.arguments.contains("--fixture-voice-example") {
+      challenge.lifecycle = "in_progress"
+      challenge.interview = InterviewState(prompt: challenge.prompt, turns: [InterviewTurn(
+        id: "earlier-example", ordinal: 0, kind: "example", prompt: challenge.prompt,
+        text: "", createdAt: "2026-09-09T18:00:00Z", jobId: "earlier-example", status: "completed",
+        result: InterviewResponse(outcome: "reply", text: "For example, give each logical operation a stable key and store its result in the same transaction as the state change."))])
+    }
     #endif
     bootstrap = Bootstrap(
       capabilities: .init(voice: nil, developerTools: true), account: .init(id: "fixture", status: "active"), settings: settings, challenge: challenge,
-      jobs: [])
+      jobs: [], todayPlan: TodayPlan(state: ProcessInfo.processInfo.arguments.contains("--fixture-dashboard") ? "complete_today" : "first_session",
+        completedTotal: ProcessInfo.processInfo.arguments.contains("--fixture-dashboard") ? 12 : 0,
+        completedLastSevenDays: ProcessInfo.processInfo.arguments.contains("--fixture-dashboard") ? 4 : 0,
+        completedToday: ProcessInfo.processInfo.arguments.contains("--fixture-dashboard") ? 1 : 0,
+        dueRecallCount: 0, recommendedRecallCount: 0, estimatedRecallMinutes: 0, dailyGoalMinutes: 10))
     #if DEBUG
     if ProcessInfo.processInfo.arguments.contains("--fixture-dashboard") { bootstrap?.challenge = nil }
     #endif

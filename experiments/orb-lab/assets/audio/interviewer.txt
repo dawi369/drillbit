@@ -1,0 +1,5 @@
+Let's design a notification service. A payment succeeds, and we need to send a receipt. The request times out. You don't know whether the customer received it. How would you retry without sending the same receipt twice?
+
+Take a moment. Start with the guarantee you want to make.
+
+Good. Now imagine two workers retry at the same time. Where would you store the idempotency key? What happens if one worker crashes after sending, but before recording success?

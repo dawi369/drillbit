@@ -97,6 +97,7 @@ struct HelpView: View {
         }
       }.frame(maxWidth: 640, alignment: .leading).padding(24)
     }
+    .background(AppPalette.background)
     .navigationTitle(preview == nil ? "Help" : "Preview draft").navigationBarTitleDisplayMode(
       .inline
     )

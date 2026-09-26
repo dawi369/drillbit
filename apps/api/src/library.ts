@@ -289,9 +289,11 @@ export async function startQuestion(
 export async function selectConcept(
   env: Env,
   account: string,
-  level: string,
+  input: import("./domain").Settings | string,
   explicit?: string,
 ) {
+  const settings = typeof input === "string" ? {engineeringLevel:input} as import("./domain").Settings : input;
+  const level = settings.engineeringLevel!;
   const rows = await env.DB.prepare(
     "SELECT json_extract(q.data,'$.primaryConceptId') id,COUNT(*) count,MAX(c.completed_at) last FROM questions q JOIN question_attempts x ON x.question_id=q.id JOIN challenges c ON c.id=x.challenge_id WHERE q.account_id=? AND c.lifecycle='completed' AND json_extract(q.data,'$.engineeringLevel')=? GROUP BY 1",
   )
@@ -320,20 +322,24 @@ export async function selectConcept(
     if (!entries) latest.set(item.conceptId, [item]);
     else if (entries[0].sessionId === item.sessionId) entries.push(item);
   }
-  const gap = [...latest.values()].flat().find(e => e.signal === "needs_practice" && !recentIDs.has(e.conceptId)
-    && rows.results.some(r => r.id === e.conceptId));
+  const gap = [...latest.values()].flat().find(e => e.signal === "needs_practice" && !recentIDs.has(e.conceptId));
+  const weakCategories: Record<string,string> = {data:"Data",traffic:"Traffic & performance",async:"Async & coordination",reliability:"Reliability & operations",boundaries:"System boundaries"};
+  const weak = candidates.find(candidate => settings.learningPlan?.weakAreas.some(area =>
+    concepts.find(concept => concept.id === candidate.id)?.category === weakCategories[area]));
   const revisit = [...rows.results].filter(r => !recentIDs.has(r.id)
     && Date.now() - Date.parse(r.last) >= 14 * 86400000)
     .sort((a,b) => a.last.localeCompare(b.last) || a.id.localeCompare(b.id))[0];
-  const selected = completed % 3 === 1 && gap ? gap.conceptId
-    : completed % 3 === 2 && revisit ? revisit.id : candidates[0]!.id;
+  const selected = gap ? gap.conceptId : weak ? weak.id
+    : revisit ? revisit.id : candidates[0]!.id;
   return {
     primaryConceptId: explicit ?? selected,
     reason: explicit ? "Your selected practice area."
-      : completed % 3 === 1 && gap ? "Revisit an area highlighted in previous feedback."
-      : completed % 3 === 2 && revisit ? "Revisit a concept you have not practised recently."
+      : gap ? "Revisit an area highlighted in previous feedback."
+      : weak ? "Build depth in one of your selected focus areas."
+      : revisit ? "Revisit a concept you have not practised recently."
       : "An area with less completed practice at this level.",
-    version: 2,
+    version: 3,
+    learningPlanVersion: settings.learningPlan?.version,
   };
 }
 export async function coverage(env: Env, account: string) {

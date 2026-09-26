@@ -1,0 +1,237 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]: drillbit / design study 04
+      - heading "Your day. Your interviewer." [level=1] [ref=e5]: Your day.Your interviewer.
+      - paragraph [ref=e6]: System design practice, wherever life fits it in.
+    - navigation "Design directions" [ref=e7]:
+      - link "Dark" [ref=e8] [cursor=pointer]:
+        - /url: "#mirage"
+      - link "Light" [ref=e9] [cursor=pointer]:
+        - /url: "#light"
+      - link "Agent" [ref=e10] [cursor=pointer]:
+        - /url: "#agent-lab"
+      - link "Flow" [ref=e11] [cursor=pointer]:
+        - /url: "#onboarding"
+      - button "Try it" [ref=e12] [cursor=pointer]
+  - main [ref=e13]:
+    - generic [ref=e14]:
+      - generic [ref=e15]:
+        - generic [ref=e16]:
+          - heading "Mirage / dark" [level=2] [ref=e17]
+          - paragraph [ref=e18]: Graphite, soft silver, and a warm voice signature.
+          - generic "Mirage / dark palette" [ref=e19]:
+            - generic "#E8C17D" [ref=e20]
+            - generic "#202530" [ref=e21]
+            - generic "#292F3A" [ref=e22]
+            - generic "#EDEFF2" [ref=e23]
+        - button "Try dark" [ref=e24] [cursor=pointer]
+      - generic [ref=e25]:
+        - article [ref=e26]:
+          - generic [ref=e27]: welcome
+          - generic [ref=e28]:
+            - generic [ref=e29]: 9:41
+            - generic [ref=e37]:
+              - generic [ref=e38]: drillbit
+              - button "Sign in" [ref=e44] [cursor=pointer]
+            - generic [ref=e45]:
+              - generic [ref=e46]: your AI interviewer
+              - heading [level=1] [ref=e47]:
+                - text: Go aboutyour day.
+                - emphasis [ref=e48]: Get better.
+              - paragraph [ref=e68]: System design. Out loud.
+              - generic [ref=e69]:
+                - generic [ref=e70]: On a run
+                - generic [ref=e71]: ·At the gym
+                - generic [ref=e72]: ·On the metro
+            - generic [ref=e73]:
+              - button "Meet your interviewer →" [ref=e74] [cursor=pointer]
+              - paragraph [ref=e75]: A real practice loop. Built around you.
+          - paragraph [ref=e77]: Meet an interviewer you can take with you.
+        - article [ref=e78]:
+          - generic [ref=e79]: home
+          - generic [ref=e80]:
+            - generic [ref=e81]: 9:41
+            - generic [ref=e89]:
+              - generic [ref=e90]: drillbit
+              - button "Settings" [ref=e96] [cursor=pointer]
+            - generic [ref=e97]:
+              - generic [ref=e98]: your next conversation
+              - heading [level=1] [ref=e99]:
+                - text: Same request.
+                - emphasis [ref=e100]: Twice.
+              - paragraph [ref=e101]: Let’s talk through reliable delivery.
+              - generic [ref=e102]: 05min
+              - generic [ref=e122]:
+                - generic [ref=e123]: System design
+                - generic [ref=e124]: / Coach me
+              - button "Talk it through" [ref=e125] [cursor=pointer]
+              - button "Prefer to type?" [ref=e127] [cursor=pointer]
+              - button "2 Ideas to revisit From your practice" [ref=e128] [cursor=pointer]:
+                - generic [ref=e129]: "2"
+                - generic [ref=e131]:
+                  - text: Ideas to revisit
+                  - generic [ref=e132]: From your practice
+            - generic "App navigation" [ref=e133]:
+              - button "Home" [ref=e134] [cursor=pointer]
+              - button "Recall" [ref=e135] [cursor=pointer]
+              - button "Library" [ref=e136] [cursor=pointer]
+          - paragraph [ref=e138]: A conversation, with a clear learning purpose.
+        - article [ref=e139]:
+          - generic [ref=e140]: voice interview
+          - generic [ref=e141]:
+            - generic [ref=e142]: 9:41
+            - generic [ref=e150]:
+              - button "Back" [ref=e151] [cursor=pointer]
+              - generic [ref=e152]: Interview
+              - button "Interview options" [ref=e153] [cursor=pointer]
+            - generic [ref=e154]:
+              - generic [ref=e155]:
+                - generic [ref=e156]: Notification delivery
+                - generic [ref=e157]: Coach me
+              - heading "What if it arrives twice?" [level=1] [ref=e158]: What if itarrives twice?
+              - status [ref=e177]: Ready when you are
+              - group [ref=e179]:
+                - generic "Transcript" [ref=e180] [cursor=pointer]
+            - generic [ref=e183]:
+              - generic [ref=e184]:
+                - button "Use text" [ref=e185] [cursor=pointer]
+                - button "Start voice demo" [ref=e187] [cursor=pointer]
+                - button "Finish" [ref=e188] [cursor=pointer]
+              - paragraph [ref=e190]: Voice preview · no microphone or audio
+          - paragraph [ref=e192]: One question. A presence. Room to answer.
+    - generic [ref=e193]:
+      - generic [ref=e194]:
+        - generic [ref=e195]:
+          - heading "Mirage / light" [level=2] [ref=e196]
+          - paragraph [ref=e197]: Neutral porcelain. Graphite controls. One shared identity.
+          - generic "Mirage / light palette" [ref=e198]:
+            - generic "#FFCC65" [ref=e199]
+            - generic "#FAFAF9" [ref=e200]
+            - generic "#EFEFEC" [ref=e201]
+            - generic "#292E35" [ref=e202]
+        - button "Try light" [ref=e203] [cursor=pointer]
+      - generic [ref=e204]:
+        - article [ref=e205]:
+          - generic [ref=e206]: welcome
+          - generic [ref=e207]:
+            - generic [ref=e208]: 9:41
+            - generic [ref=e216]:
+              - generic [ref=e217]: drillbit
+              - button "Sign in" [ref=e223] [cursor=pointer]
+            - generic [ref=e224]:
+              - generic [ref=e225]: your AI interviewer
+              - heading [level=1] [ref=e226]:
+                - text: Go aboutyour day.
+                - emphasis [ref=e227]: Get better.
+              - paragraph [ref=e247]: System design. Out loud.
+              - generic [ref=e248]:
+                - generic [ref=e249]: On a run
+                - generic [ref=e250]: ·At the gym
+                - generic [ref=e251]: ·On the metro
+            - generic [ref=e252]:
+              - button "Meet your interviewer →" [ref=e253] [cursor=pointer]
+              - paragraph [ref=e254]: A real practice loop. Built around you.
+          - paragraph [ref=e256]: The agent carries the color; the page stays quiet.
+        - article [ref=e257]:
+          - generic [ref=e258]: home
+          - generic [ref=e259]:
+            - generic [ref=e260]: 9:41
+            - generic [ref=e268]:
+              - generic [ref=e269]: drillbit
+              - button "Settings" [ref=e275] [cursor=pointer]
+            - generic [ref=e276]:
+              - generic [ref=e277]: your next conversation
+              - heading [level=1] [ref=e278]:
+                - text: Same request.
+                - emphasis [ref=e279]: Twice.
+              - paragraph [ref=e280]: Let’s talk through reliable delivery.
+              - generic [ref=e281]: 05min
+              - generic [ref=e301]:
+                - generic [ref=e302]: System design
+                - generic [ref=e303]: / Coach me
+              - button "Talk it through" [ref=e304] [cursor=pointer]
+              - button "Prefer to type?" [ref=e306] [cursor=pointer]
+              - button "2 Ideas to revisit From your practice" [ref=e307] [cursor=pointer]:
+                - generic [ref=e308]: "2"
+                - generic [ref=e310]:
+                  - text: Ideas to revisit
+                  - generic [ref=e311]: From your practice
+            - generic "App navigation" [ref=e312]:
+              - button "Home" [ref=e313] [cursor=pointer]
+              - button "Recall" [ref=e314] [cursor=pointer]
+              - button "Library" [ref=e315] [cursor=pointer]
+          - paragraph [ref=e317]: No tinted headlines or competing accents.
+        - article [ref=e318]:
+          - generic [ref=e319]: voice interview
+          - generic [ref=e320]:
+            - generic [ref=e321]: 9:41
+            - generic [ref=e329]:
+              - button "Back" [ref=e330] [cursor=pointer]
+              - generic [ref=e331]: Interview
+              - button "Interview options" [ref=e332] [cursor=pointer]
+            - generic [ref=e333]:
+              - generic [ref=e334]:
+                - generic [ref=e335]: Notification delivery
+                - generic [ref=e336]: Coach me
+              - heading "What if it arrives twice?" [level=1] [ref=e337]: What if itarrives twice?
+              - status [ref=e356]: Ready when you are
+              - group [ref=e358]:
+                - generic "Transcript" [ref=e359] [cursor=pointer]
+            - generic [ref=e362]:
+              - generic [ref=e363]:
+                - button "Use text" [ref=e364] [cursor=pointer]
+                - button "Start voice demo" [ref=e366] [cursor=pointer]
+                - button "Finish" [ref=e367] [cursor=pointer]
+              - paragraph [ref=e369]: Voice preview · no microphone or audio
+          - paragraph [ref=e371]: Voice leads. Text remains one tap away.
+  - generic [ref=e372]:
+    - generic [ref=e373]:
+      - generic [ref=e374]: agent / motion study
+      - heading "A voice with a presence." [level=2] [ref=e375]
+      - paragraph [ref=e376]: State-driven. Audio-reactive in the proposed native implementation.
+    - status [ref=e396]: Ready when you are
+    - generic [ref=e397]:
+      - button "ready" [pressed] [ref=e398] [cursor=pointer]
+      - button "listening" [ref=e399] [cursor=pointer]
+      - button "thinking" [ref=e400] [cursor=pointer]
+      - button "speaking" [ref=e401] [cursor=pointer]
+      - button "paused" [ref=e402] [cursor=pointer]
+      - button "reconnecting" [ref=e403] [cursor=pointer]
+    - paragraph [ref=e404]: Simulated states. Reduced motion keeps the shape still.
+  - generic [ref=e405]:
+    - generic [ref=e406]: first session / storyboard
+    - heading "Less setup. More practice." [level=2] [ref=e407]
+    - generic [ref=e408]:
+      - article [ref=e409]:
+        - text: "01"
+        - heading "Get the idea" [level=3] [ref=e410]
+        - paragraph [ref=e411]: One example. One action.
+      - article [ref=e412]:
+        - text: "02"
+        - heading "Choose a focus" [level=3] [ref=e413]
+        - paragraph [ref=e414]: Goal and level. Everything else can wait.
+      - article [ref=e415]:
+        - text: "03"
+        - heading "Try a thought" [level=3] [ref=e416]
+        - paragraph [ref=e417]: A local input preview. No scoring.
+      - article [ref=e418]:
+        - text: "04"
+        - heading "Keep your progress" [level=3] [ref=e419]
+        - paragraph [ref=e420]: Sign in, then confirm invitation access.
+      - article [ref=e421]:
+        - text: "05"
+        - heading "Practice" [level=3] [ref=e422]
+        - paragraph [ref=e423]: One question. A useful follow-up.
+      - article [ref=e424]:
+        - text: "06"
+        - heading "Take something away" [level=3] [ref=e425]
+        - paragraph [ref=e426]: One observation to retry or recall.
+    - button "Walk through it" [ref=e427] [cursor=pointer]
+  - contentinfo [ref=e428]:
+    - text: Design prototype. AI, voice, sign-in, and invitation access are simulated.
+    - link "Design notes" [ref=e429] [cursor=pointer]:
+      - /url: README.md
+    - text: ·
+    - link "Previous study" [ref=e430] [cursor=pointer]:
+      - /url: direction-studies-v3.html

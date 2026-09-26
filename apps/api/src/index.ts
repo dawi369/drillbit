@@ -3,7 +3,7 @@ import { practiceProfileSchema } from "./domain";
 import { dailyQuestion } from "./daily";
 import { startVoice, voiceEvents, delegateVoice, voiceCapability } from "./voice";
 import { exportPage } from "./export";
-import { learningEvidence } from "./learning";
+import { learningEvidence, recallDeck, reviewRecall, retryMoment, todayPlan } from "./learning";
 import { concepts } from "./taxonomy";
 import { libraryPage, questionDetail, setEligibility, startQuestion, coverage } from "./library";
 import { interviewStreamSnapshot, interviewInputSchema, requestInterview, retryInterview } from "./interview";
@@ -24,6 +24,7 @@ import {
   uuid,
   nextDaily,
   parseJSON,
+  validateLearningPlanDate,
 } from "./domain";
 import { identity, hash, encrypt, consumeUsage, type Env } from "./platform";
 import {
@@ -148,12 +149,15 @@ app.use("/v1/*", async (c, next) => {
 app.get("/v1/taxonomy", c => c.json({version:1,concepts}));
 app.get("/v1/library", async c => c.json(await libraryPage(c.env,c.get("account").id,new URL(c.req.url).searchParams)));
 app.get("/v1/library/coverage", async c => c.json({concepts:await coverage(c.env,c.get("account").id)}));
+app.get("/v1/recall", async c => c.json(await recallDeck(c.env,c.get("account").id)));
+app.post("/v1/recall/:id/review", async c => c.json(await reviewRecall(c.env,c.get("account").id,c.req.param("id"),requireCommand(c.req.header("Idempotency-Key")),await c.req.json())));
 app.get("/v1/questions/:id", async c => c.json(await questionDetail(c.env,c.get("account").id,c.req.param("id"),c.req.query("cursor"))));
 app.put("/v1/questions/:id/eligibility", async c => c.json(await setEligibility(c.env,c.get("account").id,c.req.param("id"),requireCommand(c.req.header("Idempotency-Key")),await c.req.json())));
 app.post("/v1/questions/:id/start", async c => c.json(await startQuestion(c.env,c.get("account").id,c.req.param("id"),requireCommand(c.req.header("Idempotency-Key")))));
 app.get("/v1/bootstrap", async (c) => {
   const a = c.get("account");
   const active = await activeChallenge(c.env, a.id);
+  const settings = await settingsFor(c.env, a.id);
   const jobs = await c.env.DB.prepare(
     "SELECT id,kind,status,error,challenge_id FROM jobs WHERE account_id=? AND status IN ('pending','running','failed') ORDER BY created_at DESC LIMIT 20",
   )
@@ -167,7 +171,8 @@ app.get("/v1/bootstrap", async (c) => {
   return c.json({
     account: { id: a.id, status: a.status },
     practiceEpoch: (await c.env.DB.prepare("SELECT value FROM practice_epoch WHERE id=1").first<{value:string}>())!.value,
-    settings: await settingsFor(c.env, a.id),
+    settings,
+    todayPlan: await todayPlan(c.env, a.id, active, settings),
     challenge: active ? await detail(c.env, a.id, active.id) : null,
     jobs: jobs.results,
     credential,
@@ -184,12 +189,17 @@ app.delete("/v1/developer/practice", async (c) => {
   const account = c.get("account").id;
   const permitted = (c.env.DEVELOPER_ACCOUNTS ?? "").split(",").map(id => id.trim()).filter(Boolean);
   if (!permitted.includes(account)) throw new Fault("not_found", 404, "Not found.");
+  const resetSettings = settingsSchema.parse({});
   await c.env.DB.batch([
     c.env.DB.prepare("DELETE FROM challenges WHERE account_id=?").bind(account),
     c.env.DB.prepare("DELETE FROM questions WHERE account_id=?").bind(account),
     c.env.DB.prepare("DELETE FROM jobs WHERE account_id=? AND kind!='delete_account'").bind(account),
     c.env.DB.prepare("DELETE FROM ai_runs WHERE account_id=?").bind(account),
     c.env.DB.prepare("DELETE FROM daily_visits WHERE account_id=?").bind(account),
+    c.env.DB.prepare("DELETE FROM credentials WHERE account_id=?").bind(account),
+    c.env.DB.prepare("DELETE FROM devices WHERE account_id=?").bind(account),
+    c.env.DB.prepare("UPDATE settings SET data=?,next_due=? WHERE account_id=?")
+      .bind(JSON.stringify(resetSettings), nextDaily(resetSettings), account),
   ]);
   return c.json({ ok: true });
 });
@@ -235,11 +245,15 @@ app.put("/v1/settings", async (c) => {
   const settings = settingsSchema.parse(await c.req.json());
   settings.model = MODEL_ID;
   const account = c.get("account").id;
-  settings.practiceProfile ??= (await settingsFor(c.env, account)).practiceProfile;
-  settings.engineeringLevel ??= (await settingsFor(c.env, account)).engineeringLevel;
+  const previous = await settingsFor(c.env, account);
+  settings.practiceProfile ??= previous.practiceProfile;
+  settings.learningPlan ??= previous.learningPlan;
+  settings.engineeringLevel ??= previous.engineeringLevel;
+  if (settings.learningPlan?.targetDate !== previous.learningPlan?.targetDate)
+    validateLearningPlanDate(settings);
   if (
     JSON.stringify(settings) ===
-    JSON.stringify(await settingsFor(c.env, account))
+    JSON.stringify(previous)
   )
     return c.json(settings);
   if (
@@ -423,6 +437,7 @@ app.post("/v1/challenges/:id/interview", async c => {
   return c.json(await requestInterview(c.env,c.get("account").id,c.req.param("id"),requireCommand(c.req.header("Idempotency-Key")),interviewInputSchema.parse(await c.req.json()),runImmediately),202);
 });
 app.post("/v1/challenges/:id/interview/:turn/retry", async c => c.json(await retryInterview(c.env,c.get("account").id,c.req.param("id"),c.req.param("turn"),requireCommand(c.req.header("Idempotency-Key"))),202));
+app.post("/v1/challenges/:id/retry-moment/:turn", async c => c.json(await retryMoment(c.env,c.get("account").id,c.req.param("id"),c.req.param("turn"),requireCommand(c.req.header("Idempotency-Key"))),201));
 app.post("/v1/challenges/:id/start", async (c) => {
   const a = c.get("account").id,
     id = c.req.param("id");

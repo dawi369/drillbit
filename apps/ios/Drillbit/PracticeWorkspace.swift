@@ -418,6 +418,7 @@ struct PracticeView: View {
         workspace
       }
     }
+    .background(AppPalette.background)
     .preferredColorScheme(
       model.fixture && ProcessInfo.processInfo.arguments.contains("--dark") ? .dark : nil
     )
@@ -522,7 +523,7 @@ struct PracticeView: View {
             .font(.body.weight(.medium))
             .foregroundStyle(.tertiary)
             .frame(width: 44, height: 44)
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
+            .background(AppPalette.elevated, in: RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
         .disabled(true)
@@ -640,7 +641,7 @@ struct PracticeOptions: View {
   var skip: () -> Void
   @Environment(\.dismiss) private var dismiss
   var body: some View {
-    Form {
+    SignalList {
       Section("Assistance") {
         Picker("Mode", selection: Binding(get: { practice.mode }, set: { practice.select($0) })) {
           ForEach(AssistanceMode.allCases) { Text($0.rawValue).tag($0) }
@@ -671,7 +672,7 @@ struct PreparationView: View {
   @State private var initialized = false
   @Environment(\.dismiss) private var dismiss
   var body: some View {
-    Form {
+    SignalList {
       Section {
         NavigationLink { PracticeAreaPicker(model: model, selection: $practiceArea, customTopic: $customTopic) } label: {
           LabeledContent("Practice area", value: customTopic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? (model.taxonomy.first { $0.id == practiceArea }?.label ?? "Automatic") : customTopic)

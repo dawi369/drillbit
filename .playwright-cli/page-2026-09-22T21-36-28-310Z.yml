@@ -1,0 +1,299 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]: drillbit / design study 02
+      - heading "A sharper kind of practice." [level=1] [ref=e5]: A sharper kindof practice.
+      - paragraph [ref=e6]: Editor-inspired structure. A little texture. Fewer words.
+    - navigation "Design directions" [ref=e7]:
+      - link "Dark" [ref=e8] [cursor=pointer]:
+        - /url: "#mirage"
+      - link "Light" [ref=e9] [cursor=pointer]:
+        - /url: "#light"
+      - link "Flow" [ref=e10] [cursor=pointer]:
+        - /url: "#onboarding"
+      - button "Try it" [ref=e11] [cursor=pointer]
+  - main [ref=e12]:
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - generic [ref=e15]:
+          - heading "Mirage / dark" [level=2] [ref=e16]
+          - paragraph [ref=e17]: Your editor palette. A quieter place to think.
+          - generic "Mirage / dark palette" [ref=e18]:
+            - generic "#FFCC65" [ref=e19]
+            - generic "#1F2430" [ref=e20]
+            - generic "#232834" [ref=e21]
+            - generic "#56B6C2" [ref=e22]
+        - button "Try dark" [ref=e23] [cursor=pointer]
+      - generic [ref=e24]:
+        - article [ref=e25]:
+          - generic [ref=e26]: welcome
+          - generic [ref=e27]:
+            - generic [ref=e28]: 9:41
+            - generic [ref=e36]:
+              - generic [ref=e37]: drillbit
+              - button "Sign in" [ref=e42] [cursor=pointer]
+            - generic [ref=e43]:
+              - generic [ref=e44]: a little practice. every day.
+              - heading [level=1] [ref=e45]:
+                - text: Think it.Try it.
+                - emphasis [ref=e46]: Refine it.
+              - paragraph [ref=e47]: Better answers, one decision at a time.
+              - generic [ref=e48]:
+                - generic [ref=e49]:
+                  - generic [ref=e50]: delivery / retry
+                  - generic [ref=e51]: one useful change
+                - generic [ref=e52]:
+                  - generic [ref=e53]: "01"
+                  - generic [ref=e54]: send(receipt)
+                - generic [ref=e55]:
+                  - generic [ref=e56]: "02"
+                  - generic [ref=e57]: // timed out. try again?
+                - generic [ref=e58]:
+                  - generic [ref=e59]: "03"
+                  - generic [ref=e60]: + retry(sameKey)
+                - generic [ref=e61]: ↳One receipt. Never two.
+              - generic [ref=e62]: illustrative example
+            - generic [ref=e63]:
+              - button "Start practicing ↗" [ref=e64] [cursor=pointer]
+              - paragraph [ref=e65]: Your first session takes 5 minutes.
+          - paragraph [ref=e67]: A small code change introduces the practice loop.
+        - article [ref=e68]:
+          - generic [ref=e69]: home
+          - generic [ref=e70]:
+            - generic [ref=e71]: 9:41
+            - generic [ref=e79]:
+              - generic [ref=e80]: drillbit
+              - button "Settings" [ref=e85] [cursor=pointer]
+            - generic [ref=e86]:
+              - generic [ref=e87]:
+                - generic [ref=e88]: today / system design
+                - generic [ref=e89]: 5 min
+              - heading "Retries, without duplicates." [level=1] [ref=e90]: Retries,withoutduplicates.
+              - generic [ref=e91]:
+                - generic [ref=e92]: notification delivery
+                - generic [ref=e94]: guided
+              - img "Send a receipt, encounter a timeout, retry with the same identifier" [ref=e95]:
+                - img [ref=e96]:
+                  - generic [ref=e100]: send
+                  - generic [ref=e101]: timeout
+                  - generic [ref=e102]: retry
+                  - generic [ref=e103]: "id: 42"
+                  - generic [ref=e104]: "id: 42"
+                  - generic [ref=e106]: same key. one delivery.
+              - button "Open question ↗" [ref=e108] [cursor=pointer]
+              - generic [ref=e109]:
+                - heading "Keep it sharp" [level=3] [ref=e110]
+                - generic [ref=e111]: from your practice
+              - button "recall / 2 due What makes a retry safe? ↗" [ref=e112] [cursor=pointer]:
+                - generic [ref=e113]:
+                  - generic [ref=e114]: recall / 2 due
+                  - strong [ref=e115]: What makes a retry safe?
+                - generic [ref=e116]: ↗
+            - generic "App navigation" [ref=e117]:
+              - button "Home" [ref=e118] [cursor=pointer]
+              - button "Recall" [ref=e119] [cursor=pointer]
+              - button "Library" [ref=e120] [cursor=pointer]
+          - paragraph [ref=e122]: The problem leads. Recall sits in a tactile deck.
+        - article [ref=e123]:
+          - generic [ref=e124]: interview
+          - generic [ref=e125]:
+            - generic [ref=e126]: 9:41
+            - generic [ref=e134]:
+              - button "Back" [ref=e135] [cursor=pointer]
+              - generic [ref=e136]: Interview
+              - button "Interview options" [ref=e137] [cursor=pointer]
+            - generic [ref=e138]:
+              - generic [ref=e139]: Notification delivery
+              - generic [ref=e140]: guided
+            - generic [ref=e141]:
+              - generic [ref=e142]:
+                - generic [ref=e143]: "01"
+                - generic [ref=e144]: you
+              - paragraph [ref=e146]: I’d clarify delivery guarantees first.
+              - generic [ref=e147]:
+                - generic [ref=e148]: "02"
+                - generic [ref=e149]: interviewer
+              - generic [ref=e150]:
+                - paragraph [ref=e151]: The send timed out.How do you avoida duplicate?
+                - generic [ref=e152]:
+                  - generic [ref=e153]:
+                    - generic [ref=e154]: receipt
+                    - generic [ref=e155]: →
+                    - generic [ref=e156]: timeout
+                  - generic [ref=e157]:
+                    - generic [ref=e158]: retry?
+                    - generic [ref=e159]: →
+                    - emphasis [ref=e160]: your decision
+                - button "A small nudge" [ref=e161] [cursor=pointer]
+            - generic [ref=e162]:
+              - generic [ref=e163]:
+                - textbox "Your answer" [ref=e164]:
+                  - /placeholder: Your thinking…
+                - generic [ref=e165]:
+                  - generic [ref=e166]: draft / only sent on ↑
+                  - button "Send answer" [ref=e167] [cursor=pointer]
+              - paragraph [ref=e168]: Use your keyboard to type or dictate.
+          - paragraph [ref=e170]: An editor gutter separates thought from follow-up.
+    - generic [ref=e171]:
+      - generic [ref=e172]:
+        - generic [ref=e173]:
+          - heading "Mirage / light" [level=2] [ref=e174]
+          - paragraph [ref=e175]: Warm paper. The same amber, with darker syntax accents.
+          - generic "Mirage / light palette" [ref=e176]:
+            - generic "#FFCC65" [ref=e177]
+            - generic "#F5F2EA" [ref=e178]
+            - generic "#FFFCF5" [ref=e179]
+            - generic "#287681" [ref=e180]
+        - button "Try light" [ref=e181] [cursor=pointer]
+      - generic [ref=e182]:
+        - article [ref=e183]:
+          - generic [ref=e184]: welcome
+          - generic [ref=e185]:
+            - generic [ref=e186]: 9:41
+            - generic [ref=e194]:
+              - generic [ref=e195]: drillbit
+              - button "Sign in" [ref=e200] [cursor=pointer]
+            - generic [ref=e201]:
+              - generic [ref=e202]: a little practice. every day.
+              - heading [level=1] [ref=e203]:
+                - text: Think it.Try it.
+                - emphasis [ref=e204]: Refine it.
+              - paragraph [ref=e205]: Better answers, one decision at a time.
+              - generic [ref=e206]:
+                - generic [ref=e207]:
+                  - generic [ref=e208]: delivery / retry
+                  - generic [ref=e209]: one useful change
+                - generic [ref=e210]:
+                  - generic [ref=e211]: "01"
+                  - generic [ref=e212]: send(receipt)
+                - generic [ref=e213]:
+                  - generic [ref=e214]: "02"
+                  - generic [ref=e215]: // timed out. try again?
+                - generic [ref=e216]:
+                  - generic [ref=e217]: "03"
+                  - generic [ref=e218]: + retry(sameKey)
+                - generic [ref=e219]: ↳One receipt. Never two.
+              - generic [ref=e220]: illustrative example
+            - generic [ref=e221]:
+              - button "Start practicing ↗" [ref=e222] [cursor=pointer]
+              - paragraph [ref=e223]: Your first session takes 5 minutes.
+          - paragraph [ref=e225]: The same structure, softened for daylight.
+        - article [ref=e226]:
+          - generic [ref=e227]: home
+          - generic [ref=e228]:
+            - generic [ref=e229]: 9:41
+            - generic [ref=e237]:
+              - generic [ref=e238]: drillbit
+              - button "Settings" [ref=e243] [cursor=pointer]
+            - generic [ref=e244]:
+              - generic [ref=e245]:
+                - generic [ref=e246]: today / system design
+                - generic [ref=e247]: 5 min
+              - heading "Retries, without duplicates." [level=1] [ref=e248]: Retries,withoutduplicates.
+              - generic [ref=e249]:
+                - generic [ref=e250]: notification delivery
+                - generic [ref=e252]: guided
+              - img "Send a receipt, encounter a timeout, retry with the same identifier" [ref=e253]:
+                - img [ref=e254]:
+                  - generic [ref=e258]: send
+                  - generic [ref=e259]: timeout
+                  - generic [ref=e260]: retry
+                  - generic [ref=e261]: "id: 42"
+                  - generic [ref=e262]: "id: 42"
+                  - generic [ref=e264]: same key. one delivery.
+              - button "Open question ↗" [ref=e266] [cursor=pointer]
+              - generic [ref=e267]:
+                - heading "Keep it sharp" [level=3] [ref=e268]
+                - generic [ref=e269]: from your practice
+              - button "recall / 2 due What makes a retry safe? ↗" [ref=e270] [cursor=pointer]:
+                - generic [ref=e271]:
+                  - generic [ref=e272]: recall / 2 due
+                  - strong [ref=e273]: What makes a retry safe?
+                - generic [ref=e274]: ↗
+            - generic "App navigation" [ref=e275]:
+              - button "Home" [ref=e276] [cursor=pointer]
+              - button "Recall" [ref=e277] [cursor=pointer]
+              - button "Library" [ref=e278] [cursor=pointer]
+          - paragraph [ref=e280]: Warm surfaces preserve depth without heavy shadows.
+        - article [ref=e281]:
+          - generic [ref=e282]: interview
+          - generic [ref=e283]:
+            - generic [ref=e284]: 9:41
+            - generic [ref=e292]:
+              - button "Back" [ref=e293] [cursor=pointer]
+              - generic [ref=e294]: Interview
+              - button "Interview options" [ref=e295] [cursor=pointer]
+            - generic [ref=e296]:
+              - generic [ref=e297]: Notification delivery
+              - generic [ref=e298]: guided
+            - generic [ref=e299]:
+              - generic [ref=e300]:
+                - generic [ref=e301]: "01"
+                - generic [ref=e302]: you
+              - paragraph [ref=e304]: I’d clarify delivery guarantees first.
+              - generic [ref=e305]:
+                - generic [ref=e306]: "02"
+                - generic [ref=e307]: interviewer
+              - generic [ref=e308]:
+                - paragraph [ref=e309]: The send timed out.How do you avoida duplicate?
+                - generic [ref=e310]:
+                  - generic [ref=e311]:
+                    - generic [ref=e312]: receipt
+                    - generic [ref=e313]: →
+                    - generic [ref=e314]: timeout
+                  - generic [ref=e315]:
+                    - generic [ref=e316]: retry?
+                    - generic [ref=e317]: →
+                    - emphasis [ref=e318]: your decision
+                - button "A small nudge" [ref=e319] [cursor=pointer]
+            - generic [ref=e320]:
+              - generic [ref=e321]:
+                - textbox "Your answer" [ref=e322]:
+                  - /placeholder: Your thinking…
+                - generic [ref=e323]:
+                  - generic [ref=e324]: draft / only sent on ↑
+                  - button "Send answer" [ref=e325] [cursor=pointer]
+              - paragraph [ref=e326]: Use your keyboard to type or dictate.
+          - paragraph [ref=e328]: Dark amber and teal keep the syntax readable.
+  - generic [ref=e329]:
+    - generic [ref=e330]: first session / storyboard
+    - heading "Less setup. More practice." [level=2] [ref=e331]
+    - generic [ref=e332]:
+      - article [ref=e333]:
+        - text: "01"
+        - heading "Get the idea" [level=3] [ref=e334]
+        - paragraph [ref=e335]: One example. One action.
+        - generic [ref=e336]: No carousel
+      - article [ref=e337]:
+        - text: "02"
+        - heading "Choose a focus" [level=3] [ref=e338]
+        - paragraph [ref=e339]: Goal and level. Everything else can wait.
+        - generic [ref=e340]: Two choices
+      - article [ref=e341]:
+        - text: "03"
+        - heading "Try a thought" [level=3] [ref=e342]
+        - paragraph [ref=e343]: A local input preview. No scoring.
+        - generic [ref=e344]: No AI call
+      - article [ref=e345]:
+        - text: "04"
+        - heading "Keep your progress" [level=3] [ref=e346]
+        - paragraph [ref=e347]: Sign in, then confirm invitation access.
+        - generic [ref=e348]: Setup retained
+      - article [ref=e349]:
+        - text: "05"
+        - heading "Practice" [level=3] [ref=e350]
+        - paragraph [ref=e351]: One question. A useful follow-up.
+        - generic [ref=e352]: Guided start
+      - article [ref=e353]:
+        - text: "06"
+        - heading "Take something away" [level=3] [ref=e354]
+        - paragraph [ref=e355]: One observation to retry or recall.
+        - generic [ref=e356]: Grounded feedback
+    - button "Walk through it" [ref=e357] [cursor=pointer]
+  - contentinfo [ref=e358]:
+    - text: Design prototype. AI, sign-in, and invitation access are simulated.
+    - link "Design notes" [ref=e359] [cursor=pointer]:
+      - /url: README.md
+    - text: ·
+    - link "Previous study" [ref=e360] [cursor=pointer]:
+      - /url: direction-studies-v1.html

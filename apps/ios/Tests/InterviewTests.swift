@@ -7,6 +7,12 @@ import Testing
 @testable import Drillbit
 #endif
 struct InterviewTests {
+  @Test func oneComposerRoutesStandaloneQuestionsWithoutTreatingAnswersAsQuestions() {
+    #expect(InterviewComposerIntent.isQuestion("What scale?"))
+    #expect(InterviewComposerIntent.isQuestion("  Could we assume a single region?  "))
+    #expect(!InterviewComposerIntent.isQuestion("I would start with a queue."))
+    #expect(!InterviewComposerIntent.isQuestion("I would start with a queue.\nWhat happens on retry?"))
+  }
   @Test func lateSettingsAcknowledgementCannotEraseNewerOfflineChoice() async throws {
     let container = try ModelContainer(for: Schema(StoreV1.models), configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     let store = DiskStore(modelContainer: container)
@@ -156,13 +162,17 @@ struct InterviewTests {
     let container = try ModelContainer(for: Schema(StoreV1.models), configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     let store = DiskStore(modelContainer: container)
     let question = Challenge(id: "q", lifecycle: "in_progress", title: "Queue", prompt: "How?", topic: "System design", session: SessionDraft(answer: "", revision: 0))
-    for account in ["a", "b"] { _ = try await store.load(account: account, challenge: question); try await store.save(account: account, id: "q", answer: "Pending"); try await store.cache(key: "library:" + account, data: Data("cached".utf8)); try await store.cache(key: "interview:" + account + ":q:pending", data: Data("command".utf8)) }
+    for account in ["a", "b"] { _ = try await store.load(account: account, challenge: question); try await store.save(account: account, id: "q", answer: "Pending"); try await store.cache(key: "library:" + account, data: Data("cached".utf8)); try await store.cache(key: "interview:" + account + ":q:pending", data: Data("command".utf8)); try await store.cache(key: "settings-pending:" + account, data: Data("settings".utf8)); try await store.cache(key: "onboarding:" + account, data: Data("plan".utf8)) }
     try await store.clearPractice(account: "a")
     #expect(try await store.pending(account: "a").isEmpty)
     #expect(try await store.cached(key: "interview:a:q:pending") == nil)
+    #expect(try await store.cached(key: "settings-pending:a") == nil)
+    #expect(try await store.cached(key: "onboarding:a") == nil)
     #expect(try await store.pending(account: "b").count == 1)
     #expect(try await store.cached(key: "library:b") != nil)
     #expect(try await store.cached(key: "interview:b:q:pending") != nil)
+    #expect(try await store.cached(key: "settings-pending:b") != nil)
+    #expect(try await store.cached(key: "onboarding:b") != nil)
   }
   @Test func commandAndDraftSurviveStoreRecreation() async throws {
     let url = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString + ".store")

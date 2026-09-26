@@ -62,7 +62,9 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
   var body: some Scene {
     WindowGroup {
       if let model {
-        RootView(model: model).tint(AppPalette.primary)
+        RootView(model: model)
+          .tint(AppPalette.accent)
+          .background(AppPalette.background.ignoresSafeArea(.all))
       } else {
         ContentUnavailableView(
           "Setup required", systemImage: AppIcon.settings.rawValue,

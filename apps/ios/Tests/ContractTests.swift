@@ -10,6 +10,34 @@ import Testing
 
 struct ContractTests {
   #if !canImport(DrillbitCore)
+  @Test func recallSessionRevealsAndRequeuesWithoutClaimingMastery() {
+    var session = RecallSession(area: .swift, depth: .foundations)
+    #expect(session.remainingCount == 1)
+    #expect(session.current?.id == "swift-value-reference")
+
+    session.markKnown()
+    #expect(session.remainingCount == 1)
+    session.reveal()
+    session.markAgain()
+    #expect(session.remainingCount == 1)
+    #expect(session.againCount == 1)
+    #expect(session.isRevealed == false)
+
+    session.reveal()
+    session.markKnown()
+    #expect(session.remainingCount == 0)
+    #expect(session.knownCount == 1)
+  }
+
+  @Test func recallFiltersProduceStableTemporaryDecks() {
+    let swift = RecallSession(area: .swift, depth: .all)
+    #expect(swift.remainingCount == 3)
+    #expect(swift.current?.area == .swift)
+    let deep = RecallSession(area: .all, depth: .deep)
+    #expect(deep.remainingCount == 5)
+    #expect(deep.current?.depth == .deep)
+  }
+
   @MainActor @Test func libraryPreloadsOnceUntilCommittedInvalidation() async throws {
     let container = try ModelContainer(for: Schema(StoreV1.models), configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     let model = AppModel(container: container, baseURL: URL(string: "https://example.invalid")!, fixture: true, monitorNetwork: false)
@@ -36,6 +64,17 @@ struct ContractTests {
     current.practiceProfile = PracticeProfile(goals: "Senior interviews", background: "Backend", preferences: "Pirate")
     let restored = try JSONDecoder().decode(PracticeSettings.self, from: JSONEncoder().encode(current))
     #expect(restored.practiceProfile == current.practiceProfile)
+  }
+  @Test func learningPlanAndTodayPlanRemainAdditive() throws {
+    var settings = PracticeSettings()
+    #expect(settings.learningPlan == nil)
+    settings.learningPlan = LearningPlan(objective: "interview", roleTrack: "backend", weakAreas: ["data", "async"], dailyGoalMinutes: 10, targetDate: "2099-01-01")
+    let restored = try JSONDecoder().decode(PracticeSettings.self, from: JSONEncoder().encode(settings))
+    #expect(restored.learningPlan == settings.learningPlan)
+    let json = #"{"state":"review_due","completedTotal":3,"completedLastSevenDays":2,"completedToday":1,"dueRecallCount":8,"recommendedRecallCount":8,"estimatedRecallMinutes":4,"dailyGoalMinutes":10}"#
+    let plan = try JSONDecoder.api.decode(TodayPlan.self, from: Data(json.utf8))
+    #expect(plan.state == "review_due")
+    #expect(plan.estimatedRecallMinutes == 4)
   }
   @Test func historicalChallengeLevels() throws {
     for (difficulty, expected) in [("easy", "Junior"), ("medium", "Mid-level"), ("hard", "Senior")] {

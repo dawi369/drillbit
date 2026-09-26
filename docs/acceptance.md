@@ -520,9 +520,27 @@ The stale-draft regression test proves that a server-confirmed missing attempt s
 - Replaced the generated metallic icon with the source-controlled three-cut Drillbit mark. The app icon is reproducible through `scripts/generate-app-icon.swift`; the in-app mark is drawn directly in SwiftUI.
 - All 34 Swift tests pass. Signed iPhone 18 Pro/iOS 27 journeys pass for normal Home, largest Dynamic Type Home in dark appearance, centered generation and completed preview, Library in largest Dynamic Type/dark appearance, Settings/onboarding and the dark interview with its keyboard open. Screenshots were inspected for hierarchy, safe-area reachability, contrast, wrapping and navigation-bar occlusion. No TestFlight upload or physical-device claim.
 
+## Connected learning loop — 17 September 2026
+
+- After-action review renders grounded quotes and observations, opens Recall directly, and can branch a completed interview from one durable interviewer prompt.
+- D1 migration 0011 adds account-scoped recall cards/reviews and retry provenance. Backend tests cover account isolation, idempotent review scheduling, Again/Got it transitions, branch replay and source preservation.
+- Recall adds Deck, Map and Paths. Cloud cards restore from an account-scoped cache; temporary language cards remain local. Map labels are evidence/exposure statements rather than scores.
+- Native personality uses the existing Canvas mark, one state-triggered phase animation and sensory feedback; semantic colors, Reduced Motion and system controls remain authoritative.
+- Contract generation, TypeScript validation and all 107 API/D1 tests pass. The Swift package suite passes 34 tests; the Xcode app compiled and its 40 unit tests passed on iPhone 18 Pro/iOS 27. The targeted Recall Deck/Map/Paths journey passes. Development D1 migration and Worker deployment succeeded; physical-device behavior remains unverified.
+
 ## CI isolation and internal build 7 — 14 September 2026
 
 - GitHub Actions now runs 34 deterministic Swift core tests plus five release-smoke UI journeys: Home/preparation, complete text interview and assistance, unavailable-voice draft preservation, Library/skipped recovery, and immediate Settings/theme behavior. Each CI run starts from one clean installation. The complete 40-journey screenshot and visual suite remains available locally through `scripts/check-ios.sh`.
 - This replaces an order-dependent CI invocation where fixture caches leaked across 40 journeys and Simulator keyboard injection occasionally dropped characters. It does not remove the comprehensive suite or turn synthetic UI tests into physical-device evidence.
 - Commit `b8dff03` passed both GitHub Actions jobs. Local release checks also passed: 104 API/D1 tests, typecheck, contract drift, 34 Swift core tests and the five smoke journeys. Release archive `2.0.0 (7)` succeeded with the authentic WebRTC dSYM matching UUID `4C4C4496-5555-3144-A149-A7E882FEE780`.
 - Apple accepted build 7 at 22:43 CEST and reported `Upload succeeded` / `Uploaded package is processing`. Internal TestFlight processing and phone availability are not inferred from upload acceptance.
+
+## Activation and guided curriculum — 18 September 2026
+
+- Added the four-page offline walkthrough, five-page resumable learning-plan onboarding, permission-gated reminder setup and Guided starter preview. Demo input is view-local and has no service path.
+- Added additive learning-plan, daily-plan, enriched Recall and evidence-turn contracts; no migration. Old-client settings preserve saved learning plans.
+- Home hides zero statistics and leads with the server recommendation. Recall Review is personal evidence only; Paths owns authored cards; Map cold states explain concepts.
+- Completion prioritizes a grounded retry, then a bounded Recall session, then Done for today. Nudge is visible beside the active reply in Guided and Practice.
+- Deterministic contract/type checks and the API/D1 suite cover structured validation, legacy preservation, source-turn grounding, daily-plan priority and a coherent Guided/Practice/Mock loop at Junior/Mid/Senior. Live model quality, physical notification delivery, spoken VoiceOver and physical-device behavior remain separate release checks.
+- Final verification: contract generation and TypeScript validation passed; all 111 API/D1 tests and 35 Swift package tests passed; the iOS 27 app compiled. Focused iPhone 18 Pro/iOS 27 journeys passed for the local walkthrough, onboarding/settings, curriculum Home, personal-versus-authored Recall and the complete interview/Nudge/completion route. The signed Debug app was installed and launched on that simulator; the resulting Home was visually inspected in dark appearance. Development Worker `dde6e225-1855-41e9-905b-a20019637879` deployed and `/health` returned `status:ok`. No TestFlight upload or physical-device acceptance claim.
+- Developer reset now preserves only sign-in, invitation redemption and usage accounting. Backend coverage proves practice, settings, provider credentials and device registrations are removed while another account remains untouched. Native storage coverage proves account-scoped onboarding/settings drafts are removed, and the iPhone 18 Pro/iOS 27 reset journey returns directly to the Goal page without creating a question.

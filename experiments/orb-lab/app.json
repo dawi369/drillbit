@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "Drillbit Orb Lab",
+    "slug": "drillbit-orb-lab",
+    "scheme": "drillbit-orb-lab",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "dev.drillbit.orblab",
+      "supportsTablet": true
+    },
+    "android": { "package": "dev.drillbit.orblab" },
+    "plugins": [
+      "expo-router",
+      "expo-dev-client",
+      ["expo-build-properties", { "ios": { "enableSceneSupport": true } }]
+    ],
+    "experiments": { "typedRoutes": true }
+  }
+}

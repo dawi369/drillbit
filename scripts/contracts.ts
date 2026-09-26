@@ -13,11 +13,14 @@ const operations: [string, string, string, string?][] = [
   ["get","taxonomy","Get the versioned system-design concept vocabulary"],
   ["get","library","Search and filter the account question library"],
   ["get","library/coverage","Count completed practice by concept without inferring ability"],
+  ["get","recall","Read the account's scheduled recall deck"],
+  ["post","recall/{id}/review","Record a spaced-recall result","RecallReview"],
   ["get","questions/{id}","Read a question and paginated attempts"],
   ["put","questions/{id}/eligibility","Update question-pool eligibility with revision and idempotency","EligibilityInput"],
   ["post","questions/{id}/start","Start a fresh attempt for an immutable question"],
   ["post", "challenges/{id}/interview", "Commit an answer or request clarification/help without advancing the answer", "InterviewInput"],
   ["post", "challenges/{id}/interview/{turn}/retry", "Retry a failed interviewer response without resubmitting the answer"],
+  ["post", "challenges/{id}/retry-moment/{turn}", "Branch from a completed interview moment"],
   [
     "put",
     "challenges/{id}/companion",
@@ -92,8 +95,10 @@ const operations: [string, string, string, string?][] = [
 ];
 const responseNames: Record<string, string> = {
   "get taxonomy":"Taxonomy", "get library":"LibraryPage", "get library/coverage":"Coverage", "get questions/{id}":"LibraryDetail", "put questions/{id}/eligibility":"LibraryQuestion", "post questions/{id}/start":"Challenge",
+  "get recall":"RecallDeck", "post recall/{id}/review":"RecallReviewResult",
   "post challenges/{id}/interview": "InterviewState",
   "post challenges/{id}/interview/{turn}/retry": "InterviewState",
+  "post challenges/{id}/retry-moment/{turn}": "Challenge",
   "put challenges/{id}/companion": "Companion",
   "post challenges/{id}/deliveries": "OK",
   "post challenges/{id}/help": "Job",
@@ -129,8 +134,10 @@ const responseNames: Record<string, string> = {
 };
 const idempotent = new Set([
   "put questions/{id}/eligibility", "post questions/{id}/start",
+  "post recall/{id}/review",
   "post challenges/{id}/interview",
   "post challenges/{id}/interview/{turn}/retry",
+  "post challenges/{id}/retry-moment/{turn}",
   "put challenges/{id}/companion",
   "post challenges/{id}/help",
   "post challenges/{id}/adopt",

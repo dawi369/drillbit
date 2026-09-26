@@ -1,0 +1,26 @@
+{
+  "cards": [{
+    "id": "session:retry-safety",
+    "sourceChallengeId": "session",
+    "conceptId": "retry-safety",
+    "question": "How would you make retries safe?",
+    "answer": "Use a stable idempotency key and commit the result atomically.",
+    "dueAt": "2026-09-17T08:00:00.000Z",
+    "intervalDays": 0,
+    "repetitions": 0,
+    "lapses": 0,
+    "createdAt": "2026-09-17T08:00:00.000Z",
+    "updatedAt": "2026-09-17T08:00:00.000Z",
+    "sourceTitle": "Design a reliable job queue",
+    "sourceCompletedAt": "2026-09-17T07:55:00.000Z",
+    "evidence": {
+      "conceptId": "retry-safety",
+      "observation": "Explained how stable operation keys prevent duplicate effects.",
+      "quote": "Use a stable idempotency key and commit the result atomically.",
+      "signal": "demonstrated",
+      "assistance": "unknown",
+      "sourceTurnId": "turn-retry-safety"
+    }
+  }],
+  "dueCount": 1
+}

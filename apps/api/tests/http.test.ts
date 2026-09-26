@@ -112,13 +112,17 @@ it("publishes a bootstrap matching the cross-platform wire schema", async () => 
   expect(response.status).toBe(200);
   expect(wire.Bootstrap.safeParse(await response.json()).success).toBe(true);
 });
-it("keeps the development reset owner-only and preserves account configuration", async () => {
+it("keeps the development reset owner-only, clears account data and returns settings to onboarding", async () => {
   const owner = await accountFor(bindings, "reset-owner");
   const other = await accountFor(bindings, "other-person");
   await bindings.DB.prepare("UPDATE accounts SET status='active' WHERE id IN (?,?)").bind(owner.id, other.id).run();
   const challenge = crypto.randomUUID();
   await bindings.DB.prepare("INSERT INTO challenges(id,account_id,lifecycle,data,created_at,available_at) VALUES(?,?,'skipped','{}','now','now')").bind(challenge, owner.id).run();
   await bindings.DB.prepare("INSERT INTO questions(id,account_id,data,created_at,eligibility_updated_at) VALUES(?,?,'{}','now','now')").bind(crypto.randomUUID(), owner.id).run();
+  await bindings.DB.prepare("UPDATE settings SET data=? WHERE account_id=?").bind(JSON.stringify({onboardingComplete:true,focus:"System design",difficulty:"hard",timezone:"America/New_York",dailyMinutes:600,reminderEnabled:true,aiMode:"byok",model:"google/gemini-3.1-flash-lite",practiceProfile:{goals:"Staff interview",background:"Backend",preferences:"Talk like a pirate"}}),owner.id).run();
+  await bindings.DB.prepare("INSERT INTO credentials(id,account_id,ciphertext,key_version,suffix,created_at) VALUES(?,?,?,?,?,'now')").bind(crypto.randomUUID(),owner.id,"encrypted","1","1234").run();
+  await bindings.DB.prepare("INSERT INTO devices(id,account_id,token_hash,expires_at) VALUES(?,?,?,'2099-01-01T00:00:00Z')").bind(crypto.randomUUID(),owner.id,crypto.randomUUID()).run();
+  await bindings.DB.prepare("INSERT INTO usage(account_id,day,kind,count) VALUES(?,'2026-09-18','voice',3)").bind(owner.id).run();
   bindings.DEVELOPER_ACCOUNTS = owner.id;
 
   expect((await request("developer/practice", "other-person", "DELETE")).status).toBe(404);
@@ -126,6 +130,13 @@ it("keeps the development reset owner-only and preserves account configuration",
   expect(await bindings.DB.prepare("SELECT count(*) count FROM challenges WHERE account_id=?").bind(owner.id).first<{count:number}>()).toMatchObject({count:0});
   expect(await bindings.DB.prepare("SELECT count(*) count FROM questions WHERE account_id=?").bind(owner.id).first<{count:number}>()).toMatchObject({count:0});
   expect(await bindings.DB.prepare("SELECT count(*) count FROM settings WHERE account_id=?").bind(owner.id).first<{count:number}>()).toMatchObject({count:1});
+  expect(await bindings.DB.prepare("SELECT count(*) count FROM credentials WHERE account_id=?").bind(owner.id).first<{count:number}>()).toMatchObject({count:0});
+  expect(await bindings.DB.prepare("SELECT count(*) count FROM devices WHERE account_id=?").bind(owner.id).first<{count:number}>()).toMatchObject({count:0});
+  expect(await bindings.DB.prepare("SELECT count(*) count FROM usage WHERE account_id=?").bind(owner.id).first<{count:number}>()).toMatchObject({count:1});
+  const reset = await request("bootstrap", "reset-owner");
+  expect(reset.status).toBe(200);
+  expect((await reset.json() as any).settings).toMatchObject({onboardingComplete:false,reminderEnabled:false,aiMode:"managed",difficulty:"medium"});
+  expect((await request("bootstrap", "reset-owner").then(response => response.json()) as any).settings.practiceProfile).toBeUndefined();
   delete bindings.DEVELOPER_ACCOUNTS;
 });
 it("paginates history without repeating sessions and supports topic search", async () => {
@@ -330,10 +341,13 @@ it('older settings clients preserve personalization and an explicit empty profil
  const subject=crypto.randomUUID();const account=await accountFor(bindings,subject);
  await bindings.DB.prepare("UPDATE accounts SET status='active' WHERE id=?").bind(account.id).run();
  const profile={goals:'Senior interviews',background:'Backend',preferences:'Pirate humor'};
- let response=await request('settings',subject,'PUT',{practiceProfile:profile});
+ const learningPlan={version:1,objective:'interview',roleTrack:'backend',weakAreas:['data'],dailyGoalMinutes:10,targetDate:'2099-01-01'};
+ let response=await request('settings',subject,'PUT',{practiceProfile:profile,learningPlan});
  expect(response.status).toBe(200);
  response=await request('settings',subject,'PUT',{difficulty:'hard'});
- expect((await response.json() as any).practiceProfile).toEqual(profile);
+ const legacyBody=await response.json() as any;
+ expect(legacyBody.practiceProfile).toEqual(profile);
+ expect(legacyBody.learningPlan).toEqual(learningPlan);
  response=await request('settings',subject,'PUT',{practiceProfile:{goals:'',background:'',preferences:''}});
  expect((await response.json() as any).practiceProfile.preferences).toBe('');
  expect((await request('settings/preview',undefined,'POST',profile)).status).toBe(401);

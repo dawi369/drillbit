@@ -58,7 +58,7 @@ Delivery distinguishes generated, uncertain, shown, dismissed/superseded and ado
 
 ## Model and voice boundary
 
-`google/gemini-3.1-flash-lite` is the sole model. `companion-v1` prompts require grounded, incremental help and permit silence. Coach has a stricter output schema: no plan, no suggested focus, no suggested answer. Companion thoughts are limited to 240 characters; expanded examples retain the existing longer schema. Live product review is required in addition to schema checks.
+At the time of this 9 September specification, `google/gemini-3.1-flash-lite` was the sole model; the current fixed text model is `openai/gpt-6-luna` (see [architecture](architecture.md)). `companion-v1` prompts require grounded, incremental help and permit silence. Coach has a stricter output schema: no plan, no suggested focus, no suggested answer. Companion thoughts are limited to 240 characters; expanded examples retain the existing longer schema. Live product review is required in addition to schema checks.
 
 Modality-neutral events are defined for committed answer changes, committed discussion, activity, yield, mode/visibility changes and delivery. A future voice adapter must feed finalized turns through these boundaries; provisional transcripts cannot trigger coaching. Answer dictation and discussion remain distinct destinations. Recording and speech transport are not implemented.
 

@@ -25,7 +25,7 @@ struct HistoryView: View {
   @State private var loading = false
   @State private var failure: String?
   var body: some View {
-    List {
+    SignalList {
       ForEach(sessions) { session in
         NavigationLink {
           SessionDetailView(model: model, initial: session)
@@ -127,7 +127,7 @@ struct SessionDetailView: View {
           }
         }
       }.padding(24)
-    }.navigationTitle("Session").navigationBarTitleDisplayMode(.inline)
+    }.background(AppPalette.background).navigationTitle("Session").navigationBarTitleDisplayMode(.inline)
       .sheet(isPresented: $preparing, onDismiss: { if let started { model.presented = started; self.started = nil } }) {
         QuestionFlow(model: model, source: challenge, onStart: { started = $0 })
       }
@@ -158,7 +158,8 @@ struct SettingsView: View {
   @State private var discarding = false
   @State private var resettingPractice = false
   @State private var saving = false
-  @AppStorage("appearance") private var appearance = "system"
+  @State private var reminderPermissionPending = false
+  @AppStorage("appearance") private var appearance = "dark"
   private var time: Binding<Date> {
     Binding(
       get: {
@@ -173,17 +174,40 @@ struct SettingsView: View {
       })
   }
   var body: some View {
-    Form {
-      Section { NavigationLink("About your practice") { PracticeProfileView(model: model) } }
+    SignalList {
+      Section {
+        NavigationLink("Learning plan") { LearningPlanSettingsView(model: model) }
+        NavigationLink("About your practice") { PracticeProfileView(model: model) }
+      }
       Section("Practice") {
         Picker("Engineering level", selection: $model.settings.selectedLevel) {
           ForEach(EngineeringLevel.choices, id: \.0) { Text($0.1).tag($0.0) }
         }
         DatePicker("Reminder time", selection: time, displayedComponents: .hourAndMinute)
         NavigationLink { TimeZoneSelectionView(selection: $model.settings.timezone) } label: {
-          LabeledContent("Time zone", value: TimeZoneSelectionView.label(model.settings.timezone))
+          HStack(spacing: 8) {
+            Text("Time zone")
+            Spacer(minLength: 8)
+            Text(TimeZoneSelectionView.label(model.settings.timezone))
+              .foregroundStyle(.secondary).lineLimit(1)
+          }
         }
-        Toggle("Daily reminder", isOn: $model.settings.reminderEnabled)
+        Toggle("Daily reminder", isOn: Binding(
+          get: { model.settings.reminderEnabled },
+          set: { enabled in
+            model.settings.reminderEnabled = enabled
+            guard enabled else { return }
+            reminderPermissionPending = true
+            Task {
+              let granted = await model.requestReminderPermission()
+              reminderPermissionPending = false
+              if !granted && model.settings.reminderEnabled {
+                model.settings.reminderEnabled = false
+                model.error = "Enable notifications for Drillbit in iPhone Settings to receive reminders."
+              }
+            }
+          }
+        )).disabled(reminderPermissionPending)
         ReminderPermissionRow()
       }
       Section { NavigationLink("LLM provider") { AIAccessView(model: model) } }
@@ -222,7 +246,7 @@ struct SettingsView: View {
                 dismiss()
               }
             }
-          }.disabled(saving)
+          }.disabled(saving || reminderPermissionPending)
         }
       }
       .confirmationDialog("Delete your account and all practice data?", isPresented: $deleting) {
@@ -252,13 +276,14 @@ struct SettingsView: View {
           Task {
             await model.perform {
               try await model.resetDeveloperPractice()
+              appearance = "dark"
               dismiss()
             }
           }
         }
         Button("Cancel", role: .cancel) {}
       } message: {
-        Text("This permanently removes your questions, attempts, skipped items and feedback. Your sign-in, settings and LLM key are preserved.")
+        Text("This permanently removes your practice, Recall history, preferences, reminders and LLM key. You’ll stay signed in and return to onboarding.")
       }
   }
 }
@@ -270,9 +295,51 @@ private struct DeveloperSettingsSection: View {
     } header: {
       Text("Developer")
     } footer: {
-      Text("Clears questions, attempts, skipped items, feedback and local practice state. Sign-in, settings and your LLM key stay intact.")
+      Text("Clears all Drillbit data and preferences, then returns to onboarding. Your sign-in stays active.")
     }
   }
+}
+struct LearningPlanSettingsView: View {
+  @Bindable var model: AppModel
+  private let objectives = [("interview","Prepare for an interview"),("learn","Learn system design"),("stay_sharp","Stay sharp")]
+  private let roles = [("general","General SWE"),("backend","Backend"),("frontend","Frontend"),("full_stack","Full-stack"),("platform","Platform / Infrastructure"),("data","Data"),("mobile","Mobile")]
+  private let areas = [("data","Data"),("traffic","Traffic & performance"),("async","Async & coordination"),("reliability","Reliability & operations"),("boundaries","System boundaries")]
+  private var plan: Binding<LearningPlan> { Binding(get: { model.settings.learningPlan ?? LearningPlan() }, set: { model.settings.learningPlan = $0 }) }
+  var body: some View {
+    SignalList {
+      Picker("Goal", selection: plan.objective) { ForEach(objectives, id: \.0) { Text($0.1).tag($0.0) } }
+        .onChange(of: plan.wrappedValue.objective) { _, value in if value != "interview" { var updated = plan.wrappedValue; updated.targetDate = nil; plan.wrappedValue = updated } }
+      Picker("Role", selection: plan.roleTrack) { ForEach(roles, id: \.0) { Text($0.1).tag($0.0) } }
+      Picker("Daily commitment", selection: plan.dailyGoalMinutes) { ForEach([5,10,15,20], id: \.self) { Text("\($0) minutes").tag($0) } }
+      if plan.wrappedValue.objective == "interview" {
+        Toggle("I have an interview date", isOn: Binding(get: { plan.wrappedValue.targetDate != nil }, set: { enabled in
+          var value = plan.wrappedValue; value.targetDate = enabled ? formatted(Date()) : nil; plan.wrappedValue = value
+        }))
+        if plan.wrappedValue.targetDate != nil {
+          DatePicker("Interview date", selection: Binding(get: { parsed(plan.wrappedValue.targetDate) ?? Date() }, set: { date in
+            var value = plan.wrappedValue; value.targetDate = formatted(date); plan.wrappedValue = value
+          }), in: Calendar.current.startOfDay(for: Date())..., displayedComponents: .date)
+        }
+      }
+      Section("Areas to work on") {
+        Button { var value = plan.wrappedValue; value.weakAreas = []; plan.wrappedValue = value } label: { choice("Let Drillbit decide", selected: plan.wrappedValue.weakAreas.isEmpty) }
+        ForEach(areas, id: \.0) { area in
+          Button {
+            var value = plan.wrappedValue
+            if value.weakAreas.contains(area.0) { value.weakAreas.removeAll { $0 == area.0 } }
+            else if value.weakAreas.count < 3 { value.weakAreas.append(area.0) }
+            plan.wrappedValue = value
+          } label: { choice(area.1, selected: plan.wrappedValue.weakAreas.contains(area.0)) }
+          .disabled(!plan.wrappedValue.weakAreas.contains(area.0) && plan.wrappedValue.weakAreas.count == 3)
+        }
+      }
+    }.navigationTitle("Learning plan").navigationBarTitleDisplayMode(.inline)
+  }
+  private func choice(_ title: String, selected: Bool) -> some View {
+    HStack { Text(title).foregroundStyle(.primary); Spacer(); if selected { Image(systemName: "checkmark") } }
+  }
+  private func formatted(_ date: Date) -> String { let value = DateFormatter(); value.calendar = Calendar(identifier: .gregorian); value.locale = Locale(identifier: "en_US_POSIX"); value.timeZone = TimeZone(identifier: model.settings.timezone); value.dateFormat = "yyyy-MM-dd"; return value.string(from: date) }
+  private func parsed(_ text: String?) -> Date? { guard let text else { return nil }; let value = DateFormatter(); value.calendar = Calendar(identifier: .gregorian); value.locale = Locale(identifier: "en_US_POSIX"); value.timeZone = TimeZone(identifier: model.settings.timezone); value.dateFormat = "yyyy-MM-dd"; return value.date(from: text) }
 }
 struct AIAccessView: View {
   @Bindable var model: AppModel
@@ -280,7 +347,7 @@ struct AIAccessView: View {
   @State private var suffix: String?
   @State private var validating = false
   var body: some View {
-    Form {
+    SignalList {
       Section {
         Picker("Use", selection: $model.settings.aiMode) {
           Text("Included AI").tag("managed")
@@ -333,36 +400,247 @@ struct AIAccessView: View {
   }
 }
 
+@MainActor @Observable final class LearningPlanCoordinator {
+  struct Draft: Codable, Equatable {
+    var page = 0
+    var objective = "learn"
+    var roleTrack = "general"
+    var level = "mid"
+    var weakAreas: Set<String> = []
+    var dailyGoalMinutes = 10
+    var targetDate: Date? = nil
+    var reminderEnabled = false
+    var dailyMinutes = 540
+    var timezone = TimeZone.current.identifier
+  }
+  var draft = Draft()
+  var saving = false
+  var failure: String?
+  var reminderNote: String?
+}
+
 struct SetupView: View {
   @Bindable var model: AppModel
-  @State private var saving = false
+  @State private var coordinator = LearningPlanCoordinator()
+  @State private var reminderPermissionPending = false
+  private let objectives = [("interview","Prepare for an interview"),("learn","Learn system design"),("stay_sharp","Stay sharp")]
+  private let roles = [("general","General SWE"),("backend","Backend"),("frontend","Frontend"),("full_stack","Full-stack"),("platform","Platform / Infrastructure"),("data","Data"),("mobile","Mobile")]
+  private let areas = [("data","Data"),("traffic","Traffic & performance"),("async","Async & coordination"),("reliability","Reliability & operations"),("boundaries","System boundaries")]
+
   var body: some View {
-    Form {
-      Section("Your practice") {
-        Picker("Engineering level", selection: $model.settings.selectedLevel) {
-          ForEach(EngineeringLevel.choices, id: \.0) { Text($0.1).tag($0.0) }
+    @Bindable var coordinator = coordinator
+    ScrollView {
+      VStack(alignment: .leading, spacing: 32) {
+        VStack(alignment: .leading, spacing: 20) {
+          SignalEyebrow(text: String(format: "%02d / 05", coordinator.draft.page + 1))
+          AppPalette.hairline.frame(height: 1)
+          Text(coordinator.draft.page == 0 ? "Make this yours." : title(for: coordinator.draft.page))
+            .font(.largeTitle.weight(.semibold))
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        pageContent(coordinator: coordinator)
+        if let note = coordinator.reminderNote { Text(note).font(.footnote).foregroundStyle(AppPalette.secondary) }
+        if let failure = coordinator.failure { Text(failure).font(.footnote).foregroundStyle(AppPalette.destructive) }
+      }
+      .frame(maxWidth: 560, alignment: .leading)
+      .padding(.horizontal, 24).padding(.top, 24).padding(.bottom, 24)
+      .frame(maxWidth: .infinity)
+    }
+    .background(AppPalette.background)
+    .safeAreaInset(edge: .bottom, spacing: 0) {
+      VStack(spacing: 0) {
+        AppPalette.hairline.frame(height: 1)
+        HStack(spacing: 12) {
+          if coordinator.draft.page > 0 {
+            Button("Back") { coordinator.draft.page -= 1 }.buttonStyle(PracticeButtonStyle(secondary: true))
+          }
+          Button(coordinator.draft.page == 4 ? "Start practice" : "Continue") {
+            if coordinator.draft.page == 4 { Task { await finish(coordinator) } }
+            else { coordinator.draft.page += 1 }
+          }.buttonStyle(PracticeButtonStyle()).disabled(coordinator.saving || reminderPermissionPending)
+        }
+        .padding(.horizontal, 24).padding(.top, 12).padding(.bottom, 8)
+      }
+      .background(AppPalette.background)
+    }
+    .toolbar(.hidden, for: .navigationBar)
+    .task(id: model.bootstrap?.account.id) { await restore(coordinator) }
+    .onChange(of: coordinator.draft) { _, _ in Task { await persist(coordinator) } }
+  }
+
+  @ViewBuilder private func pageContent(coordinator: LearningPlanCoordinator) -> some View {
+    @Bindable var coordinator = coordinator
+    switch coordinator.draft.page {
+    case 0:
+      VStack(alignment: .leading, spacing: 12) {
+        SignalEyebrow(text: "Goal")
+        VStack(spacing: 0) {
+          ForEach(objectives, id: \.0) { option in
+            SignalChoiceRow(title: option.1, selected: coordinator.draft.objective == option.0) {
+              coordinator.draft.objective = option.0
+            }
+            if option.0 != objectives.last?.0 { Divider().padding(.horizontal, 16) }
+          }
         }
       }
-      Section {
-        Button("Start practicing") {
-          Task {
-            saving = true
-            defer { saving = false }
-            await model.perform {
-              model.settings.onboardingComplete = true
-              do {
-                try await model.updateSettings()
-                await model.generate()
-              } catch {
-                model.settings.onboardingComplete = false
-                throw error
+    case 1:
+      VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: 12) {
+          SignalEyebrow(text: "Role")
+          VStack(spacing: 0) {
+            ForEach(roles, id: \.0) { option in
+              SignalChoiceRow(title: option.1, selected: coordinator.draft.roleTrack == option.0) {
+                coordinator.draft.roleTrack = option.0
+              }
+              if option.0 != roles.last?.0 { Divider().padding(.horizontal, 16) }
+            }
+          }
+        }
+        VStack(alignment: .leading, spacing: 12) {
+          SignalEyebrow(text: "Engineering level")
+          Picker("Engineering level", selection: $coordinator.draft.level) {
+            ForEach(EngineeringLevel.choices, id: \.0) { Text($0.1).tag($0.0) }
+          }
+          .pickerStyle(.menu)
+          .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+          .signalInset(padding: 16)
+        }
+      }
+    case 2:
+      VStack(alignment: .leading, spacing: 12) {
+        SignalEyebrow(text: "Focus · up to three")
+        VStack(spacing: 0) {
+          SignalChoiceRow(title: "Let Drillbit decide", selected: coordinator.draft.weakAreas.isEmpty) {
+            coordinator.draft.weakAreas = []
+          }
+          Divider().padding(.horizontal, 16)
+          ForEach(areas, id: \.0) { area in
+            SignalChoiceRow(title: area.1, selected: coordinator.draft.weakAreas.contains(area.0)) {
+              if coordinator.draft.weakAreas.contains(area.0) { coordinator.draft.weakAreas.remove(area.0) }
+              else if coordinator.draft.weakAreas.count < 3 { coordinator.draft.weakAreas.insert(area.0) }
+            }
+            .disabled(!coordinator.draft.weakAreas.contains(area.0) && coordinator.draft.weakAreas.count == 3)
+            if area.0 != areas.last?.0 { Divider().padding(.horizontal, 16) }
+          }
+        }
+      }
+    case 3:
+      VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: 12) {
+          SignalEyebrow(text: "Daily commitment")
+          VStack(spacing: 0) {
+            ForEach([5,10,15,20], id: \.self) { minutes in
+              SignalChoiceRow(title: "\(minutes) minutes", selected: coordinator.draft.dailyGoalMinutes == minutes) {
+                coordinator.draft.dailyGoalMinutes = minutes
+              }
+              if minutes != 20 { Divider().padding(.horizontal, 16) }
+            }
+          }
+        }
+        VStack(alignment: .leading, spacing: 16) {
+          if coordinator.draft.objective == "interview" {
+            Toggle("I have an interview date", isOn: Binding(get: { coordinator.draft.targetDate != nil }, set: { coordinator.draft.targetDate = $0 ? Date() : nil }))
+            if coordinator.draft.targetDate != nil { DatePicker("Interview date", selection: Binding(get: { coordinator.draft.targetDate ?? Date() }, set: { coordinator.draft.targetDate = $0 }), in: Calendar.current.startOfDay(for: Date())..., displayedComponents: .date) }
+            Divider()
+          }
+          Toggle("Daily reminder", isOn: Binding(
+            get: { coordinator.draft.reminderEnabled },
+            set: { enabled in
+              coordinator.draft.reminderEnabled = enabled
+              guard enabled else { return }
+              reminderPermissionPending = true
+              Task {
+                let granted = await model.requestReminderPermission()
+                reminderPermissionPending = false
+                if !granted && coordinator.draft.reminderEnabled {
+                  coordinator.draft.reminderEnabled = false
+                  coordinator.reminderNote = "Enable notifications in iPhone Settings to receive reminders."
+                }
+              }
+            }
+          )).disabled(reminderPermissionPending)
+          if coordinator.draft.reminderEnabled {
+            DatePicker("Time", selection: reminderTime(coordinator), displayedComponents: .hourAndMinute)
+            NavigationLink { TimeZoneSelectionView(selection: $coordinator.draft.timezone) } label: {
+              HStack(spacing: 8) {
+                Text("Time zone")
+                Spacer(minLength: 8)
+                Text(TimeZoneSelectionView.label(coordinator.draft.timezone))
+                  .foregroundStyle(.secondary).lineLimit(1)
               }
             }
           }
-        }.disabled(
-          saving || model.settings.focus.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+        .tint(AppPalette.accent)
       }
-    }.navigationTitle("Make it your practice")
+    default:
+      summary(coordinator.draft)
+    }
+  }
+
+  private func summary(_ draft: LearningPlanCoordinator.Draft) -> some View {
+    VStack(alignment: .leading, spacing: 16) {
+      SignalEyebrow(text: "Your plan")
+      LabeledContent("Goal", value: objectives.first { $0.0 == draft.objective }?.1 ?? "Learn system design")
+      Divider()
+      LabeledContent("Role", value: roles.first { $0.0 == draft.roleTrack }?.1 ?? "General SWE")
+      Divider()
+      LabeledContent("Level", value: EngineeringLevel.choices.first { $0.0 == draft.level }?.1 ?? "Mid-level")
+      Divider()
+      LabeledContent("Focus", value: draft.weakAreas.isEmpty ? "Drillbit decides" : draft.weakAreas.compactMap { id in areas.first { $0.0 == id }?.1 }.sorted().joined(separator: ", "))
+      Divider()
+      LabeledContent("Routine", value: "\(draft.dailyGoalMinutes) minutes a day")
+      Text("Your first session is Guided. Drillbit will help you structure the approach.").font(.footnote).foregroundStyle(.secondary)
+    }
+  }
+  private func title(for page: Int) -> String { ["Goal","Role and level","Areas to work on","Routine","Your plan"][min(page,4)] }
+  private func reminderTime(_ coordinator: LearningPlanCoordinator) -> Binding<Date> { Binding(get: {
+    Calendar.current.date(from: DateComponents(hour: coordinator.draft.dailyMinutes / 60, minute: coordinator.draft.dailyMinutes % 60)) ?? Date()
+  }, set: { let parts = Calendar.current.dateComponents([.hour,.minute], from: $0); coordinator.draft.dailyMinutes = (parts.hour ?? 9) * 60 + (parts.minute ?? 0) }) }
+
+  private func restore(_ coordinator: LearningPlanCoordinator) async {
+    guard let account = model.bootstrap?.account.id else { return }
+    if let data = try? await model.disk.cached(key: "onboarding:" + account), let draft = try? JSONDecoder().decode(LearningPlanCoordinator.Draft.self, from: data) { coordinator.draft = draft }
+    else { coordinator.draft.level = model.settings.selectedLevel; coordinator.draft.dailyMinutes = model.settings.dailyMinutes; coordinator.draft.timezone = model.settings.timezone }
+  }
+  private func persist(_ coordinator: LearningPlanCoordinator) async {
+    guard let account = model.bootstrap?.account.id, let data = try? JSONEncoder().encode(coordinator.draft) else { return }
+    try? await model.disk.cache(key: "onboarding:" + account, data: data)
+  }
+  private func finish(_ coordinator: LearningPlanCoordinator) async {
+    guard !coordinator.saving, let account = model.bootstrap?.account.id else { return }
+    coordinator.saving = true; coordinator.failure = nil; coordinator.reminderNote = nil
+    defer { coordinator.saving = false }
+    if coordinator.draft.reminderEnabled, !(await model.requestReminderPermission()) {
+      coordinator.draft.reminderEnabled = false
+      coordinator.reminderNote = "Notifications stay off. Your chosen time is saved, and you can enable reminders later."
+    }
+    let formatter = DateFormatter(); formatter.calendar = Calendar(identifier: .gregorian); formatter.locale = Locale(identifier: "en_US_POSIX"); formatter.timeZone = TimeZone(identifier: coordinator.draft.timezone); formatter.dateFormat = "yyyy-MM-dd"
+    model.settings.learningPlan = LearningPlan(objective: coordinator.draft.objective, roleTrack: coordinator.draft.roleTrack,
+      weakAreas: coordinator.draft.weakAreas.sorted(), dailyGoalMinutes: coordinator.draft.dailyGoalMinutes,
+      targetDate: coordinator.draft.objective == "interview" ? coordinator.draft.targetDate.map { formatter.string(from: $0) } : nil)
+    model.settings.selectedLevel = coordinator.draft.level
+    model.settings.dailyMinutes = coordinator.draft.dailyMinutes
+    model.settings.timezone = coordinator.draft.timezone
+    model.settings.reminderEnabled = coordinator.draft.reminderEnabled
+    do {
+      try await model.updateSettings()
+      let mapping = ["data":"data-modeling","traffic":"api-design","async":"queues","reliability":"fault-tolerance","boundaries":"authorization"]
+      let concept = coordinator.draft.weakAreas.sorted().first.flatMap { mapping[$0] }
+      let starter: Challenge
+      if let existing = model.bootstrap?.challenge { starter = existing }
+      else {
+        starter = try await model.generateForPreview(PreparationInput(primaryConceptId: concept,
+          guidanceMode: .learnTogether, interviewStyle: .standard, focus: "System design", kind: "design",
+          difficulty: model.settings.difficulty, engineeringLevel: coordinator.draft.level,
+          instruction: "Make this first practice one concrete, visible system-design decision."))
+      }
+      model.settings.onboardingComplete = true
+      try await model.updateSettings()
+      try? await model.disk.cache(key: "onboarding:" + account, data: Data())
+      try? await model.disk.cache(key: "first-guided-question:" + account, data: Data(starter.id.utf8))
+      model.starterPreview = starter
+    } catch { coordinator.failure = error.localizedDescription }
   }
 }
 
@@ -392,7 +670,7 @@ struct TimeZoneSelectionView: View {
     return city + String(format: " (UTC%@%02d:%02d)", minutes < 0 ? "−" : "+", abs(minutes) / 60, abs(minutes) % 60)
   }
   var body: some View {
-    List {
+    SignalList {
       Button("Use current device time zone") { selection = TimeZone.current.identifier; dismiss() }
       ForEach(Array(Set(Self.zones + [selection, TimeZone.current.identifier])).sorted().filter { search.isEmpty || Self.label($0).localizedCaseInsensitiveContains(search) || $0.localizedCaseInsensitiveContains(search) }, id: \.self) { zone in
         Button { selection = zone; dismiss() } label: {
@@ -410,7 +688,7 @@ struct PracticeAreaPicker: View {
   @State private var search = ""
   @Environment(\.dismiss) private var dismiss
   var body: some View {
-    List {
+    SignalList {
       Button { selection = ""; customTopic = ""; dismiss() } label: {
         HStack { Text("Automatic"); Spacer(); if selection.isEmpty { Image(systemName: AppIcon.checkmark.rawValue) } }
       }.foregroundStyle(.primary)
@@ -471,7 +749,11 @@ struct LibraryView: View {
   // Keep the task identity independent of the current clock.
   private var identity: String { Self.cacheIdentity(search: search, tags: tags, level: level, days: days, skipped: skipped) }
   var body: some View {
-    List {
+    SignalList {
+      if !skipped {
+        SignalEyebrow(text: "Questions / evidence")
+          .listRowBackground(AppPalette.background)
+      }
       if !skipped { NavigationLink("Practice evidence") { PracticeEvidenceView(model: model) } }
       if tags.count == 1, let id = tags.first, let value = coverage.first(where: { $0.conceptId == id }) {
         Section {
@@ -487,22 +769,23 @@ struct LibraryView: View {
         VStack(alignment: .leading, spacing: 8) {
           NavigationLink { LibraryQuestionView(model: model, initial: question) } label: {
             VStack(alignment: .leading, spacing: 4) {
-              Text(question.title).foregroundStyle(.primary).lineLimit(2)
+              Text(question.title).font(.headline).foregroundStyle(.primary).lineLimit(2)
               DrillbitMetadata(text: question.scenario + " · " + question.levelLabel)
               if let date = question.lastActivity.flatMap({ Date.fromAPI($0) }) {
                 DrillbitMetadata(text: date.formatted(date: .abbreviated, time: .omitted) + ((question.attemptCount ?? 0) > 1 ? " · \(question.attemptCount!) attempts" : ""))
               }
             }
           }.accessibilityIdentifier("library-question-" + question.id)
-          ForEach(question.conceptIds, id: \.self) { id in
+          ForEach(Array(question.conceptIds.prefix(2)), id: \.self) { id in
             Button(model.taxonomy.first { $0.id == id }?.label ?? id) { tags = [id] }
-              .font(.caption).buttonStyle(.borderless).foregroundStyle(.secondary)
+              .font(.caption).buttonStyle(.borderless).foregroundStyle(AppPalette.accent)
           }
-        }.padding(.vertical, 4)
+        }.padding(.vertical, 8).listRowBackground(AppPalette.background)
       }
       if let failure { Text(failure).font(.footnote).foregroundStyle(.secondary); Button("Retry") { Task { await load() } } }
       if cursor != nil { Button("Load more") { Task { await load(more: true) } }.disabled(loading) }
     }
+    .listStyle(.plain)
     .navigationTitle(skipped ? "Skipped questions" : "Library")
     .searchable(text: $search)
     .toolbar {
@@ -515,7 +798,7 @@ struct LibraryView: View {
     }
     .sheet(isPresented: $filterOpen) {
       NavigationStack {
-        Form {
+        SignalList {
           Section("Concepts") {
             ForEach(model.taxonomy) { concept in
               Toggle(concept.label, isOn: Binding(get: { tags.contains(concept.id) }, set: { if $0 { tags.insert(concept.id) } else { tags.remove(concept.id) } }))
@@ -602,7 +885,7 @@ struct LibraryQuestionView: View {
   }
   private var question: LibraryQuestion { detail?.question ?? initial }
   var body: some View {
-    List {
+    SignalList {
       Section {
         Text(question.title).font(.title2.weight(.semibold))
         DisclosureGroup("Original question") { Text(question.prompt).textSelection(.enabled) }
@@ -652,7 +935,7 @@ struct LibraryQuestionView: View {
                   model.bootstrap?.challenge = attempt; started = attempt; preview = false
                 } catch { failure = error.localizedDescription }
               }
-            }.buttonStyle(PracticeButtonStyle()).disabled(busy).padding(24).background(.regularMaterial)
+            }.buttonStyle(PracticeButtonStyle()).disabled(busy).padding(24).background(AppPalette.background)
           }.navigationTitle("Question preview").navigationBarTitleDisplayMode(.inline).toolbar { Button("Close") { preview = false } }
       }
     }
@@ -711,7 +994,7 @@ struct PracticeProfileView: View {
     })
   }
   var body: some View {
-    Form {
+    SignalList {
       Section {
         TextField("Preparing for senior interviews, getting better at trade-offs…", text: field(\.goals), axis: .vertical).lineLimit(3...6)
           .accessibilityLabel("Your goals").accessibilityIdentifier("practiceGoals")

@@ -45,7 +45,7 @@ The behavior is more useful, but not consistently at the final personality/corre
 - One Coach response still claimed retries guarantee at-least-once delivery; retries alone do not. Prompt guidance explicitly rejects this, but instructions are not a correctness guarantee.
 - Mock sometimes coaches too much. Generic praise, unnecessary follow-up questions and some code-like syntax in spoken examples remain.
 
-An 18-response medium-reasoning experiment improved the sampled retry corrections but still misread the ambiguous body in five of six cases. That is insufficient evidence to pay for a global reasoning increase; production remains low reasoning for substantive interview replies, with the existing smaller social path. Gemini 3.1 Flash Lite remains the only reasoning model.
+An 18-response medium-reasoning experiment on Gemini 3.1 Flash Lite improved the sampled retry corrections but still misread the ambiguous body in five of six cases. This is historical model-specific evidence. Current GPT-6 Luna interview calls disable reasoning for latency; Luna's quality needs separate acceptance rather than inheriting these results.
 
 No automatic repair inference or brittle domain-specific canned-response replacement was added. Future evaluation should retain these failing cases, measure multi-turn recovery after corrections, and improve grounding without recreating the long voice wait.
 

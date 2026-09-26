@@ -6,8 +6,8 @@ import { boundedContext, xmlContext, visibleQuestion } from "./context";
 import { Fault, MODEL_ID, timestamp, uuid, type Settings } from "./domain";
 import { consumeUsage, decrypt, type Env } from "./platform";
 export type ModelMessage = { role: "system" | "user" | "assistant"; content: string };
-const contextualInterviewVersions = ["interviewer-standard-v4", "interviewer-standard-v5", "interviewer-teaching-v1", "interviewer-teaching-v2", "interviewer-teaching-v3"];
-const teachingInterviewVersions = ["interviewer-teaching-v1", "interviewer-teaching-v2", "interviewer-teaching-v3"];
+const contextualInterviewVersions = ["interviewer-standard-v4", "interviewer-standard-v5", "interviewer-teaching-v1", "interviewer-teaching-v2", "interviewer-teaching-v3", "interviewer-teaching-v4"];
+const teachingInterviewVersions = ["interviewer-teaching-v1", "interviewer-teaching-v2", "interviewer-teaching-v3", "interviewer-teaching-v4"];
 export async function modelKey(
   env: Env,
   account: string,
@@ -109,7 +109,7 @@ function baseMessagesFor(kind: string, context: unknown): ModelMessage[] {
   }
   const instructions: Record<string, string> = {
     generate:
-      "Generate one concrete system-design interview question. Metadata: the selected primary concept is mandatory and must be central to an explicit visible design decision, not incidental to a broad system. For example an indexing question must ask about access paths for specified queries. Respect the selected engineering level through scope and ambiguity, not by adding a role title. tagEvidence is the ONLY tag list; include the primary exactly once, with zero to two other concepts only if materially tested. requirementIndex is 0 for the prompt or the one-based constraint number. Never include unselected or duplicate evidence entries. Use a 1–3 word scenario noun phrase. Write a question with a sharp decision and realistic constraints. Follow the requested focus and engineeringLevel (legacy difficulty only when no level exists). Level expectations: Intern: fundamentals and small concrete tasks; Junior: scoped implementation and debugging; Mid-level: independent features and practical trade-offs; Senior: ambiguity, reliability and system decisions; Staff: cross-team architecture and migrations; Principal: organization-wide direction and long-term constraints. Scale scope, not answer length or extreme performance numbers. Staff questions must include a concrete cross-team ownership or migration decision. Principal questions must include an organizational prioritization or long-term adoption decision. Keep this one bounded practice question, not an entire interview loop. Never combine strict global consistency, regional partition availability and sub-millisecond latency as simultaneously achievable requirements. Keep consistency language identical between prompt and constraints; if a trade-off is intended, explicitly invite the user to relax one requirement. Never use hidden level-based grading requirements. Recent history is for variety, not an ability assessment. Skipped questions and assisted answers do not demonstrate mastery. Never change the requested target level based on history. For an explicit follow-up, apply the actual prior improvement to a different situation within the selected topic; prior assistance may explain the answer and is not evidence of independent mastery. Avoid repeated question shapes. Respect the requested question kind. Put all material requirements in the prompt or constraints. The evaluator will use only these visible requirements. State how ambiguity may be resolved. targetSkill is a short internal learning objective. For a follow-up, practise the previous improvement in a different concrete situation; do not repeat the same question.",
+      "Generate one concrete system-design interview question. Metadata: the selected primary concept is mandatory and must be central to an explicit visible design decision, not incidental to a broad system. For example an indexing question must ask about access paths for specified queries. Respect the selected engineering level through scope and ambiguity, not by adding a role title. tagEvidence is the ONLY tag list; include the primary exactly once, with zero to two other concepts only if materially tested. requirementIndex is 0 for the prompt or the one-based constraint number. Never include unselected or duplicate evidence entries. Use a 1–3 word scenario noun phrase. Write a question with a sharp decision; for exploratory requests leave negotiable constraints for the interview, and for guided or lower levels show useful constraints upfront. Follow the requested focus and engineeringLevel (legacy difficulty only when no level exists). Level expectations: Intern: fundamentals and small concrete tasks; Junior: scoped implementation and debugging; Mid-level: independent features and practical trade-offs; Senior: ambiguity, reliability and system decisions; Staff: cross-team architecture and migrations; Principal: organization-wide direction and long-term constraints. Scale scope, not answer length or extreme performance numbers. Staff questions must include a concrete cross-team ownership or migration decision. Principal questions must include an organizational prioritization or long-term adoption decision. Keep this one bounded practice question, not an entire interview loop. Never combine strict global consistency, regional partition availability and sub-millisecond latency as simultaneously achievable requirements. Keep consistency language identical between prompt and constraints; if a trade-off is intended, explicitly invite the user to relax one requirement. Never use hidden level-based grading requirements. Recent history is for variety, not an ability assessment. Skipped questions and assisted answers do not demonstrate mastery. Never change the requested target level based on history. For an explicit follow-up, apply the actual prior improvement to a different situation within the selected topic; prior assistance may explain the answer and is not evidence of independent mastery. Avoid repeated question shapes. Respect the requested question kind. Put all material requirements in the prompt or constraints. The evaluator will use only these visible requirements. State how ambiguity may be resolved. targetSkill is a short internal learning objective. For a follow-up, practise the previous improvement in a different concrete situation; do not repeat the same question.",
     coach:
       "Give one brief Socratic hint or answer the latest follow-up, without revealing the full solution. Ground it in the current answer. Plain text only; no markdown formatting.",
     nudge: `Decide whether to intervene BEFORE writing a hint. Silence is a successful outcome.
@@ -362,13 +362,25 @@ export function interviewReasoning(context: unknown): { enabled: false } | { eff
 }
 export function interviewModelSchema(context: unknown, legacySchema: z.ZodType): z.ZodType {
   const version = (context as { promptVersion?: string }).promptVersion ?? INTERVIEW_PROMPT_VERSION;
+  if (version === "interviewer-teaching-v4") return z.object({
+    move: z.enum(["chat", "acknowledge", "ask_one", "answer_question", "correct", "hint", "example"]),
+    text: z.string().trim().min(1).max(2400),
+    parameters: z.array(z.object({label:z.string().trim().min(1).max(32),value:z.string().trim().min(1).max(120)})).max(3),
+  });
   return contextualInterviewVersions.includes(version) ? z.object({ move: z.enum(["chat", "acknowledge", "ask_one", "answer_question", "correct", "hint", "example"]), text: z.string().trim().min(1).max(2400) }) : legacySchema;
 }
 export function parseInterviewModelResult(context: unknown, schema: z.ZodType, value: unknown) {
-  const c = context as { promptVersion?: string; action?: { kind?: string } };
-  const parsed = interviewModelSchema(context, schema).parse(value) as { text: string };
+  const c = context as { promptVersion?: string; action?: { kind?: string; text?: string } };
+  const isV4 = (c.promptVersion ?? INTERVIEW_PROMPT_VERSION) === "interviewer-teaching-v4";
+  const candidate = isV4 && value && typeof value === "object" && !Array.isArray(value)
+    ? {parameters: [], ...value} : value;
+  const parsed = interviewModelSchema(context, schema).parse(candidate) as { text: string; parameters?: {label:string;value:string}[] };
+  const available = (parsed.text + "\n" + (c.action?.text ?? "")).toLocaleLowerCase();
+  const parameters = isV4 && ["answer", "clarification", "continue"].includes(c.action?.kind ?? "")
+    ? (parsed.parameters ?? []).filter(item => available.includes(item.value.toLocaleLowerCase()))
+    : [];
   return schema.parse(contextualInterviewVersions.includes((c.promptVersion ?? INTERVIEW_PROMPT_VERSION))
-    ? { text: parsed.text, outcome: ["answer", "continue"].includes(c.action?.kind ?? "answer") ? "follow_up" : "reply" } : parsed) as { outcome: string; text: string };
+    ? { text: parsed.text, outcome: ["answer", "continue"].includes(c.action?.kind ?? "answer") ? "follow_up" : "reply", ...(isV4 ? {parameters} : {}) } : parsed) as { outcome: string; text: string; parameters?: {label:string;value:string}[] };
 }
 export async function streamedInterview(env: Env, account: string, settings: Settings, context: unknown, schema: z.ZodType, publish: (text: string) => Promise<void>) {
   const controller = new AbortController();

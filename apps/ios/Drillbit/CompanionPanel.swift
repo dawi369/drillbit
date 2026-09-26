@@ -4,16 +4,6 @@ struct CompanionPanel: View {
   var practice: PracticeController
   var expand: () -> Void
   @Environment(\.dynamicTypeSize) private var size
-  @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
-  @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
-  private var reduceMotion: Bool {
-    systemReduceMotion
-      || (practice.model.fixture && ProcessInfo.processInfo.arguments.contains("--reduce-effects"))
-  }
-  private var reduceTransparency: Bool {
-    systemReduceTransparency
-      || (practice.model.fixture && ProcessInfo.processInfo.arguments.contains("--reduce-effects"))
-  }
   private var companion: CompanionCoordinator { practice.companion }
   var body: some View {
     HStack(spacing: 12) {
@@ -41,8 +31,6 @@ struct CompanionPanel: View {
             )
             .font(.subheadline).lineLimit(3)
             .id(companion.suggestion?.id ?? "quiet")
-            .transition(
-              .opacity.combined(with: .offset(y: reduceMotion || companion.replacing ? 0 : 4)))
           }
         }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
       }.buttonStyle(.plain).accessibilityIdentifier("openHelp")
@@ -52,32 +40,12 @@ struct CompanionPanel: View {
         ProgressView().controlSize(.small).accessibilityLabel("Preparing help")
       }
     }
-    .padding(12)
-    .frame(height: size.isAccessibilitySize ? 80 : 100)
-    .background {
-      if reduceTransparency {
-        RoundedRectangle(cornerRadius: 12).fill(Color(uiColor: .secondarySystemBackground))
-      } else {
-        RoundedRectangle(cornerRadius: 12).fill(.regularMaterial)
-      }
+    .padding(.horizontal, 24).padding(.vertical, 12)
+    .frame(minHeight: 100)
+    .overlay(alignment: .top) {
+      (companion.requestingSince != nil || companion.suggestion != nil
+       ? AppPalette.accent : AppPalette.hairline).frame(height: 1)
     }
-    .overlay {
-      RoundedRectangle(cornerRadius: 12)
-        .stroke(
-          LinearGradient(colors: [.blue, .purple], startPoint: .leading, endPoint: .trailing),
-          lineWidth: 1
-        )
-        .opacity(companion.requestingSince != nil || companion.suggestion != nil ? 0.35 : 0)
-        .animation(
-          reduceMotion ? nil : .easeOut(duration: 0.6), value: companion.requestingSince != nil
-        )
-        .allowsHitTesting(false)
-    }
-    .animation(
-      reduceMotion ? nil : .easeInOut(duration: companion.replacing ? 0.2 : 0.35),
-      value: companion.suggestion?.id
-    )
-    .padding(.horizontal, 24)
     .task(id: companion.requestingSince) {
       companion.showProgress = false
       guard companion.requestingSince != nil else { return }

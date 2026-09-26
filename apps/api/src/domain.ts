@@ -4,7 +4,7 @@ import { captureSchema, receiptSchema } from "./companion-contract";
 import { z } from "zod";
 import { Temporal } from "@js-temporal/polyfill";
 
-export const MODEL_ID = "google/gemini-3.1-flash-lite";
+export const MODEL_ID = "openai/gpt-6-luna";
 export const engineeringLevelSchema = z.enum(["intern", "junior", "mid", "senior", "staff", "principal"]);
 export const levelForDifficulty = (difficulty: string) => difficulty === "easy" ? "junior" : difficulty === "hard" ? "senior" : "mid";
 export const practiceProfileSchema = z.object({
@@ -12,8 +12,21 @@ export const practiceProfileSchema = z.object({
   background: z.string().trim().max(600).default(""),
   preferences: z.string().trim().max(600).default(""),
 });
+export const learningPlanSchema = z.object({
+  version: z.literal(1).default(1),
+  objective: z.enum(["interview", "learn", "stay_sharp"]),
+  roleTrack: z.enum(["general", "backend", "frontend", "full_stack", "platform", "data", "mobile"]),
+  weakAreas: z.array(z.enum(["data", "traffic", "async", "reliability", "boundaries"])).max(3),
+  dailyGoalMinutes: z.union([z.literal(5), z.literal(10), z.literal(15), z.literal(20)]),
+  targetDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+});
+export type LearningPlan = z.infer<typeof learningPlanSchema>;
+export const defaultLearningPlan = (): LearningPlan => ({
+  version: 1, objective: "learn", roleTrack: "general", weakAreas: [], dailyGoalMinutes: 10,
+});
 export const settingsSchema = z.object({
   practiceProfile: practiceProfileSchema.optional(),
+  learningPlan: learningPlanSchema.optional(),
   onboardingComplete: z.boolean().default(false),
   focus: z.string().trim().min(1).max(4000).default("System design"),
   engineeringLevel: engineeringLevelSchema.optional(),
@@ -32,7 +45,7 @@ export const settingsSchema = z.object({
   dailyMinutes: z.number().int().min(0).max(1439).default(540),
   reminderEnabled: z.boolean().default(false),
   aiMode: z.enum(["managed", "byok"]).default("managed"),
-  model: z.enum([MODEL_ID, "google/gemini-2.5-flash-lite"]).default(MODEL_ID),
+  model: z.enum([MODEL_ID, "google/gemini-3.1-flash-lite", "google/gemini-2.5-flash-lite"]).default(MODEL_ID),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 export const challengeSchema = z.object({
@@ -60,6 +73,7 @@ export const learningEvidenceSchema = z.object({
   quote: z.string().min(1).max(500),
   signal: z.enum(["demonstrated", "needs_practice"]),
   assistance: z.enum(["assisted", "unknown"]),
+  sourceTurnId: z.string().optional(),
 });
 export const reflectionSchema = z.object({
   evidence: z.array(learningEvidenceSchema).max(3).optional(),
@@ -131,6 +145,15 @@ export function normalizeSettings(value: unknown): Settings {
   const settings = settingsSchema.parse({ ...(value as object), model: MODEL_ID });
   return { ...settings, focus: "System design", engineeringLevel: settings.engineeringLevel ?? levelForDifficulty(settings.difficulty) };
 }
+export function validateLearningPlanDate(settings: Settings, now = new Date()) {
+  const plan = settings.learningPlan;
+  if (!plan?.targetDate) return;
+  if (plan.objective !== "interview")
+    throw new Fault("invalid_target_date", 400, "An interview date requires the interview goal.");
+  const today = Temporal.Instant.from(now.toISOString()).toZonedDateTimeISO(settings.timezone).toPlainDate();
+  if (Temporal.PlainDate.compare(Temporal.PlainDate.from(plan.targetDate), today) < 0)
+    throw new Fault("invalid_target_date", 400, "Choose today or a future interview date.");
+}
 export const generationSchema = z.object({
   guidanceMode: guidanceModeSchema.optional(),
   primaryConceptId: conceptId.optional(),
@@ -178,7 +201,9 @@ export function helpSchemaFor(kind: string) {
 }
 
 export const reflectionOutputSchema = reflectionSchema.extend({
-  evidence: z.array(learningEvidenceSchema).max(2),
+  // Attribution is derived from saved answer turns after inference. It is not
+  // model output, and optional properties violate Luna's strict JSON schema.
+  evidence: z.array(learningEvidenceSchema.omit({ sourceTurnId: true })).max(2),
   nextExercise: z.string().min(1).max(400),
   strengths: z.array(z.string().max(80)).max(2),
   gaps: z.array(z.string().max(80)).max(2),

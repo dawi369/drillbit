@@ -1,0 +1,40 @@
+{
+  "name": "orb-lab",
+  "version": "1.0.0",
+  "main": "expo-router/entry",
+  "dependencies": {
+    "@react-native-community/slider": "5.2.0",
+    "@shopify/react-native-skia": "2.6.2",
+    "expo": "57.0.23",
+    "expo-constants": "~57.0.18",
+    "expo-dev-client": "~57.0.19",
+    "expo-document-picker": "~57.0.2",
+    "expo-linking": "~57.0.10",
+    "expo-router": "~57.0.21",
+    "expo-status-bar": "~57.0.1",
+    "expo-thinking-orbs": "0.2.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-audio-api": "0.13.3",
+    "react-native-reanimated": "4.5.1",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-worklets": "0.10.1",
+    "expo-build-properties": "57.0.20"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.2",
+    "eslint": "9",
+    "eslint-config-expo": "~57.0.2",
+    "typescript": "~6.0.3"
+  },
+  "scripts": {
+    "start": "node --dns-result-order=ipv4first node_modules/expo/bin/cli start --dev-client --localhost --port 8083",
+    "ios": "expo run:ios --port 8083",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test src/spectrum.test.ts",
+    "lint": "eslint src --max-warnings=0"
+  },
+  "private": true
+}

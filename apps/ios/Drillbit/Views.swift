@@ -4,8 +4,8 @@ import SwiftUI
 struct RootView: View {
   @Bindable var model: AppModel
   @State private var settingsOpen = false
-  @State private var selectedTab = "home"
-  @AppStorage("appearance") private var appearance = "system"
+  @State private var selectedTab = ProcessInfo.processInfo.arguments.contains("--fixture-recall") ? "recall" : "home"
+  @AppStorage("appearance") private var appearance = "dark"
   @Environment(\.scenePhase) private var scenePhase
   @Environment(\.colorScheme) private var systemColorScheme
   var body: some View {
@@ -20,7 +20,7 @@ struct RootView: View {
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.background)
+        .background(AppPalette.background)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("sessionRestoration")
       } else if let account = model.bootstrap?.account, account.status == "active" {
@@ -30,14 +30,17 @@ struct RootView: View {
           TabView(selection: $selectedTab) {
             Tab("Home", systemImage: AppIcon.home.rawValue, value: "home") {
               NavigationStack {
-                HomeView(model: model).toolbar {
-                  Button("Settings", systemImage: AppIcon.settings.rawValue) { settingsOpen = true }
-                }
+                HomeView(model: model, openSettings: { settingsOpen = true })
+              }
+            }
+            Tab("Recall", systemImage: AppIcon.recall.rawValue, value: "recall") {
+              NavigationStack {
+                RecallView(model: model).drillbitTabClearance()
               }
             }
             Tab("Library", systemImage: AppIcon.library.rawValue, value: "library") {
               NavigationStack {
-                MemoryView(model: model).toolbar {
+                MemoryView(model: model).drillbitTabClearance().toolbar {
                   Button("Settings", systemImage: AppIcon.settings.rawValue) { settingsOpen = true }
                 }
               }
@@ -53,7 +56,18 @@ struct RootView: View {
       selectedTab = "home"
       Task { await model.refresh() }
     }
-    .task { await model.launch() }
+    .onReceive(NotificationCenter.default.publisher(for: .init("OpenRecall"))) { _ in
+      selectedTab = "recall"
+      Task { await model.loadRecall() }
+    }
+    .task {
+      await model.launch()
+      #if DEBUG
+        if model.fixture && ProcessInfo.processInfo.arguments.contains("--fixture-settings") {
+          settingsOpen = true
+        }
+      #endif
+    }
     .onChange(of: scenePhase) { _, phase in
       if phase == .active {
         Task { await model.refresh(); await model.ensureHomeQuestion() }
@@ -67,6 +81,10 @@ struct RootView: View {
         .environment(\.colorScheme, appearance == "dark" ? .dark : appearance == "light" ? .light : systemColorScheme)
         .preferredColorScheme(appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
         .interactiveDismissDisabled()
+    }
+    .sheet(item: $model.starterPreview) { challenge in
+      QuestionFlow(model: model, initial: challenge, isStarter: true) { opened in model.presented = opened }
+        .interactiveDismissDisabled(false)
     }
     .fullScreenCover(item: $model.presented) { challenge in
       NavigationStack { InterviewView(model: model, challenge: challenge) }
@@ -122,13 +140,22 @@ struct LocalRecoveryView: View {
 }
 struct HomeView: View {
   @Bindable var model: AppModel
+  var openSettings: () -> Void
   @State private var flow: QuestionFlowEntry?
   @State private var started: Challenge?
   @State private var skipping: Challenge?
   @State private var chooseAfterSkip = false
   var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: 24) {
+      VStack(alignment: .leading, spacing: 32) {
+        HStack {
+          DrillbitLogo(compact: true)
+          Spacer()
+          SignalEyebrow(text: "Today")
+          Button("Settings", systemImage: AppIcon.settings.rawValue, action: openSettings)
+            .labelStyle(.iconOnly).buttonStyle(DrillbitIconButtonStyle())
+            .accessibilityIdentifier("homeSettings")
+        }
         if let account = model.completionNoticeAccount, account == model.bootstrap?.account.id {
           HStack(alignment: .top, spacing: 12) {
             CompletionHeading()
@@ -143,13 +170,9 @@ struct HomeView: View {
           .accessibilityIdentifier("practiceCompletionNotice")
           Divider()
         }
-        VStack(alignment: .leading, spacing: 12) {
-          DrillbitSectionHeader(title: "Your practice")
-          PracticeOverview(memory: model.memory)
-        }
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 20) {
           HStack {
-            DrillbitSectionHeader(title: "Next question")
+            SignalEyebrow(text: "The next question")
             Spacer()
             if let challenge = model.bootstrap?.challenge {
               Menu {
@@ -169,11 +192,15 @@ struct HomeView: View {
                 .disabled(model.busy)
             }
           }
-          VStack(alignment: .leading, spacing: 16) {
+          VStack(alignment: .leading, spacing: 20) {
           if let challenge = model.bootstrap?.challenge {
-            VStack(alignment: .leading, spacing: 12) {
-              Text(challenge.title).font(.title2.weight(.semibold)).lineLimit(2)
+            VStack(alignment: .leading, spacing: 20) {
+              Text(challenge.title).font(.largeTitle.weight(.semibold)).tracking(-0.8)
+                .fixedSize(horizontal: false, vertical: true)
               DrillbitMetadata(text: "\(challenge.topic) · \(challenge.levelLabel)")
+              Text(challenge.displayPrompt).font(.subheadline).foregroundStyle(AppPalette.secondary)
+                .lineLimit(3).fixedSize(horizontal: false, vertical: true)
+              SignalJourney(inProgress: challenge.lifecycle == "in_progress")
               Button(challenge.lifecycle == "in_progress" ? "Resume" : "Open question") {
                 if challenge.lifecycle == "in_progress" { Task { await model.open(challenge) } }
                 else { flow = QuestionFlowEntry(challenge: challenge) }
@@ -195,18 +222,27 @@ struct HomeView: View {
               Button("Retry") { Task { await model.retry(job) } }
             }
           }
-          }.drillbitHeroSurface()
+          }
+        }
+        if model.bootstrap?.todayPlan?.completedTotal != 0 {
+          VStack(alignment: .leading, spacing: 12) {
+            SignalEyebrow(text: "Your practice")
+            HomeRecommendation(plan: model.bootstrap?.todayPlan)
+            PracticeOverview(memory: model.memory)
+          }
         }
         if let revisit = model.homeRevisit { revisitSection(revisit) }
         exploreSection
-      }.frame(maxWidth: 640, alignment: .leading).frame(maxWidth: .infinity).padding(20)
-    }.safeAreaPadding(.bottom, 24)
+      }.frame(maxWidth: 640, alignment: .leading).frame(maxWidth: .infinity)
+        .padding(.horizontal, 24).padding(.top, 24).padding(.bottom, 40)
+    }.drillbitTabClearance()
       .task(id: model.bootstrap?.account.id) { await model.ensureHomeQuestion() }
       .alert("Skip this question?", isPresented: Binding(get: { skipping != nil }, set: { if !$0 { skipping = nil } })) {
         Button("Keep practising", role: .cancel) { skipping = nil }
         Button("Skip question", role: .destructive) { if let question = skipping { let choose = chooseAfterSkip; Task { await model.skip(question.id); if choose, model.bootstrap?.challenge == nil { flow = QuestionFlowEntry() } } }; skipping = nil }
       } message: { Text("Keep it in Skipped questions and return to Home. Your saved draft is preserved.") }
       .navigationTitle("Home").navigationBarTitleDisplayMode(.inline)
+      .toolbar(.hidden, for: .navigationBar)
       .background(AppPalette.background)
       .refreshable { await model.refresh() }
       .sheet(item: $flow, onDismiss: {
@@ -243,22 +279,23 @@ struct HomeView: View {
           Button("Practise this concept") { prepare(concept, source: item.source) }
             .buttonStyle(PracticeButtonStyle(secondary: true))
         }
-      }.drillbitSurface()
+      }
+      .padding(.top, 16)
+      .overlay(alignment: .top) { AppPalette.hairline.frame(height: 1) }
     }
   }
   private var exploreSection: some View {
     VStack(alignment: .leading, spacing: 12) {
-      DrillbitSectionHeader(title: "Explore system design")
+      SignalEyebrow(text: "Explore system design")
       VStack(spacing: 0) {
         let ranked = HomeTopicRanking.ranked(PracticeAreaCatalog.curated(model.taxonomy), coverage: model.libraryCoverage)
         ForEach(Array(ranked.prefix(3))) { concept in
           Button { prepare(concept) } label: {
             HomeTopicRow(concept: concept, coverage: model.libraryCoverage.first(where: { $0.conceptId == concept.id }), loaded: model.libraryCoverageLoaded)
           }.buttonStyle(.plain)
-          if concept.id != ranked.prefix(3).last?.id { Divider().padding(.horizontal, 16) }
+          if concept.id != ranked.prefix(3).last?.id { Divider() }
         }
-      }.background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 12))
-        .overlay { RoundedRectangle(cornerRadius: 12).stroke(AppPalette.hairline, lineWidth: 0.5) }
+      }
       Button("See all topics", systemImage: "arrow.right") { flow = QuestionFlowEntry(browseTopics: true) }
         .frame(minHeight: 44)
     }.task { await model.loadTaxonomy() }
@@ -275,6 +312,7 @@ struct QuestionFlowEntry: Identifiable {
 struct QuestionFlow: View {
   @Bindable var model: AppModel
   var initial: Challenge? = nil
+  var isStarter = false
   var source: Challenge? = nil
   var recovery: PreparationInput? = nil
   var browseTopics = false
@@ -297,7 +335,7 @@ struct QuestionFlow: View {
   var body: some View {
     NavigationStack {
       if browseTopics && selectedTopic == nil && selectedCustomTopic == nil {
-        List {
+        SignalList {
           Section("Core areas") {
             ForEach(PracticeAreaCatalog.curated(model.taxonomy).filter { topicSearch.isEmpty || $0.label.localizedCaseInsensitiveContains(topicSearch) }) { concept in
               Button {
@@ -325,12 +363,14 @@ struct QuestionFlow: View {
             ScrollView {
               VStack(alignment: .leading, spacing: 16) {
                 if let question {
-                  Text("YOUR NEXT BOSS FIGHT")
-                    .font(.caption2.weight(.semibold)).tracking(0.8)
-                    .foregroundStyle(AppPalette.accent)
-                  Text(question.title).font(.title2.weight(.semibold))
+                  SignalEyebrow(text: "The scenario")
+                  Text(question.title).font(.largeTitle.weight(.semibold)).tracking(-0.8)
                     .fixedSize(horizontal: false, vertical: true)
-                  Text(question.prompt)
+                  if question.guidanceMode == .learnTogether {
+                    Text(isStarter ? "Start with one question or one design choice." : "Guided practice helps you structure the approach.")
+                      .font(.subheadline).foregroundStyle(.secondary)
+                  }
+                  Text(question.displayPrompt)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .textSelection(.enabled).accessibilityIdentifier("previewPrompt")
@@ -346,7 +386,7 @@ struct QuestionFlow: View {
         }.safeAreaInset(edge: .bottom) {
           if let question, !loading {
             VStack(spacing: 12) {
-              Button(question.lifecycle == "in_progress" ? "Resume" : "Start interview") {
+              Button(question.lifecycle == "in_progress" ? "Resume" : isStarter ? "Start practice" : "Start interview") {
                 starting = true
                 Task {
                   do {
@@ -388,7 +428,7 @@ struct QuestionFlow: View {
           }
         }, recovery: retryInput ?? recovery)
       }
-    }.onAppear {
+    }.background(AppPalette.background).onAppear {
       visible = true
       guard !initialized else { return }
       initialized = true
@@ -402,9 +442,10 @@ struct QuestionFlow: View {
 }
 private struct CompletionHeading: View {
   var body: some View {
-    VStack(alignment: .leading, spacing: 4) {
-      Text("Boss fight logged.").font(.title2.weight(.semibold))
-      Text("Practice done. Future you says thanks.").font(.subheadline).foregroundStyle(.secondary)
+    VStack(alignment: .leading, spacing: 8) {
+      SignalEyebrow(text: "Practice complete")
+      Text("One idea to carry forward.")
+        .font(.largeTitle.weight(.semibold)).tracking(-0.8)
     }
   }
 }
@@ -413,6 +454,8 @@ struct ReflectionView: View {
   @State private var feedbackCheck = 0
   @State private var preparingFollowUp = false
   @State private var startedFollowUp: Challenge?
+  @State private var retryingTurn: String?
+  @State private var retryFailure: String?
   var model: AppModel
   var initial: Challenge
   @State private var current: Challenge?
@@ -423,6 +466,33 @@ struct ReflectionView: View {
         AssistanceSummary(challenge: current ?? initial)
         if let reflection = (current ?? initial).reflection {
           ReflectionContent(reflection: reflection)
+          completionAction(reflection: reflection)
+          if let turns = (current ?? initial).interview?.turns.filter({ $0.kind == "answer" }), !turns.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+              SignalEyebrow(text: "Other moments")
+              ForEach(turns.suffix(3)) { turn in
+                Button {
+                  Task {
+                    retryingTurn = turn.id; retryFailure = nil
+                    defer { retryingTurn = nil }
+                    do { model.presented = try await model.retryMoment(challenge: current ?? initial, turn: turn) }
+                    catch { retryFailure = error.localizedDescription }
+                  }
+                } label: {
+                  HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 3) {
+                      Text(turn.prompt).lineLimit(2).multilineTextAlignment(.leading)
+                      Text("Start a clean branch here").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if retryingTurn == turn.id { ProgressView().controlSize(.small) }
+                    else { Image(systemName: "arrow.branch").foregroundStyle(.secondary) }
+                  }
+                }.buttonStyle(.plain).disabled(retryingTurn != nil)
+              }
+            }
+          }
+          if let retryFailure { Text(retryFailure).font(.subheadline).foregroundStyle(AppPalette.destructive) }
         } else {
           Text(
             model.hasPendingWrites && !model.fixture
@@ -436,16 +506,20 @@ struct ReflectionView: View {
             Button("Retry feedback") { Task { await model.retry(job); feedbackCheck += 1 } }
           }
         }
-        Button("Done") {
-          model.presented = nil
-          Task { await model.refresh() }
-        }.buttonStyle(PracticeButtonStyle())
-        if (current ?? initial).reflection != nil {
+        if let reflection = (current ?? initial).reflection {
+          Button("Review in Recall") {
+            model.presented = nil
+            NotificationCenter.default.post(name: .init("OpenRecall"), object: nil)
+          }.buttonStyle(PracticeButtonStyle(secondary: true))
           Button("Practise this next") { preparingFollowUp = true }
             .buttonStyle(PracticeButtonStyle(secondary: true))
+          if hasLearningAction(reflection) {
+            Button("Done for today") { leave() }
+          }
         }
       }.padding(24)
-    }.navigationTitle("Reflection").navigationBarBackButtonHidden()
+    }.background(AppPalette.background)
+      .navigationTitle("Reflection").navigationBarBackButtonHidden()
       .sheet(isPresented: $preparingFollowUp, onDismiss: {
         if let startedFollowUp { model.presented = startedFollowUp; self.startedFollowUp = nil }
       }) {
@@ -461,38 +535,87 @@ struct ReflectionView: View {
           if let detail: Challenge = try? await model.api.send("challenges/" + initial.id) {
             guard account == model.bootstrap?.account.id, !Task.isCancelled else { return }
             current = detail
-            if detail.reflection != nil { await model.loadMemory(); return }
+            if detail.reflection != nil { await model.loadMemory(); await model.loadRecall(); return }
           }
           try? await Task.sleep(for: .milliseconds(Date().timeIntervalSince(started) < 10 ? 500 : 1500))
           if Task.isCancelled { return }
         }
       }
   }
+  @ViewBuilder private func completionAction(reflection: Reflection) -> some View {
+    let challenge = current ?? initial
+    let matched = reflection.evidence?.first(where: { $0.signal == "needs_practice" && $0.sourceTurnId != nil })
+      .flatMap { evidence in challenge.interview?.turns.first { $0.id == evidence.sourceTurnId } }
+    if let turn = matched {
+      Button("Retry this moment") { Task {
+        retryingTurn = turn.id
+        defer { retryingTurn = nil }
+        do { model.presented = try await model.retryMoment(challenge: challenge, turn: turn) }
+        catch { retryFailure = error.localizedDescription }
+      } }.buttonStyle(PracticeButtonStyle()).disabled(retryingTurn != nil)
+    } else if model.recall.dueCount > 0 {
+      let count = min(model.recall.dueCount, model.bootstrap?.todayPlan?.recommendedRecallCount ?? model.recall.dueCount)
+      let minutes = Int(ceil(Double(count) / 2.0))
+      Button("Review \(count) cards · about \(minutes) minutes") {
+        model.presented = nil; NotificationCenter.default.post(name: .init("OpenRecall"), object: nil)
+      }.buttonStyle(PracticeButtonStyle())
+    } else {
+      Button("Done for today") { leave() }.buttonStyle(PracticeButtonStyle())
+    }
+  }
+  private func hasLearningAction(_ reflection: Reflection) -> Bool {
+    reflection.evidence?.contains { $0.signal == "needs_practice" && $0.sourceTurnId != nil } == true
+      || model.recall.dueCount > 0
+  }
+  private func leave() { model.presented = nil; Task { await model.refresh() } }
 }
 struct ReflectionContent: View {
   var reflection: Reflection
+  private var featuredEvidence: LearningEvidence? {
+    reflection.evidence?.first { $0.signal == "needs_practice" } ?? reflection.evidence?.first
+  }
   var body: some View {
     VStack(alignment: .leading, spacing: 24) {
-      Text(reflection.summary)
-      if !reflection.worked.isEmpty {
-        VStack(alignment: .leading, spacing: 8) {
-          Text("What worked").font(.headline)
-          ForEach(reflection.worked, id: \.self) { Text($0) }
+      if let evidence = featuredEvidence {
+        SignalEyebrow(text: "From this answer")
+        Text("“\(evidence.quote)”")
+          .font(.title2.weight(.medium)).textSelection(.enabled)
+          .fixedSize(horizontal: false, vertical: true)
+        Rectangle().fill(AppPalette.action).frame(height: 2)
+        SignalEyebrow(text: evidence.signal == "demonstrated" ? "What worked" : "The missing guard")
+        Text(evidence.observation).font(.title2.weight(.semibold))
+          .fixedSize(horizontal: false, vertical: true)
+      } else {
+        SignalEyebrow(text: "Your reflection")
+        Text(reflection.takeaway).font(.title2.weight(.semibold))
+      }
+      if !reflection.summary.isEmpty {
+        Text(reflection.summary).foregroundStyle(AppPalette.secondary)
+      }
+      DisclosureGroup("Full feedback") {
+        VStack(alignment: .leading, spacing: 16) {
+          if !reflection.worked.isEmpty {
+            SignalEyebrow(text: "What worked")
+            ForEach(reflection.worked, id: \.self) { Text($0) }
+          }
+          if !reflection.improve.isEmpty {
+            SignalEyebrow(text: "Next time")
+            Text(reflection.improve)
+          }
+          if let evidence = reflection.evidence {
+            ForEach(evidence.filter { $0.id != featuredEvidence?.id }) { item in
+              VStack(alignment: .leading, spacing: 4) {
+                Text("“\(item.quote)”").textSelection(.enabled)
+                Text(item.observation).foregroundStyle(AppPalette.secondary)
+              }
+            }
+          }
+          if let exercise = reflection.nextExercise {
+            SignalEyebrow(text: "Practise next")
+            Text(exercise)
+          }
         }
       }
-      if !reflection.improve.isEmpty {
-        VStack(alignment: .leading, spacing: 8) {
-          Text("Next time").font(.headline)
-          Text(reflection.improve)
-        }
-      }
-      if let exercise = reflection.nextExercise {
-        VStack(alignment: .leading, spacing: 8) {
-          Text("Practise next").font(.headline)
-          Text(exercise)
-        }
-      }
-      Text(reflection.takeaway).foregroundStyle(.secondary)
     }
   }
 }
@@ -535,7 +658,7 @@ struct ExampleView: View {
           }.buttonStyle(PracticeButtonStyle())
         }
       }.padding(24).textSelection(.enabled)
-    }.navigationTitle("Example answer").task { answer = challenge.example }
+    }.background(AppPalette.background).navigationTitle("Example answer").task { answer = challenge.example }
   }
 }
 
@@ -553,7 +676,7 @@ struct PracticeOverview: View {
     VStack(alignment: .leading, spacing: 20) {
       Text(headline).font(.subheadline).foregroundStyle(.secondary)
       let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 16)) : AnyLayout(HStackLayout(alignment: .top, spacing: 24))
-      if let statistics = memory.statistics {
+      if let statistics = memory.statistics, statistics.completed > 0 {
         layout {
           metric("Completed", value: statistics.completed)
           metric("Last 7 days", value: statistics.lastSevenDays)
@@ -575,6 +698,31 @@ struct PracticeOverview: View {
   }
 }
 
+private struct HomeRecommendation: View {
+  var plan: TodayPlan?
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Text(title).font(.title2.weight(.semibold))
+      if let detail { Text(detail).font(.subheadline).foregroundStyle(.secondary) }
+      if plan?.state == "review_due" {
+        Button("Open Recall") { NotificationCenter.default.post(name: .init("OpenRecall"), object: nil) }.frame(minHeight: 44)
+      }
+    }.frame(maxWidth: .infinity, alignment: .leading)
+  }
+  private var title: String { switch plan?.state {
+    case "resume": "Pick up where you left off."
+    case "review_due": "A few useful things are ready to revisit."
+    case "question_ready": "Your next practice is ready."
+    case "complete_today": "Good work. You’re done for today."
+    case "prepare": "Ready for another one?"
+    default: "Your practice is ready."
+  } }
+  private var detail: String? {
+    guard let plan, plan.state == "review_due" else { return nil }
+    return "\(plan.dueRecallCount) due · start with \(plan.recommendedRecallCount) · about \(plan.estimatedRecallMinutes) min"
+  }
+}
+
 private struct HomeTopicRow: View {
   var concept: PracticeConcept
   var coverage: CoverageResponse.Entry?
@@ -584,11 +732,36 @@ private struct HomeTopicRow: View {
       VStack(alignment: .leading, spacing: 4) {
         Text(concept.label).font(.body.weight(.medium)).foregroundStyle(.primary)
         if loaded {
-          DrillbitMetadata(text: (coverage?.completedAttempts ?? 0) == 0 ? "Not explored yet" : "\((coverage?.completedAttempts ?? 0)) completed sessions")
+          DrillbitMetadata(text: (coverage?.completedAttempts ?? 0) == 0 ? (concept.description ?? "A core system design decision.") : "\((coverage?.completedAttempts ?? 0)) completed sessions")
         }
       }
       Spacer(minLength: 0)
       Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
-    }.padding(16).frame(maxWidth: .infinity, minHeight: 60, alignment: .leading).contentShape(Rectangle())
+    }.padding(.vertical, 16).frame(maxWidth: .infinity, minHeight: 60, alignment: .leading).contentShape(Rectangle())
+  }
+}
+
+private struct SignalJourney: View {
+  let inProgress: Bool
+  var body: some View {
+    HStack(alignment: .top, spacing: 0) {
+      step("01", "Question", active: !inProgress)
+      Rectangle().fill(AppPalette.hairline).frame(height: 1).padding(.top, 8)
+      step("02", "Interview", active: inProgress)
+      Rectangle().fill(AppPalette.hairline).frame(height: 1).padding(.top, 8)
+      step("03", "Recall", active: false)
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel(inProgress ? "Interview in progress; Recall follows" : "Question ready; interview and Recall follow")
+  }
+  private func step(_ number: String, _ title: String, active: Bool) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Circle().fill(active ? AppPalette.action : AppPalette.elevated)
+        .frame(width: 16, height: 16)
+        .overlay { Circle().stroke(active ? AppPalette.action : AppPalette.hairline, lineWidth: 1) }
+      Text(title).font(.caption.weight(active ? .semibold : .regular))
+        .foregroundStyle(active ? AppPalette.primary : AppPalette.secondary)
+      Text(number).font(.caption2.monospaced()).foregroundStyle(AppPalette.secondary)
+    }
   }
 }

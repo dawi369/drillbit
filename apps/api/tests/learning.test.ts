@@ -2,13 +2,19 @@ import { env } from "cloudflare:test";
 import { beforeAll, expect, it } from "vitest";
 import { initializeDatabase } from "./migrations";
 import { accountFor } from "../src/store";
-import { groundReflection, learningEvidence } from "../src/learning";
+import { groundReflection, learningEvidence, recallDeck, reviewRecall, retryMoment, todayPlan } from "../src/learning";
+import { normalizeSettings } from "../src/domain";
 import { exportPage } from "../src/export";
 import { selectConcept } from "../src/library";
 import type { Env } from "../src/platform";
+import recallFixture from "../../../packages/contracts/fixtures/recall.json";
+import { wire } from "../../../packages/contracts/wire";
 const bindings = {...env,JOBS:{create:async()=>({id:"test"})}} as unknown as Env;
 beforeAll(()=>initializeDatabase(bindings.DB));
 const feedback = {summary:"A concrete retry design.",worked:["Stable keys"],improve:"Bound retention.",takeaway:"State a retention window.",strengths:[],gaps:[],nextExercise:"Choose and justify a retention window for retry keys.",evidence:[{conceptId:"retry-safety",quote:"Use a stable idempotency key",observation:"Identifies duplicate requests.",signal:"demonstrated",assistance:"unknown"}]};
+it("keeps the recall fixture compatible with the public wire contract",()=>{
+ expect(wire.RecallDeck.safeParse(recallFixture).success).toBe(true);
+});
 it("grounds quotes in candidate work and never upgrades unknown exposure to independent",()=>{
   const context={question:{conceptIds:["retry-safety"]},session:{answer:"Use a stable idempotency key for each payment."},help:[{body:"Choose a stable key."}]};
   expect(groundReflection(feedback,context).evidence?.[0].assistance).toBe("assisted");
@@ -18,6 +24,20 @@ it("grounds quotes in candidate work and never upgrades unknown exposure to inde
   expect(social.evidence).toEqual([]);expect(social.gaps).toEqual([]);expect(social.worked).toEqual([]);
   expect(groundReflection(feedback,{...context,question:{conceptIds:["queues"]}}).evidence).toEqual([]);
   expect(groundReflection(feedback,{...context,session:{answer:""},interview:[{kind:"hint",answer:"Use a stable idempotency key"}]}).evidence).toEqual([]);
+  const turnGrounded = groundReflection(feedback,{question:{conceptIds:["retry-safety"]},interview:[{id:"learner-turn",kind:"answer",prompt:"How will retries stay safe?",text:"Use a stable idempotency key for each payment."}]});
+  expect(turnGrounded.evidence?.[0].sourceTurnId).toBe("learner-turn");
+});
+
+it("derives the shared daily plan in deterministic priority order", async()=>{
+ const account=(await accountFor(bindings,crypto.randomUUID())).id;
+ await bindings.DB.prepare("UPDATE accounts SET status='active' WHERE id=?").bind(account).run();
+ const settings=normalizeSettings({timezone:"UTC",learningPlan:{version:1,objective:"learn",roleTrack:"general",weakAreas:[],dailyGoalMinutes:5}});
+ expect((await todayPlan(bindings,account,null,settings)).state).toBe("prepare");
+ const id=crypto.randomUUID(),now=new Date().toISOString();
+ await bindings.DB.prepare("INSERT INTO challenges(id,account_id,lifecycle,data,created_at,available_at) VALUES(?,?,'ready',?,?,?)")
+  .bind(id,account,JSON.stringify({title:"First",prompt:"Design a sufficiently complete service boundary.",topic:"System design"}),now,now).run();
+ const ready=await bindings.DB.prepare("SELECT * FROM challenges WHERE id=?").bind(id).first<any>();
+ expect((await todayPlan(bindings,account,ready,settings)).state).toBe("first_session");
 });
 async function seed(count:number) {
  const account=(await accountFor(bindings,crypto.randomUUID())).id;
@@ -61,4 +81,46 @@ it("exports pool eligibility even when a question has no remaining attempt",asyn
  const page=await exportPage(bindings,account);
  expect(page.sessions).toEqual([]);expect(page.questions[0]).toMatchObject({id,eligible:true});
  expect(JSON.stringify(page.questions)).not.toContain("PRIVATE");expect(page.nextCursor).toBeNull();
+});
+
+it("schedules recall deterministically and keeps reviews account scoped",async()=>{
+ const a=await seed(1),b=await seed(0),card=crypto.randomUUID(),now="2026-01-02T00:00:00Z";
+ await env.DB.prepare("INSERT INTO recall_cards(id,account_id,source_challenge_id,concept_id,question,answer,due_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)")
+  .bind(card,a.account,a.ids[0],"retry-safety","How do retries stay safe?","Use a stable key.",now,now,now).run();
+ expect((await recallDeck(bindings,a.account)).dueCount).toBe(1);
+ await expect(reviewRecall(bindings,b.account,card,crypto.randomUUID(),{rating:"got_it"})).rejects.toMatchObject({code:"not_found"});
+ const command=crypto.randomUUID();
+ const first=await reviewRecall(bindings,a.account,card,command,{rating:"got_it",responseMs:1200});
+ expect(first.card).toMatchObject({repetitions:1,intervalDays:1});
+ const replay=await reviewRecall(bindings,a.account,card,command,{rating:"got_it"});
+ expect(replay.card.repetitions).toBe(1);
+ await expect(reviewRecall(bindings,a.account,card,command,{rating:"again"})).rejects.toMatchObject({code:"command_reused"});
+ const again=await reviewRecall(bindings,a.account,card,crypto.randomUUID(),{rating:"again"});
+ expect(again.card).toMatchObject({repetitions:0,intervalDays:0,lapses:1});
+});
+
+it("branches a completed interview moment without changing the source",async()=>{
+ const a=await seed(1),source=a.ids[0],turn=crypto.randomUUID(),job=turn,at="2026-01-03T00:00:00Z";
+ await env.DB.batch([
+  env.DB.prepare("INSERT INTO jobs(id,account_id,challenge_id,kind,status,input,created_at,updated_at) VALUES(?,?,?,'interview','completed','{}',?,?)").bind(job,a.account,source,at,at),
+  env.DB.prepare("INSERT INTO interview_turns(id,challenge_id,ordinal,kind,prompt,text,job_id,created_at) VALUES(?,?,0,'answer',?,'An answer',?,?)").bind(turn,source,"How would you make retries safe?",job,at),
+ ]);
+ const command=crypto.randomUUID();
+ const branch=await retryMoment(bindings,a.account,source,turn,command);
+ expect(branch).toMatchObject({id:command,lifecycle:"in_progress",prompt:"How would you make retries safe?"});
+ expect((await retryMoment(bindings,a.account,source,turn,command)).id).toBe(command);
+ expect((await env.DB.prepare("SELECT lifecycle FROM challenges WHERE id=?").bind(source).first<{lifecycle:string}>())?.lifecycle).toBe("completed");
+});
+
+it("keeps the canonical learning loop coherent across teaching modes and levels",()=>{
+ for (const mode of ["learn_together","coach_me","mock_interview"]) for (const level of ["junior","mid","senior"]) {
+  const quote=`At ${level} scope, use a stable idempotency key before retrying the job.`;
+  const reflection=groundReflection({...feedback,quote:undefined,evidence:[{...feedback.evidence[0],quote}],nextExercise:"Explain acknowledgement loss using the same retry key."},{
+   question:{primaryConceptId:"retry-safety",conceptIds:["queues","retry-safety"]},
+   interview:{guidanceMode:mode,turns:[{id:`${mode}-${level}`,kind:"answer",prompt:"How will retries stay safe?",text:quote}]},
+  });
+  expect(reflection.evidence).toHaveLength(1);
+  expect(reflection.evidence?.[0]).toMatchObject({conceptId:"retry-safety",quote,sourceTurnId:`${mode}-${level}`});
+  expect(reflection.nextExercise).toContain("retry key");
+ }
 });

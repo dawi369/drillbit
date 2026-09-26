@@ -53,7 +53,7 @@ const interview = z.object({
   turns: z.array(z.object({ id: z.string(), ordinal: z.number().int(), kind: z.enum(["answer","clarification","hint","example","continue","voice"]), prompt: z.string(), text: z.string(), createdAt: z.string(), jobId: z.string(), status: z.string(), error: z.string().nullable().optional(), partial: z.string().nullable().optional(), voice:z.array(voiceFragmentSchema).optional(), result: interviewResultSchema.nullable() })),
 });
 const challenge = challengeSchema.extend({
-  questionId: z.string().optional(), scenario:z.string().optional(), primaryConceptId:conceptId.optional(), conceptIds:z.array(conceptId).optional(), selectionReason:z.string().optional(),
+  questionId: z.string().optional(), scenario:z.string().optional(), primaryConceptId:conceptId.optional(), conceptIds:z.array(conceptId).optional(), selectionReason:z.string().optional(), constraints:z.array(z.string()).max(5).optional(),
   interviewStyle: interviewStyleSchema.optional(),
   guidanceMode: guidanceModeSchema.optional(),
   interview: interview.optional(),
@@ -124,6 +124,8 @@ const challenge = challengeSchema.extend({
     .optional(),
 });
 const libraryQuestion=z.object({id:z.string(),title:z.string(),prompt:z.string(),scenario:z.string(),engineeringLevel:engineeringLevelSchema,primaryConceptId:conceptId,conceptIds:z.array(conceptId).min(1).max(3),eligible:z.boolean(),eligibilityRevision:z.number().int(),lastActivity:z.string().optional(),attemptCount:z.number().int().optional()});
+const recallCard=z.object({id:z.string(),sourceChallengeId:z.string(),conceptId,question:z.string(),answer:z.string(),dueAt:z.string(),intervalDays:z.number().int(),repetitions:z.number().int(),lapses:z.number().int(),createdAt:z.string(),updatedAt:z.string(),sourceTitle:z.string().optional(),sourceCompletedAt:z.string().optional(),evidence:learningEvidenceSchema.optional()});
+const todayPlan=z.object({state:z.enum(["first_session","resume","review_due","question_ready","complete_today","prepare"]),completedTotal:z.number().int().nonnegative(),completedLastSevenDays:z.number().int().nonnegative(),completedToday:z.number().int().nonnegative(),dueRecallCount:z.number().int().nonnegative(),recommendedRecallCount:z.number().int().nonnegative(),estimatedRecallMinutes:z.number().int().nonnegative(),dailyGoalMinutes:z.union([z.literal(5),z.literal(10),z.literal(15),z.literal(20)])});
 export const wire = {
   VoiceStart:voiceStartSchema, VoiceEvents:voiceEventsSchema, VoiceDelegate:voiceDelegateSchema,
   VoiceConnection:z.object({id:z.string(),sdp:z.string(),expiresAt:z.string()}),
@@ -136,6 +138,10 @@ export const wire = {
   LearningEvidence: learningEvidenceSchema.extend({sessionId:z.string(),at:z.string()}),
   AccountExport: z.object({version:z.number().int(),asOf:z.string(),settings:settingsSchema,sessions:z.array(challenge),questions:z.array(libraryQuestion),nextCursor:z.string().nullable()}),
   Coverage:z.object({concepts:z.array(z.object({conceptId,completedAttempts:z.number().int(),distinctQuestions:z.number().int(),lastPractised:z.string().nullable()}))}),
+  RecallCard:recallCard,
+  RecallDeck:z.object({cards:z.array(recallCard),dueCount:z.number().int()}),
+  RecallReview:z.object({rating:z.enum(["again","got_it"]),responseMs:z.number().int().min(0).max(3_600_000).optional()}),
+  RecallReviewResult:z.object({card:recallCard}),
   Companion: companion,
   CompanionUpdate: companionUpdateSchema,
   DeliveryInput: receiptsSchema,
@@ -168,6 +174,7 @@ export const wire = {
     practiceEpoch:z.string().optional(),
     account: z.object({ id: z.string(), status: z.string() }),
     settings: settingsSchema,
+    todayPlan: todayPlan.optional(),
     challenge: challenge.nullable(),
     jobs: z.array(job),
     credential: z.object({ suffix: z.string() }).nullable(),

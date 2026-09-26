@@ -83,7 +83,12 @@ export async function runJob(env: Env, id: string) {
     const followUp = input.followUp as {reflection?: {evidence?: {conceptId: string; signal: string}[]}; question?: {primaryConceptId?: string}} | undefined;
     const focus = followUp?.reflection?.evidence?.find(e => e.signal === "needs_practice")?.conceptId
       ?? followUp?.question?.primaryConceptId;
-    const selection = await selectConcept(env,job.account_id,input.settings.engineeringLevel!,input.primaryConceptId ?? focus);
+    const selection = await selectConcept(env,job.account_id,input.settings,input.primaryConceptId ?? focus);
+    const exploratory = ["senior", "staff", "principal"].includes(input.settings.engineeringLevel ?? "")
+      && input.guidanceMode !== "learn_together";
+    const generationOutputSchema = exploratory
+      ? questionGenerationSchema.safeExtend({primaryConceptId:z.literal(selection.primaryConceptId),constraints:z.array(z.string().min(1).max(300)).max(0)})
+      : questionGenerationSchema.safeExtend({primaryConceptId:z.literal(selection.primaryConceptId)});
     const restored = !input.instruction && !input.followUp ? await env.DB.prepare("SELECT * FROM questions WHERE account_id=? AND eligible=1 AND json_extract(data,'$.engineeringLevel')=? AND (? IS NULL OR json_extract(data,'$.primaryConceptId')=?) ORDER BY eligibility_updated_at,id LIMIT 1").bind(job.account_id,input.settings.engineeringLevel!,input.primaryConceptId??null,input.primaryConceptId??null).first<{id:string;data:string}>() : null;
     const recent = await env.DB.prepare(
       "SELECT c.data,c.lifecycle,c.completed_at,r.data AS reflection FROM challenges c LEFT JOIN reflections r ON r.challenge_id=c.id WHERE c.account_id=? AND c.lifecycle IN ('completed','skipped') ORDER BY c.created_at DESC LIMIT 20",
@@ -101,12 +106,18 @@ export async function runJob(env: Env, id: string) {
         kind: "design",
         selection,
         taxonomy: concepts,
-        metadataInstructions: "Design a system-design problem centrally testing selection.primaryConceptId. Return that exact primaryConceptId and 0–2 distinct secondaryConceptIds from the taxonomy. scenario is a 1–3 word noun phrase. tagEvidence is the sole tag list: include the primary concept exactly once and at most two secondary concepts. Each entry has requirementIndex: 0 for prompt, or 1-based index into constraints. Concepts classify the problem, never introduce hidden grading requirements.",
+        metadataInstructions: "Design a system-design problem centrally testing selection.primaryConceptId. Return that exact primaryConceptId and 0–2 distinct secondaryConceptIds from the taxonomy. scenario is a 1–3 word noun phrase. tagEvidence is the sole tag list: include the primary concept exactly once and at most two secondary concepts. Each entry has requirementIndex: 0 for prompt, or 1-based index into constraints. Concepts classify the problem, never introduce hidden grading requirements. roleTrack may change scenario vocabulary only; it must not change scope, difficulty, visible requirements or evaluation criteria. targetDate must not change the question. " + (exploratory ? "This is an exploratory interview: constraints MUST be empty. Give one concrete design decision and only the initial context in the prompt. Leave negotiable parameters open for the interview conversation. Do not create hidden requirements or grade unstated limits." : "This is Guided or a lower-level interview: put useful concrete requirements in the prompt or visible constraints so the learner can start without negotiating every assumption."),
         instruction: input.instruction,
         followUp: input.followUp,
+        curriculumContext: input.settings.learningPlan ? {
+          objective: input.settings.learningPlan.objective,
+          roleTrack: input.settings.learningPlan.roleTrack,
+          // These influence scenario framing and session size, never hidden requirements or grading.
+          dailyGoalMinutes: input.settings.learningPlan.dailyGoalMinutes,
+        } : undefined,
 
       },
-      questionGenerationSchema.safeExtend({primaryConceptId:z.literal(selection.primaryConceptId)}),
+      generationOutputSchema,
     );
     const generated = data as import("zod").z.infer<
       typeof questionGenerationSchema
@@ -127,7 +138,7 @@ export async function runJob(env: Env, id: string) {
       scenarioKey: generated.scenario.trim().replace(/\s+/g," ").toLowerCase(),
       taxonomyVersion: 1,
       selectionReason: restored ? "A question you added back to your pool." : selection.reason,
-      selectionSnapshot: { ...selection, requestedLevel: input.settings.engineeringLevel, instruction: input.instruction??"", recent: recent.results.slice(0,10).map(r=>{const q=JSON.parse(r.data as string);return {title:q.title,primaryConceptId:q.primaryConceptId,scenario:q.scenario};}) },
+      selectionSnapshot: { ...selection, requestedLevel: input.settings.engineeringLevel, learningPlanVersion: input.settings.learningPlan?.version, instruction: input.instruction??"", recent: recent.results.slice(0,10).map(r=>{const q=JSON.parse(r.data as string);return {title:q.title,primaryConceptId:q.primaryConceptId,scenario:q.scenario};}) },
       evaluationCriteria: [generated.prompt, ...generated.constraints],
       prompt: !restored && generated.constraints.length
         ? generated.prompt +
@@ -157,7 +168,7 @@ export async function runJob(env: Env, id: string) {
           promptVersion: "practice-v2",
           difficulty: input.settings.difficulty,
           engineeringLevel: input.settings.engineeringLevel,
-          interviewStyle: "standard",
+          interviewStyle: input.interviewStyle ?? "standard",
           guidanceMode: guidanceMode(input.guidanceMode),
         }),
         now,
@@ -262,10 +273,28 @@ export async function runJob(env: Env, id: string) {
   else throw new Error("Unknown job kind");
   if (job.kind === "summarize") data = groundReflection(data, context);
   const table = job.kind === "summarize" ? "reflections" : "examples";
+  const recallWrites = job.kind === "summarize"
+    ? ((data as z.infer<typeof reflectionOutputSchema>).evidence ?? []).map((e, index) => {
+        const reflection = data as z.infer<typeof reflectionOutputSchema>;
+        const label = concepts.find(concept => concept.id === e.conceptId)?.label ?? e.conceptId;
+        const question = index === 0 && e.signal === "needs_practice" ? reflection.nextExercise
+          : e.signal === "needs_practice" ? `What would you change about your ${label.toLowerCase()} decision?`
+          : `Why did your ${label.toLowerCase()} decision work?`;
+        const answer = e.signal === "needs_practice"
+          ? `${e.observation} Next time: ${reflection.improve || reflection.takeaway}`
+          : `${e.observation} Your evidence: “${e.quote}”`;
+        const due = e.signal === "needs_practice" ? now : new Date(Date.parse(now) + 3 * 86400000).toISOString();
+        return env.DB.prepare(`INSERT INTO recall_cards(id,account_id,source_challenge_id,concept_id,question,answer,due_at,created_at,updated_at)
+          SELECT ?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM jobs WHERE id=? AND status='running')
+          ON CONFLICT(account_id,source_challenge_id,concept_id) DO UPDATE SET question=excluded.question,answer=excluded.answer,due_at=MIN(recall_cards.due_at,excluded.due_at),updated_at=excluded.updated_at`)
+          .bind(`${job.challenge_id}:${e.conceptId}`,job.account_id,job.challenge_id,e.conceptId,question,answer,due,now,now,id);
+      })
+    : [];
   await env.DB.batch([
     env.DB.prepare(
       `INSERT INTO ${table}(challenge_id,data,created_at) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM jobs WHERE id=? AND status='running') AND EXISTS(SELECT 1 FROM accounts WHERE id=? AND status='active') ON CONFLICT(challenge_id) DO UPDATE SET data=excluded.data,created_at=excluded.created_at`,
     ).bind(job.challenge_id, JSON.stringify(data), now, id, job.account_id),
+    ...recallWrites,
     env.DB.prepare(
       "UPDATE jobs SET status='completed',updated_at=? WHERE id=? AND status='running'",
     ).bind(now, id),
