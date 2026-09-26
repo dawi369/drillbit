@@ -39,6 +39,7 @@
 		EAC2A5859464998CB025529A /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BA600A70A653AC369122638 /* WelcomeView.swift */; };
 		EAEFF3596AD2741C1A97EF7B /* RecallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA7AEA4C9157169D31D8D3B8 /* RecallView.swift */; };
 		ECEC2C8AFBB8086D0EA78BEC /* ContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ED772ACFEBFA6EBE9753089 /* ContractTests.swift */; };
+		EFE8C1C42E2D80F1C5FEA8D4 /* FirstUse.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA47F5B6A6BBF68259182059 /* FirstUse.swift */; };
 		F1C52BCF979C4B21823BF045 /* Views.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE6E41BA47189A6E118B4641 /* Views.swift */; };
 /* End PBXBuildFile section */
 
@@ -101,6 +102,7 @@
 		9A2B037FAEC89AAC90414A59 /* DrillbitWidget.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = DrillbitWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		9A7106218805AC5263A12438 /* Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persistence.swift; sourceTree = "<group>"; };
 		A193915AEBBE5F30D2A8AECA /* CompanionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionCoordinator.swift; sourceTree = "<group>"; };
+		BA47F5B6A6BBF68259182059 /* FirstUse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirstUse.swift; sourceTree = "<group>"; };
 		BCE2282A43B33A17D93AF4C6 /* MemorySettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemorySettings.swift; sourceTree = "<group>"; };
 		C8E06A264C65F45E7AD14AD1 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		C8F1C4DE69AF2358015E8EDD /* PracticeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeUITests.swift; sourceTree = "<group>"; };
@@ -160,6 +162,7 @@
 				04CE1C0E2D55B42FFFD0982A /* CompanionPanel.swift */,
 				FDE151C29EEC1990D2C7E840 /* DesignSystem.swift */,
 				DAD863FB5DA9BAE45F86B3AB /* DrillbitApp.swift */,
+				BA47F5B6A6BBF68259182059 /* FirstUse.swift */,
 				F7FE2F3D17D6A2010A948002 /* HelpView.swift */,
 				92066D96F6C016361FF268E4 /* InterviewView.swift */,
 				87BD787A61C3C037E268829C /* LiveVoice.swift */,
@@ -385,6 +388,7 @@
 				387B66BE5AA3210DD6C8A017 /* CompanionPanel.swift in Sources */,
 				B60776186F24C169754719F2 /* DesignSystem.swift in Sources */,
 				3D1A1EB693F960C1596B0D8F /* DrillbitApp.swift in Sources */,
+				EFE8C1C42E2D80F1C5FEA8D4 /* FirstUse.swift in Sources */,
 				0EEA0D0A8C2A9562B674EAB4 /* HelpView.swift in Sources */,
 				B81F6A3B13FB0CFA73CFCFED /* InterviewView.swift in Sources */,
 				19BDB2BD78083CFC15FFCF77 /* LiveVoice.swift in Sources */,

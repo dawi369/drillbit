@@ -224,6 +224,43 @@ struct InterviewTests {
 
 #if !canImport(DrillbitCore)
 @MainActor struct InterviewSubmissionTests {
+  @Test func walkthroughRoutingSurvivesReplacingQuestionsAndNeverQueuesPractice() async throws {
+    let container = try ModelContainer(for: Schema(StoreV1.models), configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+    let model = AppModel(container: container, baseURL: URL(string: "https://example.invalid")!, fixture: false, monitorNetwork: false)
+    let real = Challenge(id: "real", lifecycle: "ready", title: "Queue", prompt: "Design a queue", topic: "System design")
+    model.bootstrap = Bootstrap(account: .init(id: "a", status: "active"), settings: PracticeSettings(), challenge: real, jobs: [])
+    model.settings.onboardingComplete = true
+    try await model.setFirstUse(FirstUseProgress(stage: .walkthrough))
+    let preview = try await model.generateForPreview()
+    #expect(preview.id == FirstUseProgress.challengeID)
+    let opened = try await model.openForPreview(real)
+    #expect(opened.id == FirstUseProgress.challengeID)
+    await model.ensureHomeQuestion()
+    try await model.save(opened, answer: "A local sample", completing: true)
+    do { _ = try await model.finish(opened, answer: "A local sample"); Issue.record("Walkthrough must not complete a real attempt") }
+    catch let error as APIError { #expect(error.code == "walkthrough") }
+    #expect(try await model.disk.pending(account: "a").isEmpty)
+    #expect(model.bootstrap?.challenge?.id == "real")
+    #expect(model.memory.sessions.isEmpty)
+    #expect(model.recall.cards.isEmpty)
+  }
+
+  @Test func walkthroughProgressRestoresPerAccountAndResetClearsIt() async throws {
+    let container = try ModelContainer(for: Schema(StoreV1.models), configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+    let model = AppModel(container: container, baseURL: URL(string: "https://example.invalid")!, fixture: true, monitorNetwork: false)
+    model.bootstrap = Bootstrap(account: .init(id: "a", status: "active"), settings: PracticeSettings(), challenge: nil, jobs: [])
+    let progress = FirstUseProgress(stage: .walkthrough, step: .collapse, question: "How many people?")
+    try await model.setFirstUse(progress)
+    let reopened = DiskStore(modelContainer: container)
+    let data = try #require(await reopened.cached(key: "first-use:a"))
+    #expect(try JSONDecoder().decode(FirstUseProgress.self, from: data) == progress)
+    #expect(try await reopened.cached(key: "first-use:b") == nil)
+    try await reopened.clearPractice(account: "b")
+    #expect(try await reopened.cached(key: "first-use:a") != nil)
+    try await reopened.clearPractice(account: "a")
+    #expect(try await reopened.cached(key: "first-use:a") == nil)
+  }
+
   @Test func liveVoiceKeepsDraftAndRestoresWithoutAnotherRequest() async throws {
     let container = try ModelContainer(for: Schema(StoreV1.models), configurations: ModelConfiguration(isStoredInMemoryOnly:true))
     let challenge = Challenge(id:"live",lifecycle:"in_progress",title:"Queue",prompt:"How?",topic:"System design",session:SessionDraft(answer:"",revision:0))

@@ -689,19 +689,34 @@ struct PreparationView: View {
           Button("Remove") { includeSource = false }
         }
       }
-      Section {
-        NavigationLink {
+      Section(model.firstUse.stage == .chooseMode ? "Choose your support" : "Session style") {
+        if model.firstUse.stage == .chooseMode {
+          ForEach(GuidanceMode.allCases) { mode in
+            Button { guidanceMode = mode } label: {
+              HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                  Text(mode.title).font(.headline).foregroundStyle(AppPalette.primary)
+                  Text(mode.explanation).font(.subheadline).foregroundStyle(AppPalette.secondary)
+                }
+                Spacer(minLength: 0)
+                if guidanceMode == mode { Image(systemName: "checkmark").foregroundStyle(AppPalette.accent) }
+              }.padding(.vertical, 8)
+            }.buttonStyle(.plain).accessibilityAddTraits(guidanceMode == mode ? .isSelected : [])
+              .accessibilityIdentifier("firstSessionMode-" + mode.rawValue)
+          }
+          Text("You can change the support or switch to voice during a session.").font(.footnote).foregroundStyle(.secondary)
+        } else { NavigationLink {
           GuidanceModePicker(selection: $guidanceMode)
         } label: {
           LabeledContent("Session style", value: guidanceMode.title)
-        }.accessibilityIdentifier("interviewStyle")
+        }.accessibilityIdentifier("interviewStyle") }
       }
       Section {
         TextField("Any custom instructions? (optional)", text: $instruction, axis: .vertical)
           .lineLimit(2...4).accessibilityLabel("Optional request")
       }
       Section {
-        Button("Prepare question") {
+        Button(model.firstUse.stage == .chooseMode ? "Prepare my first question" : "Prepare question") {
           let requestedTopic = customTopic.trimmingCharacters(in: .whitespacesAndNewlines)
           let request = instruction.trimmingCharacters(in: .whitespacesAndNewlines)
           let combinedInstruction = [requestedTopic.isEmpty ? nil : "Use this product or system domain: \(requestedTopic).", request.isEmpty ? nil : request]
@@ -730,7 +745,7 @@ struct PreparationView: View {
           Text("Your current question stays until the new one is ready.")
         }
       }
-    }.task { await model.loadTaxonomy() }.navigationTitle("New question").navigationBarTitleDisplayMode(.inline).toolbar {
+    }.task { await model.loadTaxonomy() }.navigationTitle(model.firstUse.stage == .chooseMode ? "Your first session" : "New question").navigationBarTitleDisplayMode(.inline).toolbar {
       Button("Cancel") { dismiss() }
     }
     .onAppear {
@@ -738,6 +753,7 @@ struct PreparationView: View {
       initialized = true
       focus = "System design"
       engineeringLevel = model.settings.selectedLevel
+      if model.firstUse.stage == .chooseMode { guidanceMode = .learnTogether }
       customTopic = initialCustomTopic ?? ""
       if let recovery {
         guidanceMode = recovery.guidanceMode ?? .coachMe

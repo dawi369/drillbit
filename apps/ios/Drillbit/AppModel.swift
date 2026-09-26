@@ -28,6 +28,24 @@ import WidgetKit
   private var settingsSaveGeneration = 0
   var presented: Challenge?
   var starterPreview: Challenge?
+  var firstUse = FirstUseProgress()
+
+  func setFirstUse(_ value: FirstUseProgress) async throws {
+    guard let account = bootstrap?.account.id else { throw CancellationError() }
+    try await disk.cache(key: "first-use:" + account, data: JSONEncoder().encode(value))
+    guard bootstrap?.account.id == account else { throw CancellationError() }
+    firstUse = value
+  }
+  func advanceFirstUseTour() async {
+    var next = firstUse
+    switch next.stage {
+    case .tourHome: next.stage = .tourRecall
+    case .tourRecall: next.stage = .tourLibrary
+    case .tourLibrary: next.stage = .chooseMode
+    default: return
+    }
+    do { try await setFirstUse(next) } catch { self.error = "Couldn’t save your walkthrough. Try again." }
+  }
   var error: String?
   var completionNoticeAccount: String?
   var busy = false
@@ -301,7 +319,9 @@ import WidgetKit
     let coverage = (try? await disk.cached(key: "home-coverage:" + account)).flatMap { try? JSONDecoder().decode(CoverageResponse.self, from: $0) }
     let dismissals = (try? await disk.cached(key: "home-revisits:" + account)).flatMap { try? JSONDecoder().decode(Set<String>.self, from: $0) } ?? []
     let cachedRecall = (try? await disk.cached(key: "recall:" + account)).flatMap { try? JSONDecoder.api.decode(RecallDeckResponse.self, from: $0) }
+    let restoredFirstUse = (try? await disk.cached(key: "first-use:" + account)).flatMap { try? JSONDecoder().decode(FirstUseProgress.self, from: $0) }
     guard cacheGeneration == generation else { return }
+    firstUse = restoredFirstUse ?? FirstUseProgress()
     pendingSettings = (try? await disk.cached(key: "settings-pending:" + account)).flatMap { try? JSONDecoder().decode(PendingSettings.self, from: $0) }
     dismissedHomeRevisits = dismissals
     libraryCoverage = coverage?.concepts ?? []; libraryCoverageLoaded = coverage != nil
@@ -565,6 +585,7 @@ import WidgetKit
     recall = RecallDeckResponse(cards: [], dueCount: 0); recallLoaded = false; recallFetchedAt = nil; recallRequestVersion += 1
     memoryRequestVersion += 1; cacheGeneration += 1; libraryVersion += 1
     settings = PracticeSettings()
+    firstUse = FirstUseProgress()
     bootstrap?.settings = settings
     bootstrap?.challenge = nil; bootstrap?.todayPlan = nil
     bootstrap?.jobs = []
@@ -587,6 +608,7 @@ import WidgetKit
   private var automaticPreparationAccounts: Set<String> = []
   func ensureHomeQuestion() async {
     guard let account = bootstrap?.account, account.status == "active", settings.onboardingComplete,
+      firstUse.stage == .complete,
       !busy, !checkingDailyQuestion else { return }
     if fixture {
       #if DEBUG
@@ -631,11 +653,18 @@ import WidgetKit
     await perform { _ = try await generateForPreview(preparation) }
   }
   func generateForPreview(_ preparation: PreparationInput? = nil) async throws -> Challenge {
+    if firstUse.stage == .walkthrough { return FirstUseProgress.challenge }
     guard !busy, let account = bootstrap?.account.id else {
       throw APIError(code: "busy", message: "A question is already being prepared.", status: 409)
     }
     busy = true
     defer { busy = false }
+    if firstUse.stage == .chooseMode {
+      syncSettingsInBackground()
+      await settingsSyncTask?.value
+      guard bootstrap?.account.id == account else { throw CancellationError() }
+      guard pendingSettings == nil else { throw APIError(code: "settings_pending", message: "Your plan is saved on this device. Connect to prepare your first question.", status: 0) }
+    }
     if !fixture {
       await sync()
       guard bootstrap?.account.id == account else { throw CancellationError() }
@@ -664,6 +693,7 @@ import WidgetKit
         prompt: "Design a reliable job queue. Explain retries, ordering, and how failures are handled.",
         topic: preparation?.focus ?? settings.focus, session: SessionDraft(answer: "", revision: 0))
       bootstrap?.challenge = challenge
+      if firstUse.stage == .chooseMode { var completed = firstUse; completed.stage = .complete; try await setFirstUse(completed) }
       return challenge
     }
     guard bootstrap?.account.id == account else { throw CancellationError() }
@@ -680,6 +710,7 @@ import WidgetKit
     } else { throw APIError(code: "missing_question", message: "The question is not available yet. Check Home shortly.", status: 0) }
     guard bootstrap?.account.id == account else { throw CancellationError() }
     bootstrap?.challenge = challenge
+    if firstUse.stage == .chooseMode { var completed = firstUse; completed.stage = .complete; try await setFirstUse(completed) }
     if let bootstrap { try await disk.cache(key: "bootstrap:" + account, data: JSONEncoder().encode(bootstrap)) }
     Task {
       guard bootstrap?.account.id == account else { return }
@@ -707,6 +738,8 @@ import WidgetKit
     await perform { presented = try await openForPreview(challenge) }
   }
   func openForPreview(_ challenge: Challenge) async throws -> Challenge {
+    if firstUse.stage == .walkthrough { return FirstUseProgress.challenge }
+    guard challenge.id != FirstUseProgress.challengeID else { throw CancellationError() }
     let account = bootstrap?.account.id
     var loaded = challenge
     if !fixture {
@@ -741,6 +774,7 @@ import WidgetKit
     }
   }
   func save(_ challenge: Challenge, answer: String, completing: Bool = false) async throws {
+    guard challenge.id != FirstUseProgress.challengeID else { return }
     guard let account = bootstrap?.account.id else { return }
     guard !isLocallySkipped(account: account, id: challenge.id) else { return }
     try await disk.save(account: account, id: challenge.id, answer: answer, completing: completing)
@@ -864,6 +898,9 @@ import WidgetKit
     }
   }
   func finish(_ challenge: Challenge, answer: String) async throws -> Challenge {
+    guard challenge.id != FirstUseProgress.challengeID else {
+      throw APIError(code: "walkthrough", message: "The walkthrough does not create a practice result.", status: 400)
+    }
     try await save(challenge, answer: answer, completing: true)
     await sync()
     if conflict != nil {
@@ -888,6 +925,7 @@ import WidgetKit
     return completed
   }
   func skip(_ id: String, answer: String? = nil) async {
+    if id == FirstUseProgress.challengeID { presented = nil; return }
     guard let account = bootstrap?.account.id else { return }
     await perform {
       if !fixture { try await disk.queueSkip(account: account, id: id, answer: answer) }
@@ -954,7 +992,7 @@ import WidgetKit
       }
     }
   }
-  /// Credential setup/onboarding still require confirmed cloud settings before their next operation.
+  /// Network-dependent operations require confirmed settings; the local walkthrough does not.
   func updateSettings() async throws {
     try await saveSettingsLocally()
     await settingsSyncTask?.value
@@ -1035,6 +1073,7 @@ import WidgetKit
     librarySnapshots = [:]; libraryDetailSnapshots = [:]; librarySessions = [:]; libraryCoverage = []; libraryCoverageLoaded = false; dismissedHomeRevisits = []
     recall = RecallDeckResponse(cards: [], dueCount: 0); recallLoaded = false; recallFetchedAt = nil; recallRequestVersion += 1
     bootstrap = nil
+    firstUse = FirstUseProgress()
     completionNoticeAccount = nil
     preparationFailure = nil
     failedPreparation = nil
@@ -1045,6 +1084,7 @@ import WidgetKit
   }
   private func seedFixture() {
     settings.onboardingComplete = true
+    if ProcessInfo.processInfo.arguments.contains("--fixture-walkthrough") { firstUse = FirstUseProgress(stage: .walkthrough) }
     #if DEBUG
     if ProcessInfo.processInfo.arguments.contains("--fixture-onboarding") { settings.onboardingComplete = false }
     if ProcessInfo.processInfo.arguments.contains("--fixture-long-focus") { settings.focus = "Distributed backend systems, database performance, cache consistency, and safe cross-team migrations" }

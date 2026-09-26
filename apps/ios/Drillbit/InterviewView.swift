@@ -431,6 +431,7 @@ struct InterviewView: View {
   @State private var topInset: CGFloat = 0
   @State private var lastCaret: CGRect?
   @State private var focused = false
+  @State private var keyboardVisible = false
   @State private var starterGuide = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.scenePhase) private var phase
@@ -464,6 +465,8 @@ struct InterviewView: View {
       } else { workspace }
     }
     .background(AppPalette.background)
+    .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardVisible = true }
+    .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardVisible = false }
     .task {
       guard !readingLoaded else { return }
       if let account = model.bootstrap?.account.id,
@@ -523,7 +526,7 @@ struct InterviewView: View {
           VStack(alignment: .leading, spacing: 12) {
             exchangeContent(exchange)
             if exchange.id == activeID {
-              if starterGuide && showsDraft { starterTip }
+              if starterGuide && showsDraft && exchange.id == "original" { starterTip }
               if showsDraft {
                 VStack(alignment: .leading, spacing: 12) {
                   Divider().accessibilityIdentifier("answerDivider")
@@ -648,21 +651,16 @@ struct InterviewView: View {
     }
   }
   private var starterTip: some View {
-    let turns = interview.displayState.turns.filter { $0.result != nil }
-    let step = turns.contains { $0.kind == "answer" } ? 3 : turns.isEmpty ? 1 : 2
-    let message = switch step {
-    case 1: "Ask what you need to know, or name your first design choice."
-    case 2: "Use what you learned. Make one concrete trade-off."
-    default: "Follow the next question. Finish when you have said enough."
-    }
+    let clarified = interview.displayState.turns.contains { $0.kind == "clarification" && $0.result != nil }
     return VStack(alignment: .leading, spacing: 8) {
       HStack {
-        SignalEyebrow(text: "Guided · \(String(format: "%02d", step)) / 03")
+        SignalEyebrow(text: clarified ? "Guided · 02 / 02" : "Guided · 01 / 02")
         Spacer()
         Button("Skip tips") { dismissStarterGuide() }
           .font(.caption.weight(.medium))
       }
-      Text(message).font(.subheadline).foregroundStyle(AppPalette.secondary)
+      Text(clarified ? "Now write one design choice in the reply box below. Send moves the interview forward." : "Ask a short question in the reply box below, then tap Send. For example: ‘What scale should I plan for?’")
+        .font(.subheadline).foregroundStyle(AppPalette.secondary)
     }
     .padding(.vertical, 8)
     .accessibilityElement(children: .contain)
@@ -830,9 +828,15 @@ struct InterviewView: View {
             persistReading()
           }
       }
+      if !collapsed {
+        ForEach(exchange.turns.filter { $0.kind == "clarification" }) { turn in
+          clarification(turn)
+            .transition(.opacity.combined(with: .offset(y: -4)))
+        }
+      }
       ForEach(exchange.turns) { turn in
         // A completed answer and its follow-up live together in the next block.
-        if !(turn.kind == "answer" && turn.result?.outcome != "wrap_up") && !(turn.kind == "voice" && (turn.voice ?? []).allSatisfy { $0.text.isEmpty }) {
+        if turn.kind != "clarification" && !(turn.kind == "answer" && turn.result?.outcome != "wrap_up") && !(turn.kind == "voice" && (turn.voice ?? []).allSatisfy { $0.text.isEmpty }) {
           VStack(alignment: .leading, spacing: 12) {
             if turn.kind == "answer" {
               Divider()
@@ -855,7 +859,7 @@ struct InterviewView: View {
                   }
               }
             } else if turn.kind != "continue" {
-              Text(turn.kind == "example" ? "Example · assisted" : turn.kind == "hint" ? "Nudge" : "Clarification").font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
+              Text(turn.kind == "example" ? "Example · assisted" : "Nudge").font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
               if !turn.text.isEmpty { Text(turn.text).textSelection(.enabled) }
               Text(turn.result?.text ?? turn.partial ?? "").fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
             }
@@ -864,6 +868,24 @@ struct InterviewView: View {
         }
       }
     }
+  }
+  private func clarification(_ turn: InterviewTurn) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      InterviewRowLabel(text: "Clarification")
+      if !turn.text.isEmpty { Text(turn.text).font(.subheadline.weight(.medium)).textSelection(.enabled) }
+      if let reply = turn.result?.text ?? turn.partial, !reply.isEmpty {
+        Text(reply).font(.subheadline).fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
+      } else if turn.status != "failed" {
+        ProgressView().controlSize(.small).accessibilityLabel("Interviewer is answering")
+      }
+      if turn.status == "failed" { recovery(turn.error ?? "The response couldn’t load.") }
+    }
+    .padding(.leading, 16)
+    .padding(.vertical, 12)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .overlay(alignment: .leading) { AppPalette.hairline.frame(width: 1) }
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("clarification-" + turn.id)
   }
   private func sentAnswer(_ turn: InterviewTurn) -> some View {
     let expanded = reading.expandedAnswers?.contains(turn.id) == true
@@ -941,6 +963,17 @@ struct InterviewView: View {
         .buttonStyle(DrillbitIconButtonStyle())
         .disabled(checkingVoice || liveVoice == nil || interview.locked || interview.voice?.blocksText == true).accessibilityLabel("Live voice").accessibilityIdentifier("liveVoice")
       Spacer(minLength: 0)
+        if keyboardVisible {
+          Button { focused = false } label: {
+            Image(systemName: "keyboard.chevron.compact.down")
+              .font(.system(size: 20, weight: .medium))
+              .frame(width: 24, height: 24)
+          }
+          .buttonStyle(DrillbitIconButtonStyle())
+          .accessibilityLabel("Hide keyboard")
+          .accessibilityIdentifier("hideKeyboard")
+          .transition(.opacity.combined(with: .offset(x: 8)))
+        }
         Button {
           focused = false
           followingLiveEnd = true
@@ -954,6 +987,7 @@ struct InterviewView: View {
           .disabled(interview.voice?.blocksText == true || interview.locked || interview.failedTurn != nil || interview.answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
           .accessibilityIdentifier("shareAnswer")
       }
+      .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: keyboardVisible)
     }.padding(16)
       .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { footerFrame = $0; if followingLiveEnd, sheet == nil, let lastCaret { revealCaret(lastCaret) } }
   }

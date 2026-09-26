@@ -13,6 +13,41 @@ struct LearningPlan: Codable, Equatable, Sendable {
   var dailyGoalMinutes = 10
   var targetDate: String? = nil
 }
+
+/// Device-local onboarding progress is account-scoped, never tied to a generated question.
+struct FirstUseProgress: Codable, Equatable, Sendable {
+  enum Stage: String, Codable, Sendable { case walkthrough, tourHome, tourRecall, tourLibrary, chooseMode, complete }
+  enum Step: String, Codable, Sendable { case ask, collapse, answer, finished }
+  var stage: Stage = .complete
+  var step: Step = .ask
+  var draft = ""
+  var question = ""
+  var answer = ""
+  var tourTab: String? {
+    switch stage { case .tourHome: "home"; case .tourRecall: "recall"; case .tourLibrary: "library"; default: nil }
+  }
+  static let challengeID = "local-first-use-walkthrough"
+  static var challenge: Challenge {
+    Challenge(guidanceMode: .learnTogether, engineeringLevel: "junior", id: challengeID, lifecycle: "ready",
+      title: "Save a link. Find it later.", prompt: "Design a small app where people save links and find them again. Where would you start?",
+      topic: "System design", session: SessionDraft(answer: "", revision: 0))
+  }
+}
+
+struct PracticeAreaGroup: Identifiable, Sendable {
+  let id: String
+  let title: String
+  let detail: String
+  let symbol: String
+  let concepts: [String]
+  static let all: [Self] = [
+    .init(id: "data", title: "Data & storage", detail: "Models, databases, consistency", symbol: "externaldrive", concepts: ["data-modeling", "consistency"]),
+    .init(id: "traffic", title: "Scale & performance", detail: "Caching and capacity", symbol: "speedometer", concepts: ["caching", "capacity-planning"]),
+    .init(id: "boundaries", title: "Services & APIs", detail: "Interfaces and access", symbol: "point.3.connected.trianglepath.dotted", concepts: ["api-design", "authorization"]),
+    .init(id: "async", title: "Async work", detail: "Queues and coordination", symbol: "arrow.triangle.branch", concepts: ["queues", "coordination"]),
+    .init(id: "reliability", title: "Reliable systems", detail: "Failures and observability", symbol: "waveform.path.ecg", concepts: ["fault-tolerance", "observability"])
+  ]
+}
 struct PersonalizationPreview: Codable { var text: String }
 struct PracticeSettings: Codable, Equatable, Sendable {
   var practiceProfile: PracticeProfile? = nil

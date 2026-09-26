@@ -301,13 +301,13 @@ private struct DeveloperSettingsSection: View {
 }
 struct LearningPlanSettingsView: View {
   @Bindable var model: AppModel
-  private let objectives = [("interview","Prepare for an interview"),("learn","Learn system design"),("stay_sharp","Stay sharp")]
+  private let objectives = [("interview","An upcoming interview"),("learn","Stronger system design skills"),("stay_sharp","Keep my skills fresh")]
   private let roles = [("general","General SWE"),("backend","Backend"),("frontend","Frontend"),("full_stack","Full-stack"),("platform","Platform / Infrastructure"),("data","Data"),("mobile","Mobile")]
-  private let areas = [("data","Data"),("traffic","Traffic & performance"),("async","Async & coordination"),("reliability","Reliability & operations"),("boundaries","System boundaries")]
+  private let areas = PracticeAreaGroup.all.map { ($0.id, $0.title) }
   private var plan: Binding<LearningPlan> { Binding(get: { model.settings.learningPlan ?? LearningPlan() }, set: { model.settings.learningPlan = $0 }) }
   var body: some View {
     SignalList {
-      Picker("Goal", selection: plan.objective) { ForEach(objectives, id: \.0) { Text($0.1).tag($0.0) } }
+      Picker("Current priority", selection: plan.objective) { ForEach(objectives, id: \.0) { Text($0.1).tag($0.0) } }
         .onChange(of: plan.wrappedValue.objective) { _, value in if value != "interview" { var updated = plan.wrappedValue; updated.targetDate = nil; plan.wrappedValue = updated } }
       Picker("Role", selection: plan.roleTrack) { ForEach(roles, id: \.0) { Text($0.1).tag($0.0) } }
       Picker("Daily commitment", selection: plan.dailyGoalMinutes) { ForEach([5,10,15,20], id: \.self) { Text("\($0) minutes").tag($0) } }
@@ -402,7 +402,8 @@ struct AIAccessView: View {
 
 @MainActor @Observable final class LearningPlanCoordinator {
   struct Draft: Codable, Equatable {
-    var page = 0
+    // A new account sees the introduction; restored drafts keep their page.
+    var page = -1
     var objective = "learn"
     var roleTrack = "general"
     var level = "mid"
@@ -423,43 +424,74 @@ struct SetupView: View {
   @Bindable var model: AppModel
   @State private var coordinator = LearningPlanCoordinator()
   @State private var reminderPermissionPending = false
-  private let objectives = [("interview","Prepare for an interview"),("learn","Learn system design"),("stay_sharp","Stay sharp")]
+  @State private var movingForward = true
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  private let objectives = [("interview","An upcoming interview"),("learn","Stronger system design skills"),("stay_sharp","Keep my skills fresh")]
   private let roles = [("general","General SWE"),("backend","Backend"),("frontend","Frontend"),("full_stack","Full-stack"),("platform","Platform / Infrastructure"),("data","Data"),("mobile","Mobile")]
-  private let areas = [("data","Data"),("traffic","Traffic & performance"),("async","Async & coordination"),("reliability","Reliability & operations"),("boundaries","System boundaries")]
+  private let areas = PracticeAreaGroup.all.map { ($0.id, $0.title) }
+  private let startingPoints = [("junior", "New to system design"), ("mid", "I’ve designed a few systems"), ("senior", "I design systems regularly"), ("staff", "I lead architecture across teams")]
 
   var body: some View {
     @Bindable var coordinator = coordinator
-    ScrollView {
-      VStack(alignment: .leading, spacing: 32) {
-        VStack(alignment: .leading, spacing: 20) {
-          SignalEyebrow(text: String(format: "%02d / 05", coordinator.draft.page + 1))
-          AppPalette.hairline.frame(height: 1)
-          Text(coordinator.draft.page == 0 ? "Make this yours." : title(for: coordinator.draft.page))
-            .font(.largeTitle.weight(.semibold))
-            .fixedSize(horizontal: false, vertical: true)
+    GeometryReader { geometry in
+      ScrollView {
+        VStack(alignment: .leading, spacing: 32) {
+          if coordinator.draft.page == -1 {
+            SetupIntroduction()
+              .frame(minHeight: max(0, geometry.size.height - 48))
+          } else {
+            VStack(alignment: .leading, spacing: 20) {
+              SignalEyebrow(text: String(format: "%02d / 05", coordinator.draft.page + 1))
+              AppPalette.hairline.frame(height: 1)
+              Text(title(for: coordinator.draft.page))
+                .font(.largeTitle.weight(.semibold))
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            pageContent(coordinator: coordinator)
+            if let note = coordinator.reminderNote { Text(note).font(.footnote).foregroundStyle(AppPalette.secondary) }
+            if let failure = coordinator.failure { Text(failure).font(.footnote).foregroundStyle(AppPalette.destructive) }
+          }
         }
-        pageContent(coordinator: coordinator)
-        if let note = coordinator.reminderNote { Text(note).font(.footnote).foregroundStyle(AppPalette.secondary) }
-        if let failure = coordinator.failure { Text(failure).font(.footnote).foregroundStyle(AppPalette.destructive) }
+        .id(coordinator.draft.page)
+        .transition(reduceMotion ? .opacity : .asymmetric(
+          insertion: .move(edge: movingForward ? .trailing : .leading),
+          removal: .move(edge: movingForward ? .leading : .trailing)))
+        .frame(maxWidth: 560, alignment: .leading)
+        .padding(.horizontal, 24).padding(.top, 24).padding(.bottom, 24)
+        .frame(maxWidth: .infinity)
       }
-      .frame(maxWidth: 560, alignment: .leading)
-      .padding(.horizontal, 24).padding(.top, 24).padding(.bottom, 24)
-      .frame(maxWidth: .infinity)
-    }
+    }.clipped()
     .background(AppPalette.background)
     .safeAreaInset(edge: .bottom, spacing: 0) {
       VStack(spacing: 0) {
         AppPalette.hairline.frame(height: 1)
         HStack(spacing: 12) {
-          if coordinator.draft.page > 0 {
-            Button("Back") { coordinator.draft.page -= 1 }.buttonStyle(PracticeButtonStyle(secondary: true))
+          if coordinator.draft.page >= 0 {
+            Button("Back") { move(coordinator, to: coordinator.draft.page - 1) }
+              .buttonStyle(PracticeButtonStyle(secondary: true))
+              .transition(.opacity.combined(with: .offset(x: -12)))
+              .disabled(coordinator.saving || reminderPermissionPending)
           }
-          Button(coordinator.draft.page == 4 ? "Start practice" : "Continue") {
+          Button {
             if coordinator.draft.page == 4 { Task { await finish(coordinator) } }
-            else { coordinator.draft.page += 1 }
+            else { move(coordinator, to: coordinator.draft.page + 1) }
+          } label: {
+            HStack(spacing: 8) {
+              if coordinator.draft.page == 4 {
+                Image(systemName: "sparkles").symbolEffect(.bounce, options: .nonRepeating, value: !reduceMotion && coordinator.draft.page == 4)
+                  .accessibilityHidden(true)
+              }
+              Text(coordinator.saving ? "Opening…" : coordinator.draft.page == -1 ? "Let's begin" : coordinator.draft.page == 4 ? "Start practice" : "Continue")
+              if coordinator.draft.page == 4 { Image(systemName: "arrow.right").accessibilityHidden(true) }
+            }
+            .padding(.vertical, coordinator.draft.page == 4 ? 8 : 0)
           }.buttonStyle(PracticeButtonStyle()).disabled(coordinator.saving || reminderPermissionPending)
+            .contentTransition(.opacity)
+            .accessibilityIdentifier("onboardingContinue")
+            .sensoryFeedback(.success, trigger: coordinator.draft.page == 4)
         }
         .padding(.horizontal, 24).padding(.top, 12).padding(.bottom, 8)
+        .animation(reduceMotion ? nil : .smooth(duration: 0.34, extraBounce: 0), value: coordinator.draft.page >= 0)
       }
       .background(AppPalette.background)
     }
@@ -468,12 +500,20 @@ struct SetupView: View {
     .onChange(of: coordinator.draft) { _, _ in Task { await persist(coordinator) } }
   }
 
+  private func move(_ coordinator: LearningPlanCoordinator, to page: Int) {
+    movingForward = page > coordinator.draft.page
+    withAnimation(reduceMotion ? nil : .smooth(duration: 0.38, extraBounce: 0)) {
+      coordinator.draft.page = page
+    }
+  }
+
   @ViewBuilder private func pageContent(coordinator: LearningPlanCoordinator) -> some View {
     @Bindable var coordinator = coordinator
     switch coordinator.draft.page {
     case 0:
       VStack(alignment: .leading, spacing: 12) {
-        SignalEyebrow(text: "Goal")
+        Text("Your priority right now. You’ll learn and practise in every path.")
+          .font(.subheadline).foregroundStyle(AppPalette.secondary)
         VStack(spacing: 0) {
           ForEach(objectives, id: \.0) { option in
             SignalChoiceRow(title: option.1, selected: coordinator.draft.objective == option.0) {
@@ -486,31 +526,29 @@ struct SetupView: View {
     case 1:
       VStack(alignment: .leading, spacing: 24) {
         VStack(alignment: .leading, spacing: 12) {
-          SignalEyebrow(text: "Role")
-          VStack(spacing: 0) {
+          Text("What do you usually build?").font(.headline)
+          Picker("Your work", selection: $coordinator.draft.roleTrack) {
             ForEach(roles, id: \.0) { option in
-              SignalChoiceRow(title: option.1, selected: coordinator.draft.roleTrack == option.0) {
-                coordinator.draft.roleTrack = option.0
-              }
-              if option.0 != roles.last?.0 { Divider().padding(.horizontal, 16) }
+              Text(option.1).tag(option.0)
             }
-          }
+          }.pickerStyle(.menu).frame(minHeight: 44)
         }
         VStack(alignment: .leading, spacing: 12) {
-          SignalEyebrow(text: "Engineering level")
-          Picker("Engineering level", selection: $coordinator.draft.level) {
-            ForEach(EngineeringLevel.choices, id: \.0) { Text($0.1).tag($0.0) }
+          Text("How familiar is system design?").font(.headline)
+          Text("This sets the depth of your questions. You can change it later.").font(.subheadline).foregroundStyle(AppPalette.secondary)
+          VStack(spacing: 0) {
+            ForEach(startingPoints, id: \.0) { option in
+              SignalChoiceRow(title: option.1, selected: coordinator.draft.level == option.0) { coordinator.draft.level = option.0 }
+              if option.0 != startingPoints.last?.0 { Divider() }
+            }
           }
-          .pickerStyle(.menu)
-          .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
-          .signalInset(padding: 16)
         }
       }
     case 2:
       VStack(alignment: .leading, spacing: 12) {
-        SignalEyebrow(text: "Focus · up to three")
+        Text("Explore everything, or pick up to three areas.").font(.subheadline).foregroundStyle(AppPalette.secondary)
         VStack(spacing: 0) {
-          SignalChoiceRow(title: "Let Drillbit decide", selected: coordinator.draft.weakAreas.isEmpty) {
+          SignalChoiceRow(title: "A bit of everything", selected: coordinator.draft.weakAreas.isEmpty) {
             coordinator.draft.weakAreas = []
           }
           Divider().padding(.horizontal, 16)
@@ -580,7 +618,7 @@ struct SetupView: View {
 
   private func summary(_ draft: LearningPlanCoordinator.Draft) -> some View {
     VStack(alignment: .leading, spacing: 16) {
-      SignalEyebrow(text: "Your plan")
+      Text("\(draft.dailyGoalMinutes) minutes. One step at a time.").font(.title2.weight(.semibold))
       LabeledContent("Goal", value: objectives.first { $0.0 == draft.objective }?.1 ?? "Learn system design")
       Divider()
       LabeledContent("Role", value: roles.first { $0.0 == draft.roleTrack }?.1 ?? "General SWE")
@@ -590,10 +628,11 @@ struct SetupView: View {
       LabeledContent("Focus", value: draft.weakAreas.isEmpty ? "Drillbit decides" : draft.weakAreas.compactMap { id in areas.first { $0.0 == id }?.1 }.sorted().joined(separator: ", "))
       Divider()
       LabeledContent("Routine", value: "\(draft.dailyGoalMinutes) minutes a day")
-      Text("Your first session is Guided. Drillbit will help you structure the approach.").font(.footnote).foregroundStyle(.secondary)
+      Label("First, a one-minute walkthrough. No score, no pressure.", systemImage: "sparkles")
+        .font(.subheadline).foregroundStyle(AppPalette.accent).padding(.top, 12)
     }
   }
-  private func title(for page: Int) -> String { ["Goal","Role and level","Areas to work on","Routine","Your plan"][min(page,4)] }
+  private func title(for page: Int) -> String { ["What brings you here?","Where are you starting?","What sparks your curiosity?","Find your rhythm.","Made for you."][max(0, min(page,4))] }
   private func reminderTime(_ coordinator: LearningPlanCoordinator) -> Binding<Date> { Binding(get: {
     Calendar.current.date(from: DateComponents(hour: coordinator.draft.dailyMinutes / 60, minute: coordinator.draft.dailyMinutes % 60)) ?? Date()
   }, set: { let parts = Calendar.current.dateComponents([.hour,.minute], from: $0); coordinator.draft.dailyMinutes = (parts.hour ?? 9) * 60 + (parts.minute ?? 0) }) }
@@ -624,23 +663,53 @@ struct SetupView: View {
     model.settings.timezone = coordinator.draft.timezone
     model.settings.reminderEnabled = coordinator.draft.reminderEnabled
     do {
-      try await model.updateSettings()
-      let mapping = ["data":"data-modeling","traffic":"api-design","async":"queues","reliability":"fault-tolerance","boundaries":"authorization"]
-      let concept = coordinator.draft.weakAreas.sorted().first.flatMap { mapping[$0] }
-      let starter: Challenge
-      if let existing = model.bootstrap?.challenge { starter = existing }
-      else {
-        starter = try await model.generateForPreview(PreparationInput(primaryConceptId: concept,
-          guidanceMode: .learnTogether, interviewStyle: .standard, focus: "System design", kind: "design",
-          difficulty: model.settings.difficulty, engineeringLevel: coordinator.draft.level,
-          instruction: "Make this first practice one concrete, visible system-design decision."))
-      }
+      try await model.setFirstUse(FirstUseProgress(stage: .walkthrough))
       model.settings.onboardingComplete = true
-      try await model.updateSettings()
+      try await model.saveSettingsLocally()
       try? await model.disk.cache(key: "onboarding:" + account, data: Data())
-      try? await model.disk.cache(key: "first-guided-question:" + account, data: Data(starter.id.utf8))
-      model.starterPreview = starter
-    } catch { coordinator.failure = error.localizedDescription }
+      model.starterPreview = FirstUseProgress.challenge
+    } catch { model.settings.onboardingComplete = false; coordinator.failure = error.localizedDescription }
+  }
+}
+
+private struct SetupIntroduction: View {
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @State private var revealed = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      DrillbitLogo(compact: true)
+      Spacer(minLength: 40)
+      ZStack {
+        SignalParticleField(density: 420)
+          .frame(maxWidth: 320, maxHeight: 320)
+        SignalWaveform()
+      }
+      .frame(maxWidth: .infinity)
+      .frame(height: 280)
+      .scaleEffect(revealed ? 1 : 0.94)
+      .opacity(revealed ? 1 : 0)
+      Spacer(minLength: 40)
+      VStack(alignment: .leading, spacing: 16) {
+        SignalEyebrow(text: "Practice, out loud")
+        Text("Think out loud.\nGet sharper.")
+          .font(.system(.largeTitle, design: .default, weight: .semibold))
+          .tracking(-0.8)
+          .fixedSize(horizontal: false, vertical: true)
+        Text("A focused system design interviewer, wherever you find a few minutes.")
+          .font(.body)
+          .foregroundStyle(AppPalette.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      .opacity(revealed ? 1 : 0)
+      .offset(y: revealed ? 0 : 12)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .task {
+      guard !revealed else { return }
+      if reduceMotion { revealed = true }
+      else { withAnimation(.smooth(duration: 0.55, extraBounce: 0).delay(0.08)) { revealed = true } }
+    }
   }
 }
 
@@ -686,16 +755,24 @@ struct PracticeAreaPicker: View {
   @Binding var selection: String
   @Binding var customTopic: String
   @State private var search = ""
+  @State private var expandedAreas: Set<String> = []
   @Environment(\.dismiss) private var dismiss
   var body: some View {
     SignalList {
       Button { selection = ""; customTopic = ""; dismiss() } label: {
         HStack { Text("Automatic"); Spacer(); if selection.isEmpty { Image(systemName: AppIcon.checkmark.rawValue) } }
       }.foregroundStyle(.primary)
-      ForEach(PracticeAreaCatalog.curated(model.taxonomy).filter { search.isEmpty || $0.label.localizedCaseInsensitiveContains(search) }) { concept in
-        Button { selection = concept.id; customTopic = ""; dismiss() } label: {
-          HStack { Text(concept.label); Spacer(); if selection == concept.id { Image(systemName: AppIcon.checkmark.rawValue) } }
-        }.foregroundStyle(.primary).accessibilityAddTraits(selection == concept.id ? .isSelected : [])
+      ForEach(PracticeAreaGroup.all) { area in
+        let matches = model.taxonomy.filter { area.concepts.contains($0.id) && (search.isEmpty || $0.label.localizedCaseInsensitiveContains(search) || area.title.localizedCaseInsensitiveContains(search)) }
+        if !matches.isEmpty {
+          DisclosureGroup(isExpanded: Binding(get: { !search.isEmpty || expandedAreas.contains(area.id) }, set: { if $0 { expandedAreas.insert(area.id) } else { expandedAreas.remove(area.id) } })) {
+            ForEach(matches) { concept in
+              Button { selection = concept.id; customTopic = ""; dismiss() } label: {
+                HStack { Text(concept.label); Spacer(); if selection == concept.id { Image(systemName: AppIcon.checkmark.rawValue) } }
+              }.foregroundStyle(.primary).accessibilityAddTraits(selection == concept.id ? .isSelected : [])
+            }
+          } label: { Text(area.title).foregroundStyle(AppPalette.primary) }
+        }
       }
       Section("Your own topic") {
         TextField("For example, collaborative editing", text: $customTopic)
@@ -704,7 +781,10 @@ struct PracticeAreaPicker: View {
         Button("Use this topic") { dismiss() }
           .disabled(customTopic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
       }
-    }.navigationTitle("Practice area").searchable(text: $search).task { await model.loadTaxonomy() }
+    }.navigationTitle("Practice area").searchable(text: $search).task {
+      await model.loadTaxonomy()
+      if let area = PracticeAreaGroup.all.first(where: { $0.concepts.contains(selection) }) { expandedAreas.insert(area.id) }
+    }
   }
 }
 

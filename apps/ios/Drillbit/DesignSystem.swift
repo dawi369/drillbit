@@ -3,15 +3,19 @@ import SwiftUI
 /// Signal uses one graphite and yellow identity, with a warm light companion.
 /// Meaning stays in the content; yellow marks active state and primary action.
 enum AppPalette {
-  private static func adaptive(_ dark: UInt32, _ light: UInt32) -> Color {
-    Color(uiColor: UIColor { traits in
+  private static func adaptiveUIColor(_ dark: UInt32, _ light: UInt32) -> UIColor {
+    UIColor { traits in
       let hex = traits.userInterfaceStyle == .dark ? dark : light
       return UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255,
                      green: CGFloat((hex >> 8) & 0xFF) / 255,
                      blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
-    })
+    }
   }
-  static let background = adaptive(0x1F2430, 0xF6F4EE)
+  private static func adaptive(_ dark: UInt32, _ light: UInt32) -> Color {
+    Color(uiColor: adaptiveUIColor(dark, light))
+  }
+  static let backgroundUIColor = adaptiveUIColor(0x1F2430, 0xF6F4EE)
+  static let background = Color(uiColor: backgroundUIColor)
   static let groupedBackground = background
   static let surface = adaptive(0x232834, 0xFFFFFF)
   static let elevated = adaptive(0x2A303E, 0xECE9E0)

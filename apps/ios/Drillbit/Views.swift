@@ -4,6 +4,7 @@ import SwiftUI
 struct RootView: View {
   @Bindable var model: AppModel
   @State private var settingsOpen = false
+  @State private var firstSessionSetup = false
   @State private var selectedTab = ProcessInfo.processInfo.arguments.contains("--fixture-recall") ? "recall" : "home"
   @AppStorage("appearance") private var appearance = "dark"
   @Environment(\.scenePhase) private var scenePhase
@@ -46,12 +47,23 @@ struct RootView: View {
               }
             }
           }
+          .allowsHitTesting(model.firstUse.tourTab == nil)
+          .overlay(alignment: .bottom) {
+            if model.firstUse.tourTab != nil && model.presented == nil {
+              FirstUseTourTip(model: model).padding(.bottom, 88)
+            }
+          }
         }
       } else {
         WelcomeView(model: model)
       }
     }
     .preferredColorScheme(model.fixture && ProcessInfo.processInfo.arguments.contains("--dark") ? .dark : appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
+    .background(WindowFloorColor().allowsHitTesting(false))
+    .onChange(of: model.firstUse.stage) { _, stage in
+      if let tab = model.firstUse.tourTab { selectedTab = tab }
+      if stage == .chooseMode { selectedTab = "home"; firstSessionSetup = true }
+    }
     .onReceive(NotificationCenter.default.publisher(for: .init("OpenPractice"))) { _ in
       selectedTab = "home"
       Task { await model.refresh() }
@@ -62,6 +74,8 @@ struct RootView: View {
     }
     .task {
       await model.launch()
+      if let tab = model.firstUse.tourTab { selectedTab = tab }
+      if model.firstUse.stage == .chooseMode { firstSessionSetup = true }
       #if DEBUG
         if model.fixture && ProcessInfo.processInfo.arguments.contains("--fixture-settings") {
           settingsOpen = true
@@ -86,8 +100,14 @@ struct RootView: View {
       QuestionFlow(model: model, initial: challenge, isStarter: true) { opened in model.presented = opened }
         .interactiveDismissDisabled(false)
     }
+    .sheet(isPresented: $firstSessionSetup) {
+      QuestionFlow(model: model) { opened in model.presented = opened }
+    }
     .fullScreenCover(item: $model.presented) { challenge in
-      NavigationStack { InterviewView(model: model, challenge: challenge) }
+      NavigationStack {
+        if challenge.id == FirstUseProgress.challengeID { FirstPracticeView(model: model) }
+        else { InterviewView(model: model, challenge: challenge) }
+      }
     }
     .sheet(item: $model.conflict) { challenge in
       NavigationStack {
@@ -126,6 +146,20 @@ struct RootView: View {
     }
   }
 }
+
+/// The keyboard's rounded corners reveal the host window, outside SwiftUI's
+/// keyboard-safe area. Keep that window on the same adaptive app floor.
+private struct WindowFloorColor: UIViewRepresentable {
+  func makeUIView(context: Context) -> FloorView { FloorView() }
+  func updateUIView(_ view: FloorView, context: Context) { view.window?.backgroundColor = AppPalette.backgroundUIColor }
+
+  final class FloorView: UIView {
+    override func didMoveToWindow() {
+      super.didMoveToWindow()
+      window?.backgroundColor = AppPalette.backgroundUIColor
+    }
+  }
+}
 struct LocalRecoveryView: View {
   var model: AppModel
   var challenge: Challenge
@@ -151,7 +185,6 @@ struct HomeView: View {
         HStack {
           DrillbitLogo(compact: true)
           Spacer()
-          SignalEyebrow(text: "Today")
           Button("Settings", systemImage: AppIcon.settings.rawValue, action: openSettings)
             .labelStyle(.iconOnly).buttonStyle(DrillbitIconButtonStyle())
             .accessibilityIdentifier("homeSettings")
@@ -174,7 +207,7 @@ struct HomeView: View {
           HStack {
             SignalEyebrow(text: "The next question")
             Spacer()
-            if let challenge = model.bootstrap?.challenge {
+            if let challenge = model.bootstrap?.challenge, model.firstUse.stage == .complete {
               Menu {
                 if challenge.lifecycle == "ready" {
                   Button("Regenerate", systemImage: AppIcon.retry.rawValue) { Task {
@@ -193,7 +226,16 @@ struct HomeView: View {
             }
           }
           VStack(alignment: .leading, spacing: 20) {
-          if let challenge = model.bootstrap?.challenge {
+          if model.firstUse.stage == .walkthrough {
+            Text("Let’s try one together.").font(.largeTitle.weight(.semibold))
+            Text("A one-minute walkthrough. Your progress starts with your first real session.").font(.subheadline).foregroundStyle(AppPalette.secondary)
+            Button("Resume walkthrough") { flow = QuestionFlowEntry(challenge: FirstUseProgress.challenge) }
+              .buttonStyle(PracticeButtonStyle()).accessibilityIdentifier("startPractice")
+          } else if model.firstUse.stage == .chooseMode {
+            Text("Make it your session.").font(.largeTitle.weight(.semibold))
+            Text("Guided, Practice, or Mock interview. Choose the support you want today.").foregroundStyle(AppPalette.secondary)
+            Button("Choose my session") { flow = QuestionFlowEntry() }.buttonStyle(PracticeButtonStyle())
+          } else if let challenge = model.bootstrap?.challenge {
             VStack(alignment: .leading, spacing: 20) {
               Text(challenge.title).font(.largeTitle.weight(.semibold)).tracking(-0.8)
                 .fixedSize(horizontal: false, vertical: true)
@@ -248,7 +290,7 @@ struct HomeView: View {
       .sheet(item: $flow, onDismiss: {
         if let started { model.presented = started; self.started = nil }
       }) { entry in
-        QuestionFlow(model: model, initial: entry.challenge, source: entry.source, recovery: entry.recovery, browseTopics: entry.browseTopics, onStart: { started = $0 })
+        QuestionFlow(model: model, initial: entry.challenge, source: entry.source, recovery: entry.recovery, browseTopics: entry.browseTopics, area: entry.area, onStart: { started = $0 })
       }
       .task {
         while !Task.isCancelled {
@@ -288,15 +330,14 @@ struct HomeView: View {
     VStack(alignment: .leading, spacing: 12) {
       SignalEyebrow(text: "Explore system design")
       VStack(spacing: 0) {
-        let ranked = HomeTopicRanking.ranked(PracticeAreaCatalog.curated(model.taxonomy), coverage: model.libraryCoverage)
-        ForEach(Array(ranked.prefix(3))) { concept in
-          Button { prepare(concept) } label: {
-            HomeTopicRow(concept: concept, coverage: model.libraryCoverage.first(where: { $0.conceptId == concept.id }), loaded: model.libraryCoverageLoaded)
+        ForEach(Array(PracticeAreaGroup.all.prefix(3))) { area in
+          Button { flow = QuestionFlowEntry(browseTopics: true, area: area) } label: {
+            PracticeAreaGroupRow(area: area)
           }.buttonStyle(.plain)
-          if concept.id != ranked.prefix(3).last?.id { Divider() }
+          if area.id != PracticeAreaGroup.all.prefix(3).last?.id { Divider() }
         }
       }
-      Button("See all topics", systemImage: "arrow.right") { flow = QuestionFlowEntry(browseTopics: true) }
+      Button("See all areas", systemImage: "arrow.right") { flow = QuestionFlowEntry(browseTopics: true) }
         .frame(minHeight: 44)
     }.task { await model.loadTaxonomy() }
   }
@@ -308,6 +349,7 @@ struct QuestionFlowEntry: Identifiable {
   var recovery: PreparationInput? = nil
   var source: Challenge? = nil
   var browseTopics = false
+  var area: PracticeAreaGroup? = nil
 }
 struct QuestionFlow: View {
   @Bindable var model: AppModel
@@ -316,8 +358,10 @@ struct QuestionFlow: View {
   var source: Challenge? = nil
   var recovery: PreparationInput? = nil
   var browseTopics = false
+  var area: PracticeAreaGroup? = nil
   var onStart: (Challenge) -> Void
   @State private var selectedTopic: PracticeConcept?
+  @State private var selectedArea: PracticeAreaGroup?
   @State private var topicSearch = ""
   @State private var customTopic = ""
   @State private var selectedCustomTopic: String?
@@ -334,16 +378,22 @@ struct QuestionFlow: View {
   @Environment(\.scenePhase) private var scenePhase
   var body: some View {
     NavigationStack {
-      if browseTopics && selectedTopic == nil && selectedCustomTopic == nil {
+      if browseTopics && selectedTopic == nil && selectedCustomTopic == nil && model.firstUse.stage != .walkthrough {
         SignalList {
           Section("Core areas") {
-            ForEach(PracticeAreaCatalog.curated(model.taxonomy).filter { topicSearch.isEmpty || $0.label.localizedCaseInsensitiveContains(topicSearch) }) { concept in
+            if let selectedArea {
+              ForEach(model.taxonomy.filter { selectedArea.concepts.contains($0.id) && (topicSearch.isEmpty || $0.label.localizedCaseInsensitiveContains(topicSearch)) }) { concept in
               Button {
                 selectedTopic = concept
                 retryInput = PreparationInput(primaryConceptId: concept.id, focus: "System design", kind: "design", difficulty: model.settings.difficulty, engineeringLevel: model.settings.selectedLevel, replaceId: model.bootstrap?.challenge?.lifecycle == "ready" ? model.bootstrap?.challenge?.id : nil)
               } label: {
                 HomeTopicRow(concept: concept, coverage: model.libraryCoverage.first(where: { $0.conceptId == concept.id }), loaded: model.libraryCoverageLoaded)
               }.buttonStyle(.plain)
+              }
+            } else {
+              ForEach(PracticeAreaGroup.all.filter { topicSearch.isEmpty || $0.title.localizedCaseInsensitiveContains(topicSearch) || $0.detail.localizedCaseInsensitiveContains(topicSearch) }) { area in
+                Button { selectedArea = area } label: { PracticeAreaGroupRow(area: area) }.buttonStyle(.plain)
+              }
             }
           }
           Section("Your own topic") {
@@ -352,8 +402,13 @@ struct QuestionFlow: View {
               .disabled(customTopic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
           }
         }.searchable(text: $topicSearch, prompt: "Find a core area")
-          .navigationTitle("System design").navigationBarTitleDisplayMode(.inline)
-          .toolbar { Button("Close") { dismiss() } }
+          .navigationTitle(selectedArea?.title ?? "System design").navigationBarTitleDisplayMode(.inline)
+          .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+              if selectedArea != nil { Button("Back") { selectedArea = nil; topicSearch = "" } }
+              else { Button("Close") { dismiss() } }
+            }
+          }.task { await model.loadTaxonomy() }
       } else if showingPreview {
         Group {
           if loading {
@@ -367,7 +422,7 @@ struct QuestionFlow: View {
                   Text(question.title).font(.largeTitle.weight(.semibold)).tracking(-0.8)
                     .fixedSize(horizontal: false, vertical: true)
                   if question.guidanceMode == .learnTogether {
-                    Text(isStarter ? "Start with one question or one design choice." : "Guided practice helps you structure the approach.")
+                    Text(question.id == FirstUseProgress.challengeID ? "A short, guided warm-up. It won’t count toward your practice." : "Guided practice helps you structure the approach.")
                       .font(.subheadline).foregroundStyle(.secondary)
                   }
                   Text(question.displayPrompt)
@@ -397,7 +452,7 @@ struct QuestionFlow: View {
                 }
               }.buttonStyle(PracticeButtonStyle()).disabled(starting)
                 .accessibilityIdentifier("previewStart")
-              if question.lifecycle == "ready" {
+              if question.lifecycle == "ready" && question.id != FirstUseProgress.challengeID {
                 Button("Choose another question") { showingPreview = false; failure = nil }.disabled(starting)
               }
             }.padding(16).background(AppPalette.background)
@@ -433,7 +488,9 @@ struct QuestionFlow: View {
       guard !initialized else { return }
       initialized = true
       account = model.bootstrap?.account.id
-      if let initial { question = initial; showingPreview = true }
+      selectedArea = area
+      if model.firstUse.stage == .walkthrough { question = FirstUseProgress.challenge; showingPreview = true }
+      else if let initial { question = initial; showingPreview = true }
     }
     .onDisappear { visible = false }
     .onChange(of: scenePhase) { _, phase in if phase == .background { visible = false; dismiss() } }
