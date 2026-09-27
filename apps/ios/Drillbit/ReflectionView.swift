@@ -1,10 +1,11 @@
 import SwiftUI
 
 struct CompletionHeading: View {
+  var warmUp = false
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
       DrillbitMark(size: 52, arrives: true).padding(.bottom, 4)
-      SignalEyebrow(text: "Practice complete")
+      SignalEyebrow(text: warmUp ? "Warm-up done" : "Practice complete")
       Text("One idea to carry forward.")
         .font(.largeTitle.weight(.semibold)).tracking(-0.8)
         .accessibilityAddTraits(.isHeader)
@@ -23,14 +24,22 @@ struct ReflectionView: View {
   var initial: Challenge
   @State private var current: Challenge?
   private var hasReflection: Bool { (current ?? initial).reflection != nil }
+  private var warmUp: Bool { initial.isWarmUp }
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 24) {
-        CompletionHeading()
+        CompletionHeading(warmUp: warmUp)
         AssistanceSummary(challenge: current ?? initial)
         if let reflection = (current ?? initial).reflection {
           Group {
           ReflectionContent(reflection: reflection)
+          // Branch retries and Recall would make the uncounted warm-up count.
+          if warmUp {
+            Text("That’s the whole loop. This one didn’t count; your real practice starts after a quick tour.")
+              .foregroundStyle(AppPalette.secondary).fixedSize(horizontal: false, vertical: true)
+            Button("Show me around") { leave() }.buttonStyle(PracticeButtonStyle())
+              .accessibilityIdentifier("warmUpTour")
+          } else {
           completionAction(reflection: reflection)
           if let turns = (current ?? initial).interview?.turns.filter({ $0.kind == "answer" }), !turns.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
@@ -60,6 +69,7 @@ struct ReflectionView: View {
             }
           }
           }
+          }
           .transition(.opacity.combined(with: .offset(y: reduceMotion ? 0 : 8)))
           if let retryFailure { Text(retryFailure).font(.subheadline).foregroundStyle(AppPalette.destructive) }
         } else {
@@ -69,14 +79,14 @@ struct ReflectionView: View {
             LoadingStatus("Your answer is saved. Feedback is being prepared.")
               .accessibilityLabel("Preparing feedback")
           } else {
-            Text("Your practice is complete. Feedback will appear here and in your library when it’s ready.").foregroundStyle(.secondary)
+            Text(warmUp ? "Your warm-up is done. Feedback will show up here in a moment." : "Your practice is complete. Feedback will appear here and in your library when it’s ready.").foregroundStyle(.secondary)
           }
           if !waitingForFeedback { Button("Check feedback") { feedbackCheck += 1 }.frame(minHeight: 44) }
           if let job = model.bootstrap?.jobs.first(where: { $0.challengeId == initial.id && $0.kind == "summarize" && $0.status == "failed" }) {
             Button("Retry feedback") { Task { await model.retry(job); feedbackCheck += 1 } }
           }
         }
-        if let reflection = (current ?? initial).reflection {
+        if let reflection = (current ?? initial).reflection, !warmUp {
           Button("Review in Recall") {
             model.presented = nil
             NotificationCenter.default.post(name: .init("OpenRecall"), object: nil)

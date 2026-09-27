@@ -27,7 +27,6 @@ import WidgetKit
   private var settingsSyncID: UUID?
   private var settingsSaveGeneration = 0
   var presented: Challenge?
-  var starterPreview: Challenge?
   var firstUse = FirstUseProgress()
 
   func setFirstUse(_ value: FirstUseProgress) async throws {
@@ -653,13 +652,21 @@ import WidgetKit
     await perform { _ = try await generateForPreview(preparation) }
   }
   func generateForPreview(_ preparation: PreparationInput? = nil) async throws -> Challenge {
-    if firstUse.stage == .walkthrough { return FirstUseProgress.challenge }
     guard !busy, let account = bootstrap?.account.id else {
       throw APIError(code: "busy", message: "A question is already being prepared.", status: 409)
     }
+    // The onboarding warm-up is generated from the saved plan like any question; the server never counts it.
+    let warmingUp = firstUse.stage == .walkthrough
+    var preparation = preparation
+    if warmingUp {
+      let current = bootstrap?.challenge
+      preparation = PreparationInput(guidanceMode: .learnTogether, focus: settings.focus, kind: "design",
+        difficulty: settings.difficulty, engineeringLevel: settings.selectedLevel,
+        replaceId: current?.lifecycle == "ready" ? current?.id : nil, warmUp: true)
+    }
     busy = true
     defer { busy = false }
-    if firstUse.stage == .chooseMode {
+    if firstUse.stage == .chooseMode || warmingUp {
       syncSettingsInBackground()
       await settingsSyncTask?.value
       guard bootstrap?.account.id == account else { throw CancellationError() }
@@ -688,7 +695,7 @@ import WidgetKit
         throw APIError(code: "generation_failed", message: "Question preparation failed. Your previous question is safe.", status: 503)
       }
       #endif
-      let challenge = Challenge(guidanceMode: preparation?.guidanceMode ?? .coachMe, interviewStyle: preparation?.interviewStyle ?? .standard, engineeringLevel: preparation?.engineeringLevel ?? settings.selectedLevel,
+      let challenge = Challenge(guidanceMode: preparation?.guidanceMode ?? .coachMe, warmUp: preparation?.warmUp, interviewStyle: preparation?.interviewStyle ?? .standard, engineeringLevel: preparation?.engineeringLevel ?? settings.selectedLevel,
         id: UUID().uuidString, lifecycle: "ready", title: "Design a reliable job queue",
         prompt: "Design a reliable job queue. Explain retries, ordering, and how failures are handled.",
         topic: preparation?.focus ?? settings.focus, session: SessionDraft(answer: "", revision: 0))
@@ -738,8 +745,6 @@ import WidgetKit
     await perform { presented = try await openForPreview(challenge) }
   }
   func openForPreview(_ challenge: Challenge) async throws -> Challenge {
-    if firstUse.stage == .walkthrough { return FirstUseProgress.challenge }
-    guard challenge.id != FirstUseProgress.challengeID else { throw CancellationError() }
     let account = bootstrap?.account.id
     var loaded = challenge
     if !fixture {
@@ -774,7 +779,6 @@ import WidgetKit
     }
   }
   func save(_ challenge: Challenge, answer: String, completing: Bool = false) async throws {
-    guard challenge.id != FirstUseProgress.challengeID else { return }
     guard let account = bootstrap?.account.id else { return }
     guard !isLocallySkipped(account: account, id: challenge.id) else { return }
     try await disk.save(account: account, id: challenge.id, answer: answer, completing: completing)
@@ -898,9 +902,6 @@ import WidgetKit
     }
   }
   func finish(_ challenge: Challenge, answer: String) async throws -> Challenge {
-    guard challenge.id != FirstUseProgress.challengeID else {
-      throw APIError(code: "walkthrough", message: "The walkthrough does not create a practice result.", status: 400)
-    }
     try await save(challenge, answer: answer, completing: true)
     await sync()
     if conflict != nil {
@@ -918,18 +919,30 @@ import WidgetKit
         improve: "Explain what happens when work finishes but its acknowledgement is lost.",
         takeaway: "Make retries safe before making them automatic.",
         strengths: ["Queue durability"], gaps: ["Retry safety"])
-      memory.sessions.insert(completed, at: 0)
+      if !challenge.isWarmUp { memory.sessions.insert(completed, at: 0) }
     }
     bootstrap?.challenge = nil
-    completionNoticeAccount = bootstrap?.account.id
+    // The tour follows the warm-up's feedback; an uncounted result never becomes Home's completion notice.
+    if challenge.isWarmUp { try? await setFirstUse(FirstUseProgress(stage: .tourHome)) }
+    else { completionNoticeAccount = bootstrap?.account.id }
+    await completeOnboarding()
     return completed
   }
+  /// Setup stays on screen behind the warm-up; Home replaces it only once the warm-up is over.
+  func completeOnboarding() async {
+    guard let account = bootstrap?.account.id, !settings.onboardingComplete else { return }
+    settings.onboardingComplete = true
+    do { try await saveSettingsLocally() } catch let failure { error = failure.localizedDescription }
+    try? await disk.cache(key: "onboarding:" + account, data: Data())
+  }
   func skip(_ id: String, answer: String? = nil) async {
-    if id == FirstUseProgress.challengeID { presented = nil; return }
     guard let account = bootstrap?.account.id else { return }
     await perform {
       if !fixture { try await disk.queueSkip(account: account, id: id, answer: answer) }
       guard bootstrap?.account.id == account else { return }
+      // Skipping the warm-up skips it for good; onboarding continues with the tour.
+      if firstUse.stage == .walkthrough { try? await setFirstUse(FirstUseProgress(stage: .tourHome)) }
+      await completeOnboarding()
       locallySkipped[account, default: []].insert(id)
       if bootstrap?.challenge?.id == id { bootstrap?.challenge = nil }
       if var plan = bootstrap?.todayPlan { plan.state = plan.dueRecallCount > 0 ? "review_due" : "prepare"; bootstrap?.todayPlan = plan }

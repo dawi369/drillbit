@@ -28,6 +28,8 @@ struct SetupView: View {
   @State private var movingForward = true
   @State private var hasMoved = false
   @State private var scroll = ScrollPosition(edge: .top)
+  @State private var warmingUp = false
+  @State private var startedWarmUp: Challenge?
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   private let objectives = [("interview","An upcoming interview"),("learn","Stronger system design skills"),("stay_sharp","Keep my skills fresh")]
   private let roles = [("general","A mix of things"),("backend","Backend services"),("frontend","Web frontends"),("full_stack","Full-stack products"),("platform","Platforms and infrastructure"),("data","Data systems"),("mobile","Mobile apps")]
@@ -112,6 +114,14 @@ struct SetupView: View {
     .toolbar(.hidden, for: .navigationBar)
     .task(id: model.bootstrap?.account.id) { await restore(coordinator) }
     .onChange(of: coordinator.draft) { _, _ in Task { await persist(coordinator) } }
+    // The warm-up preview rises over this page, and the interview replaces it; Home only appears once the warm-up is done.
+    .sheet(isPresented: $warmingUp, onDismiss: {
+      guard let started = startedWarmUp else { return }
+      startedWarmUp = nil
+      model.presented = started
+    }) {
+      QuestionFlow(model: model, initial: model.bootstrap?.challenge.flatMap { $0.isWarmUp && $0.isActive ? $0 : nil }) { startedWarmUp = $0 }
+    }
   }
 
   private func move(_ coordinator: LearningPlanCoordinator, to page: Int) {
@@ -255,7 +265,7 @@ struct SetupView: View {
     try? await model.disk.cache(key: "onboarding:" + account, data: data)
   }
   private func finish(_ coordinator: LearningPlanCoordinator) async {
-    guard !coordinator.saving, let account = model.bootstrap?.account.id else { return }
+    guard !coordinator.saving, model.bootstrap?.account.id != nil else { return }
     coordinator.saving = true; coordinator.failure = nil; coordinator.reminderNote = nil
     defer { coordinator.saving = false }
     if coordinator.draft.reminderEnabled, !(await model.requestReminderPermission()) {
@@ -272,11 +282,10 @@ struct SetupView: View {
     model.settings.reminderEnabled = coordinator.draft.reminderEnabled
     do {
       try await model.setFirstUse(FirstUseProgress(stage: .walkthrough))
-      model.settings.onboardingComplete = true
+      // The plan syncs now so the warm-up is generated from it; setup completes when the warm-up does.
       try await model.saveSettingsLocally()
-      try? await model.disk.cache(key: "onboarding:" + account, data: Data())
-      model.starterPreview = FirstUseProgress.challenge
-    } catch { model.settings.onboardingComplete = false; coordinator.failure = error.localizedDescription }
+      warmingUp = true
+    } catch { coordinator.failure = error.localizedDescription }
   }
 }
 

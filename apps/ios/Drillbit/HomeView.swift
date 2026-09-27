@@ -63,9 +63,10 @@ struct HomeView: View {
           }
           VStack(alignment: .leading, spacing: 20) {
           if model.firstUse.stage == .walkthrough {
+            let warmUp = model.bootstrap?.challenge.flatMap { $0.isWarmUp ? $0 : nil }
             Text("Let’s try one together.").font(.largeTitle.weight(.semibold))
-            Text("A one-minute walkthrough. Your progress starts with your first real session.").font(.subheadline).foregroundStyle(AppPalette.secondary)
-            Button("Resume walkthrough") { flow = QuestionFlowEntry(challenge: FirstUseProgress.challenge) }
+            Text("A warm-up built from your plan. It won’t count, so just try stuff.").font(.subheadline).foregroundStyle(AppPalette.secondary)
+            Button(warmUp?.lifecycle == "in_progress" ? "Resume warm-up" : "Start warm-up") { flow = QuestionFlowEntry(challenge: warmUp) }
               .buttonStyle(PracticeButtonStyle()).accessibilityIdentifier("startPractice")
           } else if model.firstUse.stage == .chooseMode {
             Text("Make it your session.").font(.largeTitle.weight(.semibold))

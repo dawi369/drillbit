@@ -17,20 +17,9 @@ struct LearningPlan: Codable, Equatable, Sendable {
 /// Device-local onboarding progress is account-scoped, never tied to a generated question.
 struct FirstUseProgress: Codable, Equatable, Sendable {
   enum Stage: String, Codable, Sendable { case walkthrough, tourHome, tourRecall, tourLibrary, chooseMode, complete }
-  enum Step: String, Codable, Sendable { case ask, collapse, answer, finished }
   var stage: Stage = .complete
-  var step: Step = .ask
-  var draft = ""
-  var question = ""
-  var answer = ""
   var tourTab: String? {
     switch stage { case .tourHome: "home"; case .tourRecall: "recall"; case .tourLibrary: "library"; default: nil }
-  }
-  static let challengeID = "local-first-use-walkthrough"
-  static var challenge: Challenge {
-    Challenge(guidanceMode: .learnTogether, engineeringLevel: "junior", id: challengeID, lifecycle: "ready",
-      title: "Save a link. Find it later.", prompt: "Design a small app where people save links and find them again. Where would you start?",
-      topic: "System design", session: SessionDraft(answer: "", revision: 0))
   }
 }
 
@@ -122,6 +111,9 @@ struct Challenge: Codable, Identifiable, Sendable {
   var selectionReason: String?
   var constraints: [String]? = nil
   var guidanceMode: GuidanceMode? = nil
+  /// Onboarding warm-up: a real generated interview that the server never counts.
+  var warmUp: Bool? = nil
+  var isWarmUp: Bool { warmUp == true }
   var interviewStyle: InterviewStyle?
   var interview: InterviewState?
   var engineeringLevel: String?
@@ -360,6 +352,7 @@ struct PreparationInput: Codable {
   var replaceId: String?
   var instruction: String = ""
   var followUpId: String?
+  var warmUp: Bool? = nil
 }
 
 struct CompanionContext: Codable, Sendable {

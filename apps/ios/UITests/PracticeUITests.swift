@@ -922,7 +922,7 @@ final class PracticeUITests: XCTestCase {
   func testOnboardingStartsWithGuidedFirstQuestion() throws {
     continueAfterFailure = false
     let app = XCUIApplication()
-    app.launchArguments = ["--fixtures", "--fixture-onboarding", "--fixture-slow-generation"]
+    app.launchArguments = ["--fixtures", "--fixture-onboarding"]
     app.launch()
     XCTAssertTrue(app.buttons["Let’s begin"].waitForExistence(timeout: 10))
     app.buttons["Let’s begin"].tap()
@@ -935,29 +935,53 @@ final class PracticeUITests: XCTestCase {
     capture("Personal onboarding plan", app)
     // The simulator's inferred hit point falls in the clipped capsule corner.
     app.buttons["Start practice"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-    // Deliberately slow real generation must not delay this local warm-up.
-    XCTAssertTrue(app.buttons["previewStart"].waitForExistence(timeout: 3))
-    app.buttons["Close"].tap()
-    XCTAssertTrue(app.buttons["Resume walkthrough"].waitForExistence(timeout: 5))
-    app.buttons["Resume walkthrough"].tap()
+    // The warm-up preview rises over the plan page: no Close, and at most three rerolls.
+    XCTAssertTrue(app.buttons["previewStart"].waitForExistence(timeout: 10))
+    XCTAssertEqual(app.buttons["previewStart"].label, "Start warm-up")
+    XCTAssertTrue(app.staticTexts["Built from your plan, just to warm up. It won’t count toward your practice."].exists)
+    XCTAssertFalse(app.buttons["Close"].exists)
+    capture("Warm-up preview over plan", app)
+    for _ in 0..<3 {
+      app.buttons["Choose another question"].tap()
+      XCTAssertTrue(app.buttons["previewStart"].waitForExistence(timeout: 10))
+    }
+    XCTAssertFalse(app.buttons["Choose another question"].exists)
     app.buttons["previewStart"].tap()
-    XCTAssertTrue(app.buttons["walkthroughExample"].waitForExistence(timeout: 5))
-    capture("Walkthrough anchored reply tip", app)
-    app.buttons["walkthroughExample"].tap()
-    app.buttons["walkthroughSend"].tap()
-    XCTAssertTrue(app.staticTexts["For this walkthrough: start with 1,000 people, each saving a few links a day."].waitForExistence(timeout: 3))
-    app.navigationBars["A quick warm-up"].buttons["Home"].tap()
-    app.buttons["Resume walkthrough"].tap()
-    app.buttons["previewStart"].tap()
-    XCTAssertTrue(app.staticTexts["For this walkthrough: start with 1,000 people, each saving a few links a day."].waitForExistence(timeout: 3))
-    app.buttons["walkthroughQuestion"].tap()
-    XCTAssertTrue(app.buttons["walkthroughExample"].waitForExistence(timeout: 3))
-    app.buttons["walkthroughExample"].tap()
-    app.buttons["walkthroughSend"].tap()
-    XCTAssertTrue(app.buttons["walkthroughTour"].waitForExistence(timeout: 3))
-    capture("Walkthrough not counted", app)
-    app.buttons["walkthroughTour"].tap()
+    // Same interview as any question; it opens locked and then guides through each control.
+    let editor = app.descendants(matching: .any).matching(identifier: "answerEditor").firstMatch
+    XCTAssertTrue(editor.waitForExistence(timeout: 5))
+    XCTAssertFalse(app.buttons["Close"].exists)
+    XCTAssertFalse(app.buttons["interviewOptions"].isEnabled)
+    let guide = app.buttons["warmUpGuideNext"]
+    XCTAssertTrue(guide.waitForExistence(timeout: 5))
+    XCTAssertTrue(app.staticTexts["Your warm-up question"].exists)
+    capture("Warm-up guide question", app)
+    editor.tap()
+    XCTAssertEqual(editor.value(forKey: "hasKeyboardFocus") as? Bool, false, "The guide blocks every control until it ends")
+    for title in ["Answer or ask", "Send it", "Rather talk it through?", "Stuck, or done?"] {
+      guide.tap()
+      XCTAssertTrue(app.staticTexts[title].waitForExistence(timeout: 3))
+      capture("Warm-up guide · " + title, app)
+    }
+    XCTAssertEqual(guide.label, "Let’s go")
+    guide.tap()
+    XCTAssertFalse(guide.waitForExistence(timeout: 1))
+    XCTAssertTrue(app.buttons["interviewOptions"].isEnabled)
+    editor.tap(); editor.typeText("Start with one table of saved links keyed by user.")
+    app.buttons["shareAnswer"].tap()
+    XCTAssertTrue(app.staticTexts["What happens if a worker stops after completing the operation but before acknowledging it?"].waitForExistence(timeout: 8))
+    app.buttons["interviewOptions"].tap()
+    XCTAssertFalse(app.buttons["Skip question"].exists)
+    app.buttons["Finish interview"].tap()
+    app.alerts.buttons["Finish interview"].tap()
+    XCTAssertTrue(app.buttons["warmUpTour"].waitForExistence(timeout: 8))
+    XCTAssertTrue(app.staticTexts["WARM-UP DONE"].exists)
+    XCTAssertFalse(app.buttons["Review in Recall"].exists)
+    XCTAssertFalse(app.buttons["Practise this next"].exists)
+    capture("Warm-up feedback not counted", app)
+    app.buttons["warmUpTour"].tap()
     XCTAssertTrue(app.buttons["firstUseTourNext"].waitForExistence(timeout: 5))
+    XCTAssertFalse(app.otherElements["practiceCompletionNotice"].exists)
     for _ in 0..<3 { app.buttons["firstUseTourNext"].tap() }
     XCTAssertTrue(app.navigationBars["Your first session"].waitForExistence(timeout: 5))
     capture("First real session modes", app)
@@ -966,9 +990,10 @@ final class PracticeUITests: XCTestCase {
     for _ in 0..<4 where !app.buttons["submitPreparation"].isHittable { app.swipeUp() }
     app.buttons["submitPreparation"].tap()
     XCTAssertTrue(app.buttons["previewStart"].waitForExistence(timeout: 15))
+    XCTAssertEqual(app.buttons["previewStart"].label, "Start interview")
     app.buttons["previewStart"].tap()
     XCTAssertTrue(app.descendants(matching: .any)["answerEditor"].waitForExistence(timeout: 5))
-    XCTAssertFalse(app.descendants(matching: .any)["firstUseTip"].exists)
+    XCTAssertFalse(app.buttons["warmUpGuideNext"].waitForExistence(timeout: 3), "Only the warm-up is guided")
     XCTAssertFalse(app.otherElements["practiceCompletionNotice"].exists)
   }
 

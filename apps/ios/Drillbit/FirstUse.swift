@@ -1,129 +1,116 @@
 import SwiftUI
 
-/// A short authored rehearsal. No interview controller, inference, outbox,
-/// completion, or Recall write is reachable from this surface.
-struct FirstPracticeView: View {
-  @Bindable var model: AppModel
-  @State private var draft = ""
-  @State private var expanded = true
-  @State private var saving = false
-  @State private var failure: String?
-  @State private var voiceInfo = false
-  @FocusState private var focused: Bool
+/// The warm-up's guided tour: the interview stays visible but locked while each control is introduced in turn.
+enum WarmUpStep: Int, CaseIterable {
+  case question, reply, send, voice, menu
+  var title: String {
+    switch self {
+    case .question: "Your warm-up question"
+    case .reply: "Answer or ask"
+    case .send: "Send it"
+    case .voice: "Rather talk it through?"
+    case .menu: "Stuck, or done?"
+    }
+  }
+  var message: String {
+    switch self {
+    case .question: "Built from your plan, just to warm up. It won’t count. Tap it anytime to fold it and make room."
+    case .reply: "Type a design choice here, or ask a clarifying question first. Same box for both."
+    case .send: "The interviewer reads it and pushes back, like a real round."
+    case .voice: "Tap here to answer out loud. You can switch back to typing anytime."
+    case .menu: "The ••• menu up top has a nudge, an example and Finish. Finish when you want feedback."
+    }
+  }
+  var next: WarmUpStep? { WarmUpStep(rawValue: rawValue + 1) }
+}
+
+/// Frames the tour points at; `document` places the card for toolbar targets it cannot measure.
+enum WarmUpAnchor: Hashable { case step(WarmUpStep), document }
+struct WarmUpAnchorKey: PreferenceKey {
+  static let defaultValue: [WarmUpAnchor: Anchor<CGRect>] = [:]
+  static func reduce(value: inout [WarmUpAnchor: Anchor<CGRect>], nextValue: () -> [WarmUpAnchor: Anchor<CGRect>]) {
+    value.merge(nextValue()) { $1 }
+  }
+}
+extension View {
+  func warmUpAnchor(_ anchor: WarmUpAnchor) -> some View {
+    anchorPreference(key: WarmUpAnchorKey.self, value: .bounds) { [anchor: $0] }
+  }
+}
+
+private struct Spotlight: Shape {
+  var hole: CGRect
+  var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>, AnimatablePair<CGFloat, CGFloat>> {
+    get { .init(.init(hole.minX, hole.minY), .init(hole.width, hole.height)) }
+    set { hole = CGRect(x: newValue.first.first, y: newValue.first.second, width: newValue.second.first, height: newValue.second.second) }
+  }
+  func path(in rect: CGRect) -> Path {
+    var path = Path(rect)
+    if hole.width > 0 { path.addRoundedRect(in: hole, cornerSize: CGSize(width: 12, height: 12)) }
+    return path
+  }
+}
+
+/// Blocks every tap. With no step it only holds the screen still so people can take it in first.
+struct WarmUpGuide: View {
+  let step: WarmUpStep?
+  let anchors: [WarmUpAnchor: Anchor<CGRect>]
+  let advance: () -> Void
+  @State private var cardHeight: CGFloat = 0
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  @Environment(\.scenePhase) private var phase
-  private var step: FirstUseProgress.Step { model.firstUse.step }
 
   var body: some View {
-    ScrollViewReader { proxy in
-      ScrollView {
-        VStack(alignment: .leading, spacing: 24) {
-          SignalEyebrow(text: "Quick walkthrough · not counted")
-          DisclosureGroup(isExpanded: $expanded) {
-            VStack(alignment: .leading, spacing: 16) {
-              Text(FirstUseProgress.challenge.prompt).padding(.top, 8)
-              if !model.firstUse.question.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                  Text("Clarification").font(.caption).foregroundStyle(AppPalette.secondary)
-                  Text(model.firstUse.question).font(.subheadline.weight(.medium))
-                  Text("For this walkthrough: start with 1,000 people, each saving a few links a day.").font(.subheadline)
-                }.padding(.leading, 16).padding(.vertical, 8)
-                  .overlay(alignment: .leading) { AppPalette.hairline.frame(width: 1) }
-                  .accessibilityIdentifier("walkthroughClarification")
-              }
-            }
-          } label: {
-            Text(FirstUseProgress.challenge.title).font(.title2.weight(.semibold))
-              .foregroundStyle(AppPalette.primary)
-          }.accessibilityIdentifier("walkthroughQuestion")
-          if step == .collapse {
-            FirstUseTip(number: "02", title: "Keep the useful detail.", message: "Your clarification lives with the question. Tap the heading above to fold them away.", pointsUp: true)
-          } else if step == .finished {
-            VStack(alignment: .leading, spacing: 16) {
-              DrillbitMark(size: 52, arrives: true)
-              Text("You’ve got the idea.").font(.largeTitle.weight(.semibold))
-              Text("We stop here on purpose. This walkthrough doesn’t count toward your practice.")
-                .foregroundStyle(AppPalette.secondary)
-              if !model.firstUse.answer.isEmpty {
-                Text(model.firstUse.answer).font(.subheadline).padding(.leading, 16)
-                  .overlay(alignment: .leading) { AppPalette.hairline.frame(width: 1) }
-              }
-            }.accessibilityIdentifier("walkthroughComplete")
-          } else {
-            FirstUseTip(number: step == .ask ? "01" : "03",
-              title: step == .ask ? "Ask before you design." : "Now make one choice.",
-              message: step == .ask ? "Use the reply box below for answers and questions. Try this sample clarification, then tap Send." : "Write a design choice in the same box. Send moves the interview forward.")
-            Button(step == .ask ? "Try: How many people will use it?" : "Try: Start with one database for saved links.") {
-              draft = step == .ask ? "How many people will use it?" : "Start with one database for saved links."
-              focused = true
-              withAnimation(reduceMotion ? nil : DrillbitMotion.reveal) { proxy.scrollTo("tutorialReply", anchor: .bottom) }
-            }.font(.subheadline.weight(.medium)).frame(minHeight: 44, alignment: .leading)
-              .accessibilityIdentifier("walkthroughExample")
-            VStack(alignment: .leading, spacing: 12) {
-              Divider()
-              Text("Your reply").font(.subheadline).foregroundStyle(AppPalette.secondary)
-              TextField("Write your reply…", text: $draft, axis: .vertical)
-                .lineLimit(3...6).focused($focused)
-                .accessibilityIdentifier("walkthroughEditor")
-            }.id("tutorialReply")
-          }
-          if let failure { Text(failure).font(.footnote).foregroundStyle(AppPalette.destructive) }
-        }.padding(24).frame(maxWidth: 600, alignment: .leading).frame(maxWidth: .infinity)
-          .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: step)
-      }.scrollDismissesKeyboard(.interactively)
-    }
-    .background(AppPalette.background.ignoresSafeArea())
-    .containerBackground(AppPalette.background, for: .navigation)
-    .navigationTitle("A quick warm-up").navigationBarTitleDisplayMode(.inline)
-    .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Home") { Task { await leave() } }.disabled(saving) } }
-    .safeAreaInset(edge: .bottom, spacing: 0) {
-      Group {
-        if step == .finished {
-          Button("Show me around") { Task { await finish() } }
-            .buttonStyle(PracticeButtonStyle()).accessibilityIdentifier("walkthroughTour")
-        } else if step != .collapse {
-          HStack(spacing: 16) {
-            Button { voiceInfo = true } label: { Image(systemName: AppIcon.voice.rawValue).frame(width: 24, height: 24) }
-              .buttonStyle(DrillbitIconButtonStyle()).accessibilityLabel("About voice practice")
-            Spacer()
-            Button { Task { await send() } } label: { Image(systemName: "arrow.up").frame(width: 24, height: 24) }
-              .buttonStyle(DrillbitIconButtonStyle(prominent: true)).accessibilityLabel("Send")
-              .accessibilityIdentifier("walkthroughSend")
-              .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-          }
+    GeometryReader { proxy in
+      let target = step.flatMap { anchors[.step($0)] }.map { proxy[$0].insetBy(dx: -8, dy: -8) }
+      let documentTop = anchors[.document].map { proxy[$0].minY } ?? 0
+      ZStack(alignment: .topLeading) {
+        Color.clear.contentShape(Rectangle()).onTapGesture {}
+        if let step {
+          Spotlight(hole: target ?? .zero)
+            .fill(Color.black.opacity(0.55), style: FillStyle(eoFill: true))
+            .allowsHitTesting(false)
+            .transition(.opacity)
+          card(step)
+            .frame(width: max(0, proxy.size.width - 32))
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { cardHeight = $0 }
+            .position(x: proxy.size.width / 2, y: cardCenter(target: target, documentTop: documentTop, height: proxy.size.height))
+            .transition(.opacity.combined(with: .offset(y: reduceMotion ? 0 : 8)))
         }
-      }.disabled(saving).padding(16).background(AppPalette.background)
+      }
+      .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: step)
     }
-    .alert("Speak or type", isPresented: $voiceInfo) { Button("Got it", role: .cancel) {} } message: {
-      Text("Real sessions support live voice. You can switch between speaking and typing without starting over.")
+    .ignoresSafeArea()
+    .accessibilityAddTraits(.isModal)
+  }
+
+  private func cardCenter(target: CGRect?, documentTop: CGFloat, height: CGFloat) -> CGFloat {
+    let half = cardHeight / 2
+    guard let target else { return documentTop + 12 + half }
+    // Below the target when it sits in the top half, otherwise above it.
+    let y = target.midY < height / 2 ? target.maxY + 12 + half : target.minY - 12 - half
+    return min(max(y, documentTop + 12 + half), height - 24 - half)
+  }
+
+  private func card(_ step: WarmUpStep) -> some View {
+    VStack(alignment: .leading, spacing: 12) {
+      HStack(spacing: 8) {
+        Text("\(step.rawValue + 1) of \(WarmUpStep.allCases.count)").font(.caption.monospaced()).foregroundStyle(AppPalette.accent)
+        Spacer(minLength: 0)
+        if step == .menu { Image(systemName: "arrow.up.right").foregroundStyle(AppPalette.accent).accessibilityHidden(true) }
+      }
+      Text(step.title).font(.headline)
+      Text(step.message).font(.subheadline).foregroundStyle(AppPalette.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+      Button(step.next == nil ? "Let’s go" : "Next", action: advance)
+        .buttonStyle(PracticeButtonStyle())
+        .accessibilityIdentifier("warmUpGuideNext")
     }
-    .sensoryFeedback(.success, trigger: step == .finished) { _, finished in finished }
-    .onAppear { draft = model.firstUse.draft; expanded = step == .ask || step == .collapse }
-    .onChange(of: expanded) { _, value in
-      if !value && step == .collapse { Task { var next = model.firstUse; next.step = .answer; await store(next) } }
-    }
-    .onChange(of: phase) { _, value in if value == .background { Task { await saveDraft() } } }
-  }
-  private func store(_ next: FirstUseProgress) async {
-    saving = true; defer { saving = false }
-    do { try await model.setFirstUse(next); failure = nil } catch { failure = "Couldn’t save your place. Try again." }
-  }
-  private func send() async {
-    guard !saving else { return }
-    focused = false
-    var next = model.firstUse
-    if step == .ask { next.question = draft; next.step = .collapse; expanded = true }
-    else { next.answer = draft; next.step = .finished }
-    next.draft = ""
-    await store(next)
-    if failure == nil { draft = "" }
-  }
-  private func saveDraft() async { var next = model.firstUse; next.draft = draft; await store(next) }
-  private func leave() async { await saveDraft(); if failure == nil { model.presented = nil } }
-  private func finish() async {
-    var next = model.firstUse; next.stage = .tourHome
-    await store(next)
-    if failure == nil { model.presented = nil }
+    .padding(16)
+    .background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 12))
+    .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(AppPalette.accent.opacity(0.35), lineWidth: 0.5) }
+    .id(step)
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("warmUpGuide")
   }
 }
 

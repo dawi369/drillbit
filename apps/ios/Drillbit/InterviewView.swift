@@ -40,12 +40,26 @@ struct InterviewView: View {
   @State private var topInset: CGFloat = 0
   @State private var lastCaret: CGRect?
   @State private var focused = false
-  @State private var starterGuide = false
+  /// The warm-up opens locked; the guided tour releases it.
+  @State private var guiding: Bool
+  @State private var guideStep: WarmUpStep?
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.scenePhase) private var phase
   init(model: AppModel, challenge: Challenge) {
     self.model = model; self.challenge = challenge
     _interview = State(initialValue: InterviewController(model: model, challenge: challenge))
+    _guiding = State(initialValue: challenge.isWarmUp)
+  }
+  private var guideKey: String { interview.key + ":guided" }
+  private func advanceGuide() {
+    if let next = guideStep?.next {
+      guideStep = next
+      if next == .reply { withAnimation(documentMotion) { position.scrollTo(id: "draft", anchor: .bottom) } }
+      return
+    }
+    guideStep = nil
+    guiding = false
+    Task { try? await model.disk.cache(key: guideKey, data: Data()) }
   }
   private var exchanges: [InterviewExchange] { InterviewExchange.document(original: challenge.displayPrompt, state: interview.displayState) }
   private var activeID: String { exchanges.last?.id ?? "original" }
@@ -72,17 +86,15 @@ struct InterviewView: View {
         InterviewVoiceRoom(voice: voice, interview: interview, question: { questionDisclosure(collapsed: voiceQuestionCollapsed) { voiceQuestionCollapsed.toggle() } }, leave: leaveVoiceRoom)
       } else { workspace }
     }
+    .overlayPreferenceValue(WarmUpAnchorKey.self) { anchors in
+      if guiding && interview.finished == nil { WarmUpGuide(step: guideStep, anchors: anchors, advance: advanceGuide) }
+    }
     .animation(reduceMotion ? nil : DrillbitMotion.page, value: interview.finished != nil)
     .sensoryFeedback(.impact(weight: .light), trigger: acceptedAnswerID) { _, accepted in accepted != nil }
     .background(AppPalette.background)
     .containerBackground(AppPalette.background, for: .navigation)
     .task {
       guard !readingLoaded else { return }
-      if let account = model.bootstrap?.account.id,
-        let data = try? await model.disk.cached(key: "first-guided-question:" + account),
-        String(data: data, encoding: .utf8) == challenge.id {
-        starterGuide = true
-      }
       // Restore disclosure choices before exposing interactive content. Loading
       // them after the network refresh could overwrite a user's fresh tap.
       if let data = try? await model.disk.cached(key: interview.key + ":reading"),
@@ -97,6 +109,13 @@ struct InterviewView: View {
       await voice.restore()
       voice.prepareIfAllowed()
       sessionRestored = true
+      if guiding {
+        if (try? await model.disk.cached(key: guideKey)) != nil { guiding = false; return }
+        // A moment to take in the screen before the tour starts.
+        try? await Task.sleep(for: .seconds(1.5))
+        reading.collapsed.remove("original")
+        guideStep = .question
+      }
     }
     .task(id: "\(interview.streamTurn?.jobId ?? ""):\(interview.streamEpoch):\(phase == .active)") {
       if phase == .active { await interview.watchResponse() }
@@ -135,7 +154,6 @@ struct InterviewView: View {
           VStack(alignment: .leading, spacing: 12) {
             exchangeContent(exchange)
             if exchange.id == activeID {
-              if starterGuide && showsDraft && exchange.id == "original" { starterTip }
               if showsDraft {
                 VStack(alignment: .leading, spacing: 12) {
                   Divider().accessibilityIdentifier("answerDivider")
@@ -146,6 +164,7 @@ struct InterviewView: View {
                     enabled: !interview.locked && interview.failedTurn == nil && interview.voice?.blocksText != true,
                     revealCaret: revealCaret)
                     .fixedSize(horizontal: false, vertical: true)
+                    .warmUpAnchor(.step(.reply))
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { editorFrame = $0 }
                     .overlay(alignment: .topLeading) {
                       if interview.answer.isEmpty { Text("Answer or ask a question…").foregroundStyle(.tertiary).padding(.top, 8).allowsHitTesting(false).accessibilityHidden(true) }
@@ -180,6 +199,7 @@ struct InterviewView: View {
         .accessibilityHidden(!readingLoaded)
     }
     .accessibilityIdentifier("interviewDocument")
+    .warmUpAnchor(.document)
     .coordinateSpace(name: "interviewDocument")
     .scrollPosition($position)
     .scrollDismissesKeyboard(.interactively)
@@ -214,11 +234,14 @@ struct InterviewView: View {
       interview.answer = await model.localAnswer(interview.challenge)
     } } }
     .toolbar {
-      ToolbarItem(placement: .cancellationAction) {
-        Button("Close") {
-          persistReading()
-          model.presented = nil
-          Task { if !interview.locked { try? await interview.flush() } }
+      // The warm-up has no way out but through: no Close, no Skip.
+      if !challenge.isWarmUp {
+        ToolbarItem(placement: .cancellationAction) {
+          Button("Close") {
+            persistReading()
+            model.presented = nil
+            Task { if !interview.locked { try? await interview.flush() } }
+          }
         }
       }
       ToolbarItem(placement: .topBarTrailing) {
@@ -232,9 +255,12 @@ struct InterviewView: View {
             .disabled(requestingAssistance || interview.locked || interview.failedTurn != nil || liveVoice?.blocksText == true)
           Button("Session style", systemImage: AppIcon.preferences.rawValue) { sheet = .style }.disabled(interview.locked || liveVoice?.blocksText == true)
           Button("Finish interview", systemImage: AppIcon.checkmark.rawValue) { focused = false; confirmFinish = true }.disabled(!interview.canFinish)
-          Divider()
-          Button("Skip question", systemImage: AppIcon.skip.rawValue, role: .destructive) { confirmSkip = true }.disabled(interview.voice?.blocksText == true)
+          if !challenge.isWarmUp {
+            Divider()
+            Button("Skip question", systemImage: AppIcon.skip.rawValue, role: .destructive) { confirmSkip = true }.disabled(interview.voice?.blocksText == true)
+          }
         } label: { Image(systemName: AppIcon.more.rawValue) }
+          .disabled(guiding)
           .accessibilityLabel("Interview options").accessibilityIdentifier("interviewOptions")
       }
     }
@@ -258,27 +284,6 @@ struct InterviewView: View {
         assistancePopup
       }
     }
-  }
-  private var starterTip: some View {
-    let clarified = interview.displayState.turns.contains { $0.kind == "clarification" && $0.result != nil }
-    return VStack(alignment: .leading, spacing: 8) {
-      HStack {
-        SignalEyebrow(text: clarified ? "Guided · 02 / 02" : "Guided · 01 / 02")
-        Spacer()
-        Button("Skip tips") { dismissStarterGuide() }
-          .font(.caption.weight(.medium))
-      }
-      Text(clarified ? "Now write one design choice in the reply box below. Send moves the interview forward." : "Ask a short question in the reply box below, then tap Send. For example: ‘What scale should I plan for?’")
-        .font(.subheadline).foregroundStyle(AppPalette.secondary)
-    }
-    .padding(.vertical, 8)
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier("starterGuideTip")
-  }
-  private func dismissStarterGuide() {
-    starterGuide = false
-    guard let account = model.bootstrap?.account.id else { return }
-    Task { try? await model.disk.cache(key: "first-guided-question:" + account, data: Data()) }
   }
   private var assistancePopup: some View {
     VStack(alignment: .leading, spacing: 20) {
@@ -321,6 +326,7 @@ struct InterviewView: View {
       if reading.collapsed.contains("original") { reading.collapsed.remove("original") } else { reading.collapsed.insert("original") }
       persistReading()
     }
+    .warmUpAnchor(.step(.question))
   }
   private func questionDisclosure(collapsed: Bool, toggle: @escaping () -> Void) -> some View {
     VStack(alignment: .leading, spacing: 4) {
@@ -581,6 +587,7 @@ struct InterviewView: View {
       }
         .buttonStyle(DrillbitIconButtonStyle())
         .disabled(checkingVoice || liveVoice == nil || interview.locked || interview.voice?.blocksText == true).accessibilityLabel("Live voice").accessibilityIdentifier("liveVoice")
+        .warmUpAnchor(.step(.voice))
       Spacer(minLength: 0)
         Button {
           focused = false
@@ -594,6 +601,7 @@ struct InterviewView: View {
           .accessibilityLabel("Send")
           .disabled(interview.voice?.blocksText == true || interview.locked || interview.failedTurn != nil || interview.answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
           .accessibilityIdentifier("shareAnswer")
+          .warmUpAnchor(.step(.send))
       }
     }.padding(16)
       .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { footerFrame = $0; if followingLiveEnd, sheet == nil, let lastCaret { revealCaret(lastCaret) } }

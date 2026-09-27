@@ -104,19 +104,12 @@ struct RootView: View {
         .preferredColorScheme(appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
         .interactiveDismissDisabled()
     }
-    .sheet(item: $model.starterPreview) { challenge in
-      QuestionFlow(model: model, initial: challenge, isStarter: true) { opened in model.presented = opened }
-        .interactiveDismissDisabled(false)
-    }
     .sheet(isPresented: $firstSessionSetup) {
       QuestionFlow(model: model) { opened in model.presented = opened }
     }
     .fullScreenCover(item: $model.presented) { challenge in
-      NavigationStack {
-        if challenge.id == FirstUseProgress.challengeID { FirstPracticeView(model: model) }
-        else { InterviewView(model: model, challenge: challenge) }
-      }
-      .presentationBackground(AppPalette.background)
+      NavigationStack { InterviewView(model: model, challenge: challenge) }
+        .presentationBackground(AppPalette.background)
     }
     .sheet(item: $model.conflict) { challenge in
       NavigationStack {
