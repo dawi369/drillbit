@@ -137,9 +137,9 @@ private enum RecallSection: String, CaseIterable, Identifiable {
   var id: Self { self }
 }
 
-private struct LearningPath: Identifiable {
+private struct LearningPath: Identifiable, Equatable {
   let id: String, title: String, detail: String
-  let concepts: [String]
+  let area: RecallArea
 }
 
 struct RecallView: View {
@@ -160,11 +160,13 @@ struct RecallView: View {
     _deckSignature = State(initialValue: Self.signature(model.recall))
   }
 
+  // Authored sets follow the catalog, so every path opens with real cards.
   private let paths = [
-    LearningPath(id:"foundations",title:"System design foundations",detail:"Model data, shape APIs, then make reads fast.",concepts:["data-modeling","api-design","caching"]),
-    LearningPath(id:"scale",title:"Data at scale",detail:"Indexes, consistency, replication and partitioning.",concepts:["indexing","transactions","consistency","replication","partitioning"]),
-    LearningPath(id:"async",title:"Reliable async systems",detail:"Queues, safe retries, backpressure and recovery.",concepts:["queues","retry-safety","backpressure","fault-tolerance"]),
-    LearningPath(id:"production",title:"Production readiness",detail:"Capacity, observability and authorization.",concepts:["capacity-planning","observability","authorization"]),
+    LearningPath(id: "system-design", title: "System design essentials", detail: "Load balancing, cache-aside and backpressure.", area: .systemDesign),
+    LearningPath(id: "swift", title: "Swift", detail: "Value semantics, actors and Sendable.", area: .swift),
+    LearningPath(id: "typescript", title: "TypeScript", detail: "Narrowing, discriminated unions and variance.", area: .typeScript),
+    LearningPath(id: "sql", title: "SQL", detail: "Indexes, composite keys and isolation.", area: .sql),
+    LearningPath(id: "networking", title: "Networking", detail: "TCP, TLS and HTTP/3.", area: .networking),
   ]
 
   var body: some View {
@@ -179,12 +181,14 @@ struct RecallView: View {
         case .paths: learningPaths
         }
       }
-      .padding(.horizontal, 20).padding(.vertical, 16)
+      .padding(.horizontal, 24).padding(.vertical, 16)
       .frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity)
     }
     .background(AppPalette.groupedBackground)
     .navigationTitle("Recall")
     .animation(reduceMotion ? nil : DrillbitMotion.disclosure, value: session.isRevealed)
+    .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: session.current?.id)
+    .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: selectedPath)
     .sensoryFeedback(.success, trigger: feedbackPulse)
     .onAppear { configureDeck() }
     .onChange(of: model.recall.cards) { _, _ in configureDeck() }
@@ -197,10 +201,27 @@ struct RecallView: View {
 
   private var deck: some View {
     VStack(alignment: .leading, spacing: 20) {
+      if let selectedPath {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+          VStack(alignment: .leading, spacing: 4) {
+            SignalEyebrow(text: "Path")
+            Text(selectedPath.title).font(.headline)
+          }
+          Spacer(minLength: 8)
+          Button("Leave path") { resetSession() }
+            .font(.subheadline.weight(.medium)).frame(minHeight: 44)
+            .accessibilityIdentifier("recallLeavePath")
+        }
+        .transition(.opacity)
+      }
       if let card = session.current {
-        SignalEyebrow(text: "One live idea")
+        if selectedPath == nil { SignalEyebrow(text: "One live idea") }
         status
         cardView(card)
+          .id(card.id)
+          .transition(.asymmetric(
+            insertion: .opacity.combined(with: .offset(x: reduceMotion ? 0 : 24)),
+            removal: .opacity.combined(with: .offset(x: reduceMotion ? 0 : -24))))
       } else {
         completion
       }
@@ -253,6 +274,11 @@ struct RecallView: View {
   }
 
   private var status: some View {
+    if selectedPath != nil {
+      let left = session.remainingCount
+      return Text("\(left) \(left == 1 ? "card" : "cards") left in this set")
+        .font(.headline).accessibilityLabel("\(left) \(left == 1 ? "card" : "cards") left in this set")
+    }
     let due = model.recall.dueCount
     let recommended = min(due, model.bootstrap?.todayPlan?.recommendedRecallCount ?? due)
     let minutes = Int(ceil(Double(max(recommended, 0)) / 2.0))
@@ -262,7 +288,7 @@ struct RecallView: View {
 
   private func cardView(_ card: RecallCard) -> some View {
     VStack(alignment: .leading, spacing: 20) {
-      SignalEyebrow(text: "From your interview")
+      if model.recall.cards.contains(where: { $0.id == card.id }) { SignalEyebrow(text: "From your interview") }
       DrillbitMetadata(text: "\(card.area.rawValue) · \(card.depth.rawValue)")
       if let source = model.recall.cards.first(where: { $0.id == card.id }) {
         Text(source.sourceTitle ?? "From this interview").font(.subheadline.weight(.medium))
@@ -275,9 +301,10 @@ struct RecallView: View {
         .fixedSize(horizontal: false, vertical: true)
         .accessibilityIdentifier("recallQuestion")
 
-      Rectangle().fill(AppPalette.action).frame(height: 2)
+      SignalRule(draws: false)
 
       if session.isRevealed {
+        Group {
         Divider()
         VStack(alignment: .leading, spacing: 8) {
           Text("Answer").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
@@ -286,6 +313,8 @@ struct RecallView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("recallAnswer")
+        }
+        .transition(.opacity.combined(with: .offset(y: reduceMotion ? 0 : 8)))
 
         HStack(spacing: 12) {
           Button("Again") { review(card, again: true) }
@@ -308,10 +337,12 @@ struct RecallView: View {
 
   private var completion: some View {
     VStack(alignment: .leading, spacing: 16) {
-      SignalEyebrow(text: model.recallLoaded || model.fixture ? "Nothing due" : "Recall")
+      SignalEyebrow(text: selectedPath != nil ? "Set complete" : model.recallLoaded || model.fixture ? "Nothing due" : "Recall")
       Text(completionTitle)
         .font(.title.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
-      if model.recallLoaded || model.fixture {
+      if selectedPath != nil {
+        Text("Leave the path to return to your personal Recall.").foregroundStyle(AppPalette.secondary)
+      } else if model.recallLoaded || model.fixture {
         Text(model.bootstrap?.todayPlan?.completedTotal == 0 ? "Finish an interview to bring its useful moments into Recall." : "New ideas will appear here when they are ready to revisit.")
           .foregroundStyle(AppPalette.secondary)
       }
@@ -319,6 +350,7 @@ struct RecallView: View {
   }
 
   private var completionTitle: String {
+    if selectedPath != nil { return "That’s the whole set." }
     if !model.recallLoaded && !model.fixture { return "Your review will appear here." }
     if model.bootstrap?.todayPlan?.completedTotal == 0 { return "Your first idea starts with a practice." }
     return "You’re caught up."
@@ -350,12 +382,10 @@ struct RecallView: View {
 
   private func cardsForSelection() -> [RecallCard] {
     let due = Self.dueCards(from: model.recall)
-    let pathIDs = Set(selectedPath?.concepts ?? [])
-    let temporary = RecallCatalog.cards.filter { card in
-      (area == .all || card.area == area) && (depth == .all || card.depth == depth)
-        && selectedPath != nil && card.conceptId.map { pathIDs.contains($0) } == true
+    guard let selectedPath else { return due }
+    return RecallCatalog.cards.filter { card in
+      card.area == selectedPath.area && (depth == .all || card.depth == depth)
     }
-    return selectedPath == nil ? due : temporary
   }
 
   private func review(_ card: RecallCard, again: Bool) {
@@ -410,25 +440,26 @@ struct RecallView: View {
   private var learningPaths: some View {
     VStack(alignment: .leading, spacing: 16) {
       DrillbitSectionHeader(title: "Choose a path", eyebrow: "Focused sets")
-      ForEach(paths) { path in
-        Button {
-          selectedPath = path; section = .review; session = RecallSession(cards: cardsForSelection())
-        } label: {
-          HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-              Text(path.title).font(.headline).foregroundStyle(.primary)
-              Text(path.detail).font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.leading)
-            }
-            Spacer(); Image(systemName: "arrow.right").foregroundStyle(.secondary)
-          }.padding(.vertical, 16)
-        }.buttonStyle(.plain)
-        Divider()
+      Text("Short general-knowledge sets. They don’t change your personal Recall.")
+        .font(.subheadline).foregroundStyle(.secondary)
+      VStack(spacing: 0) {
+        ForEach(paths) { path in
+          let count = RecallCatalog.cards.filter { $0.area == path.area }.count
+          Button {
+            selectedPath = path; section = .review; session = RecallSession(cards: cardsForSelection())
+          } label: {
+            HStack(spacing: 12) {
+              VStack(alignment: .leading, spacing: 4) {
+                Text(path.title).font(.headline).foregroundStyle(.primary)
+                Text(path.detail).font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.leading)
+                DrillbitMetadata(text: "\(count) \(count == 1 ? "card" : "cards")")
+              }
+              Spacer(); Image(systemName: "arrow.right").foregroundStyle(.secondary).accessibilityHidden(true)
+            }.padding(.vertical, 16).contentShape(Rectangle())
+          }.buttonStyle(DrillbitRowButtonStyle())
+          if path.id != paths.last?.id { Divider() }
+        }
       }
-      VStack(alignment: .leading, spacing: 8) {
-        Text("Language deep dives").font(.headline)
-        Text("Swift, TypeScript, SQL and networking are available from the Area filter in Deck.")
-          .font(.subheadline).foregroundStyle(.secondary)
-      }.padding(.vertical, 12)
     }
   }
 }

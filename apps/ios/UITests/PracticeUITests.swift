@@ -17,10 +17,12 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.staticTexts["Your system design map"].waitForExistence(timeout: 2))
     app.buttons["Paths"].tap()
     XCTAssertTrue(app.staticTexts["Choose a path"].waitForExistence(timeout: 2))
-    app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Reliable async systems")).firstMatch.tap()
+    app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "System design essentials")).firstMatch.tap()
     XCTAssertTrue(app.buttons["recallReveal"].waitForExistence(timeout: 2))
+    XCTAssertTrue(app.buttons["recallLeavePath"].exists)
     app.buttons["recallReveal"].tap()
     XCTAssertTrue(app.descendants(matching: .any)["recallAnswer"].waitForExistence(timeout: 2))
+    capture("Recall path answer", app)
   }
 
   func testHomePreservesActiveQuestionAndDismissesRevisit() throws {
