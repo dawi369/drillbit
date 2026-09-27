@@ -64,6 +64,7 @@ struct SetupView: View {
       .scrollDismissesKeyboard(.interactively)
     }.clipped()
     .background(AppPalette.background)
+    .containerBackground(AppPalette.background, for: .navigation)
     .safeAreaInset(edge: .top, spacing: 0) {
       if coordinator.draft.page >= 0 {
         SignalStepProgress(step: coordinator.draft.page + 1, total: 5)

@@ -21,6 +21,7 @@ struct WelcomeView: View {
       }
       .animation(DrillbitMotion.page, value: walkthroughVersion)
       .background(AppPalette.background)
+      .containerBackground(AppPalette.background, for: .navigation)
     }
   }
 
@@ -157,48 +158,63 @@ struct WelcomeView: View {
     let code = invite.trimmingCharacters(in: .whitespacesAndNewlines)
     return GeometryReader { geometry in
       ScrollView {
-        VStack(spacing: 32) {
-          VStack(spacing: 16) {
-            DrillbitLogo()
-            SignalPresence(density: 600).frame(height: 190)
-            VStack(spacing: 8) {
-              Text(inviting ? "One last step." : "Ready when you are.")
-                .font(.title2.weight(.semibold))
-              Text(inviting ? "Enter your invite code to begin." : "Sign in to save your practice and feedback.")
-                .font(.subheadline).foregroundStyle(AppPalette.secondary)
-            }
-            .multilineTextAlignment(.center)
-            .id(inviting)
-            .transition(.opacity)
+        VStack(spacing: 16) {
+          DrillbitLogo()
+          // Gives the form room above the keyboard while typing.
+          SignalPresence(density: 600).frame(height: inviteFocused ? 128 : 190)
+          VStack(spacing: 8) {
+            Text(inviting ? "One last step." : "Ready when you are.")
+              .font(.title2.weight(.semibold))
+            Text(inviting ? "Enter your invite code to begin." : "Sign in to save your practice and feedback.")
+              .font(.subheadline).foregroundStyle(AppPalette.secondary)
           }
-          VStack(spacing: 12) {
-            if inviting {
-              TextField("Invite code", text: $invite)
-                .textInputAutocapitalization(.never).autocorrectionDisabled()
-                .submitLabel(.go).focused($inviteFocused)
-                .onSubmit { if !code.isEmpty { redeem(code) } }
-                .signalInset(padding: 16)
-              Button("Start practising") { redeem(code) }
-                .buttonStyle(PracticeButtonStyle()).disabled(code.isEmpty || signingIn)
-            } else {
-              Button { authenticate { await model.signIn() } } label: { Label("Sign in with Apple", systemImage: AppIcon.apple.rawValue) }.buttonStyle(PracticeButtonStyle())
-              Button("Continue with Google") { authenticate { await model.signIn(provider: .google) } }.buttonStyle(PracticeButtonStyle(secondary: true))
-              Button("Continue with GitHub") { authenticate { await model.signIn(provider: .github) } }.buttonStyle(PracticeButtonStyle(secondary: true))
-            }
-            // Reserve the row so buttons never shift when work starts.
-            ProgressView(inviting ? "Checking invite…" : "Signing in…")
-              .opacity(signingIn ? 1 : 0)
-              .accessibilityHidden(!signingIn)
-          }
-          .disabled(signingIn)
+          .multilineTextAlignment(.center)
+          .id(inviting)
           .transition(.opacity)
         }
-        .animation(DrillbitMotion.page, value: inviting)
-        .animation(DrillbitMotion.fast, value: signingIn)
+        .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: inviteFocused)
         .frame(maxWidth: 400).padding(24).frame(maxWidth: .infinity, minHeight: geometry.size.height)
       }
       .scrollBounceBehavior(.basedOnSize)
-      .scrollDismissesKeyboard(.interactively)
+    }
+    // Pinned like the walkthrough footer, so the field and its action always sit above the keyboard.
+    .safeAreaInset(edge: .bottom, spacing: 0) {
+      VStack(spacing: 16) {
+        if inviting {
+          TextField("Invite code", text: $invite)
+            .font(.body.monospaced())
+            .keyboardType(.asciiCapable)
+            .textInputAutocapitalization(.never).autocorrectionDisabled()
+            .submitLabel(.go).focused($inviteFocused)
+            .onSubmit { if !code.isEmpty { redeem(code) } }
+            .signalInset(padding: 16)
+          Button { redeem(code) } label: {
+            HStack(spacing: 8) {
+              if signingIn { ProgressView().controlSize(.small).tint(AppPalette.actionInk).transition(.iconPop) }
+              Text("Start practising")
+            }
+          }
+          .buttonStyle(PracticeButtonStyle()).disabled(code.isEmpty || signingIn)
+          .accessibilityLabel(signingIn ? "Checking invite" : "Start practising")
+        } else {
+          VStack(spacing: 12) {
+            Button { authenticate { await model.signIn() } } label: { Label("Sign in with Apple", systemImage: AppIcon.apple.rawValue) }.buttonStyle(PracticeButtonStyle())
+            Button("Continue with Google") { authenticate { await model.signIn(provider: .google) } }.buttonStyle(PracticeButtonStyle(secondary: true))
+            Button("Continue with GitHub") { authenticate { await model.signIn(provider: .github) } }.buttonStyle(PracticeButtonStyle(secondary: true))
+          }
+          // Reserve the row so buttons never shift when work starts.
+          ProgressView("Signing in…")
+            .opacity(signingIn ? 1 : 0)
+            .accessibilityHidden(!signingIn)
+        }
+      }
+      .disabled(signingIn)
+      .transition(.opacity)
+      .animation(DrillbitMotion.page, value: inviting)
+      .animation(DrillbitMotion.fast, value: signingIn)
+      .frame(maxWidth: 400).padding(.horizontal, 24).padding(.top, 16).padding(.bottom, 16)
+      .frame(maxWidth: .infinity)
+      .background(AppPalette.background)
     }
     .task(id: inviting) { if inviting { inviteFocused = true } }
   }

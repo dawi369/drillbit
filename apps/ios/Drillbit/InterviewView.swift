@@ -74,7 +74,8 @@ struct InterviewView: View {
     }
     .animation(reduceMotion ? nil : DrillbitMotion.page, value: interview.finished != nil)
     .sensoryFeedback(.impact(weight: .light), trigger: acceptedAnswerID) { _, accepted in accepted != nil }
-    .background(AppPalette.background.ignoresSafeArea())
+    .background(AppPalette.background)
+    .containerBackground(AppPalette.background, for: .navigation)
     .task {
       guard !readingLoaded else { return }
       if let account = model.bootstrap?.account.id,

@@ -129,6 +129,7 @@ struct QuestionFlow: View {
             }.padding(16).background(AppPalette.background)
           }
         }.navigationTitle("Question preview").navigationBarTitleDisplayMode(.inline)
+          .containerBackground(AppPalette.background, for: .navigation)
           .toolbar { Button("Close") { dismiss() } }
       } else {
         PreparationView(model: model, source: source, initialCustomTopic: selectedCustomTopic, submit: { input in
@@ -155,7 +156,7 @@ struct QuestionFlow: View {
           }
         }, recovery: retryInput ?? recovery)
       }
-    }.background(AppPalette.background.ignoresSafeArea())
+    }.background(AppPalette.background)
       .presentationBackground(AppPalette.background)
       .onAppear {
       visible = true

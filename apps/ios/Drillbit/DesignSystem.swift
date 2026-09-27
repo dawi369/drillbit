@@ -387,7 +387,8 @@ struct SignalList<Content: View>: View {
     }
     .listStyle(.plain)
     .scrollContentBackground(.hidden)
-    .background(AppPalette.background.ignoresSafeArea())
+    .background(AppPalette.background)
+    .containerBackground(AppPalette.background, for: .navigation)
   }
 }
 

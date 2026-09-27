@@ -73,6 +73,7 @@ struct FirstPracticeView: View {
       }.scrollDismissesKeyboard(.interactively)
     }
     .background(AppPalette.background.ignoresSafeArea())
+    .containerBackground(AppPalette.background, for: .navigation)
     .navigationTitle("A quick warm-up").navigationBarTitleDisplayMode(.inline)
     .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Home") { Task { await leave() } }.disabled(saving) } }
     .safeAreaInset(edge: .bottom, spacing: 0) {

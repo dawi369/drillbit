@@ -246,6 +246,8 @@ struct LibraryView: View {
       if cursor != nil { Button("Load more") { Task { await load(more: true) } }.disabled(loading) }
     }
     .listStyle(.plain)
+    .scrollContentBackground(.hidden)
+    .containerBackground(AppPalette.background, for: .navigation)
     .navigationTitle(skipped ? "Skipped questions" : "Library")
     .searchable(text: $search)
     .toolbar {
