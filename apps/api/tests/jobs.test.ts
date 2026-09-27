@@ -1,6 +1,7 @@
 import { env, fetchMock } from "cloudflare:test";
 import { beforeAll, afterAll, it, expect } from "vitest";
-import { accountFor, createJob, detail, settingsFor } from "../src/store";
+import { accountFor, complete, createJob, detail, settingsFor } from "../src/store";
+import { learningEvidence, todayPlan } from "../src/learning";
 import { runJob } from "../src/jobs";
 import { boundedContext } from "../src/context";
 import { textDeltas } from "../src/ai";
@@ -19,6 +20,51 @@ beforeAll(async () => {
   fetchMock.disableNetConnect();
 });
 afterAll(() => fetchMock.deactivate());
+async function generatedPractice(account: string, warmUp: boolean) {
+  const settings = await settingsFor(bindings, account);
+  const provider = (content: object) => fetchMock.get("https://openrouter.ai")
+    .intercept({ path: "/api/v1/chat/completions", method: "POST" })
+    .reply(200, { choices: [{ message: { content: JSON.stringify(content) } }] });
+  provider({
+    kind: "design", scenario: "Link saver", primaryConceptId: "api-design", secondaryConceptIds: [],
+    tagEvidence: [{ conceptId: "api-design", requirementIndex: 0 }], targetSkill: "APIs", constraints: [],
+    evaluationCriteria: ["lookup"], ambiguityPolicy: "State assumptions.", title: "Save a link",
+    prompt: `Design a link saver that finds saved links fast (${warmUp ? "warm-up" : "counted"}).`, topic: "system design",
+  });
+  const id = crypto.randomUUID();
+  await createJob(bindings, account, id, "generate", null, { settings, guidanceMode: "learn_together", primaryConceptId: "api-design", ...(warmUp ? { warmUp: true } : {}) });
+  await runJob(bindings, id);
+  await complete(bindings, account, id, crypto.randomUUID(), "Use a stable request ID for each saved link.", 0, settings);
+  const summarize = await bindings.DB.prepare("SELECT id FROM jobs WHERE challenge_id=? AND kind='summarize'").bind(id).first<{ id: string }>();
+  provider({
+    summary: "Clear keys.", worked: ["Stable IDs."], improve: "", takeaway: "Tie the key to the link.", strengths: [], gaps: [],
+    nextExercise: "Explain a lost acknowledgement.",
+    evidence: [{ conceptId: "api-design", observation: "Used stable IDs.", quote: "Use a stable request ID", signal: "needs_practice", assistance: "unknown" }],
+  });
+  await runJob(bindings, summarize!.id);
+  return id;
+}
+it("a warm-up is a real generated interview with feedback that never counts, joins the pool or creates Recall", async () => {
+  const account = (await accountFor(bindings, crypto.randomUUID())).id;
+  await bindings.DB.prepare("UPDATE accounts SET status='active' WHERE id=?").bind(account).run();
+  const counted = await generatedPractice(account, false);
+  // An eligible pooled question is reused by normal generation, never by a warm-up.
+  await bindings.DB.prepare("INSERT INTO questions(id,account_id,data,created_at,eligible,eligibility_updated_at) VALUES(?,?,?,'2026-01-01',1,'2026-01-01')")
+    .bind(crypto.randomUUID(), account, JSON.stringify({ title: "Pooled", prompt: "Pooled prompt", primaryConceptId: "api-design", engineeringLevel: (await settingsFor(bindings, account)).engineeringLevel })).run();
+  const warm = await generatedPractice(account, true);
+  fetchMock.assertNoPendingInterceptors();
+  const warmDetail = await detail(bindings, account, warm);
+  expect(warmDetail).toMatchObject({ warmUp: true, lifecycle: "completed", title: "Save a link" });
+  expect(warmDetail.reflection).toMatchObject({ summary: "Clear keys." });
+  expect((await detail(bindings, account, counted) as { warmUp?: boolean }).warmUp).toBeUndefined();
+  const rows = (sql: string, id: string) => bindings.DB.prepare(sql).bind(id).all().then(r => r.results.length);
+  expect(await rows("SELECT 1 FROM question_attempts WHERE challenge_id=?", warm)).toBe(0);
+  expect(await rows("SELECT 1 FROM question_attempts WHERE challenge_id=?", counted)).toBe(1);
+  expect(await rows("SELECT 1 FROM recall_cards WHERE source_challenge_id=?", warm)).toBe(0);
+  expect(await rows("SELECT 1 FROM recall_cards WHERE source_challenge_id=?", counted)).toBe(1);
+  expect((await todayPlan(bindings, account, null, await settingsFor(bindings, account))).completedTotal).toBe(1);
+  expect((await learningEvidence(bindings, account)).map(e => e.sessionId)).toEqual([counted]);
+});
 it("durably generates a valid challenge and replay does not call the provider again", async () => {
   const account = await accountFor(bindings, crypto.randomUUID());
   await bindings.DB.prepare("UPDATE accounts SET status='active' WHERE id=?")

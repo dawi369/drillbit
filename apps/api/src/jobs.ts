@@ -23,7 +23,7 @@ import {
   type Settings,
 } from "./domain";
 import { structured, streamedInterview } from "./ai";
-import { activeChallenge, detail, dispatch, type Job } from "./store";
+import { activeChallenge, COUNTED, detail, dispatch, type Job } from "./store";
 import type { Env } from "./platform";
 export async function runJob(env: Env, id: string) {
   const job = await env.DB.prepare("SELECT j.*,a.status AS account_status,a.subject AS account_subject FROM jobs j JOIN accounts a ON a.id=j.account_id WHERE j.id=?")
@@ -75,6 +75,7 @@ export async function runJob(env: Env, id: string) {
     turnId?: string;
     primaryConceptId?: string;
     followUp?: unknown;
+    warmUp?: boolean;
   }>(job.input);
   input.settings = normalizeSettings(input.settings);
   const now = timestamp();
@@ -89,9 +90,9 @@ export async function runJob(env: Env, id: string) {
     const generationOutputSchema = exploratory
       ? questionGenerationSchema.safeExtend({primaryConceptId:z.literal(selection.primaryConceptId),constraints:z.array(z.string().min(1).max(300)).max(0)})
       : questionGenerationSchema.safeExtend({primaryConceptId:z.literal(selection.primaryConceptId)});
-    const restored = !input.instruction && !input.followUp ? await env.DB.prepare("SELECT * FROM questions WHERE account_id=? AND eligible=1 AND json_extract(data,'$.engineeringLevel')=? AND (? IS NULL OR json_extract(data,'$.primaryConceptId')=?) ORDER BY eligibility_updated_at,id LIMIT 1").bind(job.account_id,input.settings.engineeringLevel!,input.primaryConceptId??null,input.primaryConceptId??null).first<{id:string;data:string}>() : null;
+    const restored = !input.instruction && !input.followUp && !input.warmUp ? await env.DB.prepare("SELECT * FROM questions WHERE account_id=? AND eligible=1 AND json_extract(data,'$.engineeringLevel')=? AND (? IS NULL OR json_extract(data,'$.primaryConceptId')=?) ORDER BY eligibility_updated_at,id LIMIT 1").bind(job.account_id,input.settings.engineeringLevel!,input.primaryConceptId??null,input.primaryConceptId??null).first<{id:string;data:string}>() : null;
     const recent = await env.DB.prepare(
-      "SELECT c.data,c.lifecycle,c.completed_at,r.data AS reflection FROM challenges c LEFT JOIN reflections r ON r.challenge_id=c.id WHERE c.account_id=? AND c.lifecycle IN ('completed','skipped') ORDER BY c.created_at DESC LIMIT 20",
+      "SELECT c.data,c.lifecycle,c.completed_at,r.data AS reflection FROM challenges c LEFT JOIN reflections r ON r.challenge_id=c.id WHERE c.account_id=? AND c.lifecycle IN ('completed','skipped') AND " + COUNTED + " ORDER BY c.created_at DESC LIMIT 20",
     )
       .bind(job.account_id)
       .all();
@@ -170,15 +171,19 @@ export async function runJob(env: Env, id: string) {
           engineeringLevel: input.settings.engineeringLevel,
           interviewStyle: input.interviewStyle ?? "standard",
           guidanceMode: guidanceMode(input.guidanceMode),
+          ...(input.warmUp ? { warmUp: true } : {}),
         }),
         now,
         input.availableAt ?? now,
         id,
         job.account_id,
       ),
-      env.DB.prepare("INSERT OR IGNORE INTO questions(id,account_id,data,created_at,eligibility_updated_at) SELECT ?,account_id,data,created_at,created_at FROM challenges WHERE id=?").bind(questionID,id),
-      env.DB.prepare("INSERT OR IGNORE INTO question_attempts(challenge_id,question_id) SELECT id,? FROM challenges WHERE id=?").bind(questionID,id),
-      env.DB.prepare("UPDATE questions SET eligible=0,eligibility_revision=eligibility_revision+1 WHERE id=? AND EXISTS(SELECT 1 FROM question_attempts WHERE challenge_id=?)").bind(questionID,id),
+      // A warm-up never joins the question pool or Library.
+      ...(input.warmUp ? [] : [
+        env.DB.prepare("INSERT OR IGNORE INTO questions(id,account_id,data,created_at,eligibility_updated_at) SELECT ?,account_id,data,created_at,created_at FROM challenges WHERE id=?").bind(questionID,id),
+        env.DB.prepare("INSERT OR IGNORE INTO question_attempts(challenge_id,question_id) SELECT id,? FROM challenges WHERE id=?").bind(questionID,id),
+        env.DB.prepare("UPDATE questions SET eligible=0,eligibility_revision=eligibility_revision+1 WHERE id=? AND EXISTS(SELECT 1 FROM question_attempts WHERE challenge_id=?)").bind(questionID,id),
+      ]),
       env.DB.prepare(
         "INSERT OR IGNORE INTO sessions(challenge_id,updated_at) SELECT id,? FROM challenges WHERE id=?",
       ).bind(now, id),
@@ -273,7 +278,8 @@ export async function runJob(env: Env, id: string) {
   else throw new Error("Unknown job kind");
   if (job.kind === "summarize") data = groundReflection(data, context);
   const table = job.kind === "summarize" ? "reflections" : "examples";
-  const recallWrites = job.kind === "summarize"
+  const warmUp = job.kind === "summarize" && !!(await env.DB.prepare("SELECT 1 FROM challenges c WHERE c.id=? AND NOT " + COUNTED).bind(job.challenge_id).first());
+  const recallWrites = job.kind === "summarize" && !warmUp
     ? ((data as z.infer<typeof reflectionOutputSchema>).evidence ?? []).map((e, index) => {
         const reflection = data as z.infer<typeof reflectionOutputSchema>;
         const label = concepts.find(concept => concept.id === e.conceptId)?.label ?? e.conceptId;

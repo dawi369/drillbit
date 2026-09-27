@@ -6382,6 +6382,9 @@
                     "mock_interview"
                   ]
                 },
+                "warmUp": {
+                  "type": "boolean"
+                },
                 "interview": {
                   "type": "object",
                   "properties": {
@@ -7655,6 +7658,9 @@
                     "coach_me",
                     "mock_interview"
                   ]
+                },
+                "warmUp": {
+                  "type": "boolean"
                 },
                 "interview": {
                   "type": "object",
@@ -10112,6 +10118,9 @@
           },
           "followUpId": {
             "type": "string"
+          },
+          "warmUp": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -10326,6 +10335,9 @@
               "coach_me",
               "mock_interview"
             ]
+          },
+          "warmUp": {
+            "type": "boolean"
           },
           "interview": {
             "type": "object",
@@ -11861,6 +11873,9 @@
                       "mock_interview"
                     ]
                   },
+                  "warmUp": {
+                    "type": "boolean"
+                  },
                   "interview": {
                     "type": "object",
                     "properties": {
@@ -12861,6 +12876,9 @@
                   "mock_interview"
                 ]
               },
+              "warmUp": {
+                "type": "boolean"
+              },
               "interview": {
                 "type": "object",
                 "properties": {
@@ -13832,6 +13850,9 @@
                       "coach_me",
                       "mock_interview"
                     ]
+                  },
+                  "warmUp": {
+                    "type": "boolean"
                   },
                   "interview": {
                     "type": "object",
@@ -14830,6 +14851,9 @@
                     "coach_me",
                     "mock_interview"
                   ]
+                },
+                "warmUp": {
+                  "type": "boolean"
                 },
                 "interview": {
                   "type": "object",
@@ -15830,6 +15854,9 @@
                     "mock_interview"
                   ]
                 },
+                "warmUp": {
+                  "type": "boolean"
+                },
                 "interview": {
                   "type": "object",
                   "properties": {
@@ -16765,6 +16792,9 @@
                       "coach_me",
                       "mock_interview"
                     ]
+                  },
+                  "warmUp": {
+                    "type": "boolean"
                   },
                   "interview": {
                     "type": "object",

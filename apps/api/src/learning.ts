@@ -2,7 +2,7 @@ import { isSocialOpening } from "./prompts/interviewer";
 import { Fault, defaultLearningPlan, reflectionSchema, timestamp, type Settings } from "./domain";
 import type { Env } from "./platform";
 import type { ChallengeRow } from "./store";
-import { activeChallenge, detail, ownedChallenge } from "./store";
+import { activeChallenge, COUNTED, detail, ownedChallenge } from "./store";
 import { z } from "zod";
 import { Temporal } from "@js-temporal/polyfill";
 
@@ -15,7 +15,7 @@ export async function todayPlan(env: Env, account: string, active: ChallengeRow 
     env.DB.prepare(`SELECT COUNT(*) completed_total,
       SUM(CASE WHEN completed_at>=? THEN 1 ELSE 0 END) completed_last_seven,
       SUM(CASE WHEN completed_at>=? THEN 1 ELSE 0 END) completed_today
-      FROM challenges WHERE account_id=? AND lifecycle='completed'`)
+      FROM challenges c WHERE account_id=? AND lifecycle='completed' AND ${COUNTED}`)
       .bind(weekStart,dayStart,account).first<{completed_total:number;completed_last_seven:number;completed_today:number}>(),
     env.DB.prepare("SELECT COUNT(*) count FROM recall_cards WHERE account_id=? AND due_at<=?")
       .bind(account,now).first<{count:number}>(),
@@ -149,7 +149,7 @@ export function groundReflection(raw: unknown, context: any) {
 /** Counts are practice exposure. Observations remain attributed model feedback. */
 export async function learningEvidence(env: Env, account: string, level?: string) {
   const rows = await env.DB.prepare(`SELECT c.id,c.completed_at,r.data FROM challenges c
-    JOIN reflections r ON r.challenge_id=c.id WHERE c.account_id=? AND c.lifecycle='completed' AND (? IS NULL OR json_extract(c.data,'$.engineeringLevel')=?)
+    JOIN reflections r ON r.challenge_id=c.id WHERE c.account_id=? AND c.lifecycle='completed' AND ${COUNTED} AND (? IS NULL OR json_extract(c.data,'$.engineeringLevel')=?)
     ORDER BY c.completed_at DESC,c.id DESC LIMIT 100`).bind(account,level ?? null,level ?? null)
     .all<{id:string;completed_at:string;data:string}>();
   return rows.results.flatMap(row => {

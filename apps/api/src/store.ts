@@ -145,6 +145,8 @@ export async function detail(env: Env, account: string, id: string) {
     example: example ? parseJSON(example.data) : null,
   };
 }
+/** SQL guard for counted practice; onboarding warm-ups are excluded. Expects the challenges alias `c`. */
+export const COUNTED = "COALESCE(json_extract(c.data,'$.warmUp'),0)=0";
 export function present(row: ChallengeRow) {
   const { evaluationCriteria, ambiguityPolicy, targetSkill, tagEvidence, selectionSnapshot, ...content } =
     parseJSON<Record<string, unknown>>(row.data);

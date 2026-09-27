@@ -23,6 +23,7 @@ import {
     accountFor,
     activeChallenge,
     complete,
+    COUNTED,
     createJob,
     detail,
     ownedChallenge,
@@ -566,7 +567,7 @@ app.get("/v1/sessions", async (c) => {
   }
   const search = (c.req.query("q") ?? "").slice(0, 160);
   const rows = await c.env.DB.prepare(
-    `SELECT c.*,r.data AS reflection FROM challenges c LEFT JOIN reflections r ON r.challenge_id=c.id WHERE c.account_id=? AND c.lifecycle='completed' AND (?='' OR instr(lower(json_extract(c.data,'$.title')),lower(?))>0 OR instr(lower(json_extract(c.data,'$.topic')),lower(?))>0) AND (? IS NULL OR c.completed_at<? OR (c.completed_at=? AND c.id<?)) ORDER BY c.completed_at DESC,c.id DESC LIMIT 26`,
+    `SELECT c.*,r.data AS reflection FROM challenges c LEFT JOIN reflections r ON r.challenge_id=c.id WHERE c.account_id=? AND c.lifecycle='completed' AND ${COUNTED} AND (?='' OR instr(lower(json_extract(c.data,'$.title')),lower(?))>0 OR instr(lower(json_extract(c.data,'$.topic')),lower(?))>0) AND (? IS NULL OR c.completed_at<? OR (c.completed_at=? AND c.id<?)) ORDER BY c.completed_at DESC,c.id DESC LIMIT 26`,
   )
     .bind(
       a,
@@ -597,10 +598,10 @@ app.get("/v1/memory", async (c) => {
   const asOf = timestamp();
   const cutoff = new Date(Date.parse(asOf) - 7 * 86400000).toISOString();
   const statistics = await c.env.DB.prepare(
-    "SELECT COUNT(*) AS completed, COALESCE(SUM(CASE WHEN completed_at>=? AND completed_at<=? THEN 1 ELSE 0 END),0) AS lastSevenDays FROM challenges WHERE account_id=? AND lifecycle='completed'"
+    "SELECT COUNT(*) AS completed, COALESCE(SUM(CASE WHEN completed_at>=? AND completed_at<=? THEN 1 ELSE 0 END),0) AS lastSevenDays FROM challenges c WHERE account_id=? AND lifecycle='completed' AND " + COUNTED
   ).bind(cutoff, asOf, c.get("account").id).first<{ completed: number; lastSevenDays: number }>();
   const rows = await c.env.DB.prepare(
-    "SELECT c.*,r.data AS reflection FROM challenges c LEFT JOIN reflections r ON r.challenge_id=c.id WHERE c.account_id=? AND c.lifecycle='completed' ORDER BY c.completed_at DESC LIMIT 100",
+    "SELECT c.*,r.data AS reflection FROM challenges c LEFT JOIN reflections r ON r.challenge_id=c.id WHERE c.account_id=? AND c.lifecycle='completed' AND " + COUNTED + " ORDER BY c.completed_at DESC LIMIT 100",
   )
     .bind(c.get("account").id)
     .all<ChallengeRow & { reflection: string | null }>();

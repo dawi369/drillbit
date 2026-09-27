@@ -1,11 +1,12 @@
 import { learningEvidence } from "./learning";
 import type { Env } from "./platform";
+import { COUNTED } from "./store";
 
 /** Bounded factual snapshot; no raw old answers or inferred skill scores. */
 export async function historicalSnapshot(env: Env, account: string, excludeAttempt = "", relevantConcepts: string[] = []) {
   const [rows, coverage, evidence] = await Promise.all([env.DB.prepare(`SELECT c.id,c.data,c.lifecycle,c.completed_at,c.created_at,r.data AS feedback
     FROM challenges c LEFT JOIN reflections r ON r.challenge_id=c.id
-    WHERE c.account_id=? AND c.id<>? AND c.lifecycle IN ('completed','skipped')
+    WHERE c.account_id=? AND c.id<>? AND c.lifecycle IN ('completed','skipped') AND ${COUNTED}
     ORDER BY COALESCE(c.completed_at,c.created_at) DESC,c.id DESC LIMIT 8`)
     .bind(account, excludeAttempt).all<{id:string;data:string;lifecycle:string;completed_at:string|null;created_at:string;feedback:string|null}>(),
     env.DB.prepare(`SELECT json_extract(q.data,'$.engineeringLevel') engineeringLevel, t.value conceptId,

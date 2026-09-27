@@ -165,6 +165,8 @@ export const generationSchema = z.object({
   replaceId: z.string().optional(),
   instruction: z.string().trim().max(1000).default(""),
   followUpId: z.string().optional(),
+  // Onboarding warm-up: a real generated interview that never counts as practice.
+  warmUp: z.boolean().optional(),
 });
 export const helpInputSchema = z.object({
   kind: z.enum([

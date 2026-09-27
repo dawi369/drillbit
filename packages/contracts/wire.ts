@@ -56,6 +56,8 @@ const challenge = challengeSchema.extend({
   questionId: z.string().optional(), scenario:z.string().optional(), primaryConceptId:conceptId.optional(), conceptIds:z.array(conceptId).optional(), selectionReason:z.string().optional(), constraints:z.array(z.string()).max(5).optional(),
   interviewStyle: interviewStyleSchema.optional(),
   guidanceMode: guidanceModeSchema.optional(),
+  // Onboarding warm-up: excluded from progress, Recall, evidence and history.
+  warmUp: z.boolean().optional(),
   interview: interview.optional(),
   difficulty: z.enum(["easy", "medium", "hard"]).optional(),
   engineeringLevel: engineeringLevelSchema.optional(),
