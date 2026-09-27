@@ -82,9 +82,13 @@ struct SessionDetailView: View {
     let challenge = current ?? initial
     ScrollView {
       VStack(alignment: .leading, spacing: 24) {
-        Text(challenge.title).font(.title.weight(.semibold))
-        Text(challenge.levelLabel).foregroundStyle(.secondary)
-        if let date = challenge.completedAt.flatMap({ Date.fromAPI($0) }) { Text(date.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary) }
+        VStack(alignment: .leading, spacing: 8) {
+          SignalEyebrow(text: challenge.lifecycle == "completed" ? "Completed session" : "Session")
+          Text(challenge.title).font(.title.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
+            .accessibilityAddTraits(.isHeader)
+          let date = challenge.completedAt.flatMap { Date.fromAPI($0) }?.formatted(date: .abbreviated, time: .shortened)
+          DrillbitMetadata(text: [challenge.levelLabel, date].compactMap { $0 }.joined(separator: " · "))
+        }
         Text(challenge.prompt).foregroundStyle(.secondary)
         if let interview = challenge.interview, !interview.turns.isEmpty {
           NavigationLink("Interview conversation") { InterviewConversation(state: interview) }

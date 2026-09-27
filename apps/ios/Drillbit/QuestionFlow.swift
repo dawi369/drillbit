@@ -25,6 +25,7 @@ struct QuestionFlow: View {
   @State private var showingPreview = false
   @State private var question: Challenge?
   @State private var loading = false
+  @State private var generated = false
   @State private var starting = false
   @State private var failure: String?
   @State private var retryInput: PreparationInput?
@@ -45,11 +46,11 @@ struct QuestionFlow: View {
                 retryInput = PreparationInput(primaryConceptId: concept.id, focus: "System design", kind: "design", difficulty: model.settings.difficulty, engineeringLevel: model.settings.selectedLevel, replaceId: model.bootstrap?.challenge?.lifecycle == "ready" ? model.bootstrap?.challenge?.id : nil)
               } label: {
                 HomeTopicRow(concept: concept, coverage: model.libraryCoverage.first(where: { $0.conceptId == concept.id }), loaded: model.libraryCoverageLoaded)
-              }.buttonStyle(.plain)
+              }.buttonStyle(DrillbitRowButtonStyle())
               }
             } else {
               ForEach(PracticeAreaGroup.all.filter { topicSearch.isEmpty || $0.title.localizedCaseInsensitiveContains(topicSearch) || $0.detail.localizedCaseInsensitiveContains(topicSearch) }) { area in
-                Button { selectedArea = area } label: { PracticeAreaGroupRow(area: area) }.buttonStyle(.plain)
+                Button { selectedArea = area } label: { PracticeAreaGroupRow(area: area) }.buttonStyle(DrillbitRowButtonStyle())
                   .accessibilityIdentifier("browse-area-" + area.id)
               }
             }
@@ -72,21 +73,26 @@ struct QuestionFlow: View {
           if loading {
             LoadingStatus("Preparing your question…", centered: true)
               .frame(maxWidth: .infinity, maxHeight: .infinity)
+              .transition(.opacity)
           } else {
             ScrollView {
               VStack(alignment: .leading, spacing: 16) {
                 if let question {
-                  SignalEyebrow(text: "The scenario")
-                  Text(question.title).font(.largeTitle.weight(.semibold)).tracking(-0.8)
-                    .fixedSize(horizontal: false, vertical: true)
-                  if question.guidanceMode == .learnTogether {
-                    Text(question.id == FirstUseProgress.challengeID ? "A short, guided warm-up. It won’t count toward your practice." : "Guided practice helps you structure the approach.")
-                      .font(.subheadline).foregroundStyle(.secondary)
-                  }
-                  Text(question.displayPrompt)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .textSelection(.enabled).accessibilityIdentifier("previewPrompt")
+                  VStack(alignment: .leading, spacing: 16) {
+                    SignalEyebrow(text: "The scenario")
+                    Text(question.title).font(.largeTitle.weight(.semibold)).tracking(-0.8)
+                      .fixedSize(horizontal: false, vertical: true)
+                  }.signalEntrance(0, active: generated)
+                  VStack(alignment: .leading, spacing: 16) {
+                    if question.guidanceMode == .learnTogether {
+                      Text(question.id == FirstUseProgress.challengeID ? "A short, guided warm-up. It won’t count toward your practice." : "Guided practice helps you structure the approach.")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    Text(question.displayPrompt)
+                      .fixedSize(horizontal: false, vertical: true)
+                      .frame(maxWidth: .infinity, alignment: .leading)
+                      .textSelection(.enabled).accessibilityIdentifier("previewPrompt")
+                  }.signalEntrance(1, active: generated)
                 }
                 if let failure {
                   Text(failure).foregroundStyle(.secondary)
@@ -99,7 +105,7 @@ struct QuestionFlow: View {
         }.safeAreaInset(edge: .bottom) {
           if let question, !loading {
             VStack(spacing: 12) {
-              Button(question.lifecycle == "in_progress" ? "Resume" : isStarter ? "Start practice" : "Start interview") {
+              Button {
                 starting = true
                 Task {
                   do {
@@ -108,7 +114,14 @@ struct QuestionFlow: View {
                   } catch { failure = error.localizedDescription }
                   starting = false
                 }
+              } label: {
+                HStack(spacing: 8) {
+                  if starting { ProgressView().controlSize(.small).tint(AppPalette.actionInk).transition(.iconPop) }
+                  Text(question.lifecycle == "in_progress" ? "Resume" : isStarter ? "Start practice" : "Start interview")
+                }
+                .animation(DrillbitMotion.fast, value: starting)
               }.buttonStyle(PracticeButtonStyle()).disabled(starting)
+                .accessibilityLabel(question.lifecycle == "in_progress" ? "Resume" : isStarter ? "Start practice" : "Start interview")
                 .accessibilityIdentifier("previewStart")
               if question.lifecycle == "ready" && question.id != FirstUseProgress.challengeID {
                 Button("Choose another question") { showingPreview = false; failure = nil }.disabled(starting)
@@ -128,6 +141,7 @@ struct QuestionFlow: View {
             do {
               let result = try await model.generateForPreview(input)
               guard capturedAccount == model.bootstrap?.account.id else { return }
+              generated = true
               question = result
             } catch {
               guard capturedAccount == model.bootstrap?.account.id else { return }
@@ -137,7 +151,7 @@ struct QuestionFlow: View {
               model.failedPreparationSource = source
               retryInput = input
             }
-            loading = false
+            withAnimation(DrillbitMotion.fast) { loading = false }
           }
         }, recovery: retryInput ?? recovery)
       }

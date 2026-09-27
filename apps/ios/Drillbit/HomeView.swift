@@ -7,6 +7,13 @@ struct HomeView: View {
   @State private var started: Challenge?
   @State private var skipping: Challenge?
   @State private var chooseAfterSkip = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  /// Changes when the question area switches state, never while typing or polling.
+  private var questionState: String {
+    let challenge = model.bootstrap?.challenge
+    let preparing = model.busy || model.bootstrap?.jobs.contains(where: { $0.kind == "generate" && ["pending", "running"].contains($0.status) }) == true
+    return "\(model.firstUse.stage)|\(challenge?.id ?? "")|\(challenge?.lifecycle ?? "")|\(preparing)|\(model.preparationFailure != nil)"
+  }
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 32) {
@@ -29,6 +36,7 @@ struct HomeView: View {
             .accessibilityLabel("Dismiss practice completion")
           }
           .accessibilityIdentifier("practiceCompletionNotice")
+          .transition(.opacity)
           Divider()
         }
         VStack(alignment: .leading, spacing: 20) {
@@ -76,11 +84,13 @@ struct HomeView: View {
                 else { flow = QuestionFlowEntry(challenge: challenge) }
               }.buttonStyle(PracticeButtonStyle()).accessibilityIdentifier("startPractice")
             }
+            .id(challenge.id)
+            .transition(.opacity.combined(with: .offset(y: reduceMotion ? 0 : 8)))
           } else if !model.busy {
             Button("Prepare question") { flow = QuestionFlowEntry() }.buttonStyle(PracticeButtonStyle())
           }
           if model.busy || model.bootstrap?.jobs.contains(where: { $0.kind == "generate" && ["pending", "running"].contains($0.status) }) == true {
-            LoadingStatus("Preparing your question…")
+            LoadingStatus("Preparing your question…").transition(.opacity)
           }
           if let failure = model.preparationFailure {
             Text(failure).font(.subheadline).foregroundStyle(.secondary)
@@ -93,6 +103,7 @@ struct HomeView: View {
             }
           }
           }
+          .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: questionState)
         }
         if model.bootstrap?.todayPlan?.completedTotal != 0 {
           VStack(alignment: .leading, spacing: 12) {
@@ -101,10 +112,12 @@ struct HomeView: View {
             PracticeOverview(memory: model.memory)
           }
         }
-        if let revisit = model.homeRevisit { revisitSection(revisit) }
+        if let revisit = model.homeRevisit { revisitSection(revisit).transition(.opacity) }
         exploreSection
       }.frame(maxWidth: 640, alignment: .leading).frame(maxWidth: .infinity)
         .padding(.horizontal, 24).padding(.top, 24).padding(.bottom, 40)
+        .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: model.homeRevisit == nil)
+        .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: model.completionNoticeAccount)
     }.drillbitTabClearance()
       .task(id: model.bootstrap?.account.id) { await model.ensureHomeQuestion() }
       .alert("Skip this question?", isPresented: Binding(get: { skipping != nil }, set: { if !$0 { skipping = nil } })) {
@@ -133,25 +146,36 @@ struct HomeView: View {
   private func revisitSection(_ item: HomeRevisit) -> some View {
     VStack(alignment: .leading, spacing: 12) {
       HStack {
-        DrillbitSectionHeader(title: "Revisit")
+        SignalEyebrow(text: "Revisit").accessibilityAddTraits(.isHeader)
         Spacer()
         Button { Task { await model.dismissHomeRevisit(item) } } label: {
-          Image(systemName: "xmark").foregroundStyle(.secondary).frame(width: 44, height: 44)
+          Image(systemName: "xmark").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary).frame(width: 44, height: 44)
         }.buttonStyle(.plain).accessibilityLabel("Dismiss revisit suggestion")
       }
-      VStack(alignment: .leading, spacing: 12) {
+      VStack(alignment: .leading, spacing: 8) {
         Text(model.taxonomy.first(where: { $0.id == item.evidence.conceptId })?.label ?? "From your practice")
-          .font(.headline)
+          .font(.title3.weight(.semibold))
         Text(item.evidence.observation).font(.subheadline).foregroundStyle(.secondary)
-        NavigationLink("Review reasoning") { SessionDetailView(model: model, initial: item.source) }
-          .frame(minHeight: 44)
-        if let concept = model.taxonomy.first(where: { $0.id == item.evidence.conceptId }) {
-          Button("Practise this concept") { prepare(concept, source: item.source) }
-            .buttonStyle(PracticeButtonStyle(secondary: true))
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      ViewThatFits(in: .horizontal) {
+        HStack(spacing: 24) { revisitLinks(item) }
+        VStack(alignment: .leading, spacing: 0) { revisitLinks(item) }
+      }
+      .font(.body.weight(.medium))
+    }
+  }
+  @ViewBuilder private func revisitLinks(_ item: HomeRevisit) -> some View {
+    NavigationLink("Review reasoning") { SessionDetailView(model: model, initial: item.source) }
+      .frame(minHeight: 44)
+    if let concept = model.taxonomy.first(where: { $0.id == item.evidence.conceptId }) {
+      Button { prepare(concept, source: item.source) } label: {
+        HStack(spacing: 4) {
+          Text("Practise this concept")
+          Image(systemName: "arrow.right").font(.subheadline.weight(.semibold)).accessibilityHidden(true)
         }
       }
-      .padding(.top, 16)
-      .overlay(alignment: .top) { AppPalette.hairline.frame(height: 1) }
+      .frame(minHeight: 44)
     }
   }
   private var exploreSection: some View {
@@ -162,12 +186,17 @@ struct HomeView: View {
         ForEach(areas) { area in
           Button { flow = QuestionFlowEntry(browseTopics: true, area: area) } label: {
             PracticeAreaGroupRow(area: area)
-          }.buttonStyle(.plain)
+          }.buttonStyle(DrillbitRowButtonStyle())
           if area.id != areas.last?.id { Divider() }
         }
       }
-      Button("See all areas", systemImage: "arrow.right") { flow = QuestionFlowEntry(browseTopics: true) }
-        .frame(minHeight: 44)
+      Button { flow = QuestionFlowEntry(browseTopics: true) } label: {
+        HStack(spacing: 4) {
+          Text("See all areas")
+          Image(systemName: "arrow.right").font(.subheadline.weight(.semibold)).accessibilityHidden(true)
+        }
+      }
+      .frame(minHeight: 44)
     }.task { await model.loadTaxonomy() }
   }
 
@@ -212,6 +241,8 @@ struct PracticeOverview: View {
   private func metric(_ title: String, value: Int) -> some View {
     VStack(alignment: .leading, spacing: 4) {
       Text(String(value)).font(.system(.title, design: .rounded, weight: .bold)).monospacedDigit()
+        .contentTransition(.numericText(value: Double(value)))
+        .animation(DrillbitMotion.reveal, value: value)
       Text(title).font(.subheadline).foregroundStyle(.secondary)
     }.frame(maxWidth: .infinity, alignment: .leading)
       .accessibilityElement(children: .ignore)
@@ -253,7 +284,7 @@ struct HomeTopicRow: View {
       VStack(alignment: .leading, spacing: 4) {
         Text(concept.label).font(.body.weight(.medium)).foregroundStyle(.primary)
         if loaded {
-          DrillbitMetadata(text: (coverage?.completedAttempts ?? 0) == 0 ? (concept.description ?? "A core system design decision.") : "\((coverage?.completedAttempts ?? 0)) completed sessions")
+          DrillbitMetadata(text: (coverage?.completedAttempts ?? 0) == 0 ? (concept.description ?? "A core system design decision.") : "\(coverage?.completedAttempts ?? 0) completed \(coverage?.completedAttempts == 1 ? "session" : "sessions")")
         }
       }
       Spacer(minLength: 0)
@@ -264,25 +295,43 @@ struct HomeTopicRow: View {
 
 private struct SignalJourney: View {
   let inProgress: Bool
+  @Environment(\.dynamicTypeSize) private var typeSize
   var body: some View {
-    HStack(alignment: .top, spacing: 0) {
-      step("01", "Question", active: !inProgress)
-      Rectangle().fill(AppPalette.hairline).frame(height: 1).padding(.top, 8)
-      step("02", "Interview", active: inProgress)
-      Rectangle().fill(AppPalette.hairline).frame(height: 1).padding(.top, 8)
-      step("03", "Recall", active: false)
+    Group {
+      // Three columns split words mid-syllable at accessibility sizes.
+      if typeSize.isAccessibilitySize {
+        VStack(alignment: .leading, spacing: 12) {
+          step("01", "Question", active: !inProgress)
+          step("02", "Interview", active: inProgress)
+          step("03", "Recall", active: false)
+        }
+      } else {
+        HStack(alignment: .top, spacing: 0) {
+          step("01", "Question", active: !inProgress)
+          Rectangle().fill(AppPalette.hairline).frame(height: 1).padding(.top, 8)
+          step("02", "Interview", active: inProgress)
+          Rectangle().fill(AppPalette.hairline).frame(height: 1).padding(.top, 8)
+          step("03", "Recall", active: false)
+        }
+      }
     }
     .accessibilityElement(children: .combine)
     .accessibilityLabel(inProgress ? "Interview in progress; Recall follows" : "Question ready; interview and Recall follow")
   }
-  private func step(_ number: String, _ title: String, active: Bool) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
-      Circle().fill(active ? AppPalette.action : AppPalette.elevated)
-        .frame(width: 16, height: 16)
-        .overlay { Circle().stroke(active ? AppPalette.action : AppPalette.hairline, lineWidth: 1) }
-      Text(title).font(.caption.weight(active ? .semibold : .regular))
-        .foregroundStyle(active ? AppPalette.primary : AppPalette.secondary)
-      Text(number).font(.caption2.monospaced()).foregroundStyle(AppPalette.secondary)
+  @ViewBuilder private func step(_ number: String, _ title: String, active: Bool) -> some View {
+    let marker = Circle().fill(active ? AppPalette.action : AppPalette.elevated)
+      .frame(width: 16, height: 16)
+      .overlay { Circle().stroke(active ? AppPalette.action : AppPalette.hairline, lineWidth: 1) }
+    let label = Text(title).font(.caption.weight(active ? .semibold : .regular))
+      .foregroundStyle(active ? AppPalette.primary : AppPalette.secondary)
+    if typeSize.isAccessibilitySize {
+      HStack(spacing: 12) { marker; label }
+    } else {
+      VStack(alignment: .leading, spacing: 8) {
+        marker
+        label
+        Text(number).font(.caption2.monospaced()).foregroundStyle(AppPalette.secondary)
+      }
     }
   }
 }

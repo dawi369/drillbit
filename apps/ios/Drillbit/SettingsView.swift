@@ -33,15 +33,6 @@ struct SettingsView: View {
         Picker("Engineering level", selection: $model.settings.selectedLevel) {
           ForEach(EngineeringLevel.choices, id: \.0) { Text($0.1).tag($0.0) }
         }
-        DatePicker("Reminder time", selection: time, displayedComponents: .hourAndMinute)
-        NavigationLink { TimeZoneSelectionView(selection: $model.settings.timezone) } label: {
-          HStack(spacing: 8) {
-            Text("Time zone")
-            Spacer(minLength: 8)
-            Text(TimeZoneSelectionView.label(model.settings.timezone))
-              .foregroundStyle(.secondary).lineLimit(1)
-          }
-        }
         Toggle("Daily reminder", isOn: Binding(
           get: { model.settings.reminderEnabled },
           set: { enabled in
@@ -58,6 +49,18 @@ struct SettingsView: View {
             }
           }
         )).disabled(reminderPermissionPending)
+        // The reminder time only matters while reminders are on; the time zone also sets the practice day.
+        if model.settings.reminderEnabled {
+          DatePicker("Reminder time", selection: time, displayedComponents: .hourAndMinute)
+        }
+        NavigationLink { TimeZoneSelectionView(selection: $model.settings.timezone) } label: {
+          HStack(spacing: 8) {
+            Text("Time zone")
+            Spacer(minLength: 8)
+            Text(TimeZoneSelectionView.label(model.settings.timezone))
+              .foregroundStyle(.secondary).lineLimit(1)
+          }
+        }
         ReminderPermissionRow()
       }
       Section { NavigationLink("LLM provider") { AIAccessView(model: model) } }
