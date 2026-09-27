@@ -1,49 +1,39 @@
-import { structured } from "./ai";
-import { practiceProfileSchema } from "./domain";
-import { dailyQuestion } from "./daily";
-import { startVoice, voiceEvents, delegateVoice, voiceCapability } from "./voice";
-import { exportPage } from "./export";
-import { learningEvidence, recallDeck, reviewRecall, retryMoment, todayPlan } from "./learning";
-import { concepts } from "./taxonomy";
-import { libraryPage, questionDetail, setEligibility, startQuestion, coverage } from "./library";
-import { cancelInterviewAssistance, interviewStreamSnapshot, interviewInputSchema, requestInterview, retryInterview } from "./interview";
-import { updateContext, receive } from "./companion";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { streamSSE } from "hono/streaming";
 import { z } from "zod";
+import { messagesFor, provider, recordUsage, structured, textDeltas } from "./ai";
+import { receive, updateContext } from "./companion";
+import { dailyQuestion } from "./daily";
 import {
-  Fault,
-  MODEL_ID,
-  generationSchema,
-  levelForDifficulty,
-  answerSchema,
-  settingsSchema,
-  requireCommand,
-  timestamp,
-  uuid,
-  nextDaily,
-  parseJSON,
-  validateLearningPlanDate,
+    Fault,
+    MODEL_ID, answerSchema, generationSchema,
+    levelForDifficulty, nextDaily,
+    parseJSON, practiceProfileSchema, requireCommand, settingsSchema, timestamp,
+    uuid, validateLearningPlanDate
 } from "./domain";
-import { identity, hash, encrypt, consumeUsage, type Env } from "./platform";
-import {
-  accountFor,
-  settingsFor,
-  activeChallenge,
-  ownedChallenge,
-  detail,
-  present,
-  createJob,
-  complete,
-  dispatch,
-  type Account,
-  type ChallengeRow,
-  type Job,
-} from "./store";
-import { messagesFor, provider, textDeltas, recordUsage } from "./ai";
-import { requestHelp, adopt } from "./practice";
+import { exportPage } from "./export";
+import { cancelInterviewAssistance, interviewInputSchema, interviewStreamSnapshot, requestInterview, retryInterview } from "./interview";
 import { reconcile, runJobSafely } from "./jobs";
+import { learningEvidence, recallDeck, retryMoment, reviewRecall, todayPlan } from "./learning";
+import { coverage, libraryPage, questionDetail, setEligibility, startQuestion } from "./library";
+import { consumeUsage, encrypt, hash, identity, type Env } from "./platform";
+import { adopt, requestHelp } from "./practice";
+import {
+    accountFor,
+    activeChallenge,
+    complete,
+    createJob,
+    detail,
+    ownedChallenge,
+    present,
+    settingsFor,
+    type Account,
+    type ChallengeRow,
+    type Job
+} from "./store";
+import { concepts } from "./taxonomy";
+import { delegateVoice, startVoice, voiceCapability, voiceEvents } from "./voice";
 export { PracticeWorkflow } from "./jobs";
 export const app = new Hono<{
   Bindings: Env;

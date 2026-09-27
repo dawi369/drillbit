@@ -1,11 +1,11 @@
-import { guidanceModeSchema, guidanceMode } from "./prompts/teaching";
-import { assertNoVoice } from "./voice";
 import { z } from "zod";
-import { historicalSnapshot } from "./history";
-import { INTERVIEW_PROMPT_VERSION } from "./prompts/interviewer";
 import { Fault, timestamp } from "./domain";
+import { historicalSnapshot } from "./history";
 import { consumeUsage, type Env } from "./platform";
-import { ownedChallenge, settingsFor, dispatch, type Job } from "./store";
+import { INTERVIEW_PROMPT_VERSION } from "./prompts/interviewer";
+import { guidanceMode, guidanceModeSchema } from "./prompts/teaching";
+import { dispatch, ownedChallenge, settingsFor, type Job } from "./store";
+import { assertNoVoice } from "./voice";
 
 export const interviewStyleSchema = z.enum(["quick", "standard", "in_depth"]);
 export const interviewInputSchema = z.object({

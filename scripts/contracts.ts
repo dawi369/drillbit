@@ -1,6 +1,6 @@
+import { writeFileSync } from "node:fs";
 import { z } from "../apps/api/node_modules/zod";
 import { wire } from "../packages/contracts/wire";
-import { writeFileSync } from "node:fs";
 const definitions = Object.fromEntries(
   Object.entries(wire).map(([name, schema]) => [name, z.toJSONSchema(schema)]),
 );
