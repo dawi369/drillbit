@@ -8,6 +8,8 @@ import { beforeAll, afterAll, it, expect } from "vitest";
 import { SignJWT, generateKeyPair, exportJWK } from "jose";
 import { app } from "../src/index";
 import { accountFor } from "../src/store";
+import { provider, recordUsage } from "../src/ai";
+import { settingsSchema } from "../src/domain";
 import { initializeDatabase } from "./migrations";
 import { wire } from "../../../packages/contracts/wire";
 import type { Env } from "../src/platform";
@@ -367,4 +369,36 @@ it('personalization preview is explicit, bounded and does not save settings or c
   expect((await settings.json() as any).settings.practiceProfile).toBeUndefined();
   expect(await bindings.DB.prepare('SELECT id FROM jobs WHERE account_id=?').bind(account.id).first()).toBeNull();
  }finally{bindings.MANAGED_AI_ENABLED=oldEnabled;bindings.OPENROUTER_API_KEY=oldKey;}
+});
+
+it('saves a BYOK key only with a model that can do structured output, then uses that model',async()=>{
+ const subject=crypto.randomUUID(); const account=await accountFor(bindings,subject);
+ await bindings.DB.prepare("UPDATE accounts SET status='active' WHERE id=?").bind(account.id).run();
+ const oldKey=bindings.CREDENTIAL_KEY;
+ bindings.CREDENTIAL_KEY=btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
+ const models:string[]=[];
+ const openrouter=(status:number)=>fetchMock.get('https://openrouter.ai').intercept({path:'/api/v1/chat/completions',method:'POST'}).reply(status,(opts:{body?:unknown})=>{const body=JSON.parse(String(opts.body));models.push(body.model);return {choices:[{message:{content:'{"ok":true}'}}],usage:{prompt_tokens:3,completion_tokens:2}};});
+ try {
+  openrouter(404);
+  let response=await request('credential',subject,'PUT',{key:'sk-or-v1-test-key-9876',model:'nobody/not-a-model'});
+  expect(response.status).toBe(422);
+  expect(await response.json()).toMatchObject({error:{code:'model_invalid'}});
+  expect(await bindings.DB.prepare('SELECT id FROM credentials WHERE account_id=?').bind(account.id).first()).toBeNull();
+  expect((await request('credential',subject,'PUT',{key:'sk-or-v1-test-key-9876',model:'not a model'})).status).toBe(400);
+
+  openrouter(200);
+  response=await request('credential',subject,'PUT',{key:'sk-or-v1-test-key-9876',model:'anthropic/claude-opus-5.5'});
+  expect(response.status).toBe(200);
+  const saved=await response.json();
+  expect(wire.Credential.parse(saved)).toEqual({suffix:'9876',model:'anthropic/claude-opus-5.5'});
+  const bootstrap=await (await request('bootstrap',subject)).json() as any;
+  expect(bootstrap.credential).toEqual({suffix:'9876',model:'anthropic/claude-opus-5.5'});
+
+  const settings=settingsSchema.parse({aiMode:'byok'});
+  openrouter(200);
+  await provider(bindings,account.id,settings,[{role:'user',content:'hi'}]);
+  await recordUsage(bindings,account.id,settings,'coach',{prompt_tokens:3,completion_tokens:2});
+  expect(models).toEqual(['nobody/not-a-model','anthropic/claude-opus-5.5','anthropic/claude-opus-5.5']);
+  expect(await bindings.DB.prepare("SELECT model FROM ai_runs WHERE account_id=? AND kind='coach'").bind(account.id).first()).toEqual({model:'anthropic/claude-opus-5.5'});
+ }finally{bindings.CREDENTIAL_KEY=oldKey;}
 });

@@ -9,6 +9,7 @@ import eighth from "../migrations/0008_question_library.sql?raw";
 import ninth from "../migrations/0009_voice.sql?raw";
 import tenth from "../migrations/0010_daily_visits.sql?raw";
 import eleventh from "../migrations/0011_learning_loop.sql?raw";
+import twelfth from "../migrations/0012_credential_model.sql?raw";
 export async function initializeDatabase(db: D1Database) {
   for (const sql of [first, second, third, fourth, fifth, sixth, seventh, eighth, ninth, tenth, eleventh])
     for (const statement of sql.split(";").filter((s) => s.trim()))
@@ -23,4 +24,9 @@ export async function initializeDatabase(db: D1Database) {
             .replace(/CREATE INDEX /g, "CREATE INDEX IF NOT EXISTS "),
         )
         .run();
+  // ADD COLUMN has no IF NOT EXISTS; a repeat initialisation already has it.
+  for (const statement of twelfth.split(";").filter((s) => s.trim()))
+    await db.prepare(statement).run().catch((error: Error) => {
+      if (!/duplicate column/i.test(error.message)) throw error;
+    });
 }

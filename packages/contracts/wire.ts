@@ -169,9 +169,9 @@ export const wire = {
   OK: z.object({ ok: z.boolean() }),
   Revision: z.object({ revision: z.number().int() }),
   InviteInput: z.object({ code: z.string() }),
-  KeyInput: z.object({ key: z.string() }),
+  KeyInput: z.object({ key: z.string(), model: z.string().optional() }),
   Question: z.object({ question: z.string().max(4000) }),
-  Credential: z.object({ suffix: z.string() }),
+  Credential: z.object({ suffix: z.string(), model: z.string() }),
   Bootstrap: z.object({
     practiceEpoch:z.string().optional(),
     account: z.object({ id: z.string(), status: z.string() }),
@@ -179,7 +179,7 @@ export const wire = {
     todayPlan: todayPlan.optional(),
     challenge: challenge.nullable(),
     jobs: z.array(job),
-    credential: z.object({ suffix: z.string() }).nullable(),
+    credential: z.object({ suffix: z.string(), model: z.string().nullable() }).nullable(),
     capabilities: z.object({
       automaticCompanion: z.boolean().optional(),
       managedAI: z.boolean(),

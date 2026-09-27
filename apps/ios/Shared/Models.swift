@@ -185,7 +185,7 @@ struct Bootstrap: Codable, Sendable {
     var id: String
     var status: String
   }
-  struct Credential: Codable, Sendable { var suffix: String }
+  struct Credential: Codable, Sendable { var suffix: String; var model: String? }
   var account: Account
   var settings: PracticeSettings
   var challenge: Challenge?
@@ -273,7 +273,7 @@ struct DraftWrite: Codable, Sendable {
 }
 struct Question: Codable, Sendable { var question: String }
 struct CodeInput: Codable, Sendable { var code: String }
-struct KeyInput: Codable, Sendable { var key: String }
+struct KeyInput: Codable, Sendable { var key: String; var model: String }
 struct DeviceResponse: Codable, Sendable {
   var id: String
   var token: String

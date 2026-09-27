@@ -11447,6 +11447,9 @@
         "properties": {
           "key": {
             "type": "string"
+          },
+          "model": {
+            "type": "string"
           }
         },
         "required": [
@@ -11474,10 +11477,14 @@
         "properties": {
           "suffix": {
             "type": "string"
+          },
+          "model": {
+            "type": "string"
           }
         },
         "required": [
-          "suffix"
+          "suffix",
+          "model"
         ],
         "additionalProperties": false
       },
@@ -12694,10 +12701,17 @@
                 "properties": {
                   "suffix": {
                     "type": "string"
+                  },
+                  "model": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
                   }
                 },
                 "required": [
-                  "suffix"
+                  "suffix",
+                  "model"
                 ],
                 "additionalProperties": false
               },

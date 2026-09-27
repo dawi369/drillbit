@@ -198,7 +198,8 @@ struct LearningPlanSettingsView: View {
 struct AIAccessView: View {
   @Bindable var model: AppModel
   @State private var key = ""
-  @State private var suffix: String?
+  @State private var modelID = ""
+  @State private var saved: Bootstrap.Credential?
   @State private var validating = false
   var body: some View {
     SignalList {
@@ -208,42 +209,52 @@ struct AIAccessView: View {
           Text("My OpenRouter key").tag("byok")
         }
       }
-      Section("OpenRouter") {
-        if let suffix = suffix ?? model.bootstrap?.credential?.suffix {
-          Label("Key ending in \(suffix)", systemImage: AppIcon.completed.rawValue).foregroundStyle(
+      Section {
+        if let credential = saved ?? model.bootstrap?.credential {
+          Label("Key ending in \(credential.suffix)", systemImage: AppIcon.completed.rawValue).foregroundStyle(
             AppPalette.success)
+          if let name = credential.model {
+            LabeledContent("Model", value: name)
+          }
         }
         SecureField("OpenRouter key", text: $key).textInputAutocapitalization(.never)
           .autocorrectionDisabled()
+        TextField("Model", text: $modelID, prompt: Text("openai/gpt-6-luna"))
+          .textInputAutocapitalization(.never)
+          .autocorrectionDisabled()
+          .keyboardType(.asciiCapable)
+          .accessibilityIdentifier("openRouterModel")
         Button("Validate and save") {
           Task {
             validating = true
             defer { validating = false }
             await model.perform {
               let result: Bootstrap.Credential = try await model.api.send(
-                "credential", method: "PUT", body: KeyInput(key: key))
-              suffix = result.suffix
+                "credential", method: "PUT",
+                body: KeyInput(key: key, model: modelID.trimmingCharacters(in: .whitespaces)))
+              saved = result
+              model.bootstrap?.credential = result
               key = ""
+              modelID = ""
               model.settings.aiMode = "byok"
               try await model.updateSettings()
             }
           }
-        }.disabled(key.isEmpty || validating)
+        }.disabled(key.isEmpty || modelID.trimmingCharacters(in: .whitespaces).isEmpty || validating)
         Button("Remove key", role: .destructive) {
           Task {
             await model.perform {
               let _: EmptyResponse = try await model.api.send("credential", method: "DELETE")
-              suffix = nil
+              saved = nil
               model.bootstrap?.credential = nil
               await model.refresh()
             }
           }
         }
-        LabeledContent {
-          Text("Gemini 3.1 Flash Lite").foregroundStyle(.secondary)
-        } label: {
-          Text("Model").foregroundStyle(.primary)
-        }
+      } header: {
+        Text("OpenRouter")
+      } footer: {
+        Text("Type the OpenRouter model ID, like openai/gpt-6-luna. It has to handle structured output, and we check that when you save.")
       }
       Section {
         Text(

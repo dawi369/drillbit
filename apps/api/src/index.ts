@@ -155,7 +155,7 @@ app.get("/v1/bootstrap", async (c) => {
     .bind(a.id)
     .all();
   const credential = await c.env.DB.prepare(
-    "SELECT suffix FROM credentials WHERE account_id=?",
+    "SELECT suffix,model FROM credentials WHERE account_id=?",
   )
     .bind(a.id)
     .first();
@@ -647,25 +647,58 @@ app.delete("/v1/challenges/:id", async (c) => {
   return c.json({ ok: true });
 });
 app.put("/v1/credential", async (c) => {
-  const { key } = z
-    .object({ key: z.string().trim().min(10).max(1000) })
+  const { key, model } = z
+    .object({
+      key: z.string().trim().min(10).max(1000),
+      // Builds before the model field send only the key.
+      model: z
+        .string()
+        .trim()
+        .max(200)
+        .regex(/^[\w.-]+\/[\w.:~-]+$/)
+        .default(MODEL_ID),
+    })
     .parse(await c.req.json());
-  const result = await fetch("https://openrouter.ai/api/v1/key", {
-    headers: { Authorization: `Bearer ${key}` },
-    signal: AbortSignal.timeout(15000),
-  });
-  if (!result.ok)
-    throw new Fault(
-      "credential_invalid",
-      422,
-      "OpenRouter could not validate that key.",
-    );
+  // One tiny structured call proves the key works and that this model can
+  // return the strict JSON every Drillbit feature depends on.
+  const result = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    signal: AbortSignal.timeout(30000),
+    body: JSON.stringify({
+      model,
+      messages: [{ role: "user", content: "Reply with ok set to true." }],
+      provider: { require_parameters: true },
+      max_tokens: 64,
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "drillbit_check",
+          strict: true,
+          schema: {
+            type: "object",
+            properties: { ok: { type: "boolean" } },
+            required: ["ok"],
+            additionalProperties: false,
+          },
+        },
+      },
+    }),
+  }).catch(() => null);
+  if (!result?.ok)
+    throw result?.status === 401
+      ? new Fault("credential_invalid", 422, "OpenRouter could not validate that key.")
+      : result?.status === 402
+        ? new Fault("credential_invalid", 422, "That OpenRouter key is out of credits.")
+        : result
+          ? new Fault("model_invalid", 422, "OpenRouter doesn't have that model, or it can't do structured output. Check the model ID.")
+          : new Fault("provider_unavailable", 503, "Couldn't reach OpenRouter. Try again.");
   const a = c.get("account").id,
     id = uuid();
   const ciphertext = await encrypt(c.env, key, `${a}:${id}`);
   await c.env.DB.batch([
     c.env.DB.prepare(
-      "INSERT INTO credentials(id,account_id,ciphertext,key_version,suffix,created_at) VALUES(?,?,?,?,?,?) ON CONFLICT(account_id) DO UPDATE SET id=excluded.id,ciphertext=excluded.ciphertext,key_version=excluded.key_version,suffix=excluded.suffix,created_at=excluded.created_at",
+      "INSERT INTO credentials(id,account_id,ciphertext,key_version,suffix,model,created_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(account_id) DO UPDATE SET id=excluded.id,ciphertext=excluded.ciphertext,key_version=excluded.key_version,suffix=excluded.suffix,model=excluded.model,created_at=excluded.created_at",
     ).bind(
       id,
       a,
@@ -675,13 +708,14 @@ app.put("/v1/credential", async (c) => {
       timestamp(),
     ),
     c.env.DB.prepare(
+      model,
       "UPDATE jobs SET status='cancelled' WHERE account_id=? AND status IN ('pending','running') AND json_extract(input,'$.settings.aiMode')='byok'",
     ).bind(a),
     c.env.DB.prepare(
       "UPDATE requests SET status='interrupted' WHERE account_id=? AND status='running'",
     ).bind(a),
   ]);
-  return c.json({ suffix: key.slice(-4) });
+  return c.json({ suffix: key.slice(-4), model });
 });
 app.delete("/v1/credential", async (c) => {
   const a = c.get("account").id;

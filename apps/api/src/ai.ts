@@ -8,11 +8,11 @@ import { consumeUsage, decrypt, type Env } from "./platform";
 export type ModelMessage = { role: "system" | "user" | "assistant"; content: string };
 const contextualInterviewVersions = ["interviewer-standard-v4", "interviewer-standard-v5", "interviewer-teaching-v1", "interviewer-teaching-v2", "interviewer-teaching-v3", "interviewer-teaching-v4"];
 const teachingInterviewVersions = ["interviewer-teaching-v1", "interviewer-teaching-v2", "interviewer-teaching-v3", "interviewer-teaching-v4"];
-export async function modelKey(
+export async function modelAccess(
   env: Env,
   account: string,
   settings: Settings,
-): Promise<string> {
+): Promise<{ key: string; model: string }> {
   if (settings.aiMode === "managed") {
     if (env.MANAGED_AI_ENABLED !== "true" || !env.OPENROUTER_API_KEY)
       throw new Fault(
@@ -20,20 +20,23 @@ export async function modelKey(
         503,
         "Included AI is currently unavailable.",
       );
-    return env.OPENROUTER_API_KEY;
+    return { key: env.OPENROUTER_API_KEY, model: MODEL_ID };
   }
   const row = await env.DB.prepare(
-    "SELECT id,ciphertext,key_version FROM credentials WHERE account_id=?",
+    "SELECT id,ciphertext,key_version,model FROM credentials WHERE account_id=?",
   )
     .bind(account)
-    .first<{ id: string; ciphertext: string; key_version: string }>();
+    .first<{ id: string; ciphertext: string; key_version: string; model: string | null }>();
   if (!row || row.key_version !== env.CREDENTIAL_KEY_VERSION)
     throw new Fault(
       "credential_required",
       422,
       "Add or replace your OpenRouter key in Settings.",
     );
-  return decrypt(env, row.ciphertext, `${account}:${row.id}`);
+  return {
+    key: await decrypt(env, row.ciphertext, `${account}:${row.id}`),
+    model: row.model ?? MODEL_ID,
+  };
 }
 export function messagesFor(kind: string, context: unknown): ModelMessage[] {
   const value = context as {practiceProfile?: unknown; settings?: {practiceProfile?: unknown}};
@@ -163,7 +166,7 @@ export async function provider(
 ) {
   const schema = options.schema ? z.toJSONSchema(options.schema) : undefined;
   const started = Date.now();
-  const key = await modelKey(env, account, settings);
+  const { key, model } = await modelAccess(env, account, settings);
   await consumeUsage(env, account, "provider_attempt", 100);
   let response: Response;
   try {
@@ -176,7 +179,7 @@ export async function provider(
       },
       signal: options.signal ?? AbortSignal.timeout(60000),
       body: JSON.stringify({
-        model: MODEL_ID,
+        model,
         messages,
         provider: { sort: "latency", ...(options.schema ? { require_parameters: true } : {}) },
         reasoning: options.reasoning ?? { enabled: false },
@@ -197,7 +200,7 @@ export async function provider(
           : {}),
       }),
     });
-    console.info(JSON.stringify({event: "inference_headers", model: MODEL_ID, streaming: !!options.stream, setupMs: dispatched - started, headersMs: Date.now() - dispatched, status: response.status}));
+    console.info(JSON.stringify({event: "inference_headers", model, streaming: !!options.stream, setupMs: dispatched - started, headersMs: Date.now() - dispatched, status: response.status}));
   } catch {
     throw new Fault(
       "provider_unavailable",
@@ -313,6 +316,12 @@ export async function recordUsage(
   usage?: { prompt_tokens?: number; completion_tokens?: number; cost?: number },
   promptVersion = "companion-v1",
 ) {
+  const model = settings.aiMode === "byok"
+    ? (await env.DB.prepare("SELECT model FROM credentials WHERE account_id=?")
+        .bind(account)
+        .first<{ model: string | null }>()
+        .catch(() => null))?.model ?? MODEL_ID
+    : MODEL_ID;
   await env.DB.prepare(
     "INSERT INTO ai_runs(id,account_id,kind,model,prompt_version,input_tokens,output_tokens,cost,created_at) SELECT ?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM accounts WHERE id=? AND status='active')",
   )
@@ -320,7 +329,7 @@ export async function recordUsage(
       uuid(),
       account,
       kind,
-      MODEL_ID,
+      model,
       promptVersion,
       usage?.prompt_tokens ?? null,
       usage?.completion_tokens ?? null,
