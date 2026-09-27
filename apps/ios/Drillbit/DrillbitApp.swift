@@ -1,5 +1,6 @@
 import BackgroundTasks
 import ClerkKit
+import Security
 import SwiftData
 import SwiftUI
 import UserNotifications
@@ -33,6 +34,14 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         "Set API_BASE_URL and CLERK_PUBLISHABLE_KEY in Config/Local.xcconfig, then rebuild. No provider secret belongs in the app."
       return
     }
+    #if DEBUG
+      // UI tests install unsigned builds; Clerk asserts at launch without Keychain entitlements.
+      if !fixture && !Self.keychainUsable() {
+        configurationError =
+          "This is an unsigned test build, so sign-in can’t use the Keychain. Run Drillbit from Xcode or scripts/check-ios-launch.sh to install a signed build."
+        return
+      }
+    #endif
     do {
       let configuration = ModelConfiguration(isStoredInMemoryOnly: fixture, cloudKitDatabase: .none)
       let container = try ModelContainer(
@@ -69,9 +78,25 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         ContentUnavailableView(
           "Setup required", systemImage: AppIcon.settings.rawValue,
           description: Text(configurationError ?? "Configuration is unavailable."))
+          .background(AppPalette.background.ignoresSafeArea())
       }
     }
   }
+  #if DEBUG
+    private static func keychainUsable() -> Bool {
+      let probe: [String: Any] = [
+        kSecClass as String: kSecClassGenericPassword,
+        kSecAttrService as String: "dawi.drillbit.keychain-probe",
+        kSecAttrAccount as String: "probe",
+      ]
+      SecItemDelete(probe as CFDictionary)
+      var item = probe
+      item[kSecValueData as String] = Data([1])
+      let status = SecItemAdd(item as CFDictionary, nil)
+      SecItemDelete(probe as CFDictionary)
+      return status == errSecSuccess
+    }
+  #endif
 }
 
 @MainActor enum BackgroundRefresh {

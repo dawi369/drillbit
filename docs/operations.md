@@ -82,6 +82,8 @@ A signed TestFlight release requires real Apple sign-in, both AI modes, cold wid
 
 For real authentication in Simulator, run a **signed** build from Xcode or `scripts/check-ios-launch.sh` (optionally pass a simulator UDID). The script builds, installs and checks a normal launch without fixture arguments. `CODE_SIGNING_ALLOWED=NO` remains suitable for compilation and isolated unit tests, but the Clerk SDK asserts on startup when its Keychain operations lack entitlements. Do not launch the unsigned test artifact for authentication acceptance.
 
+Since 27 September 2026 development uses a single iPhone 17 simulator (`32C4E22D-369B-4538-9816-96C7FF7FDCAE`, iOS 27); the others were deleted after backing up the iPhone 18 Pro Drillbit data container to `~/Library/Application Support/Drillbit/SimulatorRecovery-20260927-iPhone18Pro` (no Keychain). UI tests with `CODE_SIGNING_ALLOWED=NO` replace the signed app on that simulator. Debug builds now detect the missing Keychain entitlement and show a setup message instead of crashing; run `scripts/check-ios-launch.sh` afterwards to reinstall the signed app.
+
 Clerk CLI is linked to the project. `clerk doctor` verifies the account/application; its root `.env` warning is expected because the app/API deliberately keep their configuration in separate locations. Production Clerk and custom production Google/GitHub OAuth credentials remain separate release work.
 
 ## Text-practice migration (9 September 2026)
