@@ -52,7 +52,7 @@ final class PracticeUITests: XCTestCase {
     app.buttons["appearancePicker"].tap(); app.buttons["Dark"].tap()
     XCTAssertTrue(app.buttons["appearancePicker"].label.contains("Dark"))
     capture("Settings immediate dark", app)
-    app.buttons["Done for today"].firstMatch.tap()
+    app.navigationBars["Settings"].buttons["Done"].tap()
     XCTAssertTrue(app.buttons["homeSettings"].waitForExistence(timeout: 3))
     app.buttons["Settings"].tap()
     XCTAssertTrue(app.buttons["appearancePicker"].label.contains("Dark"))
@@ -722,7 +722,9 @@ final class PracticeUITests: XCTestCase {
     XCTAssertFalse(app.buttons["practiceMode"].exists)
     XCTAssertTrue(app.buttons["liveVoice"].isEnabled)
     XCTAssertTrue(app.otherElements["answerDivider"].exists)
-    editor.tap(); editor.typeText("Use a durable queue and retry failed work.")
+    // Long enough to wrap on every iPhone width, so the answer always gets a disclosure.
+    let answer = "Use a durable queue, retry failed work with backoff, and record each attempt so duplicates stay safe."
+    editor.tap(); editor.typeText(answer)
     capture("Interview writing", app)
     app.buttons["shareAnswer"].tap()
     XCTAssertTrue(app.staticTexts["What happens if a worker stops after completing the operation but before acknowledging it?"].waitForExistence(timeout:5))
@@ -733,7 +735,7 @@ final class PracticeUITests: XCTestCase {
     XCTAssertEqual(answerRow.value as? String, "Collapsed")
     XCTAssertTrue(answerRow.isHittable)
     answerRow.tap()
-    let sent = app.staticTexts["Use a durable queue and retry failed work."]
+    let sent = app.staticTexts[answer]
     XCTAssertTrue(sent.isHittable, "The complete sent answer expands beside its response")
     let followUp = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier != %@", "exchange-", "exchange-original")).firstMatch
     followUp.tap()
