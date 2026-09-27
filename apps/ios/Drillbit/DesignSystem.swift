@@ -115,10 +115,12 @@ struct SignalPresence: View {
 
   var body: some View {
     let particles = SignalParticle.field(density)
-    let paused = reduceMotion || mode == .still || !visible || scenePhase != .active
+    let still = reduceMotion || mode == .still
+    // Only true background pauses; system sheets (Sign in with Apple) leave it turning.
+    let paused = still || !visible || scenePhase == .background
     let interval = ProcessInfo.processInfo.isLowPowerModeEnabled ? 1.0 / 20 : 1.0 / 30
     TimelineView(.animation(minimumInterval: interval, paused: paused)) { timeline in
-      let frame = paused ? PresenceFrame.rest(mode) : dynamics.advance(to: timeline.date, mode: mode, levels: levels)
+      let frame = still ? PresenceFrame.rest(mode) : paused ? dynamics.current : dynamics.advance(to: timeline.date, mode: mode, levels: levels)
       Canvas { context, size in
         SignalPresenceRenderer.draw(particles, frame: frame, in: &context, size: size)
       }
@@ -144,17 +146,16 @@ struct PresenceFrame: Sendable {
 
 /// Frame-clock state for one presence view: smoothed levels and mode blends.
 @MainActor final class PresenceDynamics {
-  private var origin: Date?
   private var last: Date?
   private var frame = PresenceFrame()
+  var current: PresenceFrame { frame }
 
   func advance(to date: Date, mode: SignalPresence.Mode, levels: VoiceLevels?) -> PresenceFrame {
-    let start = origin ?? date
-    origin = start
+    // Accumulated time: pauses and resumes continue smoothly instead of jumping.
     let dt = min(0.1, max(0, date.timeIntervalSince(last ?? date)))
     last = date
     let live = mode == .live
-    frame.time = date.timeIntervalSince(start)
+    frame.time += dt
     frame.input = approach(frame.input, live ? levels?.input ?? 0 : 0, dt, attack: 0.06, release: 0.28)
     frame.output = approach(frame.output, live ? levels?.output ?? 0 : 0, dt, attack: 0.06, release: 0.28)
     frame.quiet = approach(frame.quiet, mode == .muted ? 1 : 0, dt, attack: 0.2, release: 0.2)
