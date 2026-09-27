@@ -56,7 +56,7 @@ struct FirstPracticeView: View {
             Button(step == .ask ? "Try: How many people will use it?" : "Try: Start with one database for saved links.") {
               draft = step == .ask ? "How many people will use it?" : "Start with one database for saved links."
               focused = true
-              withAnimation(reduceMotion ? nil : .smooth(duration: 0.25)) { proxy.scrollTo("tutorialReply", anchor: .bottom) }
+              withAnimation(reduceMotion ? nil : DrillbitMotion.reveal) { proxy.scrollTo("tutorialReply", anchor: .bottom) }
             }.font(.subheadline.weight(.medium)).frame(minHeight: 44, alignment: .leading)
               .accessibilityIdentifier("walkthroughExample")
             VStack(alignment: .leading, spacing: 12) {
@@ -69,7 +69,7 @@ struct FirstPracticeView: View {
           }
           if let failure { Text(failure).font(.footnote).foregroundStyle(AppPalette.destructive) }
         }.padding(24).frame(maxWidth: 600, alignment: .leading).frame(maxWidth: .infinity)
-          .animation(reduceMotion ? nil : .smooth(duration: 0.32), value: step)
+          .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: step)
       }.scrollDismissesKeyboard(.interactively)
     }
     .background(AppPalette.background.ignoresSafeArea())
@@ -100,6 +100,7 @@ struct FirstPracticeView: View {
     .alert("Speak or type", isPresented: $voiceInfo) { Button("Got it", role: .cancel) {} } message: {
       Text("Real sessions support live voice. You can switch between speaking and typing without starting over.")
     }
+    .sensoryFeedback(.success, trigger: step == .finished) { _, finished in finished }
     .onAppear { draft = model.firstUse.draft; expanded = step == .ask || step == .collapse }
     .onChange(of: expanded) { _, value in
       if !value && step == .collapse { Task { var next = model.firstUse; next.step = .answer; await store(next) } }
@@ -134,13 +135,14 @@ struct FirstUseTip: View {
   let title: String
   let message: String
   var pointsUp = false
+  var symbol: String? = nil
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
       HStack(spacing: 8) {
         Text(number).font(.caption.monospaced()).foregroundStyle(AppPalette.accent)
         Text(title).font(.headline)
         Spacer(minLength: 0)
-        Image(systemName: pointsUp ? "arrow.up" : "arrow.down").foregroundStyle(AppPalette.accent).accessibilityHidden(true)
+        Image(systemName: symbol ?? (pointsUp ? "arrow.up" : "arrow.down")).foregroundStyle(AppPalette.accent).accessibilityHidden(true)
       }
       Text(message).font(.subheadline).foregroundStyle(AppPalette.secondary)
     }.padding(16).background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 12))
@@ -152,16 +154,18 @@ struct FirstUseTip: View {
 
 struct FirstUseTourTip: View {
   @Bindable var model: AppModel
-  private var content: (String, String, String) {
+  private var content: (String, String, String, AppIcon) {
     switch model.firstUse.stage {
-    case .tourRecall: ("02", "Recall makes it stick.", "Short reviews grow from your real sessions. Come back here to practise what needs another look.")
-    case .tourLibrary: ("03", "Your work stays in Library.", "Revisit past interviews and feedback. Next, choose how you want your first real session to feel.")
-    default: ("01", "Home is your starting point.", "Resume a session or explore a core area. Your next question is always within reach.")
+    case .tourRecall: ("02", "Recall makes it stick.", "Short reviews grow from your real sessions. Come back here to practise what needs another look.", .recall)
+    case .tourLibrary: ("03", "Your work stays in Library.", "Revisit past interviews and feedback. Next, choose how you want your first real session to feel.", .library)
+    default: ("01", "Home is your starting point.", "Resume a session or explore a core area. Your next question is always within reach.", .home)
     }
   }
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
-      FirstUseTip(number: content.0, title: content.1, message: content.2)
+      FirstUseTip(number: content.0, title: content.1, message: content.2, symbol: content.3.rawValue)
+        .id(model.firstUse.stage)
+        .transition(.asymmetric(insertion: .opacity.combined(with: .offset(y: 8)), removal: .opacity))
       Button(model.firstUse.stage == .tourLibrary ? "Choose my session" : "Next") { Task { await model.advanceFirstUseTour() } }
         .buttonStyle(PracticeButtonStyle()).accessibilityIdentifier("firstUseTourNext")
     }.padding(20).background(AppPalette.background)

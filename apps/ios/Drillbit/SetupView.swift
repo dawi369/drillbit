@@ -26,6 +26,8 @@ struct SetupView: View {
   @State private var coordinator = LearningPlanCoordinator()
   @State private var reminderPermissionPending = false
   @State private var movingForward = true
+  @State private var hasMoved = false
+  @State private var scroll = ScrollPosition(edge: .top)
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   private let objectives = [("interview","An upcoming interview"),("learn","Stronger system design skills"),("stay_sharp","Keep my skills fresh")]
   private let roles = [("general","General SWE"),("backend","Backend"),("frontend","Frontend"),("full_stack","Full-stack"),("platform","Platform / Infrastructure"),("data","Data"),("mobile","Mobile")]
@@ -38,16 +40,13 @@ struct SetupView: View {
       ScrollView {
         VStack(alignment: .leading, spacing: 32) {
           if coordinator.draft.page == -1 {
-            SetupIntroduction()
+            SetupIntroduction(animatesIn: !hasMoved)
               .frame(minHeight: max(0, geometry.size.height - 48))
           } else {
-            VStack(alignment: .leading, spacing: 20) {
-              SignalEyebrow(text: String(format: "%02d / 05", coordinator.draft.page + 1))
-              AppPalette.hairline.frame(height: 1)
-              Text(title(for: coordinator.draft.page))
-                .font(.largeTitle.weight(.semibold))
-                .fixedSize(horizontal: false, vertical: true)
-            }
+            Text(title(for: coordinator.draft.page))
+              .font(.largeTitle.weight(.semibold))
+              .fixedSize(horizontal: false, vertical: true)
+              .accessibilityAddTraits(.isHeader)
             pageContent(coordinator: coordinator)
             if let note = coordinator.reminderNote { Text(note).font(.footnote).foregroundStyle(AppPalette.secondary) }
             if let failure = coordinator.failure { Text(failure).font(.footnote).foregroundStyle(AppPalette.destructive) }
@@ -61,8 +60,19 @@ struct SetupView: View {
         .padding(.horizontal, 24).padding(.top, 24).padding(.bottom, 24)
         .frame(maxWidth: .infinity)
       }
+      .scrollPosition($scroll)
+      .scrollDismissesKeyboard(.interactively)
     }.clipped()
     .background(AppPalette.background)
+    .safeAreaInset(edge: .top, spacing: 0) {
+      if coordinator.draft.page >= 0 {
+        SignalStepProgress(step: coordinator.draft.page + 1, total: 5)
+          .frame(maxWidth: 560).padding(.horizontal, 24).padding(.top, 16)
+          .frame(maxWidth: .infinity)
+          .background(AppPalette.background)
+          .transition(.opacity)
+      }
+    }
     .safeAreaInset(edge: .bottom, spacing: 0) {
       VStack(spacing: 0) {
         AppPalette.hairline.frame(height: 1)
@@ -83,18 +93,18 @@ struct SetupView: View {
                 Image(systemName: "sparkles").symbolEffect(.bounce, options: .nonRepeating, value: !reduceMotion && coordinator.draft.page == 4)
                   .accessibilityHidden(true)
               }
-              Text(coordinator.saving ? "Opening…" : coordinator.draft.page == -1 ? "Let's begin" : coordinator.draft.page == 4 ? "Start practice" : "Continue")
+              Text(coordinator.saving ? "Opening…" : coordinator.draft.page == -1 ? "Let’s begin" : coordinator.draft.page == 4 ? "Start practice" : "Continue")
               if coordinator.draft.page == 4 { Image(systemName: "arrow.right").accessibilityHidden(true) }
             }
             .padding(.vertical, coordinator.draft.page == 4 ? 8 : 0)
           }.buttonStyle(PracticeButtonStyle()).disabled(coordinator.saving || reminderPermissionPending)
             .contentTransition(.opacity)
-            .accessibilityLabel(coordinator.saving ? "Opening…" : coordinator.draft.page == -1 ? "Let's begin" : coordinator.draft.page == 4 ? "Start practice" : "Continue")
+            .accessibilityLabel(coordinator.saving ? "Opening…" : coordinator.draft.page == -1 ? "Let’s begin" : coordinator.draft.page == 4 ? "Start practice" : "Continue")
             .accessibilityIdentifier("onboardingContinue")
-            .sensoryFeedback(.success, trigger: coordinator.draft.page == 4)
+            .sensoryFeedback(.success, trigger: coordinator.draft.page == 4) { _, reached in reached }
         }
         .padding(.horizontal, 24).padding(.top, 12).padding(.bottom, 8)
-        .animation(reduceMotion ? nil : .smooth(duration: 0.34, extraBounce: 0), value: coordinator.draft.page >= 0)
+        .animation(reduceMotion ? nil : DrillbitMotion.page, value: coordinator.draft.page >= 0)
       }
       .background(AppPalette.background)
     }
@@ -105,9 +115,11 @@ struct SetupView: View {
 
   private func move(_ coordinator: LearningPlanCoordinator, to page: Int) {
     movingForward = page > coordinator.draft.page
-    withAnimation(reduceMotion ? nil : .smooth(duration: 0.38, extraBounce: 0)) {
+    hasMoved = true
+    withAnimation(reduceMotion ? nil : DrillbitMotion.page) {
       coordinator.draft.page = page
     }
+    scroll.scrollTo(edge: .top)
   }
 
   @ViewBuilder private func pageContent(coordinator: LearningPlanCoordinator) -> some View {
@@ -117,66 +129,56 @@ struct SetupView: View {
       VStack(alignment: .leading, spacing: 12) {
         Text("Your priority right now. You’ll learn and practise in every path.")
           .font(.subheadline).foregroundStyle(AppPalette.secondary)
-        VStack(spacing: 0) {
-          ForEach(objectives, id: \.0) { option in
-            SignalChoiceRow(title: option.1, selected: coordinator.draft.objective == option.0) {
-              coordinator.draft.objective = option.0
-            }
-            if option.0 != objectives.last?.0 { Divider().padding(.horizontal, 16) }
-          }
-        }
+        SignalChoiceList(options: objectives.map { SignalChoice(id: $0.0, title: $0.1) },
+          isSelected: { coordinator.draft.objective == $0 }) { coordinator.draft.objective = $0 }
       }
     case 1:
       VStack(alignment: .leading, spacing: 24) {
         VStack(alignment: .leading, spacing: 12) {
           Text("What do you usually build?").font(.headline)
-          Picker("Your work", selection: $coordinator.draft.roleTrack) {
-            ForEach(roles, id: \.0) { option in
-              Text(option.1).tag(option.0)
+          Menu {
+            Picker("Your work", selection: $coordinator.draft.roleTrack) {
+              ForEach(roles, id: \.0) { option in Text(option.1).tag(option.0) }
             }
-          }.pickerStyle(.menu).frame(minHeight: 44)
+          } label: {
+            HStack(spacing: 8) {
+              Text(roles.first { $0.0 == coordinator.draft.roleTrack }?.1 ?? "General SWE")
+                .foregroundStyle(AppPalette.primary)
+              Spacer(minLength: 8)
+              Image(systemName: "chevron.up.chevron.down").font(.caption.weight(.semibold))
+                .foregroundStyle(AppPalette.secondary)
+            }
+            .padding(.horizontal, 16).frame(maxWidth: .infinity, minHeight: 56)
+            .background(AppPalette.inset, in: RoundedRectangle(cornerRadius: 12))
+            .contentShape(Rectangle())
+          }
+          .accessibilityLabel("Your work")
+          .accessibilityValue(roles.first { $0.0 == coordinator.draft.roleTrack }?.1 ?? "General SWE")
         }
         VStack(alignment: .leading, spacing: 12) {
           Text("How familiar is system design?").font(.headline)
           Text("This sets the depth of your questions. You can change it later.").font(.subheadline).foregroundStyle(AppPalette.secondary)
-          VStack(spacing: 0) {
-            ForEach(startingPoints, id: \.0) { option in
-              SignalChoiceRow(title: option.1, selected: coordinator.draft.level == option.0) { coordinator.draft.level = option.0 }
-              if option.0 != startingPoints.last?.0 { Divider() }
-            }
-          }
+          SignalChoiceList(options: startingPoints.map { SignalChoice(id: $0.0, title: $0.1) },
+            isSelected: { coordinator.draft.level == $0 }) { coordinator.draft.level = $0 }
         }
       }
     case 2:
       VStack(alignment: .leading, spacing: 12) {
         Text("Explore everything, or pick up to three areas.").font(.subheadline).foregroundStyle(AppPalette.secondary)
-        VStack(spacing: 0) {
-          SignalChoiceRow(title: "A bit of everything", selected: coordinator.draft.weakAreas.isEmpty) {
-            coordinator.draft.weakAreas = []
-          }
-          Divider().padding(.horizontal, 16)
-          ForEach(areas, id: \.0) { area in
-            SignalChoiceRow(title: area.1, selected: coordinator.draft.weakAreas.contains(area.0)) {
-              if coordinator.draft.weakAreas.contains(area.0) { coordinator.draft.weakAreas.remove(area.0) }
-              else if coordinator.draft.weakAreas.count < 3 { coordinator.draft.weakAreas.insert(area.0) }
-            }
-            .disabled(!coordinator.draft.weakAreas.contains(area.0) && coordinator.draft.weakAreas.count == 3)
-            if area.0 != areas.last?.0 { Divider().padding(.horizontal, 16) }
-          }
+        SignalChoiceList(options: [SignalChoice(id: "", title: "A bit of everything")] + areas.map { SignalChoice(id: $0.0, title: $0.1) },
+          isSelected: { $0.isEmpty ? coordinator.draft.weakAreas.isEmpty : coordinator.draft.weakAreas.contains($0) },
+          isDisabled: { !$0.isEmpty && !coordinator.draft.weakAreas.contains($0) && coordinator.draft.weakAreas.count == 3 }) { id in
+          if id.isEmpty { coordinator.draft.weakAreas = [] }
+          else if coordinator.draft.weakAreas.contains(id) { coordinator.draft.weakAreas.remove(id) }
+          else if coordinator.draft.weakAreas.count < 3 { coordinator.draft.weakAreas.insert(id) }
         }
       }
     case 3:
       VStack(alignment: .leading, spacing: 24) {
         VStack(alignment: .leading, spacing: 12) {
           SignalEyebrow(text: "Daily commitment")
-          VStack(spacing: 0) {
-            ForEach([5,10,15,20], id: \.self) { minutes in
-              SignalChoiceRow(title: "\(minutes) minutes", selected: coordinator.draft.dailyGoalMinutes == minutes) {
-                coordinator.draft.dailyGoalMinutes = minutes
-              }
-              if minutes != 20 { Divider().padding(.horizontal, 16) }
-            }
-          }
+          SignalChoiceList(options: [5, 10, 15, 20].map { SignalChoice(id: $0, title: "\($0) minutes") },
+            isSelected: { coordinator.draft.dailyGoalMinutes == $0 }) { coordinator.draft.dailyGoalMinutes = $0 }
         }
         VStack(alignment: .leading, spacing: 16) {
           if coordinator.draft.objective == "interview" {
@@ -276,39 +278,31 @@ struct SetupView: View {
 }
 
 private struct SetupIntroduction: View {
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  @State private var revealed = false
-
+  var animatesIn = true
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      DrillbitLogo(compact: true)
+      DrillbitLogo(compact: true).signalEntrance(0, active: animatesIn)
       Spacer(minLength: 40)
       SignalPresence(density: 420)
         .frame(maxWidth: 320, maxHeight: 320)
-      .frame(maxWidth: .infinity)
-      .frame(height: 280)
-      .scaleEffect(revealed ? 1 : 0.94)
-      .opacity(revealed ? 1 : 0)
+        .frame(maxWidth: .infinity)
+        .frame(height: 280)
+        .signalEntrance(1, active: animatesIn)
       Spacer(minLength: 40)
       VStack(alignment: .leading, spacing: 16) {
-        SignalEyebrow(text: "Practice, out loud")
-        Text("Think out loud.\nGet sharper.")
-          .font(.system(.largeTitle, design: .default, weight: .semibold))
+        SignalEyebrow(text: "Welcome to Drillbit")
+        Text("Let’s shape\nyour practice.")
+          .font(.largeTitle.weight(.semibold))
           .tracking(-0.8)
           .fixedSize(horizontal: false, vertical: true)
-        Text("A focused system design interviewer, wherever you find a few minutes.")
+          .accessibilityAddTraits(.isHeader)
+        Text("Five quick questions tune your first interview. It takes about a minute, and you can change anything later.")
           .font(.body)
           .foregroundStyle(AppPalette.secondary)
           .fixedSize(horizontal: false, vertical: true)
       }
-      .opacity(revealed ? 1 : 0)
-      .offset(y: revealed ? 0 : 12)
+      .signalEntrance(2, active: animatesIn)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .task {
-      guard !revealed else { return }
-      if reduceMotion { revealed = true }
-      else { withAnimation(.smooth(duration: 0.55, extraBounce: 0).delay(0.08)) { revealed = true } }
-    }
   }
 }

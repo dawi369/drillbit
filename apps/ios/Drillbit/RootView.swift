@@ -9,24 +9,22 @@ struct RootView: View {
   @AppStorage("appearance") private var appearance = "dark"
   @Environment(\.scenePhase) private var scenePhase
   @Environment(\.colorScheme) private var systemColorScheme
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  private enum Stage { case restoring, welcome, setup, app }
+  private var stage: Stage {
+    if model.restoringSession || model.launchError != nil { return .restoring }
+    guard model.bootstrap?.account.status == "active" else { return .welcome }
+    return model.settings.onboardingComplete ? .app : .setup
+  }
   var body: some View {
     Group {
       if model.restoringSession || model.launchError != nil {
-        VStack(spacing: 16) {
-          DrillbitLogo(compact: true)
-          if let message = model.launchError {
-            Text(message).foregroundStyle(.secondary).multilineTextAlignment(.center)
-            Button("Try again") { Task { await model.launch() } }
-          }
-        }
-        .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(AppPalette.background)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("sessionRestoration")
+        LaunchSurface(message: model.launchError) { Task { await model.launch() } }
+          .transition(.opacity)
       } else if let account = model.bootstrap?.account, account.status == "active" {
         if !model.settings.onboardingComplete {
           NavigationStack { SetupView(model: model) }
+            .transition(.opacity)
         } else {
           TabView(selection: $selectedTab) {
             Tab("Home", systemImage: AppIcon.home.rawValue, value: "home") {
@@ -55,13 +53,18 @@ struct RootView: View {
                 FirstUseTourTip(model: model)
                 ScrollView { FirstUseTourTip(model: model) }
               }.padding(.bottom, 88)
+                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
             }
           }
+          .animation(DrillbitMotion.page, value: model.firstUse.stage)
+          .transition(.opacity)
         }
       } else {
         WelcomeView(model: model)
+          .transition(.opacity)
       }
     }
+    .animation(DrillbitMotion.page, value: stage)
     .preferredColorScheme(model.fixture && ProcessInfo.processInfo.arguments.contains("--dark") ? .dark : appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
     .background(WindowFloorColor().allowsHitTesting(false))
     .onChange(of: model.firstUse.stage) { _, stage in
@@ -147,6 +150,36 @@ struct RootView: View {
       if url.scheme == "dawi.drillbit" && url.host == "callback" { return }
       selectedTab = "home"
       Task { await model.refresh() }
+    }
+  }
+}
+
+/// Neutral surface while Clerk and the account cache restore. Progress appears
+/// only if restoration is slow, so fast launches never flash a spinner.
+private struct LaunchSurface: View {
+  var message: String?
+  var retry: () -> Void
+  @State private var slow = false
+  var body: some View {
+    VStack(spacing: 16) {
+      DrillbitLogo(compact: true)
+      if let message {
+        Text(message).foregroundStyle(.secondary).multilineTextAlignment(.center)
+        Button("Try again", action: retry)
+      } else {
+        ProgressView().controlSize(.small).opacity(slow ? 1 : 0)
+          .accessibilityLabel("Restoring your session")
+      }
+    }
+    .animation(DrillbitMotion.fast, value: slow)
+    .padding(24)
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .background(AppPalette.background)
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("sessionRestoration")
+    .task {
+      try? await Task.sleep(for: .seconds(1.2))
+      slow = true
     }
   }
 }

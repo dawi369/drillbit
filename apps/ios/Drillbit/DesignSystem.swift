@@ -405,13 +405,19 @@ struct DrillbitPressStyle: ButtonStyle {
 }
 
 /// Step count above a track; yellow fills the completed share.
-struct SignalStepProgress: View {
+struct SignalStepProgress<Accessory: View>: View {
   let step: Int
   let total: Int
+  @ViewBuilder var accessory: () -> Accessory
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
-      SignalEyebrow(text: String(format: "%02d / %02d", step, total))
-        .contentTransition(.numericText(value: Double(step)))
+      HStack(spacing: 12) {
+        SignalEyebrow(text: String(format: "%02d / %02d", step, total))
+          .contentTransition(.numericText(value: Double(step)))
+          .accessibilityLabel("Step \(step) of \(total)")
+        Spacer(minLength: 0)
+        accessory()
+      }
       Capsule().fill(AppPalette.hairline).frame(height: 2)
         .overlay(alignment: .leading) {
           GeometryReader { proxy in
@@ -419,9 +425,28 @@ struct SignalStepProgress: View {
               .frame(width: proxy.size.width * CGFloat(min(step, total)) / CGFloat(max(total, 1)))
           }
         }
+        .accessibilityHidden(true)
     }
-    .accessibilityElement(children: .ignore)
-    .accessibilityLabel("Step \(step) of \(total)")
+  }
+}
+
+extension SignalStepProgress where Accessory == EmptyView {
+  init(step: Int, total: Int) { self.init(step: step, total: total) { EmptyView() } }
+}
+
+/// The yellow rule that links a quote to its observation; it draws once on arrival.
+struct SignalRule: View {
+  var draws = true
+  @State private var drawn = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  var body: some View {
+    Rectangle().fill(AppPalette.action).frame(height: 2)
+      .scaleEffect(x: drawn || !draws || reduceMotion ? 1 : 0, anchor: .leading)
+      .onAppear {
+        guard draws, !drawn, !reduceMotion else { return }
+        withAnimation(DrillbitMotion.entrance.delay(0.2)) { drawn = true }
+      }
+      .accessibilityHidden(true)
   }
 }
 

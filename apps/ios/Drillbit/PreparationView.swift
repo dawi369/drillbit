@@ -38,6 +38,7 @@ struct PreparationView: View {
       Section(model.firstUse.stage == .chooseMode ? "Choose your support" : "Session style") {
         if model.firstUse.stage == .chooseMode {
           ForEach(GuidanceMode.allCases) { mode in
+            let selected = guidanceMode == mode
             Button { guidanceMode = mode } label: {
               HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -45,10 +46,22 @@ struct PreparationView: View {
                   Text(mode.explanation).font(.subheadline).foregroundStyle(AppPalette.secondary)
                 }
                 Spacer(minLength: 0)
-                if guidanceMode == mode { Image(systemName: "checkmark").foregroundStyle(AppPalette.accent) }
-              }.padding(.vertical, 8)
-            }.buttonStyle(.plain).accessibilityAddTraits(guidanceMode == mode ? .isSelected : [])
+                if selected {
+                  Image(systemName: AppIcon.checkmark.rawValue).fontWeight(.semibold)
+                    .foregroundStyle(AppPalette.accent).transition(.iconPop)
+                }
+              }.padding(.vertical, 8).contentShape(Rectangle())
+            }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
               .accessibilityIdentifier("firstSessionMode-" + mode.rawValue)
+              .listRowBackground(ZStack {
+                AppPalette.background
+                RoundedRectangle(cornerRadius: 12).fill(AppPalette.inset)
+                  .padding(.horizontal, 4).padding(.vertical, 2)
+                  .opacity(selected ? 1 : 0)
+              })
+              .listRowSeparator(.hidden)
+              .animation(DrillbitMotion.selection, value: selected)
+              .sensoryFeedback(.selection, trigger: selected) { _, now in now }
           }
           Text("You can change the support or switch to voice during a session.").font(.footnote).foregroundStyle(.secondary)
         } else { NavigationLink {

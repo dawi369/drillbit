@@ -500,9 +500,9 @@ final class PracticeUITests: XCTestCase {
     app.terminate()
     app.launchArguments = ["--fixtures", "--fixture-onboarding"]
     app.launch()
-    XCTAssertTrue(app.staticTexts["Think out loud.\nGet sharper."].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.staticTexts["Let’s shape\nyour practice."].waitForExistence(timeout: 10))
     capture("Onboarding introduction", app)
-    app.buttons["Let's begin"].tap()
+    app.buttons["Let’s begin"].tap()
     XCTAssertTrue(app.staticTexts["What brings you here?"].waitForExistence(timeout: 10))
     capture("Onboarding goal", app)
     app.buttons["Continue"].tap()
@@ -510,9 +510,9 @@ final class PracticeUITests: XCTestCase {
     app.buttons["Back"].tap()
     XCTAssertTrue(app.staticTexts["What brings you here?"].waitForExistence(timeout: 5))
     app.buttons["Back"].tap()
-    XCTAssertTrue(app.buttons["Let's begin"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.buttons["Let’s begin"].waitForExistence(timeout: 5))
     XCTAssertFalse(app.buttons["Back"].exists)
-    app.buttons["Let's begin"].tap()
+    app.buttons["Let’s begin"].tap()
     app.buttons["Continue"].tap()
     capture("Onboarding levels", app)
     for level in ["New to system design", "I’ve designed a few systems", "I design systems regularly", "I lead architecture across teams"] { XCTAssertTrue(app.buttons[level].exists) }
@@ -534,8 +534,8 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.sheets.buttons["Reset Drillbit"].waitForExistence(timeout: 3))
     app.sheets.buttons["Reset Drillbit"].tap()
 
-    XCTAssertTrue(app.staticTexts["Think out loud.\nGet sharper."].waitForExistence(timeout: 5))
-    XCTAssertTrue(app.buttons["Let's begin"].exists)
+    XCTAssertTrue(app.staticTexts["Let’s shape\nyour practice."].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.buttons["Let’s begin"].exists)
   }
 
   func testSettingsSelections() throws {
@@ -896,8 +896,8 @@ final class PracticeUITests: XCTestCase {
     let app = XCUIApplication()
     app.launchArguments = ["--fixtures", "--fixture-onboarding", "--fixture-slow-generation"]
     app.launch()
-    XCTAssertTrue(app.buttons["Let's begin"].waitForExistence(timeout: 10))
-    app.buttons["Let's begin"].tap()
+    XCTAssertTrue(app.buttons["Let’s begin"].waitForExistence(timeout: 10))
+    app.buttons["Let’s begin"].tap()
     XCTAssertTrue(app.staticTexts["What brings you here?"].waitForExistence(timeout: 5))
     for _ in 0..<4 { app.buttons["Continue"].tap() }
     XCTAssertTrue(app.staticTexts["Made for you."].exists)
@@ -1082,7 +1082,7 @@ final class PracticeUITests: XCTestCase {
     let app = XCUIApplication()
     app.launchArguments = ["--fixtures", "--fixture-signed-out", "--fixture-walkthrough"]
     app.launch()
-    XCTAssertTrue(app.staticTexts["A better answer\nstarts in motion."].waitForExistence(timeout: 8))
+    XCTAssertTrue(app.staticTexts["Think out loud.\nGet sharper."].waitForExistence(timeout: 8))
     app.buttons["Continue"].tap()
     XCTAssertTrue(app.staticTexts["One request ID.\nOne delivery."].exists)
     app.buttons["Continue"].tap()

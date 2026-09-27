@@ -5,63 +5,96 @@ struct WelcomeView: View {
   @Bindable var model: AppModel
   @AppStorage("walkthroughVersion") private var walkthroughVersion = 0
   @State private var page = 0
+  @State private var movingForward = true
+  @State private var hasMoved = false
   @State private var demoReply = ""
   @State private var invite = ""
   @State private var signingIn = false
+  @FocusState private var inviteFocused: Bool
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
     NavigationStack {
       Group {
         let forced = ProcessInfo.processInfo.arguments.contains("--fixture-walkthrough")
-        if !forced && (walkthroughVersion >= 1 || model.fixture) { authentication } else { walkthrough }
+        if !forced && (walkthroughVersion >= 1 || model.fixture) { authentication.transition(.opacity) } else { walkthrough.transition(.opacity) }
       }
-        .background(AppPalette.background)
+      .animation(DrillbitMotion.page, value: walkthroughVersion)
+      .background(AppPalette.background)
     }
   }
 
   private var walkthrough: some View {
     GeometryReader { geometry in
       ScrollView {
-        VStack(alignment: .leading, spacing: 24) {
-          HStack {
-            SignalEyebrow(text: String(format: "%02d / 04", page + 1))
-            Spacer()
-            Button("Sign in now") { finishWalkthrough() }
-              .font(.subheadline.weight(.medium))
-          }
-          Group {
-            switch page {
-            case 0: practiceProof
-            case 1: feedbackProof
-            case 2: recallProof
-            default: localTry
-            }
-          }.id(page)
-          Spacer(minLength: 12)
-          HStack(spacing: 12) {
-            if page > 0 { Button("Back") { move(to: page - 1) }.buttonStyle(PracticeButtonStyle(secondary: true)) }
-            Button(page == 3 ? "Continue to sign in" : "Continue") {
-              if page == 3 { finishWalkthrough() } else { move(to: page + 1) }
-            }.buttonStyle(PracticeButtonStyle())
+        Group {
+          switch page {
+          case 0: practiceProof
+          case 1: feedbackProof
+          case 2: recallProof
+          default: localTry
           }
         }
-        .frame(maxWidth: 560, minHeight: geometry.size.height, alignment: .topLeading)
-        .padding(24).frame(maxWidth: .infinity)
-      }.scrollBounceBehavior(.basedOnSize)
+        .id(page)
+        .transition(reduceMotion ? .identity : .asymmetric(
+          insertion: .offset(x: movingForward ? geometry.size.width : -geometry.size.width),
+          removal: .offset(x: movingForward ? -geometry.size.width : geometry.size.width)))
+        .frame(maxWidth: 560, alignment: .topLeading)
+        .padding(.horizontal, 24).padding(.top, 24).padding(.bottom, 24)
+        .frame(maxWidth: .infinity)
+      }
+      .scrollBounceBehavior(.basedOnSize)
+      .scrollDismissesKeyboard(.interactively)
+    }
+    .clipped()
+    .safeAreaInset(edge: .top, spacing: 0) {
+      SignalStepProgress(step: page + 1, total: 4) {
+        Button("Sign in now") { finishWalkthrough() }
+          .font(.subheadline.weight(.medium)).frame(minHeight: 44)
+      }
+      .frame(maxWidth: 560).padding(.horizontal, 24).padding(.top, 8)
+      .frame(maxWidth: .infinity)
+      .background(AppPalette.background)
+    }
+    .safeAreaInset(edge: .bottom, spacing: 0) {
+      VStack(spacing: 0) {
+        AppPalette.hairline.frame(height: 1)
+        HStack(spacing: 12) {
+          if page > 0 {
+            Button("Back") { move(to: page - 1) }
+              .buttonStyle(PracticeButtonStyle(secondary: true))
+              .frame(width: 88)
+              .transition(.opacity.combined(with: .offset(x: -12)))
+          }
+          Button(page == 3 ? "Continue to sign in" : "Continue") {
+            if page == 3 { finishWalkthrough() } else { move(to: page + 1) }
+          }
+          .buttonStyle(PracticeButtonStyle())
+          .contentTransition(.opacity)
+        }
+        .frame(maxWidth: 560).padding(.horizontal, 24).padding(.top, 12).padding(.bottom, 8)
+        .frame(maxWidth: .infinity)
+        .animation(reduceMotion ? nil : DrillbitMotion.page, value: page > 0)
+      }
+      .background(AppPalette.background)
     }
   }
 
   private var practiceProof: some View {
     VStack(alignment: .leading, spacing: 20) {
-      DrillbitLogo(compact: true)
+      DrillbitLogo(compact: true).signalEntrance(0, active: !hasMoved)
       SignalPresence(density: 720)
         .frame(height: 260)
-      SignalEyebrow(text: "System design / out loud")
-      Text("A better answer\nstarts in motion.")
-        .font(.largeTitle.weight(.semibold)).tracking(-0.8)
-        .fixedSize(horizontal: false, vertical: true)
-      Text("An AI interviewer for five spare minutes.")
-        .font(.subheadline).foregroundStyle(AppPalette.secondary)
+        .signalEntrance(1, active: !hasMoved)
+      VStack(alignment: .leading, spacing: 20) {
+        SignalEyebrow(text: "System design, out loud")
+        Text("Think out loud.\nGet sharper.")
+          .font(.largeTitle.weight(.semibold)).tracking(-0.8)
+          .fixedSize(horizontal: false, vertical: true)
+        Text("An AI interviewer for five spare minutes.")
+          .font(.subheadline).foregroundStyle(AppPalette.secondary)
+      }
+      .signalEntrance(2, active: !hasMoved)
     }
   }
 
@@ -70,7 +103,7 @@ struct WelcomeView: View {
       SignalEyebrow(text: "From your answer")
       Text("“I’d retry every failed delivery.”")
         .font(.title.weight(.medium)).fixedSize(horizontal: false, vertical: true)
-      Rectangle().fill(AppPalette.action).frame(height: 2)
+      SignalRule()
       SignalEyebrow(text: "The missing guard")
       Text("One request ID.\nOne delivery.")
         .font(.largeTitle.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
@@ -88,11 +121,11 @@ struct WelcomeView: View {
       Text("A focused retry tests the same decision. Recall brings the evidence back when it is useful.")
         .foregroundStyle(AppPalette.secondary)
       VStack(alignment: .leading, spacing: 0) {
-        stage("01", "Speak through a decision")
+        stage("01", "Speak through a decision").signalEntrance(1)
         Divider()
-        stage("02", "See the missing guard")
+        stage("02", "See the missing guard").signalEntrance(2)
         Divider()
-        stage("03", "Practice it again")
+        stage("03", "Practise it again").signalEntrance(3)
       }
     }
   }
@@ -104,6 +137,7 @@ struct WelcomeView: View {
       VStack(alignment: .leading, spacing: 10) {
         Text("You").font(.subheadline).foregroundStyle(.secondary)
         TextField("Type or use keyboard dictation…", text: $demoReply, axis: .vertical).lineLimit(3...6).textFieldStyle(.plain)
+          .submitLabel(.done)
         if !demoReply.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { Divider(); Text(demoReply).fixedSize(horizontal: false, vertical: true) }
       }.signalInset(padding: 20)
       Text("This local preview is not saved or scored. Personalized follow-up begins after sign-in.").font(.footnote).foregroundStyle(.secondary)
@@ -122,35 +156,66 @@ struct WelcomeView: View {
   }
 
   private var authentication: some View {
-    GeometryReader { geometry in
+    let inviting = model.bootstrap != nil
+    let code = invite.trimmingCharacters(in: .whitespacesAndNewlines)
+    return GeometryReader { geometry in
       ScrollView {
         VStack(spacing: 32) {
-          VStack(spacing: 12) {
+          VStack(spacing: 16) {
             DrillbitLogo()
             SignalPresence(density: 480).frame(height: 190)
-            Text(model.bootstrap == nil ? "System design. Out loud." : "Enter your invite to begin.")
-              .font(.title2.weight(.semibold)).multilineTextAlignment(.center)
+            VStack(spacing: 8) {
+              Text(inviting ? "One last step." : "Ready when you are.")
+                .font(.title2.weight(.semibold))
+              Text(inviting ? "Enter your invite code to begin." : "Sign in to save your practice and feedback.")
+                .font(.subheadline).foregroundStyle(AppPalette.secondary)
+            }
+            .multilineTextAlignment(.center)
+            .id(inviting)
+            .transition(.opacity)
           }
           VStack(spacing: 12) {
-            if model.bootstrap != nil {
-              TextField("Invite code", text: $invite).textInputAutocapitalization(.never).autocorrectionDisabled()
+            if inviting {
+              TextField("Invite code", text: $invite)
+                .textInputAutocapitalization(.never).autocorrectionDisabled()
+                .submitLabel(.go).focused($inviteFocused)
+                .onSubmit { if !code.isEmpty { redeem(code) } }
                 .signalInset(padding: 16)
-              Button("Start practicing") { authenticate { await model.redeem(invite.trimmingCharacters(in: .whitespacesAndNewlines)) } }
-                .buttonStyle(PracticeButtonStyle()).disabled(invite.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || signingIn)
+              Button("Start practising") { redeem(code) }
+                .buttonStyle(PracticeButtonStyle()).disabled(code.isEmpty || signingIn)
             } else {
               Button { authenticate { await model.signIn() } } label: { Label("Sign in with Apple", systemImage: AppIcon.apple.rawValue) }.buttonStyle(PracticeButtonStyle())
               Button("Continue with Google") { authenticate { await model.signIn(provider: .google) } }.buttonStyle(PracticeButtonStyle(secondary: true))
               Button("Continue with GitHub") { authenticate { await model.signIn(provider: .github) } }.buttonStyle(PracticeButtonStyle(secondary: true))
             }
-            if signingIn { ProgressView(model.bootstrap == nil ? "Signing in…" : "Checking invite…") }
-          }.disabled(signingIn)
-        }.frame(maxWidth: 400).padding(24).frame(maxWidth: .infinity, minHeight: geometry.size.height)
-      }.scrollBounceBehavior(.basedOnSize)
+            // Reserve the row so buttons never shift when work starts.
+            ProgressView(inviting ? "Checking invite…" : "Signing in…")
+              .opacity(signingIn ? 1 : 0)
+              .accessibilityHidden(!signingIn)
+          }
+          .disabled(signingIn)
+          .transition(.opacity)
+        }
+        .animation(DrillbitMotion.page, value: inviting)
+        .animation(DrillbitMotion.fast, value: signingIn)
+        .frame(maxWidth: 400).padding(24).frame(maxWidth: .infinity, minHeight: geometry.size.height)
+      }
+      .scrollBounceBehavior(.basedOnSize)
+      .scrollDismissesKeyboard(.interactively)
     }
+    .task(id: inviting) { if inviting { inviteFocused = true } }
   }
 
+  private func redeem(_ code: String) {
+    inviteFocused = false
+    authenticate { await model.redeem(code) }
+  }
   private func finishWalkthrough() { demoReply = ""; walkthroughVersion = 1 }
-  private func move(to value: Int) { page = value }
+  private func move(to value: Int) {
+    movingForward = value > page
+    hasMoved = true
+    withAnimation(reduceMotion ? nil : DrillbitMotion.page) { page = value }
+  }
   private func authenticate(_ operation: @escaping @MainActor () async -> Void) {
     guard !signingIn else { return }; signingIn = true
     Task { defer { signingIn = false }; await operation() }
