@@ -93,8 +93,8 @@ struct SettingsView: View {
           }
         }
         Button("Delete account", role: .destructive) { deleting = true }
-          .confirmationDialog("Delete your account and all practice data?", isPresented: $deleting) {
-            Button("Delete account", role: .destructive) {
+          .alert("Delete Account?", isPresented: $deleting) {
+            Button("Delete", role: .destructive) {
               Task {
                 await model.perform {
                   let _: [String: String] = try await model.api.send(
@@ -104,6 +104,9 @@ struct SettingsView: View {
                 }
               }
             }
+            Button("Cancel", role: .cancel) {}
+          } message: {
+            Text("This permanently deletes your account, practice, feedback, Recall and saved key. You can't undo this.")
           }
       }
       if model.bootstrap?.capabilities?.developerTools == true {
