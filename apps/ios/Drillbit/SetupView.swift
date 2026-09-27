@@ -1,0 +1,317 @@
+import SwiftUI
+import UserNotifications
+
+@MainActor @Observable final class LearningPlanCoordinator {
+  struct Draft: Codable, Equatable {
+    // A new account sees the introduction; restored drafts keep their page.
+    var page = -1
+    var objective = "learn"
+    var roleTrack = "general"
+    var level = "mid"
+    var weakAreas: Set<String> = []
+    var dailyGoalMinutes = 10
+    var targetDate: Date? = nil
+    var reminderEnabled = false
+    var dailyMinutes = 540
+    var timezone = TimeZone.current.identifier
+  }
+  var draft = Draft()
+  var saving = false
+  var failure: String?
+  var reminderNote: String?
+}
+
+struct SetupView: View {
+  @Bindable var model: AppModel
+  @State private var coordinator = LearningPlanCoordinator()
+  @State private var reminderPermissionPending = false
+  @State private var movingForward = true
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  private let objectives = [("interview","An upcoming interview"),("learn","Stronger system design skills"),("stay_sharp","Keep my skills fresh")]
+  private let roles = [("general","General SWE"),("backend","Backend"),("frontend","Frontend"),("full_stack","Full-stack"),("platform","Platform / Infrastructure"),("data","Data"),("mobile","Mobile")]
+  private let areas = PracticeAreaGroup.all.map { ($0.id, $0.title) }
+  private let startingPoints = [("junior", "New to system design"), ("mid", "I’ve designed a few systems"), ("senior", "I design systems regularly"), ("staff", "I lead architecture across teams")]
+
+  var body: some View {
+    @Bindable var coordinator = coordinator
+    GeometryReader { geometry in
+      ScrollView {
+        VStack(alignment: .leading, spacing: 32) {
+          if coordinator.draft.page == -1 {
+            SetupIntroduction()
+              .frame(minHeight: max(0, geometry.size.height - 48))
+          } else {
+            VStack(alignment: .leading, spacing: 20) {
+              SignalEyebrow(text: String(format: "%02d / 05", coordinator.draft.page + 1))
+              AppPalette.hairline.frame(height: 1)
+              Text(title(for: coordinator.draft.page))
+                .font(.largeTitle.weight(.semibold))
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            pageContent(coordinator: coordinator)
+            if let note = coordinator.reminderNote { Text(note).font(.footnote).foregroundStyle(AppPalette.secondary) }
+            if let failure = coordinator.failure { Text(failure).font(.footnote).foregroundStyle(AppPalette.destructive) }
+          }
+        }
+        .id(coordinator.draft.page)
+        .transition(reduceMotion ? .identity : .asymmetric(
+          insertion: .offset(x: movingForward ? geometry.size.width : -geometry.size.width),
+          removal: .offset(x: movingForward ? -geometry.size.width : geometry.size.width)))
+        .frame(maxWidth: 560, alignment: .leading)
+        .padding(.horizontal, 24).padding(.top, 24).padding(.bottom, 24)
+        .frame(maxWidth: .infinity)
+      }
+    }.clipped()
+    .background(AppPalette.background)
+    .safeAreaInset(edge: .bottom, spacing: 0) {
+      VStack(spacing: 0) {
+        AppPalette.hairline.frame(height: 1)
+        HStack(spacing: 12) {
+          if coordinator.draft.page >= 0 {
+            Button("Back") { move(coordinator, to: coordinator.draft.page - 1) }
+              .buttonStyle(PracticeButtonStyle(secondary: true))
+              .frame(width: 88)
+              .transition(.opacity.combined(with: .offset(x: -12)))
+              .disabled(coordinator.saving || reminderPermissionPending)
+          }
+          Button {
+            if coordinator.draft.page == 4 { Task { await finish(coordinator) } }
+            else { move(coordinator, to: coordinator.draft.page + 1) }
+          } label: {
+            HStack(spacing: 8) {
+              if coordinator.draft.page == 4 {
+                Image(systemName: "sparkles").symbolEffect(.bounce, options: .nonRepeating, value: !reduceMotion && coordinator.draft.page == 4)
+                  .accessibilityHidden(true)
+              }
+              Text(coordinator.saving ? "Opening…" : coordinator.draft.page == -1 ? "Let's begin" : coordinator.draft.page == 4 ? "Start practice" : "Continue")
+              if coordinator.draft.page == 4 { Image(systemName: "arrow.right").accessibilityHidden(true) }
+            }
+            .padding(.vertical, coordinator.draft.page == 4 ? 8 : 0)
+          }.buttonStyle(PracticeButtonStyle()).disabled(coordinator.saving || reminderPermissionPending)
+            .contentTransition(.opacity)
+            .accessibilityLabel(coordinator.saving ? "Opening…" : coordinator.draft.page == -1 ? "Let's begin" : coordinator.draft.page == 4 ? "Start practice" : "Continue")
+            .accessibilityIdentifier("onboardingContinue")
+            .sensoryFeedback(.success, trigger: coordinator.draft.page == 4)
+        }
+        .padding(.horizontal, 24).padding(.top, 12).padding(.bottom, 8)
+        .animation(reduceMotion ? nil : .smooth(duration: 0.34, extraBounce: 0), value: coordinator.draft.page >= 0)
+      }
+      .background(AppPalette.background)
+    }
+    .toolbar(.hidden, for: .navigationBar)
+    .task(id: model.bootstrap?.account.id) { await restore(coordinator) }
+    .onChange(of: coordinator.draft) { _, _ in Task { await persist(coordinator) } }
+  }
+
+  private func move(_ coordinator: LearningPlanCoordinator, to page: Int) {
+    movingForward = page > coordinator.draft.page
+    withAnimation(reduceMotion ? nil : .smooth(duration: 0.38, extraBounce: 0)) {
+      coordinator.draft.page = page
+    }
+  }
+
+  @ViewBuilder private func pageContent(coordinator: LearningPlanCoordinator) -> some View {
+    @Bindable var coordinator = coordinator
+    switch coordinator.draft.page {
+    case 0:
+      VStack(alignment: .leading, spacing: 12) {
+        Text("Your priority right now. You’ll learn and practise in every path.")
+          .font(.subheadline).foregroundStyle(AppPalette.secondary)
+        VStack(spacing: 0) {
+          ForEach(objectives, id: \.0) { option in
+            SignalChoiceRow(title: option.1, selected: coordinator.draft.objective == option.0) {
+              coordinator.draft.objective = option.0
+            }
+            if option.0 != objectives.last?.0 { Divider().padding(.horizontal, 16) }
+          }
+        }
+      }
+    case 1:
+      VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: 12) {
+          Text("What do you usually build?").font(.headline)
+          Picker("Your work", selection: $coordinator.draft.roleTrack) {
+            ForEach(roles, id: \.0) { option in
+              Text(option.1).tag(option.0)
+            }
+          }.pickerStyle(.menu).frame(minHeight: 44)
+        }
+        VStack(alignment: .leading, spacing: 12) {
+          Text("How familiar is system design?").font(.headline)
+          Text("This sets the depth of your questions. You can change it later.").font(.subheadline).foregroundStyle(AppPalette.secondary)
+          VStack(spacing: 0) {
+            ForEach(startingPoints, id: \.0) { option in
+              SignalChoiceRow(title: option.1, selected: coordinator.draft.level == option.0) { coordinator.draft.level = option.0 }
+              if option.0 != startingPoints.last?.0 { Divider() }
+            }
+          }
+        }
+      }
+    case 2:
+      VStack(alignment: .leading, spacing: 12) {
+        Text("Explore everything, or pick up to three areas.").font(.subheadline).foregroundStyle(AppPalette.secondary)
+        VStack(spacing: 0) {
+          SignalChoiceRow(title: "A bit of everything", selected: coordinator.draft.weakAreas.isEmpty) {
+            coordinator.draft.weakAreas = []
+          }
+          Divider().padding(.horizontal, 16)
+          ForEach(areas, id: \.0) { area in
+            SignalChoiceRow(title: area.1, selected: coordinator.draft.weakAreas.contains(area.0)) {
+              if coordinator.draft.weakAreas.contains(area.0) { coordinator.draft.weakAreas.remove(area.0) }
+              else if coordinator.draft.weakAreas.count < 3 { coordinator.draft.weakAreas.insert(area.0) }
+            }
+            .disabled(!coordinator.draft.weakAreas.contains(area.0) && coordinator.draft.weakAreas.count == 3)
+            if area.0 != areas.last?.0 { Divider().padding(.horizontal, 16) }
+          }
+        }
+      }
+    case 3:
+      VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: 12) {
+          SignalEyebrow(text: "Daily commitment")
+          VStack(spacing: 0) {
+            ForEach([5,10,15,20], id: \.self) { minutes in
+              SignalChoiceRow(title: "\(minutes) minutes", selected: coordinator.draft.dailyGoalMinutes == minutes) {
+                coordinator.draft.dailyGoalMinutes = minutes
+              }
+              if minutes != 20 { Divider().padding(.horizontal, 16) }
+            }
+          }
+        }
+        VStack(alignment: .leading, spacing: 16) {
+          if coordinator.draft.objective == "interview" {
+            Toggle("I have an interview date", isOn: Binding(get: { coordinator.draft.targetDate != nil }, set: { coordinator.draft.targetDate = $0 ? Date() : nil }))
+            if coordinator.draft.targetDate != nil { DatePicker("Interview date", selection: Binding(get: { coordinator.draft.targetDate ?? Date() }, set: { coordinator.draft.targetDate = $0 }), in: Calendar.current.startOfDay(for: Date())..., displayedComponents: .date) }
+            Divider()
+          }
+          Toggle("Daily reminder", isOn: Binding(
+            get: { coordinator.draft.reminderEnabled },
+            set: { enabled in
+              coordinator.draft.reminderEnabled = enabled
+              guard enabled else { return }
+              reminderPermissionPending = true
+              Task {
+                let granted = await model.requestReminderPermission()
+                reminderPermissionPending = false
+                if !granted && coordinator.draft.reminderEnabled {
+                  coordinator.draft.reminderEnabled = false
+                  coordinator.reminderNote = "Enable notifications in iPhone Settings to receive reminders."
+                }
+              }
+            }
+          )).disabled(reminderPermissionPending)
+          if coordinator.draft.reminderEnabled {
+            DatePicker("Time", selection: reminderTime(coordinator), displayedComponents: .hourAndMinute)
+            NavigationLink { TimeZoneSelectionView(selection: $coordinator.draft.timezone) } label: {
+              HStack(spacing: 8) {
+                Text("Time zone")
+                Spacer(minLength: 8)
+                Text(TimeZoneSelectionView.label(coordinator.draft.timezone))
+                  .foregroundStyle(.secondary).lineLimit(1)
+              }
+            }
+          }
+        }
+        .tint(AppPalette.accent)
+      }
+    default:
+      summary(coordinator.draft)
+    }
+  }
+
+  private func summary(_ draft: LearningPlanCoordinator.Draft) -> some View {
+    VStack(alignment: .leading, spacing: 16) {
+      Text("\(draft.dailyGoalMinutes) minutes. One step at a time.").font(.title2.weight(.semibold))
+      LabeledContent("Goal", value: objectives.first { $0.0 == draft.objective }?.1 ?? "Learn system design")
+      Divider()
+      LabeledContent("Role", value: roles.first { $0.0 == draft.roleTrack }?.1 ?? "General SWE")
+      Divider()
+      LabeledContent("Experience", value: startingPoints.first { $0.0 == draft.level }?.1 ?? "I’ve designed a few systems")
+      Divider()
+      LabeledContent("Focus", value: draft.weakAreas.isEmpty ? "A bit of everything" : draft.weakAreas.compactMap { id in areas.first { $0.0 == id }?.1 }.sorted().joined(separator: ", "))
+      Divider()
+      LabeledContent("Routine", value: "\(draft.dailyGoalMinutes) minutes a day")
+      Label("First, a one-minute walkthrough. No score, no pressure.", systemImage: "sparkles")
+        .font(.subheadline).foregroundStyle(AppPalette.accent).padding(.top, 12)
+    }
+  }
+  private func title(for page: Int) -> String { ["What brings you here?","Where are you starting?","What sparks your curiosity?","Find your rhythm.","Made for you."][max(0, min(page,4))] }
+  private func reminderTime(_ coordinator: LearningPlanCoordinator) -> Binding<Date> { Binding(get: {
+    Calendar.current.date(from: DateComponents(hour: coordinator.draft.dailyMinutes / 60, minute: coordinator.draft.dailyMinutes % 60)) ?? Date()
+  }, set: { let parts = Calendar.current.dateComponents([.hour,.minute], from: $0); coordinator.draft.dailyMinutes = (parts.hour ?? 9) * 60 + (parts.minute ?? 0) }) }
+
+  private func restore(_ coordinator: LearningPlanCoordinator) async {
+    guard let account = model.bootstrap?.account.id else { return }
+    if let data = try? await model.disk.cached(key: "onboarding:" + account), let draft = try? JSONDecoder().decode(LearningPlanCoordinator.Draft.self, from: data) { coordinator.draft = draft }
+    else { coordinator.draft.level = model.settings.selectedLevel; coordinator.draft.dailyMinutes = model.settings.dailyMinutes; coordinator.draft.timezone = model.settings.timezone }
+  }
+  private func persist(_ coordinator: LearningPlanCoordinator) async {
+    guard let account = model.bootstrap?.account.id, let data = try? JSONEncoder().encode(coordinator.draft) else { return }
+    try? await model.disk.cache(key: "onboarding:" + account, data: data)
+  }
+  private func finish(_ coordinator: LearningPlanCoordinator) async {
+    guard !coordinator.saving, let account = model.bootstrap?.account.id else { return }
+    coordinator.saving = true; coordinator.failure = nil; coordinator.reminderNote = nil
+    defer { coordinator.saving = false }
+    if coordinator.draft.reminderEnabled, !(await model.requestReminderPermission()) {
+      coordinator.draft.reminderEnabled = false
+      coordinator.reminderNote = "Notifications stay off. Your chosen time is saved, and you can enable reminders later."
+    }
+    let formatter = DateFormatter(); formatter.calendar = Calendar(identifier: .gregorian); formatter.locale = Locale(identifier: "en_US_POSIX"); formatter.timeZone = TimeZone(identifier: coordinator.draft.timezone); formatter.dateFormat = "yyyy-MM-dd"
+    model.settings.learningPlan = LearningPlan(objective: coordinator.draft.objective, roleTrack: coordinator.draft.roleTrack,
+      weakAreas: coordinator.draft.weakAreas.sorted(), dailyGoalMinutes: coordinator.draft.dailyGoalMinutes,
+      targetDate: coordinator.draft.objective == "interview" ? coordinator.draft.targetDate.map { formatter.string(from: $0) } : nil)
+    model.settings.selectedLevel = coordinator.draft.level
+    model.settings.dailyMinutes = coordinator.draft.dailyMinutes
+    model.settings.timezone = coordinator.draft.timezone
+    model.settings.reminderEnabled = coordinator.draft.reminderEnabled
+    do {
+      try await model.setFirstUse(FirstUseProgress(stage: .walkthrough))
+      model.settings.onboardingComplete = true
+      try await model.saveSettingsLocally()
+      try? await model.disk.cache(key: "onboarding:" + account, data: Data())
+      model.starterPreview = FirstUseProgress.challenge
+    } catch { model.settings.onboardingComplete = false; coordinator.failure = error.localizedDescription }
+  }
+}
+
+private struct SetupIntroduction: View {
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @State private var revealed = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      DrillbitLogo(compact: true)
+      Spacer(minLength: 40)
+      ZStack {
+        SignalParticleField(density: 420)
+          .frame(maxWidth: 320, maxHeight: 320)
+        SignalWaveform()
+      }
+      .frame(maxWidth: .infinity)
+      .frame(height: 280)
+      .scaleEffect(revealed ? 1 : 0.94)
+      .opacity(revealed ? 1 : 0)
+      Spacer(minLength: 40)
+      VStack(alignment: .leading, spacing: 16) {
+        SignalEyebrow(text: "Practice, out loud")
+        Text("Think out loud.\nGet sharper.")
+          .font(.system(.largeTitle, design: .default, weight: .semibold))
+          .tracking(-0.8)
+          .fixedSize(horizontal: false, vertical: true)
+        Text("A focused system design interviewer, wherever you find a few minutes.")
+          .font(.body)
+          .foregroundStyle(AppPalette.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      .opacity(revealed ? 1 : 0)
+      .offset(y: revealed ? 0 : 12)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .task {
+      guard !revealed else { return }
+      if reduceMotion { revealed = true }
+      else { withAnimation(.smooth(duration: 0.55, extraBounce: 0).delay(0.08)) { revealed = true } }
+    }
+  }
+}

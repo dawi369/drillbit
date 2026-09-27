@@ -1,0 +1,178 @@
+import ClerkKit
+import SwiftUI
+
+struct RootView: View {
+  @Bindable var model: AppModel
+  @State private var settingsOpen = false
+  @State private var firstSessionSetup = false
+  @State private var selectedTab = ProcessInfo.processInfo.arguments.contains("--fixture-recall") ? "recall" : "home"
+  @AppStorage("appearance") private var appearance = "dark"
+  @Environment(\.scenePhase) private var scenePhase
+  @Environment(\.colorScheme) private var systemColorScheme
+  var body: some View {
+    Group {
+      if model.restoringSession || model.launchError != nil {
+        VStack(spacing: 16) {
+          DrillbitLogo(compact: true)
+          if let message = model.launchError {
+            Text(message).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            Button("Try again") { Task { await model.launch() } }
+          }
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(AppPalette.background)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("sessionRestoration")
+      } else if let account = model.bootstrap?.account, account.status == "active" {
+        if !model.settings.onboardingComplete {
+          NavigationStack { SetupView(model: model) }
+        } else {
+          TabView(selection: $selectedTab) {
+            Tab("Home", systemImage: AppIcon.home.rawValue, value: "home") {
+              NavigationStack {
+                HomeView(model: model, openSettings: { settingsOpen = true })
+              }
+            }
+            Tab("Recall", systemImage: AppIcon.recall.rawValue, value: "recall") {
+              NavigationStack {
+                RecallView(model: model).drillbitTabClearance()
+              }
+            }
+            Tab("Library", systemImage: AppIcon.library.rawValue, value: "library") {
+              NavigationStack {
+                MemoryView(model: model).drillbitTabClearance().toolbar {
+                  Button("Settings", systemImage: AppIcon.settings.rawValue) { settingsOpen = true }
+                }
+              }
+            }
+          }
+          .allowsHitTesting(model.firstUse.tourTab == nil)
+          .accessibilityHidden(model.firstUse.tourTab != nil)
+          .overlay(alignment: .bottom) {
+            if model.firstUse.tourTab != nil && model.presented == nil {
+              ViewThatFits(in: .vertical) {
+                FirstUseTourTip(model: model)
+                ScrollView { FirstUseTourTip(model: model) }
+              }.padding(.bottom, 88)
+            }
+          }
+        }
+      } else {
+        WelcomeView(model: model)
+      }
+    }
+    .preferredColorScheme(model.fixture && ProcessInfo.processInfo.arguments.contains("--dark") ? .dark : appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
+    .background(WindowFloorColor().allowsHitTesting(false))
+    .onChange(of: model.firstUse.stage) { _, stage in
+      if let tab = model.firstUse.tourTab { selectedTab = tab }
+      if stage == .chooseMode { selectedTab = "home"; firstSessionSetup = true }
+    }
+    .onReceive(NotificationCenter.default.publisher(for: .init("OpenPractice"))) { _ in
+      selectedTab = "home"
+      Task { await model.refresh() }
+    }
+    .onReceive(NotificationCenter.default.publisher(for: .init("OpenRecall"))) { _ in
+      selectedTab = "recall"
+      Task { await model.loadRecall() }
+    }
+    .task {
+      await model.launch()
+      if let tab = model.firstUse.tourTab { selectedTab = tab }
+      if model.firstUse.stage == .chooseMode { firstSessionSetup = true }
+      #if DEBUG
+        if model.fixture && ProcessInfo.processInfo.arguments.contains("--fixture-settings") {
+          settingsOpen = true
+        }
+      #endif
+    }
+    .onChange(of: scenePhase) { _, phase in
+      if phase == .active {
+        Task { await model.refresh(); await model.ensureHomeQuestion() }
+      } else if phase == .background {
+        if !model.fixture { BackgroundRefresh.schedule() }
+        Task { await model.sync() }
+      }
+    }
+    .sheet(isPresented: $settingsOpen) {
+      NavigationStack { SettingsView(model: model) }
+        .environment(\.colorScheme, appearance == "dark" ? .dark : appearance == "light" ? .light : systemColorScheme)
+        .preferredColorScheme(appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
+        .interactiveDismissDisabled()
+    }
+    .sheet(item: $model.starterPreview) { challenge in
+      QuestionFlow(model: model, initial: challenge, isStarter: true) { opened in model.presented = opened }
+        .interactiveDismissDisabled(false)
+    }
+    .sheet(isPresented: $firstSessionSetup) {
+      QuestionFlow(model: model) { opened in model.presented = opened }
+    }
+    .fullScreenCover(item: $model.presented) { challenge in
+      NavigationStack {
+        if challenge.id == FirstUseProgress.challengeID { FirstPracticeView(model: model) }
+        else { InterviewView(model: model, challenge: challenge) }
+      }
+    }
+    .sheet(item: $model.conflict) { challenge in
+      NavigationStack {
+        ScrollView {
+          VStack(alignment: .leading, spacing: 16) {
+            Text("The answer changed on another device. Your local draft is still stored.")
+            Text("Cloud answer").font(.headline)
+            Text(challenge.session?.answer ?? "No answer").textSelection(.enabled)
+            Button("Use cloud answer") { Task { await model.resolveConflict(keepLocal: false) } }
+              .buttonStyle(PracticeButtonStyle())
+            if challenge.isActive {
+              Button("Keep my local answer") {
+                Task { await model.resolveConflict(keepLocal: true) }
+              }
+            } else {
+              Text("This session is already complete. Copy your local draft before replacing it.")
+                .foregroundStyle(.secondary)
+            }
+            LocalRecoveryView(model: model, challenge: challenge)
+          }.padding(24)
+        }.navigationTitle("Review draft")
+      }.interactiveDismissDisabled()
+    }
+    .alert(
+      "Drillbit",
+      isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })
+    ) {
+      Button("OK") { model.error = nil }
+    } message: {
+      Text(model.error ?? "")
+    }
+    .onOpenURL { url in
+      if url.scheme == "dawi.drillbit" && url.host == "callback" { return }
+      selectedTab = "home"
+      Task { await model.refresh() }
+    }
+  }
+}
+
+/// The keyboard's rounded corners reveal the host window, outside SwiftUI's
+/// keyboard-safe area. Keep that window on the same adaptive app floor.
+private struct WindowFloorColor: UIViewRepresentable {
+  func makeUIView(context: Context) -> FloorView { FloorView() }
+  func updateUIView(_ view: FloorView, context: Context) { view.window?.backgroundColor = AppPalette.backgroundUIColor }
+
+  final class FloorView: UIView {
+    override func didMoveToWindow() {
+      super.didMoveToWindow()
+      window?.backgroundColor = AppPalette.backgroundUIColor
+    }
+  }
+}
+struct LocalRecoveryView: View {
+  var model: AppModel
+  var challenge: Challenge
+  @State private var local = ""
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Text("Local answer").font(.headline)
+      Text(local).textSelection(.enabled)
+      ShareLink("Export local answer", item: local)
+    }.task { local = await model.localAnswer(challenge) }
+  }
+}
