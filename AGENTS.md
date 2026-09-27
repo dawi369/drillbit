@@ -8,5 +8,6 @@ Native iOS client and independent Cloudflare backend. Product and architectural 
 - Test lifecycle concurrency and failure recovery against D1; mocked happy paths are insufficient.
 - API changes update OpenAPI and fixtures; native DTOs remain compatible with the contract.
 - Native UI uses system fonts, semantic colors, SF Symbols and system controls. Custom spacing uses 4-point increments; custom surfaces use a 12-point radius. System component geometry takes precedence over legacy web rules.
+- Copy sounds like a fellow CS student: casual, direct, concrete, a little playful, honest about what to fix. The first Welcome screen in `apps/ios/Drillbit/WelcomeView.swift` is the reference voice; check every new or changed string against it.
 - Preserve Dynamic Type, VoiceOver, reduced motion and native keyboard behavior.
 - Reports distinguish compiled/tested, live-service verified and physical-device verified outcomes.
