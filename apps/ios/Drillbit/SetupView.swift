@@ -30,7 +30,7 @@ struct SetupView: View {
   @State private var scroll = ScrollPosition(edge: .top)
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   private let objectives = [("interview","An upcoming interview"),("learn","Stronger system design skills"),("stay_sharp","Keep my skills fresh")]
-  private let roles = [("general","General SWE"),("backend","Backend"),("frontend","Frontend"),("full_stack","Full-stack"),("platform","Platform / Infrastructure"),("data","Data"),("mobile","Mobile")]
+  private let roles = [("general","A mix of things"),("backend","Backend services"),("frontend","Web frontends"),("full_stack","Full-stack products"),("platform","Platforms and infrastructure"),("data","Data systems"),("mobile","Mobile apps")]
   private let areas = PracticeAreaGroup.all.map { ($0.id, $0.title) }
   private let startingPoints = [("junior", "New to system design"), ("mid", "I’ve designed a few systems"), ("senior", "I design systems regularly"), ("staff", "I lead architecture across teams")]
 
@@ -142,7 +142,7 @@ struct SetupView: View {
             }
           } label: {
             HStack(spacing: 8) {
-              Text(roles.first { $0.0 == coordinator.draft.roleTrack }?.1 ?? "General SWE")
+              Text(roles.first { $0.0 == coordinator.draft.roleTrack }?.1 ?? "A mix of things")
                 .foregroundStyle(AppPalette.primary)
               Spacer(minLength: 8)
               Image(systemName: "chevron.up.chevron.down").font(.caption.weight(.semibold))
@@ -153,7 +153,7 @@ struct SetupView: View {
             .contentShape(Rectangle())
           }
           .accessibilityLabel("Your work")
-          .accessibilityValue(roles.first { $0.0 == coordinator.draft.roleTrack }?.1 ?? "General SWE")
+          .accessibilityValue(roles.first { $0.0 == coordinator.draft.roleTrack }?.1 ?? "A mix of things")
         }
         VStack(alignment: .leading, spacing: 12) {
           Text("How familiar is system design?").font(.headline)
@@ -228,7 +228,7 @@ struct SetupView: View {
       Text("\(draft.dailyGoalMinutes) minutes. One step at a time.").font(.title2.weight(.semibold))
       LabeledContent("Goal", value: objectives.first { $0.0 == draft.objective }?.1 ?? "Learn system design")
       Divider()
-      LabeledContent("Role", value: roles.first { $0.0 == draft.roleTrack }?.1 ?? "General SWE")
+      LabeledContent("You build", value: roles.first { $0.0 == draft.roleTrack }?.1 ?? "A mix of things")
       Divider()
       LabeledContent("Experience", value: startingPoints.first { $0.0 == draft.level }?.1 ?? "I’ve designed a few systems")
       Divider()

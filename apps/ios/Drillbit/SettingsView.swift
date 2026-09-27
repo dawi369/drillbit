@@ -155,14 +155,14 @@ private struct DeveloperSettingsSection: View {
 struct LearningPlanSettingsView: View {
   @Bindable var model: AppModel
   private let objectives = [("interview","An upcoming interview"),("learn","Stronger system design skills"),("stay_sharp","Keep my skills fresh")]
-  private let roles = [("general","General SWE"),("backend","Backend"),("frontend","Frontend"),("full_stack","Full-stack"),("platform","Platform / Infrastructure"),("data","Data"),("mobile","Mobile")]
+  private let roles = [("general","A mix of things"),("backend","Backend services"),("frontend","Web frontends"),("full_stack","Full-stack products"),("platform","Platforms and infrastructure"),("data","Data systems"),("mobile","Mobile apps")]
   private let areas = PracticeAreaGroup.all.map { ($0.id, $0.title) }
   private var plan: Binding<LearningPlan> { Binding(get: { model.settings.learningPlan ?? LearningPlan() }, set: { model.settings.learningPlan = $0 }) }
   var body: some View {
     SignalList {
       Picker("Current priority", selection: plan.objective) { ForEach(objectives, id: \.0) { Text($0.1).tag($0.0) } }
         .onChange(of: plan.wrappedValue.objective) { _, value in if value != "interview" { var updated = plan.wrappedValue; updated.targetDate = nil; plan.wrappedValue = updated } }
-      Picker("Role", selection: plan.roleTrack) { ForEach(roles, id: \.0) { Text($0.1).tag($0.0) } }
+      Picker("You build", selection: plan.roleTrack) { ForEach(roles, id: \.0) { Text($0.1).tag($0.0) } }
       Picker("Daily commitment", selection: plan.dailyGoalMinutes) { ForEach([5,10,15,20], id: \.self) { Text("\($0) minutes").tag($0) } }
       if plan.wrappedValue.objective == "interview" {
         Toggle("I have an interview date", isOn: Binding(get: { plan.wrappedValue.targetDate != nil }, set: { enabled in
