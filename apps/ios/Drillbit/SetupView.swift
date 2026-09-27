@@ -283,11 +283,8 @@ private struct SetupIntroduction: View {
     VStack(alignment: .leading, spacing: 0) {
       DrillbitLogo(compact: true)
       Spacer(minLength: 40)
-      ZStack {
-        SignalParticleField(density: 420)
-          .frame(maxWidth: 320, maxHeight: 320)
-        SignalWaveform()
-      }
+      SignalPresence(density: 420)
+        .frame(maxWidth: 320, maxHeight: 320)
       .frame(maxWidth: .infinity)
       .frame(height: 280)
       .scaleEffect(revealed ? 1 : 0.94)

@@ -23,6 +23,8 @@ private struct VoiceOutbox: Codable {
   var message: String?
   var isOpen: Bool { phase != .idle }
   var blocksText: Bool { [.connecting,.active,.ending].contains(phase) || outbox != nil }
+  let levels = VoiceLevels()
+  private var meter: Task<Void, Never>?
   private let interview: InterviewController
   private var transport: NativeVoiceTransport?
   private var prepared: (link: NativeVoiceTransport, offer: Task<String, Error>, date: Date)?
@@ -95,6 +97,9 @@ private struct VoiceOutbox: Codable {
       if interview.model.fixture {
         phase = .active
         present([],id:id)
+        #if DEBUG
+        startFixtureMeter(epoch: epoch)
+        #endif
         return
       }
       interruptedObserver = NotificationCenter.default.addObserver(forName:AVAudioSession.interruptionNotification,object:nil,queue:.main) { [weak self] _ in
@@ -134,6 +139,7 @@ private struct VoiceOutbox: Codable {
       try await link.answer(result.sdp)
       guard generation == epoch, phase == .connecting || phase == .active else { link.close(); return }
       link.startAudio()
+      startMeter(epoch: epoch)
       Task { [weak self] in
         try? await Task.sleep(for:.seconds(10))
         guard let self, self.generation == epoch, self.phase == .connecting else { return }
@@ -165,7 +171,31 @@ private struct VoiceOutbox: Codable {
     discardPreparation()
     // Cancel startup synchronously, before the exit's asynchronous finalization.
     if phase == .connecting { generation = UUID() }
+    stopMeter()
     transport?.stopAudio()
+  }
+  private func startMeter(epoch: UUID) {
+    meter?.cancel()
+    meter = Task { [weak self] in
+      while let self, self.generation == epoch, self.phase == .connecting || self.phase == .active, let transport = self.transport {
+        let sample = await transport.audioLevels()
+        guard !Task.isCancelled, self.generation == epoch else { break }
+        self.levels.input = self.muted ? 0 : Self.perceptual(sample.input)
+        self.levels.output = Self.perceptual(sample.output)
+        try? await Task.sleep(for: .milliseconds(80))
+      }
+      self?.levels.reset()
+    }
+  }
+  private func stopMeter() {
+    meter?.cancel()
+    meter = nil
+    levels.reset()
+  }
+  /// WebRTC reports linear amplitude; speech sits roughly between -50 and -10 dBFS.
+  private static func perceptual(_ level: Double) -> Double {
+    guard level > 0.0005 else { return 0 }
+    return min(1, max(0, (20 * log10(level) + 50) / 40))
   }
   func end() async {
     guard isOpen, phase != .ending else { return }
@@ -302,12 +332,30 @@ private struct VoiceOutbox: Codable {
     if outbox == nil { await interview.refresh() }
   }
   private func cleanup() {
+    stopMeter()
     transport?.close(); transport = nil
     if let interruptedObserver { NotificationCenter.default.removeObserver(interruptedObserver) }; interruptedObserver = nil
     if let routeObserver { NotificationCenter.default.removeObserver(routeObserver) }; routeObserver = nil
     try? AVAudioSession.sharedInstance().setActive(false,options:.notifyOthersOnDeactivation)
   }
   #if DEBUG
+  /// Fixture sessions have no audio; alternate a synthetic speaker envelope.
+  private func startFixtureMeter(epoch: UUID) {
+    meter?.cancel()
+    meter = Task { [weak self] in
+      var time = 0.0
+      while let self, self.generation == epoch, self.phase == .active {
+        let candidateSpeaking = Int(time / 3) % 2 == 0
+        let envelope = max(0, 0.5 * sin(time * 7.3) + 0.5 * sin(time * 3.1))
+        self.levels.input = candidateSpeaking && !self.muted ? envelope * 0.8 : 0
+        self.levels.output = candidateSpeaking ? 0 : envelope * 0.7
+        try? await Task.sleep(for: .milliseconds(80))
+        if Task.isCancelled { break }
+        time += 0.08
+      }
+      self?.levels.reset()
+    }
+  }
   func fixtureSpeech() async {
     let events:[[String:Any]] = [
       ["type":"session.input_transcript.delta","event_id":UUID().uuidString,"delta":"I'd use a durable queue.","start_ms":0,"end_ms":1000],
@@ -369,6 +417,21 @@ private struct VoiceOutbox: Codable {
     }
   }
   func mute(_ muted:Bool) { guard !stopped else { return }; track?.isEnabled = !muted }
+  /// Reads WebRTC's own audio-level statistics; never touches the audio unit.
+  func audioLevels() async -> (input: Double, output: Double) {
+    guard let peer, !stopped else { return (0, 0) }
+    return await withCheckedContinuation { continuation in
+      peer.statistics { report in
+        var input = 0.0, output = 0.0
+        for stat in report.statistics.values where (stat.values["kind"] as? String) == "audio" {
+          guard let level = (stat.values["audioLevel"] as? NSNumber)?.doubleValue else { continue }
+          if stat.type == "media-source" { input = max(input, level) }
+          else if stat.type == "inbound-rtp" { output = max(output, level) }
+        }
+        continuation.resume(returning: (input, output))
+      }
+    }
+  }
   func send(_ event:[String:Any]) { if let data=try? JSONSerialization.data(withJSONObject:event) { channel?.sendData(RTCDataBuffer(data:data,isBinary:false)) } }
   func close() { stopAudio();channel?.delegate=nil;channel?.close();peer?.delegate=nil;peer?.close();peer=nil;channel=nil;track=nil }
   nonisolated func dataChannelDidChangeState(_ dataChannel:RTCDataChannel) {}

@@ -12,9 +12,8 @@ struct InterviewVoiceRoom<Question: View>: View {
       VStack(alignment: .leading, spacing: 12) {
         question()
         if !showingHistory {
-          SignalParticleField(density: 720)
+          SignalPresence(mode: presenceMode, density: 720, levels: voice.levels)
             .frame(height: 240)
-            .overlay { SignalWaveform() }
           SignalEyebrow(text: voiceState)
             .frame(maxWidth: .infinity)
         }
@@ -43,6 +42,14 @@ struct InterviewVoiceRoom<Question: View>: View {
     case .active: nil
     case .ending: "Voice ended · saving conversation"
     case .unavailable: "Voice unavailable"
+    }
+  }
+  private var presenceMode: SignalPresence.Mode {
+    switch voice.phase {
+    case .idle: .ambient
+    case .connecting: .connecting
+    case .active: voice.muted ? .muted : .live
+    case .ending, .unavailable: .still
     }
   }
   private var voiceState: String {

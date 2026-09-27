@@ -54,9 +54,8 @@ struct WelcomeView: View {
   private var practiceProof: some View {
     VStack(alignment: .leading, spacing: 20) {
       DrillbitLogo(compact: true)
-      SignalParticleField(density: 720)
+      SignalPresence(density: 720)
         .frame(height: 260)
-        .overlay { SignalWaveform() }
       SignalEyebrow(text: "System design / out loud")
       Text("A better answer\nstarts in motion.")
         .font(.largeTitle.weight(.semibold)).tracking(-0.8)
@@ -128,8 +127,7 @@ struct WelcomeView: View {
         VStack(spacing: 32) {
           VStack(spacing: 12) {
             DrillbitLogo()
-            SignalParticleField(density: 480).frame(height: 190)
-              .overlay { SignalWaveform() }
+            SignalPresence(density: 480).frame(height: 190)
             Text(model.bootstrap == nil ? "System design. Out loud." : "Enter your invite to begin.")
               .font(.title2.weight(.semibold)).multilineTextAlignment(.center)
           }
