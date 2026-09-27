@@ -6,7 +6,6 @@ struct SettingsView: View {
   @Environment(\.dismiss) private var dismiss
   @State private var deleting = false
   @State private var discarding = false
-  @State private var resettingPractice = false
   @State private var saving = false
   @State private var reminderPermissionPending = false
   @AppStorage("appearance") private var appearance = "dark"
@@ -82,10 +81,41 @@ struct SettingsView: View {
             if model.hasPendingWrites || model.pendingSettings != nil { discarding = true }
           }
         }
+        // Dialogs attach to their buttons so iOS presents them from the tapped row.
+        .confirmationDialog("Some local edits have not synced", isPresented: $discarding) {
+          Button("Discard local edits and sign out", role: .destructive) {
+            Task {
+              await model.perform {
+                try await model.signOut(discard: true)
+                dismiss()
+              }
+            }
+          }
+        }
         Button("Delete account", role: .destructive) { deleting = true }
+          .confirmationDialog("Delete your account and all practice data?", isPresented: $deleting) {
+            Button("Delete account", role: .destructive) {
+              Task {
+                await model.perform {
+                  let _: [String: String] = try await model.api.send(
+                    "account", method: "DELETE", command: UUID().uuidString)
+                  try await model.signOut(discard: true, deleting: true)
+                  dismiss()
+                }
+              }
+            }
+          }
       }
       if model.bootstrap?.capabilities?.developerTools == true {
-        DeveloperSettingsSection(resetRequested: $resettingPractice)
+        DeveloperSettingsSection {
+          Task {
+            await model.perform {
+              try await model.resetDeveloperPractice()
+              appearance = "dark"
+              dismiss()
+            }
+          }
+        }
       }
     }.navigationTitle("Settings")
       .toolbar {
@@ -102,49 +132,20 @@ struct SettingsView: View {
           }.disabled(saving || reminderPermissionPending)
         }
       }
-      .confirmationDialog("Delete your account and all practice data?", isPresented: $deleting) {
-        Button("Delete account", role: .destructive) {
-          Task {
-            await model.perform {
-              let _: [String: String] = try await model.api.send(
-                "account", method: "DELETE", command: UUID().uuidString)
-              try await model.signOut(discard: true, deleting: true)
-              dismiss()
-            }
-          }
-        }
-      }
-      .confirmationDialog("Some local edits have not synced", isPresented: $discarding) {
-        Button("Discard local edits and sign out", role: .destructive) {
-          Task {
-            await model.perform {
-              try await model.signOut(discard: true)
-              dismiss()
-            }
-          }
-        }
-      }
-      .confirmationDialog("Reset all Drillbit practice data?", isPresented: $resettingPractice) {
-        Button("Reset Drillbit", role: .destructive) {
-          Task {
-            await model.perform {
-              try await model.resetDeveloperPractice()
-              appearance = "dark"
-              dismiss()
-            }
-          }
-        }
-        Button("Cancel", role: .cancel) {}
-      } message: {
-        Text("This permanently removes your practice, Recall history, preferences, reminders and LLM key. You’ll stay signed in and return to onboarding.")
-      }
   }
 }
 private struct DeveloperSettingsSection: View {
-  @Binding var resetRequested: Bool
+  var reset: () -> Void
+  @State private var confirming = false
   var body: some View {
     Section {
-      Button("Reset Drillbit", role: .destructive) { resetRequested = true }
+      Button("Reset Drillbit", role: .destructive) { confirming = true }
+        .confirmationDialog("Reset all Drillbit practice data?", isPresented: $confirming) {
+          Button("Reset Drillbit", role: .destructive, action: reset)
+          Button("Cancel", role: .cancel) {}
+        } message: {
+          Text("This permanently removes your practice, Recall history, preferences, reminders and LLM key. You’ll stay signed in and return to onboarding.")
+        }
     } header: {
       Text("Developer")
     } footer: {
