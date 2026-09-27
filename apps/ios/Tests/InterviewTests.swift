@@ -4,6 +4,7 @@ import Testing
 #if canImport(DrillbitCore)
 @testable import DrillbitCore
 #else
+import ClerkKit
 @testable import Drillbit
 #endif
 struct InterviewTests {
@@ -224,6 +225,13 @@ struct InterviewTests {
 
 #if !canImport(DrillbitCore)
 @MainActor struct InterviewSubmissionTests {
+  @Test func vanishedClerkSessionReadsAsSignedOutNotAnError() async throws {
+    let gone = try JSONDecoder().decode(ClerkAPIError.self, from: Data(#"{"code":"resource_not_found","message":"No session with id sess_1 found"}"#.utf8))
+    #expect(try await APIClient.signedOutWhenSessionIsGone { throw gone } == nil)
+    let offline = try JSONDecoder().decode(ClerkAPIError.self, from: Data(#"{"code":"network_error"}"#.utf8))
+    await #expect(throws: ClerkAPIError.self) { try await APIClient.signedOutWhenSessionIsGone { throw offline } }
+    #expect(try await APIClient.signedOutWhenSessionIsGone { "token" } == "token")
+  }
   @Test func walkthroughRoutingSurvivesReplacingQuestionsAndNeverQueuesPractice() async throws {
     let container = try ModelContainer(for: Schema(StoreV1.models), configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     let model = AppModel(container: container, baseURL: URL(string: "https://example.invalid")!, fixture: false, monitorNetwork: false)

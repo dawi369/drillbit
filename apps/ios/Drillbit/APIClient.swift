@@ -6,9 +6,16 @@ import Foundation
   private let tokenProvider: @MainActor () async throws -> String?
   private let transport: @MainActor (URLRequest) async throws -> (Data, URLResponse)
   init(baseURL: URL,
-       tokenProvider: @escaping @MainActor () async throws -> String? = { try await Clerk.shared.session?.getToken(.init(template: "drillbit")) },
+       tokenProvider: @escaping @MainActor () async throws -> String? = {
+         try await APIClient.signedOutWhenSessionIsGone { try await Clerk.shared.session?.getToken(.init(template: "drillbit")) }
+       },
        transport: @escaping @MainActor (URLRequest) async throws -> (Data, URLResponse) = { try await URLSession.shared.data(for: $0) }) {
     self.baseURL = baseURL; self.tokenProvider = tokenProvider; self.transport = transport
+  }
+  /// A session Clerk no longer has (e.g. after account deletion) means signed out, not an error to show.
+  static func signedOutWhenSessionIsGone(_ token: @MainActor () async throws -> String?) async throws -> String? {
+    do { return try await token() }
+    catch let error as ClerkAPIError where ["authentication_invalid", "resource_not_found", "signed_out"].contains(error.code) { return nil }
   }
   func request(_ path: String, method: String = "GET", body: Data? = nil, command: String? = nil)
     async throws -> URLRequest

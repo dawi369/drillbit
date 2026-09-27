@@ -1056,7 +1056,8 @@ import WidgetKit
         let _: EmptyResponse = try await api.send("devices/" + id, method: "DELETE")
       }
       if deleting {
-        try? await Clerk.shared.auth.signOut()
+        // The server may already have revoked the session; resync so no stale session survives relaunch.
+        do { try await Clerk.shared.auth.signOut() } catch { _ = try? await Clerk.shared.refreshClient() }
       } else {
         try await Clerk.shared.auth.signOut()
       }
