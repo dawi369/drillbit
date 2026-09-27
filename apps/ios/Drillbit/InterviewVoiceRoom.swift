@@ -7,6 +7,7 @@ struct InterviewVoiceRoom<Question: View>: View {
   @ViewBuilder var question: () -> Question
   var leave: () -> Void
   @State private var showingHistory = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   var body: some View {
     InterviewConversation(state: interview.displayState, latestOnly: !showingHistory) {
       VStack(alignment: .leading, spacing: 12) {
@@ -15,7 +16,9 @@ struct InterviewVoiceRoom<Question: View>: View {
           SignalPresence(mode: presenceMode, density: 720, levels: voice.levels)
             .frame(height: 240)
           SignalEyebrow(text: voiceState)
+            .contentTransition(.opacity)
             .frame(maxWidth: .infinity)
+            .animation(DrillbitMotion.fast, value: voiceState)
         }
       }
     }
@@ -63,7 +66,8 @@ struct InterviewVoiceRoom<Question: View>: View {
   }
   private var controls: some View {
     VStack(spacing: 12) {
-      if let status { Text(status).font(.subheadline).foregroundStyle(.secondary) }
+      // The live view already names Connecting under the presence field.
+      if let status, showingHistory || voice.phase != .connecting { Text(status).font(.subheadline).foregroundStyle(.secondary) }
       if let message = voice.message { Text(message).font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center) }
       HStack(alignment: .top, spacing: 16) {
         Spacer(minLength: 0)
@@ -76,7 +80,7 @@ struct InterviewVoiceRoom<Question: View>: View {
               Image(systemName: voice.phase == .active ? (voice.muted ? AppIcon.microphoneMuted.rawValue : AppIcon.microphone.rawValue) : AppIcon.start.rawValue)
               .font(.title3.weight(.medium))
               .symbolRenderingMode(.monochrome)
-              .contentTransition(.identity)
+              .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace))
               .foregroundStyle(voice.muted ? AppPalette.destructive : AppPalette.actionInk)
               .frame(width: 116, height: 56)
               .background(voice.muted ? AppPalette.surface : AppPalette.action, in: Capsule())
@@ -85,9 +89,13 @@ struct InterviewVoiceRoom<Question: View>: View {
                 .font(.caption).foregroundStyle(AppPalette.secondary)
             }
               .opacity(voice.phase == .connecting ? 0.4 : 1)
+              .animation(DrillbitMotion.selection, value: voice.muted)
+              .animation(DrillbitMotion.selection, value: voice.phase)
           }
-          .buttonStyle(.plain)
+          .buttonStyle(DrillbitPressStyle())
           .disabled(voice.phase == .connecting)
+          .sensoryFeedback(.impact(weight: .medium), trigger: voice.phase == .active) { _, live in live }
+          .sensoryFeedback(.selection, trigger: voice.muted)
           .accessibilityIdentifier(voice.phase == .active ? "voiceMute" : "voiceStart")
           .accessibilityLabel(voice.phase == .active ? (voice.muted ? "Unmute microphone" : "Mute microphone") : "Start voice")
           .accessibilityValue(voice.phase == .active ? (voice.muted ? "Muted" : "Microphone on") : "Microphone off")
@@ -113,7 +121,7 @@ struct InterviewVoiceRoom<Question: View>: View {
           .frame(width: 76, height: 56).background(AppPalette.elevated, in: Capsule())
         Text(title).font(.caption).multilineTextAlignment(.center).contentTransition(.identity).transaction { $0.animation = nil }
       }.frame(maxWidth: .infinity)
-    }.buttonStyle(.plain).accessibilityIdentifier(id)
+    }.buttonStyle(DrillbitPressStyle()).accessibilityIdentifier(id)
   }
 
 }

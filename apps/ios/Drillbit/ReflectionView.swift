@@ -3,9 +3,11 @@ import SwiftUI
 struct CompletionHeading: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
+      DrillbitMark(size: 40, arrives: true).padding(.bottom, 4)
       SignalEyebrow(text: "Practice complete")
       Text("One idea to carry forward.")
         .font(.largeTitle.weight(.semibold)).tracking(-0.8)
+        .accessibilityAddTraits(.isHeader)
     }
   }
 }
@@ -16,15 +18,18 @@ struct ReflectionView: View {
   @State private var startedFollowUp: Challenge?
   @State private var retryingTurn: String?
   @State private var retryFailure: String?
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   var model: AppModel
   var initial: Challenge
   @State private var current: Challenge?
+  private var hasReflection: Bool { (current ?? initial).reflection != nil }
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 24) {
         CompletionHeading()
         AssistanceSummary(challenge: current ?? initial)
         if let reflection = (current ?? initial).reflection {
+          Group {
           ReflectionContent(reflection: reflection)
           completionAction(reflection: reflection)
           if let turns = (current ?? initial).interview?.turns.filter({ $0.kind == "answer" }), !turns.isEmpty {
@@ -40,28 +45,33 @@ struct ReflectionView: View {
                   }
                 } label: {
                   HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 3) {
+                    VStack(alignment: .leading, spacing: 4) {
                       Text(turn.prompt).lineLimit(2).multilineTextAlignment(.leading)
                       Text("Start a clean branch here").font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
                     if retryingTurn == turn.id { ProgressView().controlSize(.small) }
-                    else { Image(systemName: "arrow.branch").foregroundStyle(.secondary) }
+                    else { Image(systemName: "arrow.branch").foregroundStyle(.secondary).accessibilityHidden(true) }
                   }
-                }.buttonStyle(.plain).disabled(retryingTurn != nil)
+                  .frame(minHeight: 56)
+                  .contentShape(Rectangle())
+                }.buttonStyle(DrillbitRowButtonStyle()).disabled(retryingTurn != nil)
               }
             }
           }
+          }
+          .transition(.opacity.combined(with: .offset(y: reduceMotion ? 0 : 8)))
           if let retryFailure { Text(retryFailure).font(.subheadline).foregroundStyle(AppPalette.destructive) }
         } else {
-          Text(
-            model.hasPendingWrites && !model.fixture
-              ? "Saved on this device. Your answer will sync when connected."
-              : waitingForFeedback ? "Your answer is saved. Feedback is being prepared." : "Your practice is complete. Feedback will appear here and in your library when it’s ready."
-          ).foregroundStyle(
-            .secondary)
-          if waitingForFeedback { ProgressView().accessibilityLabel("Preparing feedback") }
-          else { Button("Check feedback") { feedbackCheck += 1 } }
+          if model.hasPendingWrites && !model.fixture {
+            Text("Saved on this device. Your answer will sync when connected.").foregroundStyle(.secondary)
+          } else if waitingForFeedback {
+            LoadingStatus("Your answer is saved. Feedback is being prepared.")
+              .accessibilityLabel("Preparing feedback")
+          } else {
+            Text("Your practice is complete. Feedback will appear here and in your library when it’s ready.").foregroundStyle(.secondary)
+          }
+          if !waitingForFeedback { Button("Check feedback") { feedbackCheck += 1 }.frame(minHeight: 44) }
           if let job = model.bootstrap?.jobs.first(where: { $0.challengeId == initial.id && $0.kind == "summarize" && $0.status == "failed" }) {
             Button("Retry feedback") { Task { await model.retry(job); feedbackCheck += 1 } }
           }
@@ -78,7 +88,9 @@ struct ReflectionView: View {
           }
         }
       }.padding(24)
+        .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: hasReflection)
     }.background(AppPalette.background)
+      .sensoryFeedback(.success, trigger: hasReflection) { before, now in !before && now }
       .navigationTitle("Reflection").navigationBarBackButtonHidden()
       .sheet(isPresented: $preparingFollowUp, onDismiss: {
         if let startedFollowUp { model.presented = startedFollowUp; self.startedFollowUp = nil }
@@ -141,7 +153,7 @@ struct ReflectionContent: View {
         Text("“\(evidence.quote)”")
           .font(.title2.weight(.medium)).textSelection(.enabled)
           .fixedSize(horizontal: false, vertical: true)
-        Rectangle().fill(AppPalette.action).frame(height: 2)
+        SignalRule()
         SignalEyebrow(text: evidence.signal == "demonstrated" ? "What worked" : "The missing guard")
         Text(evidence.observation).font(.title2.weight(.semibold))
           .fixedSize(horizontal: false, vertical: true)
@@ -175,6 +187,8 @@ struct ReflectionContent: View {
             Text(exercise)
           }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 12)
       }
     }
   }

@@ -59,6 +59,17 @@ struct InterviewRowLabel: View {
   }
 }
 
+/// One chevron that turns with its disclosure, carried by the disclosure's own transaction.
+struct DisclosureChevron: View {
+  let expanded: Bool
+  var body: some View {
+    Image(systemName: AppIcon.collapsed.rawValue)
+      .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+      .rotationEffect(.degrees(expanded ? 90 : 0))
+      .accessibilityHidden(true)
+  }
+}
+
 /// Measure the actual SwiftUI text at the current width and Dynamic Type size.
 /// Short turns remain plain text; a longer turn gets a 44-point disclosure target.
 struct InterviewTurnRow: View {
@@ -81,8 +92,7 @@ struct InterviewTurnRow: View {
     .overlay(alignment: .topTrailing) {
       if overflows {
         Button(action: toggle) {
-          Image(systemName: expanded ? AppIcon.expanded.rawValue : AppIcon.collapsed.rawValue)
-            .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+          DisclosureChevron(expanded: expanded)
             .frame(width: 44, height: 44).contentShape(Rectangle())
         }.buttonStyle(.plain)
           .accessibilityLabel(title + ". " + text)

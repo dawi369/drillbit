@@ -62,17 +62,19 @@ struct InterviewView: View {
   }
   private var acceptedPending: Bool { interview.pending.map { pending in pending.input.kind == "answer" && interview.state.turns.contains { $0.id == pending.command } } ?? false }
   private var waitingForAnswer: Bool { interview.displayState.turns.contains { ["answer", "continue"].contains($0.kind) && $0.pending } }
-  private var documentMotion: Animation? { reduceMotion || !sessionRestored || stagingAnswer ? nil : .smooth(duration: 0.38, extraBounce: 0) }
-  private var sendMotion: Animation? { reduceMotion || !sessionRestored ? nil : .smooth(duration: 0.42, extraBounce: 0) }
+  private var documentMotion: Animation? { reduceMotion || !sessionRestored || stagingAnswer ? nil : DrillbitMotion.document }
+  private var sendMotion: Animation? { reduceMotion || !sessionRestored ? nil : DrillbitMotion.send }
   private var disclosureMotion: Animation? { documentMotion }
   private var showsDraft: Bool { interview.loaded && !waitingForAnswer && interview.outgoing == nil && !interview.state.wrapUp && exchanges.last?.hasAnswer == false && !acceptedPending }
   var body: some View {
     ZStack {
-      if let finished = interview.finished { ReflectionView(model: model, initial: finished) }
+      if let finished = interview.finished { ReflectionView(model: model, initial: finished).transition(.opacity) }
       else if showingVoiceRoom, let voice = liveVoice {
         InterviewVoiceRoom(voice: voice, interview: interview, question: { questionDisclosure(collapsed: voiceQuestionCollapsed) { voiceQuestionCollapsed.toggle() } }, leave: leaveVoiceRoom)
       } else { workspace }
     }
+    .animation(reduceMotion ? nil : DrillbitMotion.page, value: interview.finished != nil)
+    .sensoryFeedback(.impact(weight: .light), trigger: acceptedAnswerID) { _, accepted in accepted != nil }
     .background(AppPalette.background)
     .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardVisible = true }
     .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardVisible = false }
@@ -172,8 +174,8 @@ struct InterviewView: View {
         .animation(disclosureMotion, value: reading.collapsed)
         .animation(disclosureMotion, value: reading.expandedAnswers)
         // Streamed line growth moves subsequent rows without replaying text fades.
-        .animation(reduceMotion || !sessionRestored ? nil : .easeOut(duration: 0.18), value: exchanges.last?.prompt)
-        .animation(reduceMotion ? nil : .easeOut(duration:0.18), value: interview.state.turns.last?.voice?.count)
+        .animation(reduceMotion || !sessionRestored ? nil : DrillbitMotion.stream, value: exchanges.last?.prompt)
+        .animation(reduceMotion ? nil : DrillbitMotion.stream, value: interview.state.turns.last?.voice?.count)
         .scrollTargetLayout()
         .opacity(readingLoaded ? 1 : 0)
         .allowsHitTesting(readingLoaded)
@@ -281,8 +283,10 @@ struct InterviewView: View {
     Task { try? await model.disk.cache(key: "first-guided-question:" + account, data: Data()) }
   }
   private var assistancePopup: some View {
-    VStack(spacing: 20) {
-      Text(assistanceTitle).font(.headline)
+    VStack(alignment: .leading, spacing: 20) {
+      Label(assistanceTitle, systemImage: assistanceTitle == "Example" ? AppIcon.text.rawValue : AppIcon.hint.rawValue)
+        .font(.headline)
+        .labelStyle(AssistanceTitleStyle())
       if let assistanceText {
         ScrollView {
           Text(assistanceText)
@@ -290,9 +294,11 @@ struct InterviewView: View {
             .textSelection(.enabled)
         }
         .frame(maxHeight: 240)
+        .transition(.opacity)
       } else if requestingAssistance {
         ProgressView()
           .controlSize(.small)
+          .frame(maxWidth: .infinity, minHeight: 44)
           .accessibilityLabel("Preparing \(assistanceTitle.lowercased())")
           .accessibilityIdentifier("assistanceLoading")
       } else {
@@ -301,9 +307,9 @@ struct InterviewView: View {
           .frame(maxWidth: .infinity, alignment: .leading)
       }
       Button(requestingAssistance ? "Cancel" : "Got it") { dismissAssistance() }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
+        .buttonStyle(PracticeButtonStyle(secondary: requestingAssistance))
     }
+    .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: assistanceText == nil)
     .padding(24)
     .frame(maxWidth: 420)
     .presentationDetents([requestingAssistance ? .height(220) : .height(360)])
@@ -328,7 +334,7 @@ struct InterviewView: View {
               // Keep the title outside the clipped description.
               Text(challenge.title).font(.headline).fixedSize(horizontal: false, vertical: true)
             }.frame(maxWidth: .infinity, alignment: .leading)
-            Image(systemName: collapsed ? AppIcon.collapsed.rawValue : AppIcon.expanded.rawValue).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+            DisclosureChevron(expanded: !collapsed)
           }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
         }.buttonStyle(InterviewDisclosureButtonStyle())
           .accessibilityLabel("Original question. " + challenge.displayPrompt)
@@ -581,7 +587,7 @@ struct InterviewView: View {
           .buttonStyle(DrillbitIconButtonStyle())
           .accessibilityLabel("Hide keyboard")
           .accessibilityIdentifier("hideKeyboard")
-          .transition(.opacity.combined(with: .offset(x: 8)))
+          .transition(.iconPop)
         }
         Button {
           focused = false
@@ -596,7 +602,7 @@ struct InterviewView: View {
           .disabled(interview.voice?.blocksText == true || interview.locked || interview.failedTurn != nil || interview.answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
           .accessibilityIdentifier("shareAnswer")
       }
-      .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: keyboardVisible)
+      .animation(reduceMotion ? nil : DrillbitMotion.stream, value: keyboardVisible)
     }.padding(16)
       .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { footerFrame = $0; if followingLiveEnd, sheet == nil, let lastCaret { revealCaret(lastCaret) } }
   }
@@ -611,6 +617,15 @@ struct InterviewView: View {
     else if top < upperLimit { position.scrollTo(y: max(0, reading.offset + top - upperLimit)) }
   }
 }
+private struct AssistanceTitleStyle: LabelStyle {
+  func makeBody(configuration: Configuration) -> some View {
+    HStack(spacing: 8) {
+      configuration.icon.foregroundStyle(AppPalette.accent)
+      configuration.title
+    }
+  }
+}
+
 struct GuidanceModePicker: View {
   @Binding var selection: GuidanceMode
   var onDismiss: (() -> Void)? = nil
