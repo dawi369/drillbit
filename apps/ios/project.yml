@@ -42,7 +42,9 @@ targets:
         SharedKeychainGroup: $(AppIdentifierPrefix)dawi.drillbit.shared
         CFBundleURLTypes:
           - CFBundleURLSchemes: [drillbit, dawi.drillbit]
-        UILaunchScreen: {}
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+          UIImageName: LaunchMark
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIBackgroundModes: [fetch]
         BGTaskSchedulerPermittedIdentifiers: [dawi.drillbit.refresh]

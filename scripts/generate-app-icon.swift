@@ -1,5 +1,5 @@
 #!/usr/bin/env swift
-// Renders docs/design/logo/drillbit-icon.svg as the opaque 1024 px App Store icon.
+// Renders docs/design/logo/drillbit-icon.svg as the opaque 1024 px App Store icon, plus the launch mark.
 import AppKit
 
 let side = 1024
@@ -66,3 +66,17 @@ else { fatalError("Could not render app icon") }
 let output = CommandLine.arguments.dropFirst().first
   ?? "apps/ios/Drillbit/Assets.xcassets/AppIcon.appiconset/AppIcon.png"
 try png.write(to: URL(fileURLWithPath: output))
+
+// Launch screen mark: the flat drill at the same 24 × 68 pt size as the app's restoring surface.
+let mark = URL(fileURLWithPath: output).deletingLastPathComponent().deletingLastPathComponent()
+  .appendingPathComponent("LaunchMark.imageset/LaunchMark.pdf")
+var box = CGRect(x: 0, y: 0, width: 24, height: 68)
+guard let pdf = CGContext(mark as CFURL, mediaBox: &box, nil) else { fatalError("Could not create launch mark") }
+pdf.beginPDFPage(nil)
+pdf.translateBy(x: 12, y: 34)
+pdf.scaleBy(x: 0.1, y: -0.1)
+pdf.addPath(drill)
+pdf.setFillColor(color(0xFFCC65))
+pdf.fillPath()
+pdf.endPDFPage()
+pdf.closePDF()

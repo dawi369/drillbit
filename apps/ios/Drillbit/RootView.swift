@@ -161,8 +161,8 @@ private struct LaunchSurface: View {
   var retry: () -> Void
   @State private var slow = false
   var body: some View {
-    VStack(spacing: 16) {
-      DrillbitLogo(compact: true)
+    VStack(spacing: 32) {
+      DrillbitMark(size: 68).alignmentGuide(.launchMark) { $0[VerticalAlignment.center] }
       if let message {
         Text(message).foregroundStyle(.secondary).multilineTextAlignment(.center)
         Button("Try again", action: retry)
@@ -172,9 +172,12 @@ private struct LaunchSurface: View {
       }
     }
     .animation(DrillbitMotion.fast, value: slow)
-    .padding(24)
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .padding(.horizontal, 24)
+    // Mirrors the system launch screen (LaunchMark on LaunchBackground): the drill at the exact screen centre.
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: Alignment(horizontal: .center, vertical: .launchMark))
+    .ignoresSafeArea()
     .background(AppPalette.background)
+    .environment(\.colorScheme, .dark)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("sessionRestoration")
     .task {
@@ -182,6 +185,13 @@ private struct LaunchSurface: View {
       slow = true
     }
   }
+}
+
+private extension VerticalAlignment {
+  enum LaunchMark: AlignmentID {
+    static func defaultValue(in context: ViewDimensions) -> CGFloat { context[VerticalAlignment.center] }
+  }
+  static let launchMark = VerticalAlignment(LaunchMark.self)
 }
 
 /// The keyboard's rounded corners reveal the host window, outside SwiftUI's
