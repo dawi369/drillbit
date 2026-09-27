@@ -100,9 +100,9 @@ struct DrillbitLogo: View {
   func reset() { input = 0; output = 0 }
 }
 
-/// The interviewer's presence: a deterministic particle field and waveform.
-/// Ambient drift is slow; live levels push the silver grain (you) and the warm
-/// core (interviewer). Reduce Motion, Still mode and background render the texture.
+/// The interviewer's presence: a slowly turning particle orb around a warm core.
+/// Live levels ripple the silver shell (you) and swell the yellow core (interviewer).
+/// Reduce Motion, Still mode and background render one still frame.
 struct SignalPresence: View {
   enum Mode: Equatable { case still, ambient, connecting, live, muted }
   var mode: Mode = .ambient
@@ -136,10 +136,9 @@ struct PresenceFrame: Sendable {
   var output = 0.0
   var quiet = 0.0
   var connecting = 0.0
-  var wavePhase = 0.0
-  var amplitude = 1.0
+  var spin = 0.0
   static func rest(_ mode: SignalPresence.Mode) -> PresenceFrame {
-    PresenceFrame(quiet: mode == .muted ? 1 : 0, amplitude: mode == .muted ? 0.14 : 1)
+    PresenceFrame(quiet: mode == .muted ? 1 : 0)
   }
 }
 
@@ -154,23 +153,15 @@ struct PresenceFrame: Sendable {
     origin = start
     let dt = min(0.1, max(0, date.timeIntervalSince(last ?? date)))
     last = date
-    let time = date.timeIntervalSince(start)
     let live = mode == .live
-    frame.time = time
+    frame.time = date.timeIntervalSince(start)
     frame.input = approach(frame.input, live ? levels?.input ?? 0 : 0, dt, attack: 0.06, release: 0.28)
     frame.output = approach(frame.output, live ? levels?.output ?? 0 : 0, dt, attack: 0.06, release: 0.28)
     frame.quiet = approach(frame.quiet, mode == .muted ? 1 : 0, dt, attack: 0.2, release: 0.2)
     frame.connecting = approach(frame.connecting, mode == .connecting ? 1 : 0, dt, attack: 0.25, release: 0.25)
     frame.motion = approach(frame.motion, 1, dt, attack: 0.6, release: 0.6)
-    let energy = max(frame.input, frame.output)
-    frame.wavePhase += dt * (0.6 + 2.6 * energy)
-    let target: Double = switch mode {
-    case .still, .ambient: 0.92 + 0.08 * sin(time * 0.8)
-    case .connecting: 0.5 + 0.2 * sin(time * 2.4)
-    case .live: 0.3 + 0.9 * min(1, energy)
-    case .muted: 0.14
-    }
-    frame.amplitude = approach(frame.amplitude, target, dt, attack: 0.08, release: 0.2)
+    // Integrated so speech speeds the turn without the orb jumping.
+    frame.spin += dt * (0.1 + 0.3 * max(frame.input, frame.output)) * (1 - 0.7 * frame.quiet)
     return frame
   }
 
@@ -180,21 +171,21 @@ struct PresenceFrame: Sendable {
 }
 
 struct SignalParticle: Sendable {
-  static let buckets = 8
-  var angle: Double
+  enum Layer: Sendable { case core, shell, dust }
+  static let depthBuckets = 8
+  var layer: Layer
+  var theta: Double
+  var height: Double
+  var ring: Double
   var radius: Double
   var size: Double
   var warm: Bool
-  var bucket: Int
-  var spin: Double
   var phase: Double
   var response: Double
 
-  static func opacity(bucket: Int) -> Double { bucket == 0 ? 0.18 : 0.32 + Double(bucket - 1) / Double(buckets - 2) * 0.36 }
-
   @MainActor private static var cache: [Int: [SignalParticle]] = [:]
 
-  /// Rest positions reproduce the original still texture exactly.
+  /// Deterministic: the same density always produces the same orb.
   @MainActor static func field(_ density: Int) -> [SignalParticle] {
     if let cached = cache[density] { return cached }
     var seed: UInt64 = 0x5349474E414C
@@ -204,23 +195,29 @@ struct SignalParticle: Sendable {
     }
     var particles: [SignalParticle] = []
     particles.reserveCapacity(density)
-    for index in 0..<density {
-      let angle = unit() * .pi * 2
-      let radius = min(1.18, (unit() + unit() + unit()) / 3 * 1.42)
-      let size = 0.45 + unit() * 0.75
-      let warm = radius < 0.46 || (radius < 0.82 && unit() < 0.14)
-      // Motion traits use an independent hash so the rest layout is unchanged.
-      var mix = UInt64(index + 1) &* 0x9E3779B97F4A7C15
-      func trait() -> Double {
-        mix ^= mix >> 30; mix = mix &* 0xBF58476D1CE4E5B9; mix ^= mix >> 27
-        return Double(mix >> 11) / Double(1 << 53)
+    for _ in 0..<density {
+      let pick = unit()
+      let layer: Layer = pick < 0.22 ? .core : pick < 0.93 ? .shell : .dust
+      let theta = unit() * .pi * 2
+      let height = unit() * 2 - 1
+      let radius: Double
+      let size: Double
+      switch layer {
+      case .core:
+        let gaussian = sqrt(-2 * log(max(unit(), 1e-9))) * cos(2 * .pi * unit())
+        radius = min(0.5, abs(gaussian) * 0.2)
+        size = 1.2 + unit() * 1.2
+      case .shell:
+        // A thin shell keeps a readable sphere edge when projected.
+        radius = 0.8 + (unit() + unit() + unit() - 1.5) * 0.055
+        size = 0.8 + unit()
+      case .dust:
+        radius = 1.0 + unit() * 0.28
+        size = 0.5 + unit() * 0.6
       }
-      let speed = (0.035 + 0.05 * trait()) * (1.25 - min(radius, 1.1))
-      let direction = trait() < 0.15 ? -1.0 : 1.0
-      let opacity = radius > 0.95 ? 0.18 : 0.32 + (1 - radius) * 0.36
-      let bucket = radius > 0.95 ? 0 : 1 + min(buckets - 2, Int(((opacity - 0.32) / 0.36 * Double(buckets - 2)).rounded()))
-      particles.append(SignalParticle(angle: angle, radius: radius, size: size, warm: warm, bucket: bucket,
-        spin: speed * direction, phase: trait() * .pi * 2, response: 0.6 + 0.8 * trait()))
+      let warm = layer == .core || (layer == .shell && unit() < 0.05)
+      particles.append(SignalParticle(layer: layer, theta: theta, height: height, ring: sqrt(1 - height * height),
+        radius: radius, size: size, warm: warm, phase: unit() * .pi * 2, response: 0.6 + 0.8 * unit()))
     }
     cache[density] = particles
     return particles
@@ -229,42 +226,49 @@ struct SignalParticle: Sendable {
 
 enum SignalPresenceRenderer {
   static func draw(_ particles: [SignalParticle], frame: PresenceFrame, in context: inout GraphicsContext, size: CGSize) {
-    let center = CGPoint(x: size.width / 2, y: size.height / 2)
-    let breath = frame.connecting * 0.1 * (0.5 + 0.5 * sin(frame.time * 2.4))
+    let cx = Double(size.width) / 2, cy = Double(size.height) / 2
+    let scale = Double(min(size.width, size.height)) * 0.4
+    let breath = frame.connecting * (0.5 + 0.5 * sin(frame.time * 2.4)) * 0.35
     let listening = max(frame.input, breath)
     let speaking = max(frame.output, breath)
-    let contraction = 1 - 0.05 * frame.quiet
-    var warm = Array(repeating: Path(), count: SignalParticle.buckets)
-    var grain = Array(repeating: Path(), count: SignalParticle.buckets)
-    for particle in particles {
-      let swirl = frame.time * particle.spin * frame.motion
-      let pulse = 1 + 0.018 * sin(frame.time * 0.7 + particle.phase) * frame.motion
-      let energy = particle.warm ? speaking : listening
-      let push = particle.warm ? energy * 0.22 * (1.1 - particle.radius) : energy * 0.16 * particle.radius
-      let radius = particle.radius * pulse * (1 + push * particle.response) * contraction
-      let jitter = energy * 1.6 * frame.motion
-      let x = Double(center.x) + cos(particle.angle + swirl) * Double(size.width) * 0.45 * radius + cos(frame.time * 3.1 + particle.phase) * jitter
-      let y = Double(center.y) + sin(particle.angle + swirl) * Double(size.height) * 0.45 * radius + sin(frame.time * 2.7 + particle.phase) * jitter
-      let rect = CGRect(x: x, y: y, width: particle.size, height: particle.size)
-      if particle.warm { warm[particle.bucket].addEllipse(in: rect) } else { grain[particle.bucket].addEllipse(in: rect) }
-    }
     let quiet = 1 - 0.45 * frame.quiet
-    for bucket in 0..<SignalParticle.buckets {
-      let base = SignalParticle.opacity(bucket: bucket)
-      context.fill(warm[bucket], with: .color(AppPalette.action.opacity(min(1, base * (1 + speaking * 0.7)) * quiet)))
-      context.fill(grain[bucket], with: .color(AppPalette.grain.opacity(min(1, base * (1 + listening * 0.5)) * quiet)))
+    let contraction = 1 - 0.06 * frame.quiet
+    let tilt = 0.38 + 0.05 * sin(frame.time * 0.23) * frame.motion
+    let cosTilt = cos(tilt), sinTilt = sin(tilt)
+
+    let glow = scale * (0.62 + 0.25 * speaking)
+    context.fill(Path(ellipseIn: CGRect(x: cx - glow, y: cy - glow, width: 2 * glow, height: 2 * glow)),
+      with: .radialGradient(Gradient(colors: [AppPalette.action.opacity((0.2 + 0.22 * speaking) * quiet), AppPalette.action.opacity(0)]),
+        center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: glow))
+
+    let buckets = SignalParticle.depthBuckets
+    var warm = Array(repeating: Path(), count: buckets)
+    var grain = Array(repeating: Path(), count: buckets)
+    for particle in particles {
+      var radius = particle.radius * contraction * (1 + 0.02 * sin(frame.time * 0.8 + particle.phase) * frame.motion)
+      switch particle.layer {
+      case .core: radius *= 1 + speaking * 0.45 * particle.response
+      case .shell: radius *= 1 + listening * (0.05 + 0.07 * sin(3 * particle.theta + frame.time * 5 + particle.phase)) * particle.response
+      case .dust: radius *= 1 + (listening + speaking) * 0.06
+      }
+      // Dust turns slower than the shell, which reads as depth.
+      let angle = particle.theta + frame.spin * (particle.layer == .dust ? 0.6 : 1)
+      let x = radius * particle.ring * cos(angle)
+      let z0 = radius * particle.ring * sin(angle)
+      let y0 = radius * particle.height
+      let y = y0 * cosTilt - z0 * sinTilt
+      let z = y0 * sinTilt + z0 * cosTilt
+      let depth = min(1, max(0, (z / 1.28 + 1) / 2))
+      let dot = particle.size * (0.55 + 0.9 * depth)
+      let rect = CGRect(x: cx + x * scale - dot / 2, y: cy + y * scale - dot / 2, width: dot, height: dot)
+      let bucket = min(buckets - 1, Int(depth * Double(buckets)))
+      if particle.warm { warm[bucket].addEllipse(in: rect) } else { grain[bucket].addEllipse(in: rect) }
     }
-    let bars = 33
-    let barWidth = 2.0, gap = 2.0
-    let start = Double(center.x) - (Double(bars) * barWidth + Double(bars - 1) * gap) / 2
-    var wave = Path()
-    for index in 0..<bars {
-      let ripple = abs(sin(Double(index) * 0.35 + frame.wavePhase * frame.motion))
-      let height = 4 + 18 * ripple * frame.amplitude
-      let rect = CGRect(x: start + Double(index) * (barWidth + gap), y: Double(center.y) - height / 2, width: barWidth, height: height)
-      wave.addRoundedRect(in: rect, cornerSize: CGSize(width: 1, height: 1))
+    for bucket in 0..<buckets {
+      let depth = (Double(bucket) + 0.5) / Double(buckets)
+      context.fill(grain[bucket], with: .color(AppPalette.grain.opacity(min(1, (0.08 + 0.72 * depth) * (1 + listening * 0.6)) * quiet)))
+      context.fill(warm[bucket], with: .color(AppPalette.action.opacity(min(1, (0.4 + 0.6 * depth) * (1 + speaking * 0.5)) * quiet)))
     }
-    context.fill(wave, with: .color(AppPalette.action.opacity(0.92 * quiet)))
   }
 }
 

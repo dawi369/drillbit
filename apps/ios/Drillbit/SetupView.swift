@@ -285,7 +285,7 @@ private struct SetupIntroduction: View {
     VStack(alignment: .leading, spacing: 0) {
       DrillbitLogo(compact: true).signalEntrance(0, active: animatesIn)
       Spacer(minLength: 40)
-      SignalPresence(density: 420)
+      SignalPresence(density: 640)
         .frame(maxWidth: 320, maxHeight: 320)
         .frame(maxWidth: .infinity)
         .frame(height: 280)

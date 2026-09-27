@@ -48,13 +48,10 @@ struct WelcomeView: View {
     }
     .clipped()
     .safeAreaInset(edge: .top, spacing: 0) {
-      SignalStepProgress(step: page + 1, total: 4) {
-        Button("Sign in now") { finishWalkthrough() }
-          .font(.subheadline.weight(.medium)).frame(minHeight: 44)
-      }
-      .frame(maxWidth: 560).padding(.horizontal, 24).padding(.top, 8)
-      .frame(maxWidth: .infinity)
-      .background(AppPalette.background)
+      SignalStepProgress(step: page + 1, total: 4)
+        .frame(maxWidth: 560).padding(.horizontal, 24).padding(.top, 16)
+        .frame(maxWidth: .infinity)
+        .background(AppPalette.background)
     }
     .safeAreaInset(edge: .bottom, spacing: 0) {
       VStack(spacing: 0) {
@@ -163,7 +160,7 @@ struct WelcomeView: View {
         VStack(spacing: 32) {
           VStack(spacing: 16) {
             DrillbitLogo()
-            SignalPresence(density: 480).frame(height: 190)
+            SignalPresence(density: 600).frame(height: 190)
             VStack(spacing: 8) {
               Text(inviting ? "One last step." : "Ready when you are.")
                 .font(.title2.weight(.semibold))
