@@ -140,7 +140,7 @@ struct FirstUseTip: View {
         Text(number).font(.caption.monospaced()).foregroundStyle(AppPalette.accent)
         Text(title).font(.headline)
         Spacer(minLength: 0)
-        Image(systemName: pointsUp ? "arrow.up" : "arrow.down").foregroundStyle(AppPalette.accent)
+        Image(systemName: pointsUp ? "arrow.up" : "arrow.down").foregroundStyle(AppPalette.accent).accessibilityHidden(true)
       }
       Text(message).font(.subheadline).foregroundStyle(AppPalette.secondary)
     }.padding(16).background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 12))
@@ -166,7 +166,7 @@ struct FirstUseTourTip: View {
         .buttonStyle(PracticeButtonStyle()).accessibilityIdentifier("firstUseTourNext")
     }.padding(20).background(AppPalette.background)
       .overlay(alignment: .top) { AppPalette.hairline.frame(height: 0.5) }
-      .accessibilityIdentifier("firstUseTour")
+      .accessibilityElement(children: .contain)
   }
 }
 
@@ -174,13 +174,14 @@ struct PracticeAreaGroupRow: View {
   let area: PracticeAreaGroup
   var body: some View {
     HStack(spacing: 16) {
-      Image(systemName: area.symbol).foregroundStyle(AppPalette.accent).frame(width: 24)
+      Image(systemName: area.symbol).font(.system(size: 20)).foregroundStyle(AppPalette.accent).frame(width: 24)
+        .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: 4) {
         Text(area.title).foregroundStyle(AppPalette.primary)
         Text(area.detail).font(.caption).foregroundStyle(AppPalette.secondary)
       }
       Spacer(minLength: 8)
-      Image(systemName: "chevron.right").font(.caption).foregroundStyle(AppPalette.secondary)
+      Image(systemName: "chevron.right").font(.caption).foregroundStyle(AppPalette.secondary).accessibilityHidden(true)
     }.frame(minHeight: 64).contentShape(Rectangle())
   }
 }

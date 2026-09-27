@@ -48,9 +48,13 @@ struct RootView: View {
             }
           }
           .allowsHitTesting(model.firstUse.tourTab == nil)
+          .accessibilityHidden(model.firstUse.tourTab != nil)
           .overlay(alignment: .bottom) {
             if model.firstUse.tourTab != nil && model.presented == nil {
-              FirstUseTourTip(model: model).padding(.bottom, 88)
+              ViewThatFits(in: .vertical) {
+                FirstUseTourTip(model: model)
+                ScrollView { FirstUseTourTip(model: model) }
+              }.padding(.bottom, 88)
             }
           }
         }
@@ -330,16 +334,28 @@ struct HomeView: View {
     VStack(alignment: .leading, spacing: 12) {
       SignalEyebrow(text: "Explore system design")
       VStack(spacing: 0) {
-        ForEach(Array(PracticeAreaGroup.all.prefix(3))) { area in
+        let areas = suggestedAreas
+        ForEach(areas) { area in
           Button { flow = QuestionFlowEntry(browseTopics: true, area: area) } label: {
             PracticeAreaGroupRow(area: area)
           }.buttonStyle(.plain)
-          if area.id != PracticeAreaGroup.all.prefix(3).last?.id { Divider() }
+          if area.id != areas.last?.id { Divider() }
         }
       }
       Button("See all areas", systemImage: "arrow.right") { flow = QuestionFlowEntry(browseTopics: true) }
         .frame(minHeight: 44)
     }.task { await model.loadTaxonomy() }
+  }
+
+  private var suggestedAreas: [PracticeAreaGroup] {
+    let concepts = HomeTopicRanking.ranked(PracticeAreaCatalog.curated(model.taxonomy), coverage: model.libraryCoverage)
+    var areas: [PracticeAreaGroup] = []
+    for concept in concepts {
+      if let area = PracticeAreaGroup.all.first(where: { $0.concepts.contains(concept.id) }),
+         !areas.contains(where: { $0.id == area.id }) { areas.append(area) }
+    }
+    for area in PracticeAreaGroup.all where !areas.contains(where: { $0.id == area.id }) { areas.append(area) }
+    return Array(areas.prefix(3))
   }
 
 }
@@ -393,6 +409,7 @@ struct QuestionFlow: View {
             } else {
               ForEach(PracticeAreaGroup.all.filter { topicSearch.isEmpty || $0.title.localizedCaseInsensitiveContains(topicSearch) || $0.detail.localizedCaseInsensitiveContains(topicSearch) }) { area in
                 Button { selectedArea = area } label: { PracticeAreaGroupRow(area: area) }.buttonStyle(.plain)
+                  .accessibilityIdentifier("browse-area-" + area.id)
               }
             }
           }

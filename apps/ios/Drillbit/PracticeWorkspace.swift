@@ -736,12 +736,13 @@ struct PreparationView: View {
         }.buttonStyle(PracticeButtonStyle())
           .accessibilityIdentifier("submitPreparation")
           .listRowBackground(Color.clear)
-          .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+          .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+          .listRowSeparator(.hidden)
           .disabled(focus.isEmpty || model.busy || model.bootstrap?.challenge?.lifecycle == "in_progress")
       } footer: {
         if model.bootstrap?.challenge?.lifecycle == "in_progress" {
           Text("Finish or skip your current interview before preparing another. Your choices here won’t change it.")
-        } else if model.bootstrap?.challenge?.lifecycle == "ready" {
+        } else if model.bootstrap?.challenge?.lifecycle == "ready", model.firstUse.stage != .chooseMode {
           Text("Your current question stays until the new one is ready.")
         }
       }

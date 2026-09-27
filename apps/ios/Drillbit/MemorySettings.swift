@@ -453,9 +453,9 @@ struct SetupView: View {
           }
         }
         .id(coordinator.draft.page)
-        .transition(reduceMotion ? .opacity : .asymmetric(
-          insertion: .move(edge: movingForward ? .trailing : .leading),
-          removal: .move(edge: movingForward ? .leading : .trailing)))
+        .transition(reduceMotion ? .identity : .asymmetric(
+          insertion: .offset(x: movingForward ? geometry.size.width : -geometry.size.width),
+          removal: .offset(x: movingForward ? -geometry.size.width : geometry.size.width)))
         .frame(maxWidth: 560, alignment: .leading)
         .padding(.horizontal, 24).padding(.top, 24).padding(.bottom, 24)
         .frame(maxWidth: .infinity)
@@ -469,6 +469,7 @@ struct SetupView: View {
           if coordinator.draft.page >= 0 {
             Button("Back") { move(coordinator, to: coordinator.draft.page - 1) }
               .buttonStyle(PracticeButtonStyle(secondary: true))
+              .frame(width: 88)
               .transition(.opacity.combined(with: .offset(x: -12)))
               .disabled(coordinator.saving || reminderPermissionPending)
           }
@@ -487,6 +488,7 @@ struct SetupView: View {
             .padding(.vertical, coordinator.draft.page == 4 ? 8 : 0)
           }.buttonStyle(PracticeButtonStyle()).disabled(coordinator.saving || reminderPermissionPending)
             .contentTransition(.opacity)
+            .accessibilityLabel(coordinator.saving ? "Opening…" : coordinator.draft.page == -1 ? "Let's begin" : coordinator.draft.page == 4 ? "Start practice" : "Continue")
             .accessibilityIdentifier("onboardingContinue")
             .sensoryFeedback(.success, trigger: coordinator.draft.page == 4)
         }
@@ -623,9 +625,9 @@ struct SetupView: View {
       Divider()
       LabeledContent("Role", value: roles.first { $0.0 == draft.roleTrack }?.1 ?? "General SWE")
       Divider()
-      LabeledContent("Level", value: EngineeringLevel.choices.first { $0.0 == draft.level }?.1 ?? "Mid-level")
+      LabeledContent("Experience", value: startingPoints.first { $0.0 == draft.level }?.1 ?? "I’ve designed a few systems")
       Divider()
-      LabeledContent("Focus", value: draft.weakAreas.isEmpty ? "Drillbit decides" : draft.weakAreas.compactMap { id in areas.first { $0.0 == id }?.1 }.sorted().joined(separator: ", "))
+      LabeledContent("Focus", value: draft.weakAreas.isEmpty ? "A bit of everything" : draft.weakAreas.compactMap { id in areas.first { $0.0 == id }?.1 }.sorted().joined(separator: ", "))
       Divider()
       LabeledContent("Routine", value: "\(draft.dailyGoalMinutes) minutes a day")
       Label("First, a one-minute walkthrough. No score, no pressure.", systemImage: "sparkles")

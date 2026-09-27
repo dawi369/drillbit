@@ -90,7 +90,8 @@ final class PracticeUITests: XCTestCase {
     capture("Home explore and revisit", app)
     app.buttons["See all areas"].tap()
     XCTAssertTrue(app.navigationBars["System design"].waitForExistence(timeout: 5))
-    app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Async work")).firstMatch.tap()
+    for _ in 0..<4 where !app.buttons["browse-area-async"].isHittable { app.swipeUp() }
+    app.buttons["browse-area-async"].tap()
     app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Queues & streams")).firstMatch.tap()
     XCTAssertTrue(app.navigationBars["New question"].waitForExistence(timeout: 5))
     for _ in 0..<5 where !app.buttons["submitPreparation"].isHittable { app.swipeUp() }
@@ -900,8 +901,12 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.staticTexts["What brings you here?"].waitForExistence(timeout: 5))
     for _ in 0..<4 { app.buttons["Continue"].tap() }
     XCTAssertTrue(app.staticTexts["Made for you."].exists)
+    // The final action deliberately grows and changes its label. Capture and
+    // tap its settled target rather than the outgoing Continue geometry.
+    Thread.sleep(forTimeInterval: 0.5)
     capture("Personal onboarding plan", app)
-    app.buttons["Start practice"].tap()
+    // The simulator's inferred hit point falls in the clipped capsule corner.
+    app.buttons["Start practice"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
     // Deliberately slow real generation must not delay this local warm-up.
     XCTAssertTrue(app.buttons["previewStart"].waitForExistence(timeout: 3))
     app.buttons["Close"].tap()
@@ -912,12 +917,12 @@ final class PracticeUITests: XCTestCase {
     capture("Walkthrough anchored reply tip", app)
     app.buttons["walkthroughExample"].tap()
     app.buttons["walkthroughSend"].tap()
-    XCTAssertTrue(app.descendants(matching: .any)["walkthroughClarification"].waitForExistence(timeout: 3))
-    app.buttons["Home"].tap()
+    XCTAssertTrue(app.staticTexts["For this walkthrough: start with 1,000 people, each saving a few links a day."].waitForExistence(timeout: 3))
+    app.navigationBars["A quick warm-up"].buttons["Home"].tap()
     app.buttons["Resume walkthrough"].tap()
     app.buttons["previewStart"].tap()
-    XCTAssertTrue(app.descendants(matching: .any)["walkthroughClarification"].waitForExistence(timeout: 3))
-    app.descendants(matching: .any)["walkthroughQuestion"].tap()
+    XCTAssertTrue(app.staticTexts["For this walkthrough: start with 1,000 people, each saving a few links a day."].waitForExistence(timeout: 3))
+    app.buttons["walkthroughQuestion"].tap()
     XCTAssertTrue(app.buttons["walkthroughExample"].waitForExistence(timeout: 3))
     app.buttons["walkthroughExample"].tap()
     app.buttons["walkthroughSend"].tap()
@@ -928,6 +933,7 @@ final class PracticeUITests: XCTestCase {
     for _ in 0..<3 { app.buttons["firstUseTourNext"].tap() }
     XCTAssertTrue(app.navigationBars["Your first session"].waitForExistence(timeout: 5))
     capture("First real session modes", app)
+    for _ in 0..<3 where !app.buttons["firstSessionMode-coach_me"].isHittable { app.swipeUp() }
     app.buttons["firstSessionMode-coach_me"].tap()
     for _ in 0..<4 where !app.buttons["submitPreparation"].isHittable { app.swipeUp() }
     app.buttons["submitPreparation"].tap()
