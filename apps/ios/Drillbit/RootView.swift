@@ -99,6 +99,7 @@ struct RootView: View {
     }
     .sheet(isPresented: $settingsOpen) {
       NavigationStack { SettingsView(model: model) }
+        .presentationBackground(AppPalette.background)
         .environment(\.colorScheme, appearance == "dark" ? .dark : appearance == "light" ? .light : systemColorScheme)
         .preferredColorScheme(appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
         .interactiveDismissDisabled()
@@ -115,6 +116,7 @@ struct RootView: View {
         if challenge.id == FirstUseProgress.challengeID { FirstPracticeView(model: model) }
         else { InterviewView(model: model, challenge: challenge) }
       }
+      .presentationBackground(AppPalette.background)
     }
     .sheet(item: $model.conflict) { challenge in
       NavigationStack {
@@ -204,8 +206,36 @@ private struct WindowFloorColor: UIViewRepresentable {
     override func didMoveToWindow() {
       super.didMoveToWindow()
       window?.backgroundColor = AppPalette.backgroundUIColor
+      if let window { KeyboardDismissal.install(on: window) }
     }
   }
+}
+
+/// Tapping anywhere outside a text input puts the keyboard away, on every screen, sheet and cover.
+/// The tap still reaches controls; taps inside text inputs keep editing.
+@MainActor private final class KeyboardDismissal: NSObject, UIGestureRecognizerDelegate {
+  private static let shared = KeyboardDismissal()
+  static func install(on window: UIWindow) {
+    guard !(window.gestureRecognizers ?? []).contains(where: { $0.delegate === shared }) else { return }
+    let tap = UITapGestureRecognizer(target: shared, action: #selector(dismiss(_:)))
+    tap.cancelsTouchesInView = false
+    tap.delaysTouchesEnded = false
+    tap.delegate = shared
+    window.addGestureRecognizer(tap)
+  }
+  // Deferred so the tapped control's action runs before focus (and any search state) changes.
+  @objc private func dismiss(_ tap: UITapGestureRecognizer) {
+    DispatchQueue.main.async { [weak window = tap.view] in window?.endEditing(true) }
+  }
+  func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+    var view = touch.view
+    while let current = view {
+      if current is UITextField || current is UITextView || current is UISearchBar { return false }
+      view = current.superview
+    }
+    return true
+  }
+  func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
 }
 struct LocalRecoveryView: View {
   var model: AppModel

@@ -887,16 +887,14 @@ final class PracticeUITests: XCTestCase {
     editor.tap(); editor.typeText("Start with a durable queue.")
     XCTAssertTrue(app.buttons["shareAnswer"].isHittable)
     XCTAssertTrue(app.buttons["interviewOptions"].isHittable)
-    if app.buttons["hideKeyboard"].exists {
-      capture("Dark interview keyboard", app)
-      app.buttons["hideKeyboard"].tap()
-      let hidden = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.buttons["hideKeyboard"])
-      XCTAssertEqual(XCTWaiter.wait(for: [hidden], timeout: 3), .completed)
-    } else {
-      // Xcode may attach a hardware keyboard even when it exposes keyboard
-      // accessibility nodes. Capture the composer without claiming soft-keyboard coverage.
-      capture("Dark interview hardware keyboard", app)
-    }
+    // Xcode may attach a hardware keyboard; the capture name says which one this run saw.
+    capture(app.keyboards.count > 0 ? "Dark interview keyboard" : "Dark interview hardware keyboard", app)
+    XCTAssertEqual(editor.value(forKey: "hasKeyboardFocus") as? Bool, true)
+    // Tapping the document outside the reply puts the keyboard away.
+    app.otherElements["answerDivider"].tap()
+    let released = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hasKeyboardFocus == false"), object: editor)
+    XCTAssertEqual(XCTWaiter.wait(for: [released], timeout: 3), .completed)
+    XCTAssertFalse(app.buttons["hideKeyboard"].exists)
   }
 
   func testQuestionUsesSameComposerWithoutAdvancingPrompt() throws {

@@ -85,10 +85,6 @@ struct FirstPracticeView: View {
             Button { voiceInfo = true } label: { Image(systemName: AppIcon.voice.rawValue).frame(width: 24, height: 24) }
               .buttonStyle(DrillbitIconButtonStyle()).accessibilityLabel("About voice practice")
             Spacer()
-            if focused {
-              Button { focused = false } label: { Image(systemName: "keyboard.chevron.compact.down").frame(width: 24, height: 24) }
-                .buttonStyle(DrillbitIconButtonStyle()).accessibilityLabel("Hide keyboard")
-            }
             Button { Task { await send() } } label: { Image(systemName: "arrow.up").frame(width: 24, height: 24) }
               .buttonStyle(DrillbitIconButtonStyle(prominent: true)).accessibilityLabel("Send")
               .accessibilityIdentifier("walkthroughSend")

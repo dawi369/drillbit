@@ -155,7 +155,9 @@ struct QuestionFlow: View {
           }
         }, recovery: retryInput ?? recovery)
       }
-    }.background(AppPalette.background).onAppear {
+    }.background(AppPalette.background.ignoresSafeArea())
+      .presentationBackground(AppPalette.background)
+      .onAppear {
       visible = true
       guard !initialized else { return }
       initialized = true

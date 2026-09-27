@@ -40,7 +40,6 @@ struct InterviewView: View {
   @State private var topInset: CGFloat = 0
   @State private var lastCaret: CGRect?
   @State private var focused = false
-  @State private var keyboardVisible = false
   @State private var starterGuide = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.scenePhase) private var phase
@@ -75,9 +74,7 @@ struct InterviewView: View {
     }
     .animation(reduceMotion ? nil : DrillbitMotion.page, value: interview.finished != nil)
     .sensoryFeedback(.impact(weight: .light), trigger: acceptedAnswerID) { _, accepted in accepted != nil }
-    .background(AppPalette.background)
-    .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardVisible = true }
-    .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardVisible = false }
+    .background(AppPalette.background.ignoresSafeArea())
     .task {
       guard !readingLoaded else { return }
       if let account = model.bootstrap?.account.id,
@@ -584,17 +581,6 @@ struct InterviewView: View {
         .buttonStyle(DrillbitIconButtonStyle())
         .disabled(checkingVoice || liveVoice == nil || interview.locked || interview.voice?.blocksText == true).accessibilityLabel("Live voice").accessibilityIdentifier("liveVoice")
       Spacer(minLength: 0)
-        if keyboardVisible {
-          Button { focused = false } label: {
-            Image(systemName: "keyboard.chevron.compact.down")
-              .font(.system(size: 20, weight: .medium))
-              .frame(width: 24, height: 24)
-          }
-          .buttonStyle(DrillbitIconButtonStyle())
-          .accessibilityLabel("Hide keyboard")
-          .accessibilityIdentifier("hideKeyboard")
-          .transition(.iconPop)
-        }
         Button {
           focused = false
           followingLiveEnd = true
@@ -608,7 +594,6 @@ struct InterviewView: View {
           .disabled(interview.voice?.blocksText == true || interview.locked || interview.failedTurn != nil || interview.answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
           .accessibilityIdentifier("shareAnswer")
       }
-      .animation(reduceMotion ? nil : DrillbitMotion.stream, value: keyboardVisible)
     }.padding(16)
       .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { footerFrame = $0; if followingLiveEnd, sheet == nil, let lastCaret { revealCaret(lastCaret) } }
   }

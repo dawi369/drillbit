@@ -73,6 +73,7 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
       if let model {
         RootView(model: model)
           .tint(AppPalette.accent)
+          .scrollDismissesKeyboard(.interactively)
           .background(AppPalette.background.ignoresSafeArea(.all))
       } else {
         ContentUnavailableView(
