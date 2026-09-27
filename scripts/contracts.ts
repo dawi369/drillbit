@@ -20,6 +20,7 @@ const operations: [string, string, string, string?][] = [
   ["post","questions/{id}/start","Start a fresh attempt for an immutable question"],
   ["post", "challenges/{id}/interview", "Commit an answer or request clarification/help without advancing the answer", "InterviewInput"],
   ["post", "challenges/{id}/interview/{turn}/retry", "Retry a failed interviewer response without resubmitting the answer"],
+  ["post", "challenges/{id}/interview/{turn}/cancel", "Cancel an in-flight nudge or example; answers are not cancellable"],
   ["post", "challenges/{id}/retry-moment/{turn}", "Branch from a completed interview moment"],
   [
     "put",

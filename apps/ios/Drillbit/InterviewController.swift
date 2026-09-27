@@ -34,6 +34,8 @@ import UIKit
     latencyLog.info("send_to_first_text_ms=\(milliseconds, privacy: .public)")
   }
   var streamEpoch = 0
+  private var cancelledAssistance: Set<String> = []
+  private var cancellation: Task<Void, Never>?
   var displayState: InterviewState {
     var value = state
     if let outgoing, !value.turns.contains(where: { $0.id == outgoing.id }) { value.turns.append(outgoing) }
@@ -44,7 +46,8 @@ import UIKit
     guard !model.fixture, let turn = streamTurn else { return }
     do {
       try await model.api.interviewStream(id: challenge.id, turn: turn.id) { [weak self] snapshot in
-        guard let self, self.currentAccount, let index = self.state.turns.firstIndex(where: { $0.id == turn.id && $0.jobId == turn.jobId }) else { return }
+        guard let self, self.currentAccount, !self.cancelledAssistance.contains(turn.id),
+          let index = self.state.turns.firstIndex(where: { $0.id == turn.id && $0.jobId == turn.jobId }) else { return }
         self.recordFirstText(snapshot.text)
         self.state.turns[index].partial = snapshot.text
       }
@@ -52,8 +55,26 @@ import UIKit
       try Task.checkCancellation()
       await refresh()
     } catch is CancellationError {} catch {
-      guard !Task.isCancelled, currentAccount else { return }
+      guard !Task.isCancelled, currentAccount, !cancelledAssistance.contains(turn.id) else { return }
       failure = "The response was interrupted. Your answer is safe."
+    }
+  }
+  /// Stops a nudge or example now: the interview unlocks locally, the server job is
+  /// cancelled before the next command is sent, and any late reply is ignored.
+  func cancelAssistance(_ id: String) {
+    cancelledAssistance.insert(id)
+    applyCancellations()
+    guard !model.fixture else { return }
+    let prior = cancellation
+    let path = "challenges/" + challenge.id + "/interview/" + id + "/cancel"
+    cancellation = Task { [model] in
+      await prior?.value
+      let _: InterviewState? = try? await model.api.send(path, method: "POST")
+    }
+  }
+  private func applyCancellations() {
+    for index in state.turns.indices where cancelledAssistance.contains(state.turns[index].id) && state.turns[index].pending {
+      state.turns[index].status = "cancelled"
     }
   }
   var key: String { "interview:" + account + ":" + challenge.id }
@@ -126,6 +147,7 @@ import UIKit
       guard currentAccount, voice?.blocksText != true, !busy, generation == editGeneration, local.kind.isEmpty, !local.conflict else { return }
       answer = local.answer
       if let interview = fresh.interview { state = interview }
+      applyCancellations()
       challenge = fresh
       model.bootstrap?.challenge = fresh
       try await model.disk.cache(key: key + ":state", data: JSONEncoder().encode(state))
@@ -136,6 +158,8 @@ import UIKit
     guard !locked, failedTurn == nil else { return }
     sentAt = Date()
     busy = true
+    // A cancelled nudge must be stopped server-side before the next command is accepted.
+    await cancellation?.value
     let command = command ?? UUID()
     if kind == "answer" {
       outgoing = InterviewTurn(id: command.uuidString, ordinal: state.turns.count, kind: kind, prompt: state.prompt, text: answer, createdAt: Date().ISO8601Format(), jobId: command.uuidString, status: "pending")
@@ -215,10 +239,10 @@ import UIKit
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--fixture-slow-interview") { try await Task.sleep(for: .seconds(6)) }
         if ProcessInfo.processInfo.arguments.contains("--fixture-slow-assistance"), ["hint", "example"].contains(input.kind) {
-          try await Task.sleep(for: .seconds(2))
+          for _ in 0..<40 where !cancelledAssistance.contains(operation.command) { try await Task.sleep(for: .milliseconds(50)) }
         }
         #endif
-        try await Task.sleep(for: .milliseconds(500))
+        if !cancelledAssistance.contains(operation.command) { try await Task.sleep(for: .milliseconds(500)) }
         state.style = input.style ?? state.style
         state.guidanceMode = input.guidanceMode ?? state.guidanceMode
         if !state.turns.contains(where: { $0.id == operation.command }) {
@@ -232,13 +256,18 @@ import UIKit
             outgoing = nil
             let words = result.text.split(separator: " ")
             for count in stride(from: 3, through: words.count, by: 3) {
+              if cancelledAssistance.contains(operation.command) { break }
               state.turns[state.turns.count - 1].partial = words.prefix(count).joined(separator: " ")
               try await Task.sleep(for: .milliseconds(ProcessInfo.processInfo.arguments.contains("--fixture-slow-interview") ? 400 : 100))
             }
             state.turns.removeLast()
           }
-          state.turns.append(InterviewTurn(id: operation.command, ordinal: state.turns.count, kind: input.kind, prompt: state.prompt, text: input.text, createdAt: Date().ISO8601Format(), jobId: operation.command, status: "completed", result: result))
-          if isAnswer { state.wrapUp = result.outcome == "wrap_up"; if !state.wrapUp { state.prompt = result.text } }
+          if cancelledAssistance.contains(operation.command) {
+            state.turns.append(InterviewTurn(id: operation.command, ordinal: state.turns.count, kind: input.kind, prompt: state.prompt, text: input.text, createdAt: Date().ISO8601Format(), jobId: operation.command, status: "cancelled"))
+          } else {
+            state.turns.append(InterviewTurn(id: operation.command, ordinal: state.turns.count, kind: input.kind, prompt: state.prompt, text: input.text, createdAt: Date().ISO8601Format(), jobId: operation.command, status: "completed", result: result))
+            if isAnswer { state.wrapUp = result.outcome == "wrap_up"; if !state.wrapUp { state.prompt = result.text } }
+          }
           if input.kind == "answer" { answer = "" }
           try await model.save(challenge, answer: answer)
           try await model.disk.cache(key: key + ":state", data: JSONEncoder().encode(state))
@@ -256,6 +285,7 @@ import UIKit
         guard currentAccount else { throw CancellationError() }
         challenge = fresh
         if let latest = fresh.interview { state = latest }
+        applyCancellations()
         if operation.input.saveDraft == true, let revision = fresh.session?.revision {
           try await model.disk.acknowledgeInterviewAnswer(account: account, id: challenge.id, text: operation.input.text, revision: revision)
         }
@@ -268,6 +298,8 @@ import UIKit
       outgoing = nil
       try await persistPending()
       failure = nil
+      // Cancel may have reached the server before this command created its job.
+      if cancelledAssistance.contains(operation.command) { cancelAssistance(operation.command) }
     } catch let error as APIError where [400,409,422,429].contains(error.status) {
       outgoing = nil
       pending = nil

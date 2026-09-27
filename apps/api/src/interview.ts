@@ -100,6 +100,14 @@ export async function retryInterview(env: Env, account: string, id: string, turn
   return interviewFor(env,account,id);
 }
 
+// Only one-time assistance is cancellable; answers keep their retry path. A running
+// stream stops at its next write because publication requires status='running'.
+export async function cancelInterviewAssistance(env: Env, account: string, id: string, turn: string) {
+  await ownedChallenge(env, account, id);
+  await env.DB.prepare("UPDATE jobs SET status='cancelled',updated_at=? WHERE account_id=? AND status IN ('pending','running') AND id=(SELECT job_id FROM interview_turns WHERE id=? AND challenge_id=? AND kind IN ('hint','example'))").bind(timestamp(), account, turn, id).run();
+  return interviewFor(env, account, id);
+}
+
 export async function interviewStreamSnapshot(env: Env, account: string, id: string, turn: string) {
   const row = await env.DB.prepare("SELECT j.status, s.text, t.result FROM interview_turns t JOIN challenges c ON c.id=t.challenge_id JOIN jobs j ON j.id=t.job_id LEFT JOIN interview_streams s ON s.job_id=j.id WHERE t.id=? AND t.challenge_id=? AND c.account_id=?").bind(turn,id,account).first<{status:string;text:string|null;result:string|null}>();
   if (!row) throw new Fault("not_found",404,"Interview turn not found.");

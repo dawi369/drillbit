@@ -6,7 +6,7 @@ import { exportPage } from "./export";
 import { learningEvidence, recallDeck, reviewRecall, retryMoment, todayPlan } from "./learning";
 import { concepts } from "./taxonomy";
 import { libraryPage, questionDetail, setEligibility, startQuestion, coverage } from "./library";
-import { interviewStreamSnapshot, interviewInputSchema, requestInterview, retryInterview } from "./interview";
+import { cancelInterviewAssistance, interviewStreamSnapshot, interviewInputSchema, requestInterview, retryInterview } from "./interview";
 import { updateContext, receive } from "./companion";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
@@ -437,6 +437,7 @@ app.post("/v1/challenges/:id/interview", async c => {
   return c.json(await requestInterview(c.env,c.get("account").id,c.req.param("id"),requireCommand(c.req.header("Idempotency-Key")),interviewInputSchema.parse(await c.req.json()),runImmediately),202);
 });
 app.post("/v1/challenges/:id/interview/:turn/retry", async c => c.json(await retryInterview(c.env,c.get("account").id,c.req.param("id"),c.req.param("turn"),requireCommand(c.req.header("Idempotency-Key"))),202));
+app.post("/v1/challenges/:id/interview/:turn/cancel", async c => c.json(await cancelInterviewAssistance(c.env,c.get("account").id,c.req.param("id"),c.req.param("turn"))));
 app.post("/v1/challenges/:id/retry-moment/:turn", async c => c.json(await retryMoment(c.env,c.get("account").id,c.req.param("id"),c.req.param("turn"),requireCommand(c.req.header("Idempotency-Key"))),201));
 app.post("/v1/challenges/:id/start", async (c) => {
   const a = c.get("account").id,

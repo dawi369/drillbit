@@ -2,7 +2,7 @@ import { env } from "cloudflare:test";
 import { beforeAll, it, expect, vi } from "vitest";
 import { initializeDatabase } from "./migrations";
 import { accountFor, complete, detail, settingsFor } from "../src/store";
-import { requestInterview, retryInterview, interviewFor } from "../src/interview";
+import { cancelInterviewAssistance, requestInterview, retryInterview, interviewFor } from "../src/interview";
 import { runJob } from "../src/jobs";
 import { streamedInterview } from "../src/ai";
 import { interviewSchemaFor } from "../src/interview";
@@ -69,6 +69,20 @@ it("completion freezes shared turns, cancels pending replies and rejects late wr
 });
 it.each(["quick","standard","in_depth"])("retains %s style independently of engineering level",async style=>{
  const {a,id}=await fixture(style);expect((await interviewFor(e,a,id)).style).toBe(style);
+});
+it("cancels in-flight assistance immediately, never stores a late reply and unblocks the next turn",async()=>{
+ const {a,id}=await fixture(),hint=crypto.randomUUID();
+ await requestInterview(e,a,id,hint,{kind:"hint",revision:2});
+ expect((await cancelInterviewAssistance(e,a,id,hint)).turns[0].status).toBe("cancelled");
+ let mock=provider({outcome:"reply",text:"Late nudge"});await runJob(e,hint);mock.mockRestore();
+ expect((await interviewFor(e,a,id)).turns[0]).toMatchObject({status:"cancelled",result:null});
+ const example=crypto.randomUUID();await requestInterview(e,a,id,example,{kind:"example",revision:3});
+ mock=vi.spyOn(globalThis,"fetch").mockImplementation(async()=>{await cancelInterviewAssistance(e,a,id,example);return streamed({outcome:"reply",text:"Late example"});});
+ await runJob(e,example).catch(()=>{});mock.mockRestore();
+ expect((await interviewFor(e,a,id)).turns[1]).toMatchObject({status:"cancelled",result:null});
+ const answer=crypto.randomUUID();await requestInterview(e,a,id,answer,{kind:"answer",text:"Use a queue",revision:4});
+ expect((await cancelInterviewAssistance(e,a,id,answer)).turns[2].status).toBe("pending");
+ const other=await fixture();await expect(cancelInterviewAssistance(e,other.a,id,hint)).rejects.toMatchObject({status:404});
 });
 it("Quick continues until the user explicitly finishes",async()=>{
  const {a,id}=await fixture("quick"),first=crypto.randomUUID();

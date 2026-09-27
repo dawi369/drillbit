@@ -248,7 +248,7 @@ struct InterviewView: View {
       Button("Keep writing", role: .cancel) {}
       Button("Finish interview") { Task { await interview.finish() } }
     } message: { Text("Your shared answers and current draft will be saved for review.") }
-    .sheet(item: $sheet) { selection in
+    .sheet(item: $sheet, onDismiss: resetAssistance) { selection in
       switch selection {
       case .style:
         NavigationStack {
@@ -314,7 +314,6 @@ struct InterviewView: View {
     .frame(maxWidth: 420)
     .presentationDetents([requestingAssistance ? .height(220) : .height(360)])
     .presentationDragIndicator(.visible)
-    .interactiveDismissDisabled(requestingAssistance)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("assistancePopup")
   }
@@ -395,6 +394,7 @@ struct InterviewView: View {
     sheet = .assistance
     Task {
       await interview.submit(kind, command: command)
+      guard assistanceRequestID == command.uuidString else { return }
       if let failure = interview.failure {
         assistanceError = failure
         assistanceRequestID = nil
@@ -407,11 +407,17 @@ struct InterviewView: View {
     }
   }
   private func dismissAssistance() {
+    if requestingAssistance, let id = assistanceRequestID { interview.cancelAssistance(id) }
+    assistanceRequestID = nil
+    sheet = nil
+  }
+  /// Runs after the sheet has gone, so its button never changes label mid-dismissal.
+  private func resetAssistance() {
+    if requestingAssistance, let id = assistanceRequestID { interview.cancelAssistance(id) }
     assistanceRequestID = nil
     assistanceText = nil
     assistanceError = nil
     requestingAssistance = false
-    sheet = nil
   }
   private func leaveVoiceRoom() {
     // Route changes never own audio lifetime. End stops local audio before any
@@ -451,7 +457,7 @@ struct InterviewView: View {
       }
       ForEach(exchange.turns) { turn in
         // A completed answer and its follow-up live together in the next block.
-        if turn.kind != "clarification" && !(turn.kind == "answer" && turn.result?.outcome != "wrap_up") && !(turn.kind == "voice" && (turn.voice ?? []).allSatisfy { $0.text.isEmpty }) {
+        if turn.kind != "clarification" && turn.status != "cancelled" && !(turn.kind == "answer" && turn.result?.outcome != "wrap_up") && !(turn.kind == "voice" && (turn.voice ?? []).allSatisfy { $0.text.isEmpty }) {
           VStack(alignment: .leading, spacing: 12) {
             if turn.kind == "answer" {
               Divider()

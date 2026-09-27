@@ -786,6 +786,31 @@ final class PracticeUITests: XCTestCase {
     XCTAssertFalse(app.staticTexts["One idea to carry forward."].exists)
   }
 
+  func testCancellingAssistanceUnlocksImmediately() throws {
+    continueAfterFailure = false
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures", "--fixture-slow-assistance"]
+    app.launch()
+    XCTAssertTrue(app.buttons["startPractice"].waitForExistence(timeout:10))
+    app.buttons["startPractice"].tap()
+    app.buttons["previewStart"].tap()
+    XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "answerEditor").firstMatch.waitForExistence(timeout: 5))
+    app.buttons["interviewOptions"].tap()
+    app.buttons["Need a nudge?"].tap()
+    XCTAssertTrue(app.descendants(matching: .any)["assistanceLoading"].waitForExistence(timeout: 1))
+    app.buttons["Cancel"].tap()
+    XCTAssertTrue(app.otherElements["assistancePopup"].waitForNonExistence(timeout: 1))
+    // The slow nudge would still be running; the next request is available at once.
+    app.buttons["interviewOptions"].tap()
+    XCTAssertTrue(app.buttons["Show an example"].isEnabled)
+    app.buttons["Show an example"].tap()
+    let example = "For example, give each logical operation a stable key and store its result in the same transaction as the state change."
+    XCTAssertTrue(app.staticTexts[example].waitForExistence(timeout: 6))
+    app.buttons["Got it"].tap()
+    XCTAssertFalse(app.staticTexts["Consider what a retry can know about an operation that already happened."].exists,
+                   "A cancelled nudge never lands in the interview")
+  }
+
   func testPracticeModeLargestLight() throws {
     let app = XCUIApplication()
     app.launchArguments = ["--fixtures", "--fixture-dashboard", "-appearance", "light", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
