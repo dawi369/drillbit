@@ -40,7 +40,7 @@ struct FirstPracticeView: View {
             FirstUseTip(number: "02", title: "Keep the useful detail.", message: "Your clarification lives with the question. Tap the heading above to fold them away.", pointsUp: true)
           } else if step == .finished {
             VStack(alignment: .leading, spacing: 16) {
-              DrillbitMark(size: 40, arrives: true)
+              DrillbitMark(size: 52, arrives: true)
               Text("You’ve got the idea.").font(.largeTitle.weight(.semibold))
               Text("We stop here on purpose. This walkthrough doesn’t count toward your practice.")
                 .foregroundStyle(AppPalette.secondary)

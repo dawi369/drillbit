@@ -3,7 +3,7 @@ import SwiftUI
 struct CompletionHeading: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
-      DrillbitMark(size: 40, arrives: true).padding(.bottom, 4)
+      DrillbitMark(size: 52, arrives: true).padding(.bottom, 4)
       SignalEyebrow(text: "Practice complete")
       Text("One idea to carry forward.")
         .font(.largeTitle.weight(.semibold)).tracking(-0.8)

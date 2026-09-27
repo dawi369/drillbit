@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>Drillbit app icon</title>
+  <defs>
+    <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#272D3A"/>
+      <stop offset="1" stop-color="#1B1F29"/>
+    </linearGradient>
+    <linearGradient id="cylinder" x1="-120" y1="0" x2="120" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFDA8A"/>
+      <stop offset="0.45" stop-color="#FFCC65"/>
+      <stop offset="1" stop-color="#E9AE45"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#ground)"/>
+  <path fill="url(#cylinder)" transform="translate(512 512)" d="M-120 -316Q-120 -340 -96 -340H96Q120 -340 120 -316V-255C120 -227.5 43.5 -201.2 0 -185C-43.5 -168.8 -120 -142.5 -120 -115ZM-120 -61C-120 -88.5 -43.5 -114.8 0 -131C43.5 -147.2 120 -173.5 120 -201V-115C120 -87.5 43.5 -61.2 0 -45C-43.5 -28.8 -120 -2.5 -120 25ZM-120 79C-120 51.5 -43.5 25.2 0 9C43.5 -7.2 120 -33.5 120 -61V25C120 52.5 43.5 78.8 0 95C-43.5 111.2 -120 137.5 -120 165ZM-120 219C-120 191.5 -43.5 165.2 0 149C43.5 132.8 120 106.5 120 79V248L12 330.8Q0 340 -12 330.8L-120 248Z"/>
+</svg>
