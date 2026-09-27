@@ -87,6 +87,7 @@ struct InterviewVoiceRoom<Question: View>: View {
               .contentShape(Capsule())
               Text(voice.phase == .active ? (voice.muted ? "Unmute" : "Mute") : "Start")
                 .font(.caption).foregroundStyle(AppPalette.secondary)
+                .contentTransition(.identity).transaction { $0.animation = nil }
             }
               .opacity(voice.phase == .connecting ? 0.4 : 1)
               .animation(DrillbitMotion.selection, value: voice.muted)

@@ -203,7 +203,7 @@ struct SetupView: View {
             }
           )).disabled(reminderPermissionPending)
           if coordinator.draft.reminderEnabled {
-            DatePicker("Time", selection: reminderTime(coordinator), displayedComponents: .hourAndMinute)
+            DatePicker("Reminder time", selection: reminderTime(coordinator), displayedComponents: .hourAndMinute)
             NavigationLink { TimeZoneSelectionView(selection: $coordinator.draft.timezone) } label: {
               HStack(spacing: 8) {
                 Text("Time zone")
@@ -215,6 +215,8 @@ struct SetupView: View {
           }
         }
         .tint(AppPalette.accent)
+        .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: coordinator.draft.reminderEnabled)
+        .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: coordinator.draft.targetDate != nil)
       }
     default:
       summary(coordinator.draft)
