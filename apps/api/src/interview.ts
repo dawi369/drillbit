@@ -28,9 +28,27 @@ export const interviewResultSchema = z.object({
   // Guided only: suggested answers the learner can tap, and the guided-path step this reply works on.
   choices: z.array(z.string().trim().min(1).max(80)).max(3).optional(),
   step: z.number().int().min(0).max(5).optional(),
+  // Mock only: this reply changed one requirement mid-round; a round gets exactly one.
+  curveball: z.boolean().optional(),
 });
 export function interviewSchemaFor(kind: string) {
   return interviewResultSchema.extend({ outcome: ["answer", "continue"].includes(kind) ? z.literal("follow_up") : z.literal("reply") });
+}
+/** A mock round's hidden plan: the clock, phases scaled to its length, what to probe in the deep dive, and whether the one curveball is spent. */
+export function mockRound(data: Record<string, unknown>, fallbackStart: string, turns: { result?: { curveball?: boolean } | null }[]) {
+  const timing = roundTiming(data, fallbackStart);
+  const by = (share: number) => Math.round(timing.limitMinutes * share);
+  return {
+    ...timing,
+    phases: [
+      { phase: "requirements", endsByMinute: by(0.15) },
+      { phase: "high_level_design", endsByMinute: by(0.5) },
+      { phase: "deep_dive", endsByMinute: by(0.85) },
+      { phase: "wrap_up", endsByMinute: timing.limitMinutes },
+    ],
+    deepDive: Array.isArray(data.path) ? data.path : [],
+    curveballUsed: turns.some(turn => turn.result?.curveball === true),
+  };
 }
 export function interviewWrapUp(_context: unknown, _kind: string) { return null; }
 export function normalizeInterviewResult(output: z.infer<typeof interviewResultSchema>) { return output; }
@@ -75,7 +93,7 @@ export async function requestInterview(env: Env, account: string, id: string, co
   const [settings, history] = await Promise.all([settingsFor(env, account), historicalSnapshot(env, account, id, JSON.parse(challenge.data).conceptIds ?? [])]);
   const data = JSON.parse(challenge.data);
   // A mock round runs on the clock, so the interviewer can pace it like a real one.
-  const timing = context.guidanceMode === "mock_interview" ? roundTiming(data, challenge.created_at) : undefined;
+  const timing = context.guidanceMode === "mock_interview" ? mockRound(data, challenge.created_at, context.turns) : undefined;
   // Guided works through the question's path in order; the last reply says which step it reached.
   const guidedPath = context.guidanceMode === "learn_together" && Array.isArray(data.path)
     ? { steps: data.path, current: context.turns.filter(t => t.result?.step !== undefined).at(-1)?.result.step ?? 0 }

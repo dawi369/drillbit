@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import { interviewModelSchema, provider, recordUsage } from './ai';
 import { xmlContext } from './context';
-import { Fault, practiceProfileSchema, roundTiming, timestamp } from './domain';
+import { Fault, practiceProfileSchema, timestamp } from './domain';
 import { historicalSnapshot } from './history';
-import { interviewFor } from './interview';
+import { interviewFor, mockRound } from './interview';
 import { consumeUsage, type Env } from './platform';
 import { practicePersonality, questionTerminology } from "./prompts/interviewer";
 import { personalizationInstructions } from "./prompts/personalization";
@@ -117,7 +117,7 @@ export async function delegateVoice(env:Env,account:string,challenge:string,id:s
   const [settings,history,interview,voiceJob]=await Promise.all([settingsFor(env,account),historicalSnapshot(env,account,challenge,JSON.parse(c.data).conceptIds ?? []),interviewFor(env,account,challenge),env.DB.prepare("SELECT input FROM jobs WHERE id=? AND account_id=?").bind(id,account).first<{input:string}>()]);
   const pinnedProfile=voiceJob ? JSON.parse(voiceJob.input).practiceProfile : undefined;
   const data=JSON.parse(c.data);
-  const timing=interview.guidanceMode==='mock_interview'?roundTiming(data,c.created_at):undefined;
+  const timing=interview.guidanceMode==='mock_interview'?mockRound(data,c.created_at,interview.turns):undefined;
   const messages=voiceDelegationMessages(data,history,{...interview,timing},pinnedProfile ?? settings.practiceProfile);
   const contextMs=Date.now()-started;
   const voiceSchema=interviewModelSchema({promptVersion:"interviewer-teaching-v3"},z.object({}));

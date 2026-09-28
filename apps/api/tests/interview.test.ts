@@ -191,3 +191,24 @@ it('pins teaching mode per job and preserves it through legacy updates and repla
   expect((await interviewFor(e,a,id)).guidanceMode).toBe(mode);
  }
 });
+
+it('a mock round runs on hidden phases and gets exactly one curveball', async()=>{
+ const {a,id}=await fixture();
+ const first=crypto.randomUUID();
+ await requestInterview(e,a,id,first,{kind:'answer',text:'Use a queue',revision:2,guidanceMode:'mock_interview'});
+ const timing=JSON.parse((await e.DB.prepare('SELECT input FROM jobs WHERE id=?').bind(first).first<any>()).input).context.interview.timing;
+ expect(timing).toMatchObject({limitMinutes:30,elapsedMinutes:0,curveballUsed:false});
+ expect(timing.phases.map((p:any)=>p.phase)).toEqual(['requirements','high_level_design','deep_dive','wrap_up']);
+ expect(timing.phases.at(-1).endsByMinute).toBe(30);
+ let mock=provider({text:'Now assume ten times the traffic. What breaks first?',parameters:[],curveball:true});
+ try{await runJob(e,first);}finally{mock.mockRestore();}
+ expect((await interviewFor(e,a,id)).turns[0].result).toMatchObject({curveball:true});
+ const second=crypto.randomUUID();
+ await e.DB.prepare("UPDATE sessions SET answer='Shard the queue' WHERE challenge_id=?").bind(id).run();
+ const {revision}=(await e.DB.prepare('SELECT revision FROM sessions WHERE challenge_id=?').bind(id).first<any>());
+ await requestInterview(e,a,id,second,{kind:'answer',text:'Shard the queue',revision,guidanceMode:'mock_interview',promptId:first} as any);
+ expect(JSON.parse((await e.DB.prepare('SELECT input FROM jobs WHERE id=?').bind(second).first<any>()).input).context.interview.timing.curveballUsed).toBe(true);
+ mock=provider({text:'And now add a second region.',parameters:[],curveball:true});
+ try{await runJob(e,second);}finally{mock.mockRestore();}
+ expect((await interviewFor(e,a,id)).turns[1].result.curveball).toBeUndefined();
+});

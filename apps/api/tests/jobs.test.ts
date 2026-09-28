@@ -51,7 +51,7 @@ async function generatedPractice(account: string, warmUp: boolean, mode = "learn
       signals: ["requirements", "design", "trade_offs", "communication"].map(area => ({ area, rating: "mixed", note: "Partly covered." })) } } : {}),
   });
   await runJob(bindings, summarize!.id);
-  return { id, summarizeRequest: requests.at(-1) };
+  return { id, summarizeRequest: requests.at(-1), generationRequest: requests[0] };
 }
 it("a warm-up is a real generated interview with feedback that never counts, joins the pool or creates Recall", async () => {
   const account = (await accountFor(bindings, crypto.randomUUID())).id;
@@ -77,8 +77,11 @@ it("a warm-up is a real generated interview with feedback that never counts, joi
 it("a mock interview ends with a timed debrief and a verdict, not the coaching summary", async () => {
   const account = (await accountFor(bindings, crypto.randomUUID())).id;
   await bindings.DB.prepare("UPDATE accounts SET status='active' WHERE id=?").bind(account).run();
-  const { id, summarizeRequest } = await generatedPractice(account, false, "mock_interview");
+  const { id, summarizeRequest, generationRequest } = await generatedPractice(account, false, "mock_interview");
   fetchMock.assertNoPendingInterceptors();
+  // Even below senior level, a mock round opens with a prompt the candidate has to scope.
+  expect(generationRequest.response_format.json_schema.schema.properties.constraints.maxItems).toBe(0);
+  expect(generationRequest.messages[1].content).toContain("Mock interview opener");
   expect(summarizeRequest.messages[0].content).toContain('<ending mode="mock_interview">');
   expect(summarizeRequest.messages[1].content).toContain("limitMinutes");
   expect(summarizeRequest.response_format.json_schema.schema.required).toContain("debrief");

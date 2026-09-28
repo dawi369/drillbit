@@ -14,7 +14,7 @@ export function roundMinutes(data: { minutes?: unknown; engineeringLevel?: unkno
 }
 export function roundTiming(data: { minutes?: unknown; engineeringLevel?: unknown; startedAt?: unknown }, fallbackStart: string, now = Date.now()) {
   const started = Date.parse(typeof data.startedAt === "string" ? data.startedAt : fallbackStart);
-  return { limitMinutes: roundMinutes(data), elapsedMinutes: Math.max(0, Math.floor((now - started) / 60000)) };
+  return { limitMinutes: roundMinutes(data), elapsedMinutes: Number.isFinite(started) ? Math.max(0, Math.floor((now - started) / 60000)) : 0 };
 }
 export const practiceProfileSchema = z.object({
   goals: z.string().trim().max(600).default(""),

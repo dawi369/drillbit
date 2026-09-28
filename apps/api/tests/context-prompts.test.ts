@@ -139,3 +139,12 @@ it("guided replies carry the path step and tap-able choices; other styles never 
  const practice = {...guided, interview:{guidanceMode:"coach_me",turns:[]}};
  expect(parseInterviewModelResult(practice, interviewSchemaFor("answer"), {move:"ask_one",text:"What about reads?",parameters:[],step:1,choices:["x"]})).toEqual({outcome:"follow_up",text:"What about reads?",parameters:[]});
 });
+
+it("a mock reply can spend the round's one curveball, and never a second", () => {
+ const mock = {promptVersion:"interviewer-teaching-v4", interview:{guidanceMode:"mock_interview",timing:{curveballUsed:false},turns:[]}, action:{kind:"answer",text:"Use a queue"}};
+ const reply = {move:"ask_one", text:"Now assume ten times the traffic.", parameters:[], curveball:true};
+ expect(parseInterviewModelResult(mock, interviewSchemaFor("answer"), reply)).toMatchObject({curveball:true});
+ expect(parseInterviewModelResult({...mock, interview:{...mock.interview, timing:{curveballUsed:true}}}, interviewSchemaFor("answer"), reply).curveball).toBeUndefined();
+ expect(parseInterviewModelResult(mock, interviewSchemaFor("answer"), {move:"ask_one",text:"Why a queue?",parameters:[]}).curveball).toBeUndefined();
+ expect(messagesFor("interview", mock)[0].content).toContain("Curveball: exactly once per round");
+});

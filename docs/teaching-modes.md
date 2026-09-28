@@ -30,6 +30,9 @@ The mock verdict judges the answer against the round at the stated level, not th
 - Starting a question stamps `startedAt` in the challenge data (start route, Library start, retry moment). The clock counts from it, keeps running if you leave, and then counts overtime. It never ends the round.
 - The interviewer receives `interview.timing { limitMinutes, elapsedMinutes }` in text and voice. The mock policy paces it like a real round: steer to the key open decision past halfway, give one short five-minute warning, and invite Finish when time is up.
 - Mock hides Nudge and Show an example. Asking for help in words still works, as the policy requires.
+- **You scope it.** Mock questions are always open (no constraints, at every level), and the prompt is an interviewer's one-to-three-sentence opener with no numbers. When asked, the interviewer answers scale and requirement questions with concrete, consistent numbers and records them as parameters. The debrief rates scoping under requirements.
+- **Hidden phases.** `mockRound` sends the interviewer `timing { limitMinutes, elapsedMinutes, phases, deepDive, curveballUsed }`. The phases are requirements (15%), high-level design (to 50%), deep dive (to 85%) and wrap-up, scaled to the round's minutes, and `deepDive` is the question's path. The interviewer closes each phase when its time passes and never shows the plan. The app shows only the clock.
+- **One curveball.** Mock's strict reply schema has `curveball`. The interviewer changes one requirement realistically in the deep dive once the candidate has a working design. The server keeps only the first `curveball: true` per round, so a second one can't happen even if the model tries. The debrief judges how the candidate adapted.
 - Company targeting (future): a target company's format would extend the mock policy, time limit and debrief bar in `teaching.ts`. The question contract and grounding rules would not change.
 
 ### Guided holds your hand

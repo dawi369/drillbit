@@ -6609,6 +6609,9 @@
                                     "type": "integer",
                                     "minimum": 0,
                                     "maximum": 5
+                                  },
+                                  "curveball": {
+                                    "type": "boolean"
                                   }
                                 },
                                 "required": [
@@ -8009,6 +8012,9 @@
                                     "type": "integer",
                                     "minimum": 0,
                                     "maximum": 5
+                                  },
+                                  "curveball": {
+                                    "type": "boolean"
                                   }
                                 },
                                 "required": [
@@ -10269,6 +10275,9 @@
                           "type": "integer",
                           "minimum": 0,
                           "maximum": 5
+                        },
+                        "curveball": {
+                          "type": "boolean"
                         }
                       },
                       "required": [
@@ -10851,6 +10860,9 @@
                               "type": "integer",
                               "minimum": 0,
                               "maximum": 5
+                            },
+                            "curveball": {
+                              "type": "boolean"
                             }
                           },
                           "required": [
@@ -12616,6 +12628,9 @@
                                       "type": "integer",
                                       "minimum": 0,
                                       "maximum": 5
+                                    },
+                                    "curveball": {
+                                      "type": "boolean"
                                     }
                                   },
                                   "required": [
@@ -13746,6 +13761,9 @@
                                   "type": "integer",
                                   "minimum": 0,
                                   "maximum": 5
+                                },
+                                "curveball": {
+                                  "type": "boolean"
                                 }
                               },
                               "required": [
@@ -14841,6 +14859,9 @@
                                       "type": "integer",
                                       "minimum": 0,
                                       "maximum": 5
+                                    },
+                                    "curveball": {
+                                      "type": "boolean"
                                     }
                                   },
                                   "required": [
@@ -15962,6 +15983,9 @@
                                     "type": "integer",
                                     "minimum": 0,
                                     "maximum": 5
+                                  },
+                                  "curveball": {
+                                    "type": "boolean"
                                   }
                                 },
                                 "required": [
@@ -17084,6 +17108,9 @@
                                     "type": "integer",
                                     "minimum": 0,
                                     "maximum": 5
+                                  },
+                                  "curveball": {
+                                    "type": "boolean"
                                   }
                                 },
                                 "required": [
@@ -18143,6 +18170,9 @@
                                       "type": "integer",
                                       "minimum": 0,
                                       "maximum": 5
+                                    },
+                                    "curveball": {
+                                      "type": "boolean"
                                     }
                                   },
                                   "required": [
