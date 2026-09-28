@@ -6595,6 +6595,20 @@
                                       ],
                                       "additionalProperties": false
                                     }
+                                  },
+                                  "choices": {
+                                    "maxItems": 3,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 80
+                                    }
+                                  },
+                                  "step": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 5
                                   }
                                 },
                                 "required": [
@@ -7981,6 +7995,20 @@
                                       ],
                                       "additionalProperties": false
                                     }
+                                  },
+                                  "choices": {
+                                    "maxItems": 3,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 80
+                                    }
+                                  },
+                                  "step": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 5
                                   }
                                 },
                                 "required": [
@@ -10227,6 +10255,20 @@
                             ],
                             "additionalProperties": false
                           }
+                        },
+                        "choices": {
+                          "maxItems": 3,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 80
+                          }
+                        },
+                        "step": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 5
                         }
                       },
                       "required": [
@@ -10795,6 +10837,20 @@
                                 ],
                                 "additionalProperties": false
                               }
+                            },
+                            "choices": {
+                              "maxItems": 3,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80
+                              }
+                            },
+                            "step": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 5
                             }
                           },
                           "required": [
@@ -12546,6 +12602,20 @@
                                         ],
                                         "additionalProperties": false
                                       }
+                                    },
+                                    "choices": {
+                                      "maxItems": 3,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 80
+                                      }
+                                    },
+                                    "step": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 5
                                     }
                                   },
                                   "required": [
@@ -13662,6 +13732,20 @@
                                     ],
                                     "additionalProperties": false
                                   }
+                                },
+                                "choices": {
+                                  "maxItems": 3,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 80
+                                  }
+                                },
+                                "step": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 5
                                 }
                               },
                               "required": [
@@ -14743,6 +14827,20 @@
                                         ],
                                         "additionalProperties": false
                                       }
+                                    },
+                                    "choices": {
+                                      "maxItems": 3,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 80
+                                      }
+                                    },
+                                    "step": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 5
                                     }
                                   },
                                   "required": [
@@ -15850,6 +15948,20 @@
                                       ],
                                       "additionalProperties": false
                                     }
+                                  },
+                                  "choices": {
+                                    "maxItems": 3,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 80
+                                    }
+                                  },
+                                  "step": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 5
                                   }
                                 },
                                 "required": [
@@ -16958,6 +17070,20 @@
                                       ],
                                       "additionalProperties": false
                                     }
+                                  },
+                                  "choices": {
+                                    "maxItems": 3,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 80
+                                    }
+                                  },
+                                  "step": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 5
                                   }
                                 },
                                 "required": [
@@ -18003,6 +18129,20 @@
                                         ],
                                         "additionalProperties": false
                                       }
+                                    },
+                                    "choices": {
+                                      "maxItems": 3,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 80
+                                      }
+                                    },
+                                    "step": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 5
                                     }
                                   },
                                   "required": [

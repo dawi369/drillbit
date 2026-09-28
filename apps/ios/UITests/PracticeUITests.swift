@@ -1022,6 +1022,16 @@ final class PracticeUITests: XCTestCase {
     editor.tap(); editor.typeText("Start with one table of saved links keyed by user.")
     app.buttons["shareAnswer"].tap()
     XCTAssertTrue(app.staticTexts["What happens if a worker stops after completing the operation but before acknowledging it?"].waitForExistence(timeout: 8))
+    // Guided holds your hand: a visible path, and answers you can tap instead of facing an empty box.
+    let path = app.descendants(matching: .any)["guidedPath"]
+    XCTAssertTrue(path.exists)
+    XCTAssertTrue(path.label.hasPrefix("Step 1 of 4"), path.label)
+    let choice = app.buttons["guidedChoice-1"]
+    XCTAssertTrue(choice.waitForExistence(timeout: 3))
+    capture("Guided path and choices", app)
+    choice.tap()
+    XCTAssertTrue(app.buttons["guidedChoice-1"].waitForExistence(timeout: 8))
+    XCTAssertTrue(path.label.hasPrefix("Step 2 of 4"), path.label)
     app.buttons["interviewOptions"].tap()
     XCTAssertFalse(app.buttons["Skip question"].exists)
     app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Finish interview'")).firstMatch.tap()

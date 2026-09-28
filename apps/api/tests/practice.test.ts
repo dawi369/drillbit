@@ -302,7 +302,7 @@ it("starting a question wins against an in-flight replacement", async () => {
       targetSkill: "Reliability",
       constraints: [],
       ambiguityPolicy: "State assumptions",
-      minutes: 20,
+      minutes: 20, path: ["Name the failure", "Plan recovery", "Verify"],
     });
     return new Response(`data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n`, { headers: { "content-type": "text/event-stream" } });
   });

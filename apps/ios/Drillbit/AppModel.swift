@@ -696,7 +696,7 @@ import WidgetKit
         throw APIError(code: "generation_failed", message: "Question preparation failed. Your previous question is safe.", status: 503)
       }
       #endif
-      let challenge = Challenge(guidanceMode: preparation?.guidanceMode ?? .coachMe, warmUp: preparation?.warmUp, minutes: 20, interviewStyle: preparation?.interviewStyle ?? .standard, engineeringLevel: preparation?.engineeringLevel ?? settings.selectedLevel,
+      let challenge = Challenge(guidanceMode: preparation?.guidanceMode ?? .coachMe, warmUp: preparation?.warmUp, minutes: 20, path: ["Pin down what the queue promises", "Sketch the job lifecycle", "Handle worker failures", "Make retries safe"], interviewStyle: preparation?.interviewStyle ?? .standard, engineeringLevel: preparation?.engineeringLevel ?? settings.selectedLevel,
         id: UUID().uuidString, lifecycle: "ready", title: "Design a reliable job queue",
         prompt: "Design a reliable job queue. Explain retries, ordering, and how failures are handled.",
         topic: preparation?.focus ?? settings.focus, session: SessionDraft(answer: "", revision: 0))

@@ -127,3 +127,15 @@ it('does not expose internal grading criteria as interview requirements',()=>{
  expect(JSON.stringify(messages)).toContain('Visible constraint');
  expect(JSON.stringify(messages)).not.toContain('HIDDEN');
 });
+
+it("guided replies carry the path step and tap-able choices; other styles never do", () => {
+ const guided = {promptVersion:"interviewer-teaching-v4", interview:{guidanceMode:"learn_together",guidedPath:{steps:["Pin down reads","Sketch the API","Choose storage"],current:0},turns:[]}, action:{kind:"answer",text:"Clients read their links"}};
+ const messages = messagesFor("interview", guided);
+ expect(messages[0].content).toContain("<guidedPath>");
+ expect(messages[0].content).toContain("Not sure, show me");
+ expect(parseInterviewModelResult(guided, interviewSchemaFor("answer"), {
+  move:"ask_one", text:"Good. Now the API: what would a save request carry?", parameters:[], step:1, choices:["The URL and a title","Just the URL","Not sure, show me"],
+ })).toEqual({outcome:"follow_up",text:"Good. Now the API: what would a save request carry?",parameters:[],step:1,choices:["The URL and a title","Just the URL","Not sure, show me"]});
+ const practice = {...guided, interview:{guidanceMode:"coach_me",turns:[]}};
+ expect(parseInterviewModelResult(practice, interviewSchemaFor("answer"), {move:"ask_one",text:"What about reads?",parameters:[],step:1,choices:["x"]})).toEqual({outcome:"follow_up",text:"What about reads?",parameters:[]});
+});

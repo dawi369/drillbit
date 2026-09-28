@@ -34,7 +34,7 @@ async function generatedPractice(account: string, warmUp: boolean, mode = "learn
   provider({
     kind: "design", scenario: "Link saver", primaryConceptId: "api-design", secondaryConceptIds: [],
     tagEvidence: [{ conceptId: "api-design", requirementIndex: 0 }], targetSkill: "APIs", constraints: [],
-    evaluationCriteria: ["lookup"], ambiguityPolicy: "State assumptions.", title: "Save a link", minutes: 20,
+    evaluationCriteria: ["lookup"], ambiguityPolicy: "State assumptions.", title: "Save a link", minutes: 20, path: ["Pin down lookups", "Sketch the API", "Choose the storage"],
     prompt: `Design a link saver that finds saved links fast (${warmUp ? "warm-up" : "counted"}).`, topic: "system design",
   }, true);
   const id = crypto.randomUUID();
@@ -123,7 +123,7 @@ it("durably generates a valid challenge and replay does not call the provider ag
               evaluationCriteria: ["local evaluation"],
               ambiguityPolicy: "State reasonable assumptions.",
               title: "Safe flag rollout",
-              minutes: 25,
+              minutes: 25, path: ["Pin down the outage", "Sketch evaluation", "Plan rollout"],
               prompt:
                 "Design a feature flag control plane that keeps local evaluation available during a regional outage.",
               topic: "system design",

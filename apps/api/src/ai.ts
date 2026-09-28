@@ -411,25 +411,32 @@ export function interviewReasoning(context: unknown): { enabled: false } | { eff
 }
 export function interviewModelSchema(context: unknown, legacySchema: z.ZodType): z.ZodType {
   const version = (context as { promptVersion?: string }).promptVersion ?? INTERVIEW_PROMPT_VERSION;
-  if (version === "interviewer-teaching-v4") return z.object({
-    move: z.enum(["chat", "acknowledge", "ask_one", "answer_question", "correct", "hint", "example"]),
-    text: z.string().trim().min(1).max(2400),
-    parameters: z.array(z.object({label:z.string().trim().min(1).max(32),value:z.string().trim().min(1).max(120)})).max(3),
-  });
+  if (version === "interviewer-teaching-v4") {
+    const base = z.object({
+      move: z.enum(["chat", "acknowledge", "ask_one", "answer_question", "correct", "hint", "example"]),
+      text: z.string().trim().min(1).max(2400),
+      parameters: z.array(z.object({label:z.string().trim().min(1).max(32),value:z.string().trim().min(1).max(120)})).max(3),
+    });
+    return isGuided(context) ? base.extend({ step: z.number().int().min(0).max(4), choices: z.array(z.string().trim().min(1).max(60)).max(3) }) : base;
+  }
   return contextualInterviewVersions.includes(version) ? z.object({ move: z.enum(["chat", "acknowledge", "ask_one", "answer_question", "correct", "hint", "example"]), text: z.string().trim().min(1).max(2400) }) : legacySchema;
 }
 export function parseInterviewModelResult(context: unknown, schema: z.ZodType, value: unknown) {
   const c = context as { promptVersion?: string; action?: { kind?: string; text?: string } };
   const isV4 = (c.promptVersion ?? INTERVIEW_PROMPT_VERSION) === "interviewer-teaching-v4";
   const candidate = isV4 && value && typeof value === "object" && !Array.isArray(value)
-    ? {parameters: [], ...value} : value;
-  const parsed = interviewModelSchema(context, schema).parse(candidate) as { text: string; parameters?: {label:string;value:string}[] };
+    ? {parameters: [], ...(isGuided(context) ? {choices: [], step: 0} : {}), ...value} : value;
+  const parsed = interviewModelSchema(context, schema).parse(candidate) as { text: string; parameters?: {label:string;value:string}[]; choices?: string[]; step?: number };
   const available = (parsed.text + "\n" + (c.action?.text ?? "")).toLocaleLowerCase();
   const parameters = isV4 && ["answer", "clarification", "continue"].includes(c.action?.kind ?? "")
     ? (parsed.parameters ?? []).filter(item => available.includes(item.value.toLocaleLowerCase()))
     : [];
+  const guided = isV4 && isGuided(context) ? { choices: parsed.choices ?? [], step: parsed.step ?? 0 } : {};
   return schema.parse(contextualInterviewVersions.includes((c.promptVersion ?? INTERVIEW_PROMPT_VERSION))
-    ? { text: parsed.text, outcome: ["answer", "continue"].includes(c.action?.kind ?? "answer") ? "follow_up" : "reply", ...(isV4 ? {parameters} : {}) } : parsed) as { outcome: string; text: string; parameters?: {label:string;value:string}[] };
+    ? { text: parsed.text, outcome: ["answer", "continue"].includes(c.action?.kind ?? "answer") ? "follow_up" : "reply", ...(isV4 ? {parameters} : {}), ...guided } : parsed) as { outcome: string; text: string; parameters?: {label:string;value:string}[]; choices?: string[]; step?: number };
+}
+function isGuided(context: unknown) {
+  return (context as { interview?: { guidanceMode?: string } }).interview?.guidanceMode === "learn_together";
 }
 export async function streamedInterview(env: Env, account: string, settings: Settings, context: unknown, schema: z.ZodType, publish: (text: string) => Promise<void>) {
   const controller = new AbortController();

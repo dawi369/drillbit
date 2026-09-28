@@ -50,6 +50,11 @@ struct InterviewView: View {
   /// Fallback start for a round whose start time never reached this device.
   @State private var openedAt = Date()
   private var scenarioTitle: String { challenge.scenario?.split(whereSeparator: \.isWhitespace).prefix(2).joined(separator: " ") ?? "System design" }
+  /// Guided's latest interviewer reply: it carries the current path step and the answers to tap.
+  private var guidedTurn: InterviewTurn? {
+    guard interview.mode == .learnTogether else { return nil }
+    return interview.displayState.turns.last { ["answer", "continue"].contains($0.kind) && $0.result != nil }
+  }
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.scenePhase) private var phase
   init(model: AppModel, challenge: Challenge) {
@@ -166,6 +171,16 @@ struct InterviewView: View {
                 VStack(alignment: .leading, spacing: 12) {
                   Divider().accessibilityIdentifier("answerDivider")
                   InterviewRowLabel(text: "Your reply")
+                  if let turn = guidedTurn, let choices = turn.result?.choices, !choices.isEmpty, interview.answer.isEmpty, !interview.locked {
+                    GuidedChoices(choices: choices) { choice in
+                      interview.edit(choice)
+                      focused = false
+                      followingLiveEnd = true
+                      Task { await shareAnswer() }
+                    }
+                    .id(turn.id)
+                    .transition(.opacity)
+                  }
                   GrowingInterviewEditor(text: Binding(get: { interview.answer }, set: { interview.edit($0) }),
                     focused: Binding(get: { focused }, set: { focused = $0 }),
                     accessibilityLabel: "Your reply or question",
@@ -226,6 +241,11 @@ struct InterviewView: View {
       }
     }
     .safeAreaInset(edge: .bottom, spacing: 0) { footer }
+    .safeAreaInset(edge: .top, spacing: 0) {
+      if interview.mode == .learnTogether, let path = challenge.path, !path.isEmpty, interview.finished == nil {
+        GuidedPathBar(steps: path, current: guidedTurn?.result?.step ?? 0)
+      }
+    }
     .navigationTitle(scenarioTitle).navigationBarTitleDisplayMode(.inline)
     .toolbarBackground(AppPalette.background, for: .navigationBar)
     .toolbarBackground(.visible, for: .navigationBar)
@@ -724,5 +744,77 @@ struct RoundClock: View {
       .accessibilityLabel(over ? "Over time by \(max(1, seconds / 60)) minutes" : "\(max(1, (seconds + 59) / 60)) minutes left")
       .accessibilityIdentifier("roundClock")
     }
+  }
+}
+
+/// Guided's roadmap: where you are in the question and what comes next.
+struct GuidedPathBar: View {
+  let steps: [String]
+  let current: Int
+  var body: some View {
+    let index = min(max(current, 0), steps.count - 1)
+    VStack(alignment: .leading, spacing: 8) {
+      HStack(spacing: 4) {
+        ForEach(steps.indices, id: \.self) { step in
+          Capsule().fill(step <= index ? AppPalette.accent : AppPalette.hairline).frame(height: 4)
+        }
+      }
+      HStack(spacing: 8) {
+        Text("Step \(index + 1) of \(steps.count)").font(.caption.monospacedDigit()).foregroundStyle(AppPalette.accent)
+        Text(steps[index]).font(.subheadline.weight(.semibold)).foregroundStyle(AppPalette.primary).lineLimit(1)
+          .id(index)
+          .transition(.asymmetric(insertion: .opacity.combined(with: .offset(x: 12)), removal: .opacity))
+      }
+    }
+    .padding(.horizontal, 24)
+    .padding(.vertical, 12)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(AppPalette.background)
+    .overlay(alignment: .bottom) { AppPalette.hairline.frame(height: 0.5) }
+    .animation(DrillbitMotion.page, value: index)
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel("Step \(index + 1) of \(steps.count): \(steps[index])")
+    .accessibilityIdentifier("guidedPath")
+  }
+}
+
+/// Guided's suggested answers: tap one to send it, or type your own.
+struct GuidedChoices: View {
+  let choices: [String]
+  let pick: (String) -> Void
+  @State private var shown = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  var body: some View {
+    ScrollView(.horizontal, showsIndicators: false) {
+      HStack(spacing: 8) {
+        ForEach(Array(choices.enumerated()), id: \.offset) { index, choice in
+          Button(choice) { pick(choice) }
+            .buttonStyle(ChoiceChipStyle())
+            .accessibilityHint("Sends this as your reply")
+            .accessibilityIdentifier("guidedChoice-\(index)")
+            .opacity(shown ? 1 : 0)
+            .offset(y: shown || reduceMotion ? 0 : 8)
+            .animation(reduceMotion ? nil : DrillbitMotion.entrance.delay(Double(index) * 0.06), value: shown)
+        }
+      }
+    }
+    .scrollClipDisabled()
+    .onAppear { shown = true }
+  }
+}
+
+private struct ChoiceChipStyle: ButtonStyle {
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .font(.subheadline)
+      .foregroundStyle(AppPalette.primary)
+      .padding(.horizontal, 16)
+      .frame(minHeight: 44)
+      .background(AppPalette.inset, in: Capsule())
+      .overlay { Capsule().strokeBorder(AppPalette.hairline, lineWidth: 0.5) }
+      .contentShape(Capsule())
+      .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
+      .animation(DrillbitMotion.press, value: configuration.isPressed)
   }
 }

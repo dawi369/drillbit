@@ -250,7 +250,11 @@ import UIKit
           let helpText = input.kind == "example"
             ? "For example, give each logical operation a stable key and store its result in the same transaction as the state change."
             : "Consider what a retry can know about an operation that already happened."
-          let result = InterviewResponse(outcome: isAnswer ? "follow_up" : "reply", text: isAnswer ? "What happens if a worker stops after completing the operation but before acknowledging it?" : helpText)
+          var result = InterviewResponse(outcome: isAnswer ? "follow_up" : "reply", text: isAnswer ? "What happens if a worker stops after completing the operation but before acknowledging it?" : helpText)
+          if isAnswer, mode == .learnTogether {
+            result.choices = ["Store a done marker per job", "Make the work itself idempotent", "Not sure, show me"]
+            result.step = min(state.turns.filter { $0.kind == "answer" }.count, 3)
+          }
           do {
             state.turns.append(InterviewTurn(id: operation.command, ordinal: state.turns.count, kind: input.kind, prompt: state.prompt, text: input.text, createdAt: Date().ISO8601Format(), jobId: operation.command, status: "running"))
             outgoing = nil

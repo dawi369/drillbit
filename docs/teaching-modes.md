@@ -32,6 +32,12 @@ The mock verdict judges the answer against the round at the stated level, not th
 - Mock hides Nudge and Show an example. Asking for help in words still works, as the policy requires.
 - Company targeting (future): a target company's format would extend the mock policy, time limit and debrief bar in `teaching.ts`. The question contract and grounding rules would not change.
 
+### Guided holds your hand
+
+- **A visible path.** The generator writes `path`: 3–5 short steps a strong answer works through, in order. It is a roadmap and adds no requirement. Guided interviews get `interview.guidedPath { steps, current }`. The interviewer takes the steps one at a time, names each new one, and reports `step` on every reply. The app pins a step rail under the title ("Step 2 of 4 · Sketch the API"). Older and pooled questions have no path, so no rail.
+- **Answer by tapping.** Every Guided reply that continues the exercise ends with one small question and 2–3 `choices`, each under 60 characters. When a worked example would help, the last choice is "Not sure, show me". The app shows them as chips above an empty reply box. Tapping one sends it as the answer, and typing still works. "Not sure, show me" makes the interviewer demonstrate the step and then ask you to apply it.
+- Both fields exist only in Guided's strict reply schema (`interviewer-teaching-v4`). Other styles never return them, and replies that omit them default to no choices at step 0. Voice keeps its own spoken schema.
+
 Choose **Session style** in Prepare or the interview’s … menu. Choices apply to that attempt, not global difficulty. Changing modes preserves the draft and sends no paid request. A pending reply or live audio blocks mode changes. Text and voice share the same conversation policy; voice adds spoken-delivery constraints.
 
 ## Implementation

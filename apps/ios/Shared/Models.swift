@@ -146,6 +146,8 @@ struct Challenge: Codable, Identifiable, Sendable {
   /// The round's time budget, set by the generator, and when it started; Mock interview runs on this clock.
   var minutes: Int? = nil
   var startedAt: String? = nil
+  /// Guided's roadmap: the steps a strong answer works through, in order.
+  var path: [String]? = nil
   var interviewStyle: InterviewStyle?
   var interview: InterviewState?
   var engineeringLevel: String?
@@ -463,6 +465,9 @@ struct InterviewResponse: Codable, Sendable {
   var outcome: String
   var text: String
   var parameters: [InterviewParameter]? = nil
+  /// Guided only: answers the learner can tap, and the guided-path step this reply works on.
+  var choices: [String]? = nil
+  var step: Int? = nil
 }
 struct InterviewParameter: Codable, Hashable, Sendable {
   var label: String

@@ -25,6 +25,9 @@ export const interviewResultSchema = z.object({
   outcome: z.enum(["follow_up", "reply", "wrap_up"]),
   text: z.string().trim().min(1).max(2400),
   parameters: z.array(interviewParameterSchema).max(3).optional(),
+  // Guided only: suggested answers the learner can tap, and the guided-path step this reply works on.
+  choices: z.array(z.string().trim().min(1).max(80)).max(3).optional(),
+  step: z.number().int().min(0).max(5).optional(),
 });
 export function interviewSchemaFor(kind: string) {
   return interviewResultSchema.extend({ outcome: ["answer", "continue"].includes(kind) ? z.literal("follow_up") : z.literal("reply") });
@@ -73,7 +76,11 @@ export async function requestInterview(env: Env, account: string, id: string, co
   const data = JSON.parse(challenge.data);
   // A mock round runs on the clock, so the interviewer can pace it like a real one.
   const timing = context.guidanceMode === "mock_interview" ? roundTiming(data, challenge.created_at) : undefined;
-  const payload = JSON.stringify({ settings, action: input, turnId: command, context: { practiceProfile: settings.practiceProfile, promptVersion: INTERVIEW_PROMPT_VERSION, historicalSnapshot: history, currentDraft: session.answer, question: { ...data, interviewStyle: context.style }, interview: { ...context, timing } } });
+  // Guided works through the question's path in order; the last reply says which step it reached.
+  const guidedPath = context.guidanceMode === "learn_together" && Array.isArray(data.path)
+    ? { steps: data.path, current: context.turns.filter(t => t.result?.step !== undefined).at(-1)?.result.step ?? 0 }
+    : undefined;
+  const payload = JSON.stringify({ settings, action: input, turnId: command, context: { practiceProfile: settings.practiceProfile, promptVersion: INTERVIEW_PROMPT_VERSION, historicalSnapshot: history, currentDraft: session.answer, question: { ...data, interviewStyle: context.style }, interview: { ...context, timing, guidedPath } } });
   await env.DB.batch([
     env.DB.prepare(`INSERT OR IGNORE INTO jobs(id,account_id,challenge_id,kind,input,created_at,updated_at) SELECT ?,?,?,'interview',?,?,? WHERE EXISTS(SELECT 1 FROM sessions s JOIN challenges c ON c.id=s.challenge_id WHERE c.id=? AND c.account_id=? AND c.lifecycle='in_progress' AND s.revision=?) AND NOT EXISTS(SELECT 1 FROM jobs WHERE account_id=? AND kind='interview' AND status IN ('pending','running')) AND NOT EXISTS(SELECT 1 FROM voice_sessions WHERE account_id=? AND status IN ('connecting','active') AND expires_at>?)`).bind(command,account,id,payload,now,now,id,account,input.revision,account,account,now),
     env.DB.prepare(`INSERT INTO interview_turns(id,challenge_id,ordinal,kind,prompt,text,job_id,created_at) SELECT ?,?,COALESCE((SELECT MAX(ordinal)+1 FROM interview_turns WHERE challenge_id=?),0),?,?,?,?,? WHERE EXISTS(SELECT 1 FROM jobs WHERE id=?)`).bind(command,id,id,input.kind,context.prompt,input.text,command,now,command),
