@@ -45,6 +45,8 @@ struct InterviewView: View {
   @State private var guideStep: WarmUpStep?
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.scenePhase) private var phase
+  @State private var menuFrame: CGRect?
+  @State private var showingTools = false
   init(model: AppModel, challenge: Challenge) {
     self.model = model; self.challenge = challenge
     _interview = State(initialValue: InterviewController(model: model, challenge: challenge))
@@ -54,7 +56,6 @@ struct InterviewView: View {
   private func advanceGuide() {
     if let next = guideStep?.next {
       guideStep = next
-      if next == .reply { withAnimation(documentMotion) { position.scrollTo(id: "draft", anchor: .bottom) } }
       return
     }
     guideStep = nil
@@ -87,7 +88,7 @@ struct InterviewView: View {
       } else { workspace }
     }
     .overlayPreferenceValue(WarmUpAnchorKey.self) { anchors in
-      if guiding && interview.finished == nil { WarmUpGuide(step: guideStep, anchors: anchors, advance: advanceGuide).transition(.opacity) }
+      if guiding && interview.finished == nil { WarmUpGuide(step: guideStep, anchors: anchors, menuFrame: menuFrame, advance: advanceGuide).transition(.opacity) }
     }
     .animation(reduceMotion ? nil : DrillbitMotion.page, value: interview.finished != nil)
     .sensoryFeedback(.impact(weight: .light), trigger: acceptedAnswerID) { _, accepted in accepted != nil }
@@ -111,11 +112,12 @@ struct InterviewView: View {
       sessionRestored = true
       if guiding {
         if (try? await model.disk.cached(key: guideKey)) != nil { guiding = false; return }
-        // A moment to take in the screen, then the question opens and the tour points at it once it has settled.
+        // A moment to take in the screen, then the question opens and the tour starts at the reply box.
         try? await Task.sleep(for: .seconds(1.2))
         withAnimation(disclosureMotion) { _ = reading.collapsed.remove("original") }
         try? await Task.sleep(for: .milliseconds(450))
-        guideStep = .question
+        withAnimation(documentMotion) { position.scrollTo(id: "draft", anchor: .bottom) }
+        guideStep = .reply
       }
     }
     .task(id: "\(interview.streamTurn?.jobId ?? ""):\(interview.streamEpoch):\(phase == .active)") {
@@ -248,23 +250,41 @@ struct InterviewView: View {
       ToolbarItem(placement: .topBarTrailing) {
         Menu {
           if interview.state.wrapUp { Button("Continue interview") { Task { await interview.submit("continue") } } }
+        // The tour's last step opens the tools as a popover the guide can see; the system menu gives no open event.
+        if guideStep == .menu || showingTools {
+          Button { showingTools = true } label: { Image(systemName: AppIcon.more.rawValue) }
+            .accessibilityLabel("Interview options").accessibilityIdentifier("interviewOptions")
+            .popover(isPresented: $showingTools, arrowEdge: .top) {
+              WarmUpTools(
+                nudge: interview.mode == .mockInterview ? nil : { useTool { requestAssistance("hint", title: "Nudge") } },
+                example: { useTool { requestAssistance("example", title: "Example") } },
+                finish: interview.canFinish ? { useTool { focused = false; confirmFinish = true } } : nil)
+                .presentationCompactAdaptation(.popover)
+            }
+            .onChange(of: showingTools) { _, open in if open, guideStep == .menu { advanceGuide() } }
+        } else {
           if interview.mode != .mockInterview {
-            Button("Need a nudge?", systemImage: "lightbulb") { requestAssistance("hint", title: "Nudge") }
+            Button { requestAssistance("hint", title: "Nudge") } label: { menuLabel("Need a nudge?", "lightbulb", hint: "A hint toward your next step") }
               .disabled(requestingAssistance || interview.locked || interview.failedTurn != nil || liveVoice?.blocksText == true)
           }
-          Button("Show an example", systemImage: AppIcon.text.rawValue) { requestAssistance("example", title: "Example") }
+          Button { requestAssistance("example", title: "Example") } label: { menuLabel("Show an example", AppIcon.text.rawValue, hint: "How a strong answer could go") }
             .disabled(requestingAssistance || interview.locked || interview.failedTurn != nil || liveVoice?.blocksText == true)
           Button("Session style", systemImage: AppIcon.preferences.rawValue) { sheet = .style }.disabled(interview.locked || liveVoice?.blocksText == true)
-          Button("Finish interview", systemImage: AppIcon.checkmark.rawValue) { focused = false; confirmFinish = true }.disabled(!interview.canFinish)
+          Button { focused = false; confirmFinish = true } label: { menuLabel("Finish interview", AppIcon.checkmark.rawValue, hint: "Wrap up and get your feedback") }
+            .disabled(!interview.canFinish)
           if !challenge.isWarmUp {
             Divider()
             Button("Skip question", systemImage: AppIcon.skip.rawValue, role: .destructive) { confirmSkip = true }.disabled(interview.voice?.blocksText == true)
           }
-        } label: { Image(systemName: AppIcon.more.rawValue) }
-          .disabled(guiding)
+        } label: {
+          Image(systemName: AppIcon.more.rawValue)
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { menuFrame = $0 }
+        }
+          .disabled(guiding && guideStep != .menu)
           .accessibilityLabel("Interview options").accessibilityIdentifier("interviewOptions")
       }
     }
+        }
     .alert("Skip this question?", isPresented: $confirmSkip) {
       Button("Keep practising", role: .cancel) {}
       Button("Skip question", role: .destructive) { Task { await model.skip(challenge.id, answer: interview.answer) } }
@@ -327,7 +347,20 @@ struct InterviewView: View {
       if reading.collapsed.contains("original") { reading.collapsed.remove("original") } else { reading.collapsed.insert("original") }
       persistReading()
     }
-    .warmUpAnchor(.step(.question))
+  }
+  /// During the warm-up each tool says what it is for.
+  @ViewBuilder private func menuLabel(_ title: String, _ symbol: String, hint: String) -> some View {
+    Text(title)
+    if challenge.isWarmUp { Text(hint) }
+    Image(systemName: symbol)
+  }
+  /// Lets the tools popover finish closing before a sheet or alert takes over.
+  private func useTool(_ action: @escaping () -> Void) {
+    showingTools = false
+    Task {
+      try? await Task.sleep(for: .milliseconds(350))
+      action()
+    }
   }
   private func questionDisclosure(collapsed: Bool, toggle: @escaping () -> Void) -> some View {
     VStack(alignment: .leading, spacing: 4) {
