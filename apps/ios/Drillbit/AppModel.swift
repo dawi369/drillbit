@@ -48,6 +48,8 @@ import WidgetKit
   var error: String?
   var completionNoticeAccount: String?
   var busy = false
+  /// The question as it's being written, for Home's ticket; nil when nothing is streaming.
+  var preparingDraft: QuestionDraft?
   var preparationFailure: String?
   var failedPreparation: PreparationInput?
   var failedPreparationSource: Challenge?
@@ -637,7 +639,11 @@ import WidgetKit
       if let challenge = result.challenge { bootstrap?.challenge = challenge }
       if let job = result.job {
         busy = true
-        defer { busy = false }
+        defer { busy = false; preparingDraft = nil }
+        try? await api.questionStream(job: job.id) { snapshot in
+          guard self.bootstrap?.account.id == account.id else { return }
+          self.preparingDraft = QuestionDraft(title: snapshot.title, prompt: snapshot.prompt)
+        }
         try await waitForJob(job.id)
         guard bootstrap?.account.id == account.id else { return }
       }
@@ -650,6 +656,18 @@ import WidgetKit
   }
   func generate(_ preparation: PreparationInput? = nil) async {
     await perform { _ = try await generateForPreview(preparation) }
+  }
+  /// Saves a finished session to shape tomorrow's automatic question, or takes it back.
+  func setQueuedNext(_ source: Challenge, queued: Bool) async throws {
+    guard let account = bootstrap?.account.id else { throw CancellationError() }
+    if fixture {
+      let label = taxonomy.first { $0.id == source.primaryConceptId }?.label
+      bootstrap?.queuedNext = queued ? QueuedNext(sourceId: source.id, title: source.title, conceptId: source.primaryConceptId, label: label, createdAt: Date().ISO8601Format()) : nil
+      return
+    }
+    let result: QueuedNextResult = try await api.send("challenges/\(source.id)/next", method: queued ? "PUT" : "DELETE")
+    guard bootstrap?.account.id == account else { throw CancellationError() }
+    bootstrap?.queuedNext = result.queuedNext
   }
   func generateForPreview(_ preparation: PreparationInput? = nil, onDraft: (@MainActor (QuestionDraft) -> Void)? = nil) async throws -> Challenge {
     guard !busy, let account = bootstrap?.account.id else {
@@ -665,7 +683,11 @@ import WidgetKit
         replaceId: current?.lifecycle == "ready" ? current?.id : nil, warmUp: true)
     }
     busy = true
-    defer { busy = false }
+    defer { busy = false; preparingDraft = nil }
+    let publish: @MainActor (QuestionDraft) -> Void = { draft in
+      self.preparingDraft = draft
+      onDraft?(draft)
+    }
     if firstUse.stage == .chooseMode || warmingUp {
       syncSettingsInBackground()
       await settingsSyncTask?.value
@@ -700,13 +722,13 @@ import WidgetKit
         id: UUID().uuidString, lifecycle: "ready", title: "Design a reliable job queue",
         prompt: "Design a reliable job queue. Explain retries, ordering, and how failures are handled.",
         topic: preparation?.focus ?? settings.focus, session: SessionDraft(answer: "", revision: 0))
-      if let onDraft {
+      do {
         // Arrives word by word at roughly a model's pace so the preview streams like it does live.
         var written = draft
         for (field, text) in [(\QuestionDraft.title, challenge.title), (\QuestionDraft.prompt, challenge.prompt)] {
           for word in text.split(separator: " ", omittingEmptySubsequences: false) {
             written[keyPath: field] += (written[keyPath: field].isEmpty ? "" : " ") + word
-            onDraft(written)
+            publish(written)
             try await Task.sleep(for: .milliseconds(45))
           }
         }
@@ -724,14 +746,14 @@ import WidgetKit
     let challenge: Challenge
     if let existing = result.challenge { challenge = existing }
     else if let id = result.id {
-      if let onDraft {
+      do {
         // Streaming is a nicety; the job itself is the source of truth, so any stream failure falls back to polling.
         try? await api.questionStream(job: id) { snapshot in
           guard self.bootstrap?.account.id == account else { return }
           var written = draft
           written.title = snapshot.title
           written.prompt = snapshot.prompt
-          onDraft(written)
+          publish(written)
         }
       }
       try await waitForJob(id)

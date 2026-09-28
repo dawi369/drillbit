@@ -14,6 +14,14 @@ enum AppPalette {
   private static func adaptive(_ dark: UInt32, _ light: UInt32) -> Color {
     Color(uiColor: adaptiveUIColor(dark, light))
   }
+  static func adaptiveColor(_ dark: UInt32, _ light: UInt32, darkAlpha: CGFloat = 1, lightAlpha: CGFloat = 1) -> Color {
+    Color(uiColor: UIColor { traits in
+      let isDark = traits.userInterfaceStyle == .dark
+      let hex = isDark ? dark : light
+      return UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255,
+                     blue: CGFloat(hex & 0xFF) / 255, alpha: isDark ? darkAlpha : lightAlpha)
+    })
+  }
   static let backgroundUIColor = adaptiveUIColor(0x1F2430, 0xF6F4EE)
   static let background = Color(uiColor: backgroundUIColor)
   static let groupedBackground = background
@@ -858,8 +866,19 @@ struct StreamingDocument: View {
         : cursor >= end - 0.01 ? 0.3 + 0.7 * pulse : 1
       let caretAt = segments.indices.last { !segments[$0].fixed && offsets[$0] <= cursor + 0.001 }
       VStack(alignment: .leading, spacing: 16) {
-        ForEach(Array(segments.enumerated()), id: \.offset) { index, segment in
-          view(segment, shown: cursor - offsets[index], caret: caretAt == index ? caret : 0)
+        ForEach(Self.groups(segments), id: \.self) { group in
+          if segments[group[0]].style == .bullet {
+            KeyFacts {
+              VStack(alignment: .leading, spacing: 8) {
+                ForEach(group, id: \.self) { index in
+                  view(segments[index], shown: cursor - offsets[index], caret: caretAt == index ? caret : 0)
+                }
+              }
+            }
+            .opacity(paused || cursor > offsets[group[0]] ? 1 : 0)
+          } else {
+            view(segments[group[0]], shown: cursor - offsets[group[0]], caret: caretAt == group[0] ? caret : 0)
+          }
         }
         if let waitingHint, slow, empty, !finished {
           Text(waitingHint).font(.footnote).foregroundStyle(.secondary).transition(.opacity)
@@ -873,6 +892,19 @@ struct StreamingDocument: View {
       do { try await Task.sleep(for: .seconds(1.6)) } catch { return }
       slow = true
     }
+  }
+
+  /// Consecutive key facts share one inset; every other segment stands alone.
+  private static func groups(_ segments: [StreamSegment]) -> [[Int]] {
+    var result: [[Int]] = []
+    for index in segments.indices {
+      if segments[index].style == .bullet, let last = result.last, segments[last[0]].style == .bullet, last.last == index - 1 {
+        result[result.count - 1].append(index)
+      } else {
+        result.append([index])
+      }
+    }
+    return result
   }
 
   @ViewBuilder private func view(_ segment: StreamSegment, shown: Double, caret: Double) -> some View {
@@ -946,8 +978,10 @@ struct QuestionBody: View {
           Text(value).lineLimit(lineLimit).fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
         case .bullets(let items):
-          VStack(alignment: .leading, spacing: 8) {
-            ForEach(Array(items.enumerated()), id: \.offset) { _, item in QuestionBullet(text: Text(item)) }
+          KeyFacts {
+            VStack(alignment: .leading, spacing: 8) {
+              ForEach(Array(items.enumerated()), id: \.offset) { _, item in QuestionBullet(text: Text(item)) }
+            }
           }
         case .code(let value):
           CodeBlock(text: Text(value)).lineLimit(lineLimit)

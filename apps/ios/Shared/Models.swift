@@ -82,6 +82,12 @@ struct LearningEvidence: Codable, Sendable, Identifiable, Equatable {
   var sessionId: String? = nil
   var at: String? = nil
   var sourceTurnId: String? = nil
+  /// The Recall card written for this quote (feedback-v4 and later).
+  var recall: RecallPrompt? = nil
+}
+struct RecallPrompt: Codable, Sendable, Equatable {
+  var prompt: String
+  var answer: String
 }
 struct Reflection: Codable, Sendable {
   var evidence: [LearningEvidence]? = nil
@@ -143,6 +149,8 @@ struct Challenge: Codable, Identifiable, Sendable {
   /// Onboarding warm-up: a real generated interview that the server never counts.
   var warmUp: Bool? = nil
   var isWarmUp: Bool { warmUp == true }
+  /// The account's running number for this session, assigned when it completes.
+  var ticket: Int? = nil
   /// The round's time budget, set by the generator, and when it started; Mock interview runs on this clock.
   var minutes: Int? = nil
   var startedAt: String? = nil
@@ -218,6 +226,7 @@ struct Bootstrap: Codable, Sendable {
   var jobs: [Job]
   var credential: Credential?
   var todayPlan: TodayPlan?
+  var queuedNext: QueuedNext? = nil
 }
 struct TodayPlan: Codable, Sendable, Equatable {
   var state: String
@@ -228,7 +237,18 @@ struct TodayPlan: Codable, Sendable, Equatable {
   var recommendedRecallCount: Int
   var estimatedRecallMinutes: Int
   var dailyGoalMinutes: Int
+  /// The number the next finished session gets; older servers omit it.
+  var nextTicket: Int? = nil
 }
+/// A completed session saved to shape tomorrow's automatic question.
+struct QueuedNext: Codable, Sendable, Equatable {
+  var sourceId: String
+  var title: String
+  var conceptId: String? = nil
+  var label: String? = nil
+  var createdAt: String
+}
+struct QueuedNextResult: Codable, Sendable { var queuedNext: QueuedNext? }
 struct DailyQuestionResponse: Codable { var day: String; var challenge: Challenge?; var job: Job? }
 struct HistoryPage: Codable, Sendable {
   var sessions: [Challenge]
@@ -265,6 +285,7 @@ struct RecallCardDTO: Codable, Identifiable, Sendable, Equatable {
   var updatedAt: String
   var sourceTitle: String? = nil
   var sourceCompletedAt: String? = nil
+  var sourceTicket: Int? = nil
   var evidence: LearningEvidence? = nil
 }
 struct RecallDeckResponse: Codable, Sendable {
