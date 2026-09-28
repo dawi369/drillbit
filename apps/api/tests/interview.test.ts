@@ -66,6 +66,12 @@ it("completion freezes shared turns, cancels pending replies and rejects late wr
  expect(JSON.parse(frozen!.data).interview[0]).toMatchObject({answer:"Use a queue",kind:"answer",delivery:"unknown"});
  await expect(requestInterview(e,a,id,crypto.randomUUID(),{kind:"hint",revision:4})).rejects.toMatchObject({code:"inactive"});
 });
+it("finishes an untouched session and still queues a reflection",async()=>{
+ const {a,id}=await fixture();
+ await complete(e,a,id,crypto.randomUUID(),"",2,await settingsFor(e,a));
+ expect((await detail(e,a,id)).lifecycle).toBe("completed");
+ expect(await e.DB.prepare("SELECT 1 FROM jobs WHERE challenge_id=? AND kind='summarize'").bind(id).first()).not.toBeNull();
+});
 it.each(["quick","standard","in_depth"])("retains %s style independently of engineering level",async style=>{
  const {a,id}=await fixture(style);expect((await interviewFor(e,a,id)).style).toBe(style);
 });

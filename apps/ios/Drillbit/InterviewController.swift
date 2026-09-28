@@ -82,7 +82,7 @@ import UIKit
   var waiting: Bool { state.turns.contains(where: \.pending) }
   var failedTurn: InterviewTurn? { state.turns.last(where: { $0.status == "failed" }) }
   var locked: Bool { !loaded || busy || pending != nil || waiting }
-  var canFinish: Bool { voice?.blocksText != true && loaded && !busy && pending == nil && (!answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || state.turns.contains(where: { $0.kind == "answer" || $0.voice?.contains(where: { $0.speaker == "user" }) == true })) }
+  var canFinish: Bool { voice?.blocksText != true && loaded && !busy && pending == nil }
   init(model: AppModel, challenge: Challenge) {
     self.model = model
     self.challenge = challenge

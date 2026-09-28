@@ -221,8 +221,6 @@ export async function complete(
   if (challenge.lifecycle === "completed" && challenge.command_id === command)
     return;
   await assertNoVoice(env,account,id);
-  if (!answer.trim() && !(await env.DB.prepare("SELECT id FROM interview_turns WHERE challenge_id=? AND (kind='answer' OR (kind='voice' AND EXISTS(SELECT 1 FROM voice_fragments f WHERE f.session_id=interview_turns.id AND f.speaker='user' AND length(trim(f.text))>0))) LIMIT 1").bind(id).first()))
-    throw new Fault("empty_answer", 400, "Write an answer before finishing.");
   const now = timestamp();
   await env.DB.batch([
     env.DB.prepare(
