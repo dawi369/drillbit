@@ -31,7 +31,8 @@ struct WarmUpAnchorKey: PreferenceKey {
 }
 extension View {
   func warmUpAnchor(_ anchor: WarmUpAnchor) -> some View {
-    anchorPreference(key: WarmUpAnchorKey.self, value: .bounds) { [anchor: $0] }
+    // Transform, not set: a plain anchorPreference would drop anchors from inside this view.
+    transformAnchorPreference(key: WarmUpAnchorKey.self, value: .bounds) { $0[anchor] = $1 }
   }
 }
 

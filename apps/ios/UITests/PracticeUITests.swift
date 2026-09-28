@@ -220,7 +220,8 @@ final class PracticeUITests: XCTestCase {
     app.buttons["Settings"].tap()
     for _ in 0..<5 where !appearance.isHittable { app.swipeUp() }
     XCTAssertTrue(appearance.label.contains("Dark"))
-    appearance.tap(); app.buttons["System"].tap(); app.buttons["Done"].tap()
+    // Leave the shared preference on the app's default, dark.
+    appearance.tap(); app.buttons["Dark"].tap(); app.buttons["Done"].tap()
     app.tabBars.buttons["Library"].tap()
     app.buttons["Practice evidence"].tap()
     XCTAssertTrue(app.staticTexts["Defined a bounded retry policy."].waitForExistence(timeout: 5))
@@ -1005,6 +1006,11 @@ final class PracticeUITests: XCTestCase {
     let guide = app.buttons["warmUpGuideNext"]
     XCTAssertTrue(guide.waitForExistence(timeout: 5))
     XCTAssertTrue(app.staticTexts["Your turn"].exists)
+    // The callout sits right beside the reply box, never up by the step rail.
+    let card = app.staticTexts["Your turn"].frame.union(guide.frame), reply = editor.frame
+    let gap = card.minY >= reply.midY ? card.minY - reply.maxY : reply.minY - card.maxY
+    XCTAssertTrue((0...64).contains(gap), "callout \(card) should border reply \(reply)")
+    XCTAssertGreaterThan(card.minY, app.descendants(matching: .any)["guidedPath"].frame.maxY)
     capture("Warm-up guide · Your turn", app)
     editor.tap()
     XCTAssertEqual(editor.value(forKey: "hasKeyboardFocus") as? Bool, false, "The guide blocks every control until it ends")
