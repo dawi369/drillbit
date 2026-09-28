@@ -293,24 +293,17 @@ it("starting a question wins against an in-flight replacement", async () => {
   const mock = vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
     began();
     await gate;
-    return Response.json({
-      choices: [
-        {
-          message: {
-            content: JSON.stringify({
-              scenario:"Outage recovery", primaryConceptId:"api-design", secondaryConceptIds:[], tagEvidence:[{conceptId:"api-design",requirementIndex:0}],
-              title: "New question",
-              prompt: "Explain how to handle an outage.",
-              topic: "Systems",
-              kind: "explain",
-              targetSkill: "Reliability",
-              constraints: [],
-              ambiguityPolicy: "State assumptions",
-            }),
-          },
-        },
-      ],
+    const content = JSON.stringify({
+      scenario:"Outage recovery", primaryConceptId:"api-design", secondaryConceptIds:[], tagEvidence:[{conceptId:"api-design",requirementIndex:0}],
+      title: "New question",
+      prompt: "Explain how to handle an outage.",
+      topic: "Systems",
+      kind: "explain",
+      targetSkill: "Reliability",
+      constraints: [],
+      ambiguityPolicy: "State assumptions",
     });
+    return new Response(`data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n`, { headers: { "content-type": "text/event-stream" } });
   });
   try {
     const running = runJob(bindings, replacement);

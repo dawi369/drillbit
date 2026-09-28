@@ -4,7 +4,7 @@ import {
     type WorkflowStep,
 } from "cloudflare:workers";
 import { z } from "zod";
-import { streamedInterview, structured } from "./ai";
+import { partialJSONString, streamedInterview, streamedStructured, structured } from "./ai";
 import { interventionFor } from "./companion-contract";
 import {
     exampleSchema,
@@ -96,7 +96,7 @@ export async function runJob(env: Env, id: string) {
     )
       .bind(job.account_id)
       .all();
-    data = restored ? JSON.parse(restored.data) : await structured(
+    data = restored ? JSON.parse(restored.data) : await streamedStructured(
       env,
       job.account_id,
       input.settings,
@@ -119,6 +119,9 @@ export async function runJob(env: Env, id: string) {
 
       },
       generationOutputSchema,
+      // The preview shows the question as it is written; the row is keyed by job like interview text.
+      raw => env.DB.prepare("INSERT INTO interview_streams(job_id,text) SELECT ?,? WHERE EXISTS(SELECT 1 FROM jobs WHERE id=? AND status='running') ON CONFLICT(job_id) DO UPDATE SET text=excluded.text")
+        .bind(id, JSON.stringify({ title: partialJSONString(raw, "title"), prompt: partialJSONString(raw, "prompt") }), id).run(),
     );
     const generated = data as import("zod").z.infer<
       typeof questionGenerationSchema

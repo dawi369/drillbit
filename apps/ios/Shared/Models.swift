@@ -516,6 +516,14 @@ struct InterviewReadingState: Codable, Sendable {
 }
 
 struct InterviewStreamSnapshot: Decodable { var status: String; var text: String }
+struct QuestionStreamSnapshot: Decodable { var status: String; var error: String?; var title: String; var prompt: String }
+/// A question as the model writes it; provisional until the finished challenge replaces it.
+struct QuestionDraft: Equatable, Sendable {
+  var title = ""
+  var prompt = ""
+  var guidanceMode: GuidanceMode?
+  var warmUp = false
+}
 
 struct PracticeConcept: Codable, Identifiable, Sendable { var id: String; var label: String; var category: String; var aliases: [String]; var description: String? = nil }
 enum PracticeAreaCatalog {

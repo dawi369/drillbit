@@ -7,7 +7,7 @@ import {
 import { beforeAll, afterAll, it, expect } from "vitest";
 import { SignJWT, generateKeyPair, exportJWK } from "jose";
 import { app } from "../src/index";
-import { accountFor } from "../src/store";
+import { accountFor, createJob } from "../src/store";
 import { provider, recordUsage } from "../src/ai";
 import { settingsSchema } from "../src/domain";
 import { initializeDatabase } from "./migrations";
@@ -369,6 +369,21 @@ it('personalization preview is explicit, bounded and does not save settings or c
   expect((await settings.json() as any).settings.practiceProfile).toBeUndefined();
   expect(await bindings.DB.prepare('SELECT id FROM jobs WHERE account_id=?').bind(account.id).first()).toBeNull();
  }finally{bindings.MANAGED_AI_ENABLED=oldEnabled;bindings.OPENROUTER_API_KEY=oldKey;}
+});
+
+it('streams a generation draft only to the account that owns the job',async()=>{
+ const subject=crypto.randomUUID(); const account=await accountFor(bindings,subject);
+ await bindings.DB.prepare("UPDATE accounts SET status='active' WHERE id=?").bind(account.id).run();
+ const other=crypto.randomUUID(); await bindings.DB.prepare("UPDATE accounts SET status='active' WHERE id=?").bind((await accountFor(bindings,other)).id).run();
+ const id=crypto.randomUUID();
+ await createJob(bindings,account.id,id,'generate',null,{settings:{}});
+ await bindings.DB.prepare("UPDATE jobs SET status='completed' WHERE id=?").bind(id).run();
+ await bindings.DB.prepare("INSERT INTO interview_streams(job_id,text) VALUES(?,?)").bind(id,JSON.stringify({title:'Save a link',prompt:'Design a link saver.'})).run();
+ const response=await request('jobs/'+id+'/stream',subject);
+ expect(response.status).toBe(200);
+ const events=(await response.text()).split('\n').filter(line=>line.startsWith('data:')).map(line=>wire.QuestionStreamSnapshot.parse(JSON.parse(line.slice(5))));
+ expect(events).toEqual([{status:'completed',error:null,title:'Save a link',prompt:'Design a link saver.'}]);
+ expect((await request('jobs/'+id+'/stream',other)).status).toBe(404);
 });
 
 it('saves a BYOK key only with a model that can do structured output, then uses that model',async()=>{

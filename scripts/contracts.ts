@@ -259,6 +259,13 @@ paths["/v1/challenges/{id}/interview/{turn}/stream"] = {
     responses: {"200":{description:"SSE snapshot events with JSON text and job status. Partial text is provisional until completed; reconnect by resubscribing.",content:{"text/event-stream":{schema:{type:"string"}}}}}
   }
 };
+paths["/v1/jobs/{id}/stream"] = {
+  get: {
+    summary: "Subscribe to a generation job's question as it is written",
+    parameters: [{name:"id",in:"path",required:true,schema:{type:"string"}}],
+    responses: {"200":{description:"SSE `snapshot` events, each a QuestionStreamSnapshot. Title and prompt are provisional until status is completed; then fetch the challenge.",content:{"text/event-stream":{schema:{type:"string"}}}},"404":{description:"Not this account's generation job",content:json("Error")}}
+  }
+};
 writeFileSync(
   "packages/contracts/openapi.json",
   JSON.stringify(

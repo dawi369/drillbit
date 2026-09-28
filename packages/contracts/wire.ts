@@ -157,6 +157,7 @@ export const wire = {
   InterviewInput: interviewInputSchema,
   InterviewState: interview,
   InterviewStreamSnapshot: z.object({ status: z.string(), text: z.string() }),
+  QuestionStreamSnapshot: z.object({ status: z.string(), error: z.string().nullable(), title: z.string(), prompt: z.string() }),
   PreparationInput: generationSchema,
   ChallengeContent: challengeSchema,
   QuestionSpecification: questionSpecificationSchema,

@@ -364,6 +364,8 @@ final class PracticeUITests: XCTestCase {
     app.buttons["submitPreparation"].tap()
     XCTAssertTrue(app.staticTexts["Design a reliable job queue"].waitForExistence(timeout: 8))
     XCTAssertTrue(app.navigationBars["Question preview"].exists)
+    capture("Question streaming in", app)
+    XCTAssertTrue(app.buttons["previewStart"].waitForExistence(timeout: 8))
     app.buttons["previewStart"].tap()
     let editor = app.descendants(matching: .any).matching(identifier: "answerEditor").firstMatch
     XCTAssertTrue(editor.waitForExistence(timeout: 5))
@@ -415,6 +417,7 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.navigationBars["Question preview"].exists)
     XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "answerEditor").firstMatch.exists)
     app.buttons["Choose another question"].tap()
+    XCTAssertTrue(app.buttons["Prepare question"].waitForExistence(timeout: 3))
     app.buttons["Prepare question"].tap()
     XCTAssertTrue(app.buttons["Back to preparation"].waitForExistence(timeout: 8))
     capture("Failed replacement", app)
@@ -438,6 +441,7 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.buttons["homeSettings"].waitForExistence(timeout: 5))
     app.buttons["startPractice"].tap()
     app.buttons["Choose another question"].tap()
+    XCTAssertTrue(app.buttons["Prepare question"].waitForExistence(timeout: 3))
     app.buttons["Prepare question"].tap()
     XCTAssertTrue(app.navigationBars["Question preview"].waitForExistence(timeout: 5))
     app.buttons["Close"].tap()
@@ -943,6 +947,7 @@ final class PracticeUITests: XCTestCase {
     capture("Warm-up preview over plan", app)
     for _ in 0..<3 {
       app.buttons["Choose another question"].tap()
+      XCTAssertFalse(app.buttons["previewStart"].waitForExistence(timeout: 1), "Actions wait until the next question is fully written")
       XCTAssertTrue(app.buttons["previewStart"].waitForExistence(timeout: 10))
     }
     XCTAssertFalse(app.buttons["Choose another question"].exists)

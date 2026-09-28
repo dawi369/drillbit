@@ -1,6 +1,6 @@
 import { env, fetchMock } from "cloudflare:test";
 import { afterAll, beforeAll, expect, it } from "vitest";
-import { textDeltas } from "../src/ai";
+import { partialJSONString, textDeltas } from "../src/ai";
 import { boundedContext } from "../src/context";
 import { runJob } from "../src/jobs";
 import { learningEvidence, todayPlan } from "../src/learning";
@@ -20,17 +20,21 @@ beforeAll(async () => {
   fetchMock.disableNetConnect();
 });
 afterAll(() => fetchMock.deactivate());
+// Generation streams; OpenRouter frames structured output as SSE content deltas.
+const sse = (content: string) => (content.match(/[\s\S]{1,24}/g) ?? [])
+  .map(part => `data: ${JSON.stringify({ choices: [{ delta: { content: part } }] })}\n\n`).join("") + "data: [DONE]\n\n";
+const streamHeaders = { headers: { "content-type": "text/event-stream" } };
 async function generatedPractice(account: string, warmUp: boolean) {
   const settings = await settingsFor(bindings, account);
-  const provider = (content: object) => fetchMock.get("https://openrouter.ai")
+  const provider = (content: object, stream = false) => fetchMock.get("https://openrouter.ai")
     .intercept({ path: "/api/v1/chat/completions", method: "POST" })
-    .reply(200, { choices: [{ message: { content: JSON.stringify(content) } }] });
+    .reply(200, stream ? sse(JSON.stringify(content)) : { choices: [{ message: { content: JSON.stringify(content) } }] }, stream ? streamHeaders : undefined);
   provider({
     kind: "design", scenario: "Link saver", primaryConceptId: "api-design", secondaryConceptIds: [],
     tagEvidence: [{ conceptId: "api-design", requirementIndex: 0 }], targetSkill: "APIs", constraints: [],
     evaluationCriteria: ["lookup"], ambiguityPolicy: "State assumptions.", title: "Save a link",
     prompt: `Design a link saver that finds saved links fast (${warmUp ? "warm-up" : "counted"}).`, topic: "system design",
-  });
+  }, true);
   const id = crypto.randomUUID();
   await createJob(bindings, account, id, "generate", null, { settings, guidanceMode: "learn_together", primaryConceptId: "api-design", ...(warmUp ? { warmUp: true } : {}) });
   await runJob(bindings, id);
@@ -84,14 +88,11 @@ it("durably generates a valid challenge and replay does not call the provider ag
         expect(request.messages[0].content).not.toContain("Required JSON schema:");
         expect(request.response_format.type).toBe("json_schema");
         expect(request.response_format.json_schema.schema.properties).toHaveProperty("ambiguityPolicy");
+        expect(request.stream).toBe(true);
         return true;
       },
     })
-    .reply(200, {
-      choices: [
-        {
-          message: {
-            content: JSON.stringify({
+    .reply(200, sse(JSON.stringify({
               kind: "design",
               scenario:"Feature flags", primaryConceptId:"api-design", secondaryConceptIds:[], tagEvidence:[{conceptId:"api-design",requirementIndex:0}],
               targetSkill: "Availability",
@@ -102,11 +103,7 @@ it("durably generates a valid challenge and replay does not call the provider ag
               prompt:
                 "Design a feature flag control plane that keeps local evaluation available during a regional outage.",
               topic: "system design",
-            }),
-          },
-        },
-      ],
-    });
+            })), streamHeaders);
   const id = crypto.randomUUID();
   await createJob(bindings, account.id, id, "generate", null, {
     settings: await settingsFor(bindings, account.id),
@@ -123,6 +120,12 @@ it("durably generates a valid challenge and replay does not call the provider ag
       .bind(id)
       .first(),
   ).toEqual({ status: "completed" });
+  // The preview's streamed draft ends as exactly the question's title and prompt.
+  const draft = await bindings.DB.prepare("SELECT text FROM interview_streams WHERE job_id=?").bind(id).first<{ text: string }>();
+  expect(JSON.parse(draft!.text)).toEqual({
+    title: "Safe flag rollout",
+    prompt: "Design a feature flag control plane that keeps local evaluation available during a regional outage.",
+  });
   fetchMock.assertNoPendingInterceptors();
 });
 it("does not replace a valid ready challenge when the provider returns malformed output", async () => {
@@ -139,7 +142,7 @@ it("does not replace a valid ready challenge when the provider returns malformed
   fetchMock
     .get("https://openrouter.ai")
     .intercept({ path: "/api/v1/chat/completions", method: "POST" })
-    .reply(200, { choices: [{ message: { content: "not json" } }] });
+    .reply(200, sse("not json"), streamHeaders);
   const id = crypto.randomUUID();
   await createJob(bindings, account.id, id, "generate", null, {
     settings: await settingsFor(bindings, account.id),
@@ -171,6 +174,12 @@ it("trims older evidence without trimming the current answer or follow-up", () =
   expect(context.exampleViewed).toBe(true);
   expect(context.example).toBeUndefined();
   expect(JSON.stringify(context).length).toBeLessThanOrEqual(1000);
+});
+it("reads a partial question field without exposing a split escape", () => {
+  const raw = '{"kind":"design","title":"Queue \\"retries\\"","prompt":"Design a queue\\u00';
+  expect(partialJSONString(raw, "title")).toBe('Queue "retries"');
+  expect(partialJSONString(raw, "prompt")).toBe("Design a queue");
+  expect(partialJSONString('{"kind":"de', "title")).toBe("");
 });
 it("parses streamed events split across chunks, including CRLF framing", async () => {
   const encoder = new TextEncoder();

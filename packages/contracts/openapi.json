@@ -5642,6 +5642,43 @@
           }
         }
       }
+    },
+    "/v1/jobs/{id}/stream": {
+      "get": {
+        "summary": "Subscribe to a generation job's question as it is written",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SSE `snapshot` events, each a QuestionStreamSnapshot. Title and prompt are provisional until status is completed; then fetch the challenge.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not this account's generation job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -10023,6 +10060,34 @@
         "required": [
           "status",
           "text"
+        ],
+        "additionalProperties": false
+      },
+      "QuestionStreamSnapshot": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "error",
+          "title",
+          "prompt"
         ],
         "additionalProperties": false
       },

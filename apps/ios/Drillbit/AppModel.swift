@@ -651,7 +651,7 @@ import WidgetKit
   func generate(_ preparation: PreparationInput? = nil) async {
     await perform { _ = try await generateForPreview(preparation) }
   }
-  func generateForPreview(_ preparation: PreparationInput? = nil) async throws -> Challenge {
+  func generateForPreview(_ preparation: PreparationInput? = nil, onDraft: (@MainActor (QuestionDraft) -> Void)? = nil) async throws -> Challenge {
     guard !busy, let account = bootstrap?.account.id else {
       throw APIError(code: "busy", message: "A question is already being prepared.", status: 409)
     }
@@ -682,6 +682,7 @@ import WidgetKit
     preparationFailure = nil
     failedPreparation = nil
     failedPreparationSource = nil
+    let draft = QuestionDraft(guidanceMode: preparation?.guidanceMode ?? .coachMe, warmUp: preparation?.warmUp ?? false)
     if fixture {
       #if DEBUG
       if ProcessInfo.processInfo.arguments.contains("--fixture-slow-generation") {
@@ -699,6 +700,18 @@ import WidgetKit
         id: UUID().uuidString, lifecycle: "ready", title: "Design a reliable job queue",
         prompt: "Design a reliable job queue. Explain retries, ordering, and how failures are handled.",
         topic: preparation?.focus ?? settings.focus, session: SessionDraft(answer: "", revision: 0))
+      if let onDraft {
+        // Arrives word by word at roughly a model's pace so the preview streams like it does live.
+        var written = draft
+        for (field, text) in [(\QuestionDraft.title, challenge.title), (\QuestionDraft.prompt, challenge.prompt)] {
+          for word in text.split(separator: " ", omittingEmptySubsequences: false) {
+            written[keyPath: field] += (written[keyPath: field].isEmpty ? "" : " ") + word
+            onDraft(written)
+            try await Task.sleep(for: .milliseconds(45))
+          }
+        }
+        guard bootstrap?.account.id == account else { throw CancellationError() }
+      }
       bootstrap?.challenge = challenge
       if firstUse.stage == .chooseMode { var completed = firstUse; completed.stage = .complete; try await setFirstUse(completed) }
       return challenge
@@ -711,6 +724,16 @@ import WidgetKit
     let challenge: Challenge
     if let existing = result.challenge { challenge = existing }
     else if let id = result.id {
+      if let onDraft {
+        // Streaming is a nicety; the job itself is the source of truth, so any stream failure falls back to polling.
+        try? await api.questionStream(job: id) { snapshot in
+          guard self.bootstrap?.account.id == account else { return }
+          var written = draft
+          written.title = snapshot.title
+          written.prompt = snapshot.prompt
+          onDraft(written)
+        }
+      }
       try await waitForJob(id)
       guard bootstrap?.account.id == account else { throw CancellationError() }
       challenge = try await api.send("challenges/" + id)

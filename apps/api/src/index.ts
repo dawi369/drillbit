@@ -533,6 +533,30 @@ app.get("/v1/jobs/:id", async (c) => {
   if (!job) throw new Fault("not_found", 404, "Operation not found.");
   return c.json(job);
 });
+app.get("/v1/jobs/:id/stream", async (c) => {
+  const account = c.get("account").id, id = c.req.param("id");
+  const snapshot = async () => {
+    const row = await c.env.DB.prepare(
+      "SELECT j.status,j.error,s.text FROM jobs j LEFT JOIN interview_streams s ON s.job_id=j.id WHERE j.id=? AND j.account_id=? AND j.kind='generate'",
+    ).bind(id, account).first<{ status: string; error: string | null; text: string | null }>();
+    if (!row) throw new Fault("not_found", 404, "Operation not found.");
+    const draft = row.text ? parseJSON<{ title?: string; prompt?: string }>(row.text) : {};
+    return { status: row.status, error: row.error, title: draft.title ?? "", prompt: draft.prompt ?? "" };
+  };
+  const initial = await snapshot();
+  return streamSSE(c, async (stream) => {
+    let closed = false, previous = "", value = initial;
+    stream.onAbort(() => { closed = true; });
+    const deadline = Date.now() + 90000;
+    while (!closed && Date.now() < deadline) {
+      const data = JSON.stringify(value);
+      if (data !== previous) { await stream.writeSSE({ event: "snapshot", data }); previous = data; }
+      if (!["pending", "running"].includes(value.status)) return;
+      await stream.sleep(150);
+      if (!closed) value = await snapshot();
+    }
+  });
+});
 app.post("/v1/jobs/:id/retry", async (c) => {
   const a = c.get("account").id,
     old = await c.env.DB.prepare(

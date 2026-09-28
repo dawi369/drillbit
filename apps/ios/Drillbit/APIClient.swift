@@ -108,6 +108,19 @@ import Foundation
     }
     throw URLError(.networkConnectionLost)
   }
+  func questionStream(job: String, onSnapshot: @MainActor (QuestionStreamSnapshot) -> Void) async throws {
+    let request = try await request("jobs/\(job)/stream")
+    let (bytes, response) = try await URLSession.shared.bytes(for: request)
+    guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { throw URLError(.badServerResponse) }
+    for try await line in bytes.lines {
+      try Task.checkCancellation()
+      guard line.hasPrefix("data:") else { continue }
+      let value = try JSONDecoder().decode(QuestionStreamSnapshot.self, from: Data(line.dropFirst(5).utf8))
+      onSnapshot(value)
+      if !["pending", "running"].contains(value.status) { return }
+    }
+    throw URLError(.networkConnectionLost)
+  }
   private func validate(_ data: Data, _ response: URLResponse) throws {
     guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
     guard (200..<300).contains(http.statusCode) else {

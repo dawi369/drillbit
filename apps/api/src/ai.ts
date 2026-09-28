@@ -255,6 +255,41 @@ export async function structured<T>(
     );
   }
 }
+/** `structured`, but the raw JSON is published as it arrives. Publishing is best-effort and never blocks the stream. */
+export async function streamedStructured<T>(
+  env: Env,
+  account: string,
+  settings: Settings,
+  kind: string,
+  context: unknown,
+  schema: z.ZodType<T>,
+  publish: (raw: string) => Promise<unknown>,
+): Promise<T> {
+  const response = await provider(env, account, settings, messagesFor(kind, context), { schema, stream: true });
+  if (!response.body) throw new Error("missing_stream");
+  let raw = "", published = "", publishing: Promise<unknown> | undefined;
+  for await (const delta of textDeltas(response.body, usage => recordUsage(env, account, settings, kind, usage))) {
+    raw += delta;
+    if (raw.length > 50000) throw new Error("oversized_stream");
+    if (!publishing) {
+      published = raw;
+      publishing = Promise.all([publish(raw), new Promise(r => setTimeout(r, 120))])
+        .catch(() => {})
+        .finally(() => { publishing = undefined; });
+    }
+  }
+  await publishing;
+  if (published !== raw) await publish(raw).catch(() => {});
+  try {
+    return schema.parse(JSON.parse(raw));
+  } catch {
+    throw new Fault(
+      "invalid_output",
+      502,
+      "AI returned an invalid result. Try again.",
+    );
+  }
+}
 export async function* textDeltas(
   body: ReadableStream<Uint8Array>,
   onUsage?: (usage: {
@@ -346,7 +381,10 @@ export async function recordUsage(
 // Decode only complete JSON string characters; never expose the JSON envelope or
 // a split escape sequence while structured output is still arriving.
 export function partialInterviewText(raw: string): string {
-  const match = /"text"\s*:\s*"/.exec(raw);
+  return partialJSONString(raw, "text");
+}
+export function partialJSONString(raw: string, key: string): string {
+  const match = new RegExp(`"${key}"\\s*:\\s*"`).exec(raw);
   if (!match) return "";
   const start = match.index + match[0].length;
   let end = start;
