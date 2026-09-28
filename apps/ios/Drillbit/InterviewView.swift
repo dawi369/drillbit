@@ -58,7 +58,7 @@ struct InterviewView: View {
       return
     }
     guideStep = nil
-    guiding = false
+    withAnimation(reduceMotion ? nil : DrillbitMotion.page) { guiding = false }
     Task { try? await model.disk.cache(key: guideKey, data: Data()) }
   }
   private var exchanges: [InterviewExchange] { InterviewExchange.document(original: challenge.displayPrompt, state: interview.displayState) }
@@ -87,7 +87,7 @@ struct InterviewView: View {
       } else { workspace }
     }
     .overlayPreferenceValue(WarmUpAnchorKey.self) { anchors in
-      if guiding && interview.finished == nil { WarmUpGuide(step: guideStep, anchors: anchors, advance: advanceGuide) }
+      if guiding && interview.finished == nil { WarmUpGuide(step: guideStep, anchors: anchors, advance: advanceGuide).transition(.opacity) }
     }
     .animation(reduceMotion ? nil : DrillbitMotion.page, value: interview.finished != nil)
     .sensoryFeedback(.impact(weight: .light), trigger: acceptedAnswerID) { _, accepted in accepted != nil }
@@ -111,9 +111,10 @@ struct InterviewView: View {
       sessionRestored = true
       if guiding {
         if (try? await model.disk.cached(key: guideKey)) != nil { guiding = false; return }
-        // A moment to take in the screen before the tour starts.
-        try? await Task.sleep(for: .seconds(1.5))
-        reading.collapsed.remove("original")
+        // A moment to take in the screen, then the question opens and the tour points at it once it has settled.
+        try? await Task.sleep(for: .seconds(1.2))
+        withAnimation(disclosureMotion) { _ = reading.collapsed.remove("original") }
+        try? await Task.sleep(for: .milliseconds(450))
         guideStep = .question
       }
     }

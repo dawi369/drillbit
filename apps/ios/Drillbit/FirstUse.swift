@@ -14,11 +14,11 @@ enum WarmUpStep: Int, CaseIterable {
   }
   var message: String {
     switch self {
-    case .question: "Built from your plan, just to warm up. It won’t count. Tap it anytime to fold it and make room."
-    case .reply: "Type a design choice here, or ask a clarifying question first. Same box for both."
+    case .question: "Built from your plan. It won’t count. Tap it anytime to fold it away."
+    case .reply: "Type a design choice, or ask a clarifying question first."
     case .send: "The interviewer reads it and pushes back, like a real round."
-    case .voice: "Tap here to answer out loud. You can switch back to typing anytime."
-    case .menu: "The ••• menu up top has a nudge, an example and Finish. Finish when you want feedback."
+    case .voice: "Tap to answer out loud. Switch back to typing anytime."
+    case .menu: "The ••• menu has a nudge, an example and Finish."
     }
   }
   var next: WarmUpStep? { WarmUpStep(rawValue: rawValue + 1) }
@@ -51,110 +51,190 @@ private struct Spotlight: Shape {
   }
 }
 
-/// Blocks every tap. With no step it only holds the screen still so people can take it in first.
+/// Blocks every tap. The callout lags the step so the spotlight settles on its target before the callout appears.
 struct WarmUpGuide: View {
   let step: WarmUpStep?
   let anchors: [WarmUpAnchor: Anchor<CGRect>]
   let advance: () -> Void
-  @State private var cardHeight: CGFloat = 0
+  @State private var shown: WarmUpStep?
+  @State private var calloutHeight: CGFloat = 120
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
     GeometryReader { proxy in
-      let target = step.flatMap { anchors[.step($0)] }.map { proxy[$0].insetBy(dx: -8, dy: -8) }
-      let documentTop = anchors[.document].map { proxy[$0].minY } ?? 0
+      let hole = step.flatMap { anchors[.step($0)] }.map { proxy[$0].insetBy(dx: -6, dy: -6) }
       ZStack(alignment: .topLeading) {
         Color.clear.contentShape(Rectangle()).onTapGesture {}
-        if let step {
-          Spotlight(hole: target ?? .zero)
-            .fill(Color.black.opacity(0.55), style: FillStyle(eoFill: true))
+        if step != nil {
+          Spotlight(hole: hole ?? .zero)
+            .fill(Color.black.opacity(0.45), style: FillStyle(eoFill: true))
             .allowsHitTesting(false)
             .transition(.opacity)
-          card(step)
-            .frame(width: max(0, proxy.size.width - 32))
-            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { cardHeight = $0 }
-            .position(x: proxy.size.width / 2, y: cardCenter(target: target, documentTop: documentTop, height: proxy.size.height))
-            .transition(.opacity.combined(with: .offset(y: reduceMotion ? 0 : 8)))
+        }
+        if let shown {
+          callout(shown, in: proxy)
         }
       }
-      .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: step)
+      .animation(reduceMotion ? nil : DrillbitMotion.page, value: step)
     }
     .ignoresSafeArea()
     .accessibilityAddTraits(.isModal)
-  }
-
-  private func cardCenter(target: CGRect?, documentTop: CGFloat, height: CGFloat) -> CGFloat {
-    let half = cardHeight / 2
-    guard let target else { return documentTop + 12 + half }
-    // Below the target when it sits in the top half, otherwise above it.
-    let y = target.midY < height / 2 ? target.maxY + 12 + half : target.minY - 12 - half
-    return min(max(y, documentTop + 12 + half), height - 24 - half)
-  }
-
-  private func card(_ step: WarmUpStep) -> some View {
-    VStack(alignment: .leading, spacing: 12) {
-      HStack(spacing: 8) {
-        Text("\(step.rawValue + 1) of \(WarmUpStep.allCases.count)").font(.caption.monospaced()).foregroundStyle(AppPalette.accent)
-        Spacer(minLength: 0)
-        if step == .menu { Image(systemName: "arrow.up.right").foregroundStyle(AppPalette.accent).accessibilityHidden(true) }
-      }
-      Text(step.title).font(.headline)
-      Text(step.message).font(.subheadline).foregroundStyle(AppPalette.secondary)
-        .fixedSize(horizontal: false, vertical: true)
-      Button(step.next == nil ? "Let’s go" : "Next", action: advance)
-        .buttonStyle(PracticeButtonStyle())
-        .accessibilityIdentifier("warmUpGuideNext")
+    .task(id: step) {
+      if reduceMotion { shown = step; return }
+      if shown != nil { withAnimation(.easeIn(duration: 0.12)) { shown = nil } }
+      guard let step else { return }
+      do { try await Task.sleep(for: .milliseconds(360)) } catch { return }
+      withAnimation(.spring(duration: 0.38, bounce: 0.16)) { shown = step }
     }
-    .padding(16)
-    .background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 12))
-    .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(AppPalette.accent.opacity(0.35), lineWidth: 0.5) }
-    .id(step)
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier("warmUpGuide")
+  }
+
+  private func callout(_ step: WarmUpStep, in proxy: GeometryProxy) -> some View {
+    let size = proxy.size
+    let width = min(296, size.width - 32)
+    let documentTop = anchors[.document].map { proxy[$0].minY } ?? 100
+    // The ••• menu lives in the toolbar, which cannot be measured; point at its trailing corner.
+    let target = anchors[.step(step)].map { proxy[$0].insetBy(dx: -6, dy: -6) }
+      ?? CGRect(x: size.width - 60, y: documentTop - 8, width: 44, height: 0)
+    let below = target.midY < size.height / 2
+    let x = min(max(target.midX - width / 2, 16), size.width - 16 - width)
+    let preferred = below ? target.maxY + 12 : target.minY - 12 - calloutHeight
+    let y = min(max(preferred, documentTop + 8), size.height - 48 - calloutHeight)
+    let pointerX = target.midX - x
+    let edge: Edge = below ? .top : .bottom
+    return CoachCallout(
+      title: step.title, message: step.message, index: step.rawValue, count: WarmUpStep.allCases.count,
+      action: step.next == nil ? "Let’s go" : "Next", buttonID: "warmUpGuideNext",
+      pointer: edge, pointerX: pointerX, advance: advance)
+      .frame(width: width)
+      .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { calloutHeight = $0 }
+      .offset(x: x, y: y)
+      .transition(.asymmetric(
+        insertion: .scale(scale: 0.9, anchor: UnitPoint(x: pointerX / width, y: below ? 0 : 1)).combined(with: .opacity),
+        removal: .scale(scale: 0.97).combined(with: .opacity)))
+      .accessibilityIdentifier("warmUpGuide")
   }
 }
 
-struct FirstUseTip: View {
-  let number: String
+/// The small tip on a callout's edge, drawn pointing up.
+private struct CalloutPointer: Shape {
+  func path(in rect: CGRect) -> Path {
+    var path = Path()
+    path.move(to: CGPoint(x: rect.minX, y: rect.maxY))
+    path.addLine(to: CGPoint(x: rect.midX - 2, y: rect.minY + 1.5))
+    path.addQuadCurve(to: CGPoint(x: rect.midX + 2, y: rect.minY + 1.5), control: CGPoint(x: rect.midX, y: rect.minY - 0.5))
+    path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+    path.closeSubpath()
+    return path
+  }
+}
+
+/// A compact coachmark: short title, one line of help, progress and a small action.
+struct CoachCallout: View {
   let title: String
   let message: String
-  var pointsUp = false
-  var symbol: String? = nil
+  let index: Int
+  let count: Int
+  let action: String
+  let buttonID: String
+  var pointer: Edge? = nil
+  /// Measured from the callout's leading edge.
+  var pointerX: CGFloat? = nil
+  let advance: () -> Void
+  @State private var width: CGFloat = 0
+
   var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: 4) {
+      Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(AppPalette.primary)
+      Text(message).font(.footnote).foregroundStyle(AppPalette.secondary)
+        .fixedSize(horizontal: false, vertical: true)
       HStack(spacing: 8) {
-        Text(number).font(.caption.monospaced()).foregroundStyle(AppPalette.accent)
-        Text(title).font(.headline)
-        Spacer(minLength: 0)
-        Image(systemName: symbol ?? (pointsUp ? "arrow.up" : "arrow.down")).foregroundStyle(AppPalette.accent).accessibilityHidden(true)
+        HStack(spacing: 4) {
+          ForEach(0..<count, id: \.self) { dot in
+            Capsule().fill(dot == index ? AppPalette.accent : AppPalette.hairline)
+              .frame(width: dot == index ? 12 : 4, height: 4)
+          }
+        }
+        .accessibilityElement()
+        .accessibilityLabel("Step \(index + 1) of \(count)")
+        Spacer(minLength: 16)
+        Button(action, action: advance)
+          .buttonStyle(CalloutButtonStyle())
+          .accessibilityIdentifier(buttonID)
       }
-      Text(message).font(.subheadline).foregroundStyle(AppPalette.secondary)
-    }.padding(16).background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 12))
-      .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(AppPalette.accent.opacity(0.35), lineWidth: 0.5) }
-      .accessibilityElement(children: .contain)
-      .accessibilityIdentifier("firstUseTip")
+    }
+    .padding(.horizontal, 12)
+    .padding(.top, 12)
+    .padding(.bottom, 4)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+    .background {
+      ZStack(alignment: pointer == .bottom ? .bottomLeading : .topLeading) {
+        RoundedRectangle(cornerRadius: 12).fill(AppPalette.elevated)
+        if let pointer {
+          CalloutPointer().fill(AppPalette.elevated)
+            .frame(width: 16, height: 8)
+            .rotationEffect(.degrees(pointer == .bottom ? 180 : 0))
+            .offset(x: min(max(pointerX ?? width / 2, 20), max(20, width - 20)) - 8, y: pointer == .bottom ? 8 : -8)
+        }
+      }
+      .compositingGroup()
+      .shadow(color: .black.opacity(0.24), radius: 16, y: 6)
+    }
+    .accessibilityElement(children: .contain)
   }
 }
 
+private struct CalloutButtonStyle: ButtonStyle {
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .font(.footnote.weight(.semibold))
+      .foregroundStyle(AppPalette.actionInk)
+      .padding(.horizontal, 12)
+      .padding(.vertical, 6)
+      .background(AppPalette.action, in: Capsule())
+      .scaleEffect(configuration.isPressed && !reduceMotion ? 0.96 : 1)
+      .animation(DrillbitMotion.press, value: configuration.isPressed)
+      // Keeps a 44-point hit area around the small capsule.
+      .padding(.vertical, 8)
+      .contentShape(Rectangle())
+  }
+}
+
+/// The tab tour's callout, pointing down at the tab it describes.
 struct FirstUseTourTip: View {
   @Bindable var model: AppModel
-  private var content: (String, String, String, AppIcon) {
+  @State private var appeared = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  private var content: (index: Int, title: String, message: String) {
     switch model.firstUse.stage {
-    case .tourRecall: ("02", "Recall makes it stick.", "Short reviews grow from your real sessions. Come back here to practise what needs another look.", .recall)
-    case .tourLibrary: ("03", "Your work stays in Library.", "Revisit past interviews and feedback. Next, choose how you want your first real session to feel.", .library)
-    default: ("01", "Home is your starting point.", "Resume a session or explore a core area. Your next question is always within reach.", .home)
+    case .tourRecall: (1, "Recall makes it stick.", "Quick reviews built from your real sessions.")
+    case .tourLibrary: (2, "Library keeps your work.", "Past interviews and feedback. Next up: your first real session.")
+    default: (0, "Home is where you start.", "Pick up a session or grab a fresh question.")
     }
   }
   var body: some View {
-    VStack(alignment: .leading, spacing: 16) {
-      FirstUseTip(number: content.0, title: content.1, message: content.2, symbol: content.3.rawValue)
-        .id(model.firstUse.stage)
-        .transition(.asymmetric(insertion: .opacity.combined(with: .offset(y: 8)), removal: .opacity))
-      Button(model.firstUse.stage == .tourLibrary ? "Choose my session" : "Next") { Task { await model.advanceFirstUseTour() } }
-        .buttonStyle(PracticeButtonStyle()).accessibilityIdentifier("firstUseTourNext")
-    }.padding(20).background(AppPalette.background)
-      .overlay(alignment: .top) { AppPalette.hairline.frame(height: 0.5) }
-      .accessibilityElement(children: .contain)
+    GeometryReader { proxy in
+      let width = min(296, proxy.size.width - 32)
+      // Three evenly spaced tabs across the floating bar.
+      let tab = 24 + (proxy.size.width - 48) * (CGFloat(content.index) + 0.5) / 3
+      CoachCallout(
+        title: content.title, message: content.message, index: content.index, count: 3,
+        action: model.firstUse.stage == .tourLibrary ? "Choose my session" : "Next", buttonID: "firstUseTourNext",
+        pointer: .bottom, pointerX: tab - (proxy.size.width - width) / 2) { Task { await model.advanceFirstUseTour() } }
+        .frame(width: width)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .animation(reduceMotion ? nil : .spring(duration: 0.4, bounce: 0.12), value: content.index)
+    }
+    .frame(height: 160)
+    .opacity(appeared ? 1 : 0)
+    .scaleEffect(appeared || reduceMotion ? 1 : 0.92, anchor: .bottom)
+    .task {
+      // Lets Home settle after the warm-up closes before pointing at anything.
+      do { try await Task.sleep(for: .milliseconds(reduceMotion ? 0 : 450)) } catch { return }
+      withAnimation(.spring(duration: 0.4, bounce: 0.16)) { appeared = true }
+    }
+    .accessibilityIdentifier("firstUseTip")
   }
 }
 

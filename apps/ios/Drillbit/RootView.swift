@@ -49,11 +49,8 @@ struct RootView: View {
           .accessibilityHidden(model.firstUse.tourTab != nil)
           .overlay(alignment: .bottom) {
             if model.firstUse.tourTab != nil && model.presented == nil {
-              ViewThatFits(in: .vertical) {
-                FirstUseTourTip(model: model)
-                ScrollView { FirstUseTourTip(model: model) }
-              }.padding(.bottom, 88)
-                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+              FirstUseTourTip(model: model).padding(.bottom, 80)
+                .transition(.opacity)
             }
           }
           .animation(DrillbitMotion.page, value: model.firstUse.stage)
