@@ -1,13 +1,13 @@
-import {beforeAll,it,expect} from 'vitest';
-import {env} from 'cloudflare:test';
-import {initializeDatabase} from './migrations';
-import {accountFor} from '../src/store';
-import type {Env} from '../src/platform';
-import {historicalSnapshot} from '../src/history';
-import {messagesFor} from '../src/ai';
-import {voiceDelegationMessages} from '../src/prompts/voice-context';
-import {plainQuestion} from '../src/prompts/formatting';
-import {practiceProfileSchema,settingsSchema} from '../src/domain';
+import { env } from 'cloudflare:test';
+import { beforeAll, expect, it } from 'vitest';
+import { messagesFor } from '../src/ai';
+import { practiceProfileSchema, settingsSchema } from '../src/domain';
+import { historicalSnapshot } from '../src/history';
+import type { Env } from '../src/platform';
+import { plainQuestion } from '../src/prompts/formatting';
+import { voiceDelegationMessages } from '../src/prompts/voice-context';
+import { accountFor } from '../src/store';
+import { initializeDatabase } from './migrations';
 const e=env as unknown as Env;
 beforeAll(()=>initializeDatabase(e.DB));
 it('profile is optional, bounded, escaped and shared across text and delegated voice',()=>{
