@@ -5,14 +5,20 @@
 export const QUESTION_TAGS = ["b", "i", "code", "pre"] as const;
 
 const examples = [
-  "Design the write path for a <b>link shortener</b> that never hands out the same short code twice. Codes look like <code>dbit.ly/k3X9a</code>. Walk through how you generate them and what happens when two requests race for the same code.",
-  "An order service emits this event on every status change:<pre>{\n  \"orderId\": \"ord_812\",\n  \"status\": \"shipped\",\n  \"updatedAt\": \"2026-03-02T10:14:00Z\"\n}</pre>Design how a notifications service sends <i>exactly one</i> message per status change, even though the queue redelivers events.",
-  "A profile cache is configured with <code>ttl = 300</code> seconds and sits in front of a database that handles <b>2,000 reads per second</b>. Decide what happens to the database when a popular profile expires and 500 requests miss at once.",
+  "Design the write path for a <b>link shortener</b>.\n\n• Codes look like <code>dbit.ly/k3X9a</code>\n• About 50 million new links a month\n• A code is never handed out twice\n\nHow do you generate codes, and what happens when two requests race for the same one?",
+  "An order service emits this event on every status change:<pre>{\n  \"orderId\": \"ord_812\",\n  \"status\": \"shipped\",\n  \"updatedAt\": \"2026-03-02T10:14:00Z\"\n}</pre>\n\nHow does a notifications service send <i>exactly one</i> message per status change, even though the queue redelivers events?",
+  "A profile cache sits in front of your database.\n\n• Entries live for <code>ttl = 300</code> seconds\n• The database handles <b>2,000 reads per second</b>\n• A popular profile expires and 500 requests miss at once\n\nWhat happens to the database, and how do you protect it?",
 ];
 
+// Plain-text layout, so it applies with formatting on or off; the app renders paragraphs, "• " lines and the closing ask.
+const structure = `
+<question_structure>
+Lay the prompt out for quick reading. Open with one or two sentences of scenario. When the candidate needs key facts (users, scale, limits, existing pieces), give two to four of them, each on its own line starting with "• ". End with the ask on its own line: one sentence naming the decision. Separate these parts with a blank line. No headings. A Mock interview opener is the exception: one short paragraph, no bullets.
+</question_structure>`;
+
 export function questionFormattingInstructions(enabled: boolean): string {
-  if (!enabled) return "\n<question_formatting>Write title, prompt and constraints as plain text. Never use markup tags, Markdown, backticks or code fences.</question_formatting>";
-  return `
+  if (!enabled) return `${structure}\n<question_formatting>Write title, prompt and constraints as plain text. Never use markup tags, Markdown, backticks or code fences.</question_formatting>`;
+  return `${structure}
 <question_formatting>
 The app renders a small tag set in the prompt and constraints. The title is always plain text.
 - <b>…</b> for the one or two phrases carrying the core decision or a key number. Never a whole sentence.

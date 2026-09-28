@@ -66,6 +66,7 @@ it('question formatting is on by default, off on request, and stripped for plain
  const off=messagesFor('generate',{settings:{questionFormatting:false}})[0].content;
  expect(off).toContain('plain text');
  expect(off).not.toContain('<example>');
+ for(const prompt of [on,off]) expect(prompt).toContain('starting with "• "');
  expect(plainQuestion('Keep <code>ttl</code> &lt; <b>5</b>')).toBe('Keep ttl < 5');
  expect(settingsSchema.parse({}).questionFormatting).toBeUndefined();
 });
