@@ -63,7 +63,6 @@ struct PreparationView: View {
               .animation(DrillbitMotion.selection, value: selected)
               .sensoryFeedback(.selection, trigger: selected) { _, now in now }
           }
-          Text("You can change the support or switch to voice during a session.").font(.footnote).foregroundStyle(.secondary)
         } else { NavigationLink {
           GuidanceModePicker(selection: $guidanceMode)
         } label: {

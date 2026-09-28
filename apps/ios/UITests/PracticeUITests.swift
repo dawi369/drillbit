@@ -971,17 +971,18 @@ final class PracticeUITests: XCTestCase {
     app.buttons["Let’s begin"].tap()
     XCTAssertTrue(app.staticTexts["What brings you here?"].waitForExistence(timeout: 5))
     for _ in 0..<4 { app.buttons["Continue"].tap() }
-    XCTAssertTrue(app.staticTexts["Made for you."].exists)
+    XCTAssertTrue(app.staticTexts["Here’s your plan."].exists)
+    XCTAssertTrue(app.staticTexts["First up is a warm-up question. It doesn’t count, so just try stuff."].exists)
     // The final action deliberately grows and changes its label. Capture and
     // tap its settled target rather than the outgoing Continue geometry.
     Thread.sleep(forTimeInterval: 0.5)
     capture("Personal onboarding plan", app)
     // The simulator's inferred hit point falls in the clipped capsule corner.
-    app.buttons["Start practice"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+    app.buttons["Try the warm-up"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
     // The warm-up preview rises over the plan page: no Close, and at most three rerolls.
     XCTAssertTrue(app.buttons["previewStart"].waitForExistence(timeout: 10))
     XCTAssertEqual(app.buttons["previewStart"].label, "Start warm-up")
-    XCTAssertTrue(app.staticTexts["Built from your plan, just to warm up. It won’t count toward your practice."].exists)
+    XCTAssertFalse(app.staticTexts["Built from your plan, just to warm up. It won’t count toward your practice."].exists)
     XCTAssertFalse(app.buttons["Close"].exists)
     capture("Warm-up preview over plan", app)
     for _ in 0..<3 {
@@ -996,28 +997,23 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(editor.waitForExistence(timeout: 5))
     XCTAssertFalse(app.buttons["Close"].exists)
     XCTAssertFalse(app.buttons["interviewOptions"].isEnabled)
+    // First stop: the tools open for you, one line each.
+    XCTAssertTrue(app.staticTexts["A small hint when you’re stuck."].waitForExistence(timeout: 6))
+    XCTAssertTrue(app.staticTexts["Done? Wrap up and get feedback."].exists)
+    capture("Warm-up guide · tools", app)
+    app.buttons["warmUpToolsDone"].tap()
     let guide = app.buttons["warmUpGuideNext"]
     XCTAssertTrue(guide.waitForExistence(timeout: 5))
-    XCTAssertTrue(app.staticTexts["Answer or ask"].exists)
-    capture("Warm-up guide · Answer or ask", app)
+    XCTAssertTrue(app.staticTexts["Your turn"].exists)
+    capture("Warm-up guide · Your turn", app)
     editor.tap()
     XCTAssertEqual(editor.value(forKey: "hasKeyboardFocus") as? Bool, false, "The guide blocks every control until it ends")
-    for title in ["Send it", "Rather talk it through?", "Your tools are up here"] {
-      guide.tap()
-      XCTAssertTrue(app.staticTexts[title].waitForExistence(timeout: 3))
-      capture("Warm-up guide · " + title, app)
-    }
-    // The last step has no Next: it ends when the ••• menu actually opens.
-    XCTAssertFalse(guide.exists)
-    XCTAssertTrue(app.buttons["interviewOptions"].isEnabled)
-    app.buttons["interviewOptions"].tap()
-    XCTAssertTrue(app.buttons["warmUpToolNudge"].waitForExistence(timeout: 3))
-    XCTAssertTrue(app.staticTexts["A hint toward your next step"].exists)
-    XCTAssertTrue(app.buttons["warmUpToolFinish"].exists)
-    capture("Warm-up tools", app)
-    XCTAssertFalse(app.staticTexts["Your tools are up here"].waitForExistence(timeout: 1))
-    app.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.6)).tap()
-    XCTAssertFalse(app.buttons["warmUpToolNudge"].waitForExistence(timeout: 1))
+    guide.tap()
+    XCTAssertTrue(app.staticTexts["Rather talk?"].waitForExistence(timeout: 3))
+    capture("Warm-up guide · Rather talk?", app)
+    XCTAssertEqual(guide.label, "Got it")
+    guide.tap()
+    XCTAssertFalse(guide.waitForExistence(timeout: 1))
     XCTAssertTrue(app.buttons["interviewOptions"].isEnabled)
     editor.tap(); editor.typeText("Start with one table of saved links keyed by user.")
     app.buttons["shareAnswer"].tap()

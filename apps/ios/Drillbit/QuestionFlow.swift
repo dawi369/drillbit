@@ -46,10 +46,12 @@ struct QuestionFlow: View {
   @Environment(\.dismiss) private var dismiss
   @Environment(\.scenePhase) private var scenePhase
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  /// The warm-up's framing is on the plan page already, so its preview carries no note.
   private var previewNote: String? {
     let guided = (question?.guidanceMode ?? draft?.guidanceMode) == .learnTogether
-    guard guided, failure == nil else { return nil }
-    return (question?.isWarmUp ?? draft?.warmUp ?? false) ? "Built from your plan, just to warm up. It won’t count toward your practice." : "Guided practice helps you structure the approach."
+    let warmUp = question?.isWarmUp ?? draft?.warmUp ?? false
+    guard guided, !warmUp, failure == nil else { return nil }
+    return "Guided practice helps you structure the approach."
   }
   /// Eyebrow and note are fixed copy but still written out, so the page reads as one voice.
   private var previewSegments: [StreamSegment] {

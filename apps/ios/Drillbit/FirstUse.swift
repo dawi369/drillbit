@@ -1,22 +1,21 @@
 import SwiftUI
 
 /// The warm-up's guided tour: the interview stays visible but locked while each control is introduced in turn.
+/// `tools` opens the ••• tools as a popover instead of a callout.
 enum WarmUpStep: Int, CaseIterable {
-  case reply, send, voice, menu
+  case tools, reply, voice
   var title: String {
     switch self {
-    case .reply: "Answer or ask"
-    case .send: "Send it"
-    case .voice: "Rather talk it through?"
-    case .menu: "Your tools are up here"
+    case .tools: "Your tools"
+    case .reply: "Your turn"
+    case .voice: "Rather talk?"
     }
   }
   var message: String {
     switch self {
-    case .reply: "Type a design choice, or ask a clarifying question first."
-    case .send: "The interviewer reads it and pushes back, like a real round."
-    case .voice: "Tap to answer out loud. Switch back to typing anytime."
-    case .menu: "Tap ••• to open them: a nudge, an example, and Finish when you want feedback."
+    case .tools: ""
+    case .reply: "Answer here, or ask something first."
+    case .voice: "Tap to say it out loud instead."
     }
   }
   var next: WarmUpStep? { WarmUpStep(rawValue: rawValue + 1) }
@@ -50,12 +49,9 @@ private struct Spotlight: Shape {
 }
 
 /// Blocks every tap. The callout lags the step so the spotlight settles on its target before the callout appears.
-/// The toolbar sits above this overlay, so on the menu step the ••• button stays live and opening it ends the guide.
 struct WarmUpGuide: View {
   let step: WarmUpStep?
   let anchors: [WarmUpAnchor: Anchor<CGRect>]
-  /// The ••• button's global frame; toolbar items cannot publish anchors.
-  var menuFrame: CGRect? = nil
   let advance: () -> Void
   @State private var shown: WarmUpStep?
   @State private var calloutHeight: CGFloat = 120
@@ -65,15 +61,14 @@ struct WarmUpGuide: View {
     GeometryReader { proxy in
       let hole = step.flatMap { anchors[.step($0)] }.map { proxy[$0].insetBy(dx: -6, dy: -6) }
       ZStack(alignment: .topLeading) {
-        // Tapping away on the last step is a way out if the menu never opens.
-        Color.clear.contentShape(Rectangle()).onTapGesture { if step == .menu { advance() } }
+        Color.clear.contentShape(Rectangle()).onTapGesture {}
         if step != nil {
           Spotlight(hole: hole ?? .zero)
             .fill(Color.black.opacity(0.45), style: FillStyle(eoFill: true))
             .allowsHitTesting(false)
             .transition(.opacity)
         }
-        if let shown {
+        if let shown, shown != .tools {
           callout(shown, in: proxy)
         }
       }
@@ -94,10 +89,8 @@ struct WarmUpGuide: View {
     let size = proxy.size
     let width = min(296, size.width - 32)
     let documentTop = anchors[.document].map { proxy[$0].minY } ?? 100
-    let origin = proxy.frame(in: .global).origin
-    let menu = menuFrame.map { $0.offsetBy(dx: -origin.x, dy: -origin.y) }
-      ?? CGRect(x: size.width - 60, y: documentTop - 52, width: 44, height: 44)
-    let target = anchors[.step(step)].map { proxy[$0].insetBy(dx: -6, dy: -6) } ?? menu
+    let target = anchors[.step(step)].map { proxy[$0].insetBy(dx: -6, dy: -6) }
+      ?? CGRect(x: size.width / 2, y: documentTop, width: 0, height: 0)
     let below = target.midY < size.height / 2
     let x = min(max(target.midX - width / 2, 16), size.width - 16 - width)
     let preferred = below ? target.maxY + 12 : target.minY - 12 - calloutHeight
@@ -106,7 +99,7 @@ struct WarmUpGuide: View {
     let edge: Edge = below ? .top : .bottom
     return CoachCallout(
       title: step.title, message: step.message, index: step.rawValue, count: WarmUpStep.allCases.count,
-      action: step == .menu ? nil : "Next", buttonID: "warmUpGuideNext",
+      action: step.next == nil ? "Got it" : "Next", buttonID: "warmUpGuideNext",
       pointer: edge, pointerX: pointerX, advance: advance)
       .frame(width: width)
       .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { calloutHeight = $0 }
@@ -118,41 +111,42 @@ struct WarmUpGuide: View {
   }
 }
 
-/// The warm-up's first look behind •••: each tool says what it is for, and each one works.
+/// The tour's first stop: what lives behind •••, one line each.
 struct WarmUpTools: View {
-  var nudge: (() -> Void)?
-  let example: () -> Void
-  var finish: (() -> Void)?
+  var showsNudge = true
+  let done: () -> Void
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      if let nudge {
-        row("Need a nudge?", "A hint toward your next step", AppIcon.hint.rawValue, id: "warmUpToolNudge", action: nudge)
+      if showsNudge {
+        row("Need a nudge?", "A small hint when you’re stuck.", AppIcon.hint.rawValue)
         Divider().padding(.leading, 52)
       }
-      row("Show an example", "How a strong answer could go", AppIcon.text.rawValue, id: "warmUpToolExample", action: example)
+      row("Show an example", "How a solid answer could go.", AppIcon.text.rawValue)
       Divider().padding(.leading, 52)
-      row("Finish interview", "Wrap up and get your feedback", AppIcon.checkmark.rawValue, id: "warmUpToolFinish", action: finish)
+      row("Finish interview", "Done? Wrap up and get feedback.", AppIcon.checkmark.rawValue)
+      Button("Got it", action: done)
+        .buttonStyle(CalloutButtonStyle())
+        .frame(maxWidth: .infinity, alignment: .trailing)
+        .padding(.horizontal, 16)
+        .accessibilityIdentifier("warmUpToolsDone")
     }
     .frame(width: 288)
-    .padding(.vertical, 4)
+    .padding(.top, 4)
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("warmUpTools")
   }
-  private func row(_ title: String, _ detail: String, _ symbol: String, id: String, action: (() -> Void)?) -> some View {
-    Button { action?() } label: {
-      HStack(spacing: 12) {
-        Image(systemName: symbol).foregroundStyle(AppPalette.accent).frame(width: 24).accessibilityHidden(true)
-        VStack(alignment: .leading, spacing: 2) {
-          Text(title).foregroundStyle(AppPalette.primary)
-          Text(detail).font(.footnote).foregroundStyle(AppPalette.secondary)
-        }
-        Spacer(minLength: 0)
+  private func row(_ title: String, _ detail: String, _ symbol: String) -> some View {
+    HStack(spacing: 12) {
+      Image(systemName: symbol).foregroundStyle(AppPalette.accent).frame(width: 24).accessibilityHidden(true)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(title).foregroundStyle(AppPalette.primary)
+        Text(detail).font(.footnote).foregroundStyle(AppPalette.secondary)
       }
-      .padding(.horizontal, 16)
-      .padding(.vertical, 12)
-      .contentShape(Rectangle())
+      Spacer(minLength: 0)
     }
-    .buttonStyle(DrillbitRowButtonStyle())
-    .disabled(action == nil)
-    .accessibilityIdentifier(id)
+    .padding(.horizontal, 16)
+    .padding(.vertical, 12)
+    .accessibilityElement(children: .combine)
   }
 }
 
@@ -252,9 +246,9 @@ struct FirstUseTourTip: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   private var content: (index: Int, title: String, message: String) {
     switch model.firstUse.stage {
-    case .tourRecall: (1, "Recall makes it stick.", "Quick reviews built from your real sessions.")
-    case .tourLibrary: (2, "Library keeps your work.", "Past interviews and feedback. Next up: your first real session.")
-    default: (0, "Home is where you start.", "Pick up a session or grab a fresh question.")
+    case .tourRecall: (1, "Recall makes it stick.", "Quick reviews from your own sessions.")
+    case .tourLibrary: (2, "Everything you’ve done.", "Old interviews and their feedback. Next up: your first real one.")
+    default: (0, "Home base.", "Pick up where you left off, or grab a new question.")
     }
   }
   var body: some View {

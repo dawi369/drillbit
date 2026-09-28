@@ -3,13 +3,24 @@ import UniformTypeIdentifiers
 
 struct PracticeEvidenceView: View {
   var model: AppModel
+  /// Only areas with something to show; untouched concepts would be a wall of empty sections.
+  private var concepts: [PracticeConcept] {
+    model.taxonomy.filter { concept in
+      (model.memory.evidence ?? []).contains { $0.conceptId == concept.id }
+        || (model.libraryCoverage.first { $0.conceptId == concept.id }?.completedAttempts ?? 0) > 0
+    }
+  }
   var body: some View {
     SignalList {
       Section {
         Text("Feedback from your latest 100 sessions, linked to your answers. Counts track practice, not mastery.")
           .foregroundStyle(.secondary)
       }
-      ForEach(model.taxonomy, id: \.id) { concept in
+      if concepts.isEmpty {
+        ContentUnavailableView("Nothing here yet", systemImage: AppIcon.books.rawValue,
+          description: Text("Finish a session and what you showed will land here."))
+      }
+      ForEach(concepts, id: \.id) { concept in
         let observations = (model.memory.evidence ?? []).filter { $0.conceptId == concept.id }
         let coverage = model.libraryCoverage.first { $0.conceptId == concept.id }
         Section(concept.label) {

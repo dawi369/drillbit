@@ -31,7 +31,7 @@ struct SetupView: View {
   @State private var warmingUp = false
   @State private var startedWarmUp: Challenge?
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  private let objectives = [("interview","An upcoming interview"),("learn","Stronger system design skills"),("stay_sharp","Keep my skills fresh")]
+  private let objectives = [("interview","An upcoming interview"),("learn","Level up my skills"),("stay_sharp","Keep my skills fresh")]
   private let roles = [("general","A mix of things"),("backend","Backend services"),("frontend","Web frontends"),("full_stack","Full-stack products"),("platform","Platforms and infrastructure"),("data","Data systems"),("mobile","Mobile apps")]
   private let areas = PracticeAreaGroup.all.map { ($0.id, $0.title) }
   private let startingPoints = [("junior", "New to system design"), ("mid", "I’ve designed a few systems"), ("senior", "I design systems regularly"), ("staff", "I lead architecture across teams")]
@@ -92,17 +92,13 @@ struct SetupView: View {
             else { move(coordinator, to: coordinator.draft.page + 1) }
           } label: {
             HStack(spacing: 8) {
-              if coordinator.draft.page == 4 {
-                Image(systemName: "sparkles").symbolEffect(.bounce, options: .nonRepeating, value: !reduceMotion && coordinator.draft.page == 4)
-                  .accessibilityHidden(true)
-              }
-              Text(coordinator.saving ? "Opening…" : coordinator.draft.page == -1 ? "Let’s begin" : coordinator.draft.page == 4 ? "Start practice" : "Continue")
+              Text(coordinator.saving ? "Opening…" : coordinator.draft.page == -1 ? "Let’s begin" : coordinator.draft.page == 4 ? "Try the warm-up" : "Continue")
               if coordinator.draft.page == 4 { Image(systemName: "arrow.right").accessibilityHidden(true) }
             }
             .padding(.vertical, coordinator.draft.page == 4 ? 8 : 0)
           }.buttonStyle(PracticeButtonStyle()).disabled(coordinator.saving || reminderPermissionPending)
             .contentTransition(.opacity)
-            .accessibilityLabel(coordinator.saving ? "Opening…" : coordinator.draft.page == -1 ? "Let’s begin" : coordinator.draft.page == 4 ? "Start practice" : "Continue")
+            .accessibilityLabel(coordinator.saving ? "Opening…" : coordinator.draft.page == -1 ? "Let’s begin" : coordinator.draft.page == 4 ? "Try the warm-up" : "Continue")
             .accessibilityIdentifier("onboardingContinue")
             .sensoryFeedback(.success, trigger: coordinator.draft.page == 4) { _, reached in reached }
         }
@@ -235,8 +231,10 @@ struct SetupView: View {
   }
 
   private func summary(_ draft: LearningPlanCoordinator.Draft) -> some View {
-    VStack(alignment: .leading, spacing: 16) {
-      Text("\(draft.dailyGoalMinutes) minutes. One step at a time.").font(.title2.weight(.semibold))
+    let pace = "\(draft.dailyGoalMinutes) minutes a day"
+    let headline = draft.objective == "interview" ? "Interview prep, \(pace)." : draft.objective == "stay_sharp" ? "Staying sharp, \(pace)." : "Leveling up, \(pace)."
+    return VStack(alignment: .leading, spacing: 16) {
+      Text(headline).font(.title2.weight(.semibold))
       LabeledContent("Goal", value: objectives.first { $0.0 == draft.objective }?.1 ?? "Learn system design")
       Divider()
       LabeledContent("You build", value: roles.first { $0.0 == draft.roleTrack }?.1 ?? "A mix of things")
@@ -244,13 +242,11 @@ struct SetupView: View {
       LabeledContent("Experience", value: startingPoints.first { $0.0 == draft.level }?.1 ?? "I’ve designed a few systems")
       Divider()
       LabeledContent("Focus", value: draft.weakAreas.isEmpty ? "A bit of everything" : draft.weakAreas.compactMap { id in areas.first { $0.0 == id }?.1 }.sorted().joined(separator: ", "))
-      Divider()
-      LabeledContent("Routine", value: "\(draft.dailyGoalMinutes) minutes a day")
-      Label("First, a one-minute walkthrough. No score, no pressure.", systemImage: "sparkles")
-        .font(.subheadline).foregroundStyle(AppPalette.accent).padding(.top, 12)
+      Text("First up is a warm-up question. It doesn’t count, so just try stuff.")
+        .font(.subheadline).foregroundStyle(AppPalette.secondary).padding(.top, 12)
     }
   }
-  private func title(for page: Int) -> String { ["What brings you here?","Where are you starting?","What sparks your curiosity?","Find your rhythm.","Made for you."][max(0, min(page,4))] }
+  private func title(for page: Int) -> String { ["What brings you here?","Where are you starting?","What sparks your curiosity?","Find your rhythm.","Here’s your plan."][max(0, min(page,4))] }
   private func reminderTime(_ coordinator: LearningPlanCoordinator) -> Binding<Date> { Binding(get: {
     Calendar.current.date(from: DateComponents(hour: coordinator.draft.dailyMinutes / 60, minute: coordinator.draft.dailyMinutes % 60)) ?? Date()
   }, set: { let parts = Calendar.current.dateComponents([.hour,.minute], from: $0); coordinator.draft.dailyMinutes = (parts.hour ?? 9) * 60 + (parts.minute ?? 0) }) }

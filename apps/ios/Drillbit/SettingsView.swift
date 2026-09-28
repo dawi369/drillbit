@@ -162,7 +162,7 @@ private struct DeveloperSettingsSection: View {
 }
 struct LearningPlanSettingsView: View {
   @Bindable var model: AppModel
-  private let objectives = [("interview","An upcoming interview"),("learn","Stronger system design skills"),("stay_sharp","Keep my skills fresh")]
+  private let objectives = [("interview","An upcoming interview"),("learn","Level up my skills"),("stay_sharp","Keep my skills fresh")]
   private let roles = [("general","A mix of things"),("backend","Backend services"),("frontend","Web frontends"),("full_stack","Full-stack products"),("platform","Platforms and infrastructure"),("data","Data systems"),("mobile","Mobile apps")]
   private let areas = PracticeAreaGroup.all.map { ($0.id, $0.title) }
   private var plan: Binding<LearningPlan> { Binding(get: { model.settings.learningPlan ?? LearningPlan() }, set: { model.settings.learningPlan = $0 }) }
@@ -306,9 +306,6 @@ struct ReminderPermissionRow: View {
 
 struct PracticeProfileView: View {
   @Bindable var model: AppModel
-  @State private var preview: String?
-  @State private var previewing = false
-  @State private var failure: String?
   private func field(_ path: WritableKeyPath<PracticeProfile, String>) -> Binding<String> {
     Binding(get: { (model.settings.practiceProfile ?? PracticeProfile())[keyPath: path] }, set: { value in
       var profile = model.settings.practiceProfile ?? PracticeProfile()
@@ -316,7 +313,6 @@ struct PracticeProfileView: View {
       while bounded.utf16.count > 600 { bounded.removeLast() }
       profile[keyPath: path] = bounded
       model.settings.practiceProfile = profile
-      preview = nil
     })
   }
   var body: some View {
@@ -336,24 +332,7 @@ struct PracticeProfileView: View {
         Text("Goals and background inform practice questions. Preferences shape your interviewer in text and voice. Save with Done in Settings; restart voice to apply changes to an active session.")
       }
       Section {
-        Button(previewing ? "Trying it…" : "Try it") {
-          let profile = model.settings.practiceProfile ?? PracticeProfile()
-          let account = model.bootstrap?.account.id
-          previewing = true; failure = nil
-          Task {
-            defer { previewing = false }
-            do {
-              let result: PersonalizationPreview = try await model.api.send("settings/preview", method: "POST", body: profile)
-              guard account == model.bootstrap?.account.id, profile == (model.settings.practiceProfile ?? PracticeProfile()) else { return }
-              preview = result.text
-            } catch { if account == model.bootstrap?.account.id { failure = error.localizedDescription } }
-          }
-        }.disabled(previewing)
-        if let preview { Text(preview).textSelection(.enabled) }
-        if let failure { Text(failure).foregroundStyle(.secondary) }
-      } footer: { Text("A short sample using AI. It won’t save your changes or create a practice session.") }
-      Section {
-        Button("Reset personalization", role: .destructive) { model.settings.practiceProfile = PracticeProfile(); preview = nil; failure = nil }
+        Button("Reset personalization", role: .destructive) { model.settings.practiceProfile = PracticeProfile() }
       }
     }.navigationTitle("About your practice").navigationBarTitleDisplayMode(.inline)
   }

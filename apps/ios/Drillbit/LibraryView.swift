@@ -262,7 +262,8 @@ struct LibraryView: View {
       NavigationStack {
         SignalList {
           Section("Concepts") {
-            ForEach(model.taxonomy) { concept in
+            // The practice areas, plus any concept already selected (for example from a question's tag).
+            ForEach(PracticeAreaCatalog.curated(model.taxonomy) + model.taxonomy.filter { tags.contains($0.id) && !PracticeAreaCatalog.ids.contains($0.id) }) { concept in
               Toggle(concept.label, isOn: Binding(get: { tags.contains(concept.id) }, set: { if $0 { tags.insert(concept.id) } else { tags.remove(concept.id) } }))
             }
           }
