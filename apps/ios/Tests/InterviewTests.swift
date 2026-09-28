@@ -486,4 +486,15 @@ struct QuestionMarkupTests {
     let plain = QuestionMarkup.blocks("Use <b>one</b> key", formatted: false)
     #expect(plain == [.text(AttributedString("Use one key"))])
   }
+  @Test func splitsScenarioFactsAndAsk() {
+    let blocks = QuestionMarkup.blocks("Design a <b>link shortener</b>.\n\n• 50M links a month\n- Codes never repeat\n\nHow do you generate codes?")
+    #expect(blocks.count == 3)
+    guard case .bullets(let items) = blocks[1] else { Issue.record("expected bullets"); return }
+    #expect(items.map { String($0.characters) } == ["50M links a month", "Codes never repeat"])
+    #expect(QuestionMarkup.isAsk(2, of: blocks))
+    #expect(!QuestionMarkup.isAsk(0, of: blocks))
+    // A lone paragraph is just the prompt, and a mixed paragraph stays prose.
+    #expect(!QuestionMarkup.isAsk(0, of: QuestionMarkup.blocks("Design a cache.")))
+    #expect(QuestionMarkup.blocks("Keep:\n• one") == [.text(AttributedString("Keep:\n• one"))])
+  }
 }

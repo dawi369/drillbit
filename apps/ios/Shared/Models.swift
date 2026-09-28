@@ -641,10 +641,13 @@ enum HomeTopicRanking {
 enum QuestionMarkup {
   enum Block: Equatable, Sendable {
     case text(AttributedString)
+    /// Consecutive lines that start with "• " or "- ", without their markers.
+    case bullets([AttributedString])
     case code(String)
     var length: Int {
       switch self {
       case .text(let value): value.characters.count
+      case .bullets(let items): items.reduce(0) { $0 + $1.characters.count }
       case .code(let value): value.count
       }
     }
@@ -677,8 +680,7 @@ enum QuestionMarkup {
     }
     func flushText() {
       flushRun()
-      let value = trimmingNewlines(text)
-      if !value.characters.allSatisfy(\.isWhitespace) { blocks.append(.text(value)) }
+      blocks += paragraphs(trimmingNewlines(text))
       text = AttributedString()
     }
     var index = source.startIndex
@@ -716,9 +718,52 @@ enum QuestionMarkup {
     blocks(source).map { block in
       switch block {
       case .text(let value): String(value.characters)
+      case .bullets(let items): items.map { "• " + String($0.characters) }.joined(separator: "\n")
       case .code(let value): value
       }
     }.joined(separator: "\n")
+  }
+
+  /// The closing paragraph is the ask, but only when the prompt has some structure before it.
+  static func isAsk(_ index: Int, of blocks: [Block]) -> Bool {
+    guard blocks.count > 1, index == blocks.count - 1, case .text = blocks[index] else { return false }
+    return true
+  }
+
+  /// Blank lines separate paragraphs; a paragraph made only of marked lines is a list.
+  private static func paragraphs(_ text: AttributedString) -> [Block] {
+    var lines: [AttributedString] = []
+    var start = text.startIndex, index = text.startIndex
+    while index < text.endIndex {
+      if text.characters[index] == "\n" {
+        lines.append(AttributedString(text[start..<index]))
+        start = text.characters.index(after: index)
+      }
+      index = text.characters.index(after: index)
+    }
+    lines.append(AttributedString(text[start..<text.endIndex]))
+    var blocks: [Block] = [], paragraph: [AttributedString] = []
+    func flush() {
+      defer { paragraph = [] }
+      guard !paragraph.isEmpty else { return }
+      let marked = paragraph.map { line -> AttributedString? in
+        let plain = String(line.characters)
+        guard plain.hasPrefix("• ") || plain.hasPrefix("- ") else { return nil }
+        return AttributedString(line[line.characters.index(line.startIndex, offsetBy: 2)...])
+      }
+      if marked.allSatisfy({ $0 != nil }) { blocks.append(.bullets(marked.compactMap { $0 })); return }
+      var joined = AttributedString()
+      for (offset, line) in paragraph.enumerated() {
+        if offset > 0 { joined.append(AttributedString("\n")) }
+        joined.append(line)
+      }
+      blocks.append(.text(joined))
+    }
+    for line in lines {
+      if line.characters.allSatisfy(\.isWhitespace) { flush() } else { paragraph.append(line) }
+    }
+    flush()
+    return blocks
   }
 
   private static func trimmingNewlines(_ value: AttributedString) -> AttributedString {

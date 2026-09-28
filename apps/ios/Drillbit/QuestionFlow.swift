@@ -63,7 +63,11 @@ struct QuestionFlow: View {
     let blocks = QuestionMarkup.blocks(question?.displayPrompt ?? draft?.prompt ?? "", formatted: model.settings.formatsQuestions)
     for (index, block) in blocks.enumerated() {
       switch block {
-      case .text(let value): segments.append(StreamSegment(style: .body, text: value, identifier: index == 0 ? "previewPrompt" : nil))
+      case .text(let value):
+        let ask = QuestionMarkup.isAsk(index, of: blocks) && (question != nil || String(value.characters).hasSuffix("?"))
+        segments.append(StreamSegment(style: ask ? .ask : .body, text: value, identifier: index == 0 ? "previewPrompt" : nil))
+      case .bullets(let items):
+        segments += items.map { StreamSegment(style: .bullet, text: $0) }
       case .code(let value): segments.append(StreamSegment(style: .code, text: AttributedString(value)))
       }
     }

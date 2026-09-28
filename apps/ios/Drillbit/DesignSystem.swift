@@ -811,7 +811,7 @@ struct RevealRenderer: TextRenderer {
 
 /// One piece of streamed copy. Fixed copy is known upfront, so it never proves that the text before it is complete.
 struct StreamSegment {
-  enum Style { case eyebrow, title, note, body, code }
+  enum Style { case eyebrow, title, note, body, bullet, ask, code }
   var style: Style
   var text: AttributedString
   var fixed = false
@@ -901,6 +901,10 @@ struct StreamingDocument: View {
           .textRenderer(renderer)
           .textSelection(.enabled)
           .accessibilityIdentifier(segment.identifier ?? "")
+      case .bullet:
+        QuestionBullet(text: text.textRenderer(renderer)).opacity(paused || shown > 0 ? 1 : 0)
+      case .ask:
+        QuestionAsk(text: text.textRenderer(renderer)).accessibilityIdentifier(segment.identifier ?? "")
       case .code:
         CodeBlock(text: text, renderer: renderer)
           .opacity(paused ? 1 : min(1, max(0, shown / 4)))
@@ -934,16 +938,46 @@ struct QuestionBody: View {
   var body: some View {
     let blocks = QuestionMarkup.blocks(markup, formatted: formatsQuestions)
     VStack(alignment: .leading, spacing: 12) {
-      ForEach(Array((lineLimit == nil ? blocks : Array(blocks.prefix(1))).enumerated()), id: \.offset) { _, block in
+      ForEach(Array((lineLimit == nil ? blocks : Array(blocks.prefix(1))).enumerated()), id: \.offset) { index, block in
         switch block {
+        case .text(let value) where lineLimit == nil && QuestionMarkup.isAsk(index, of: blocks):
+          QuestionAsk(text: Text(value))
         case .text(let value):
           Text(value).lineLimit(lineLimit).fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
+        case .bullets(let items):
+          VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(items.enumerated()), id: \.offset) { _, item in QuestionBullet(text: Text(item)) }
+          }
         case .code(let value):
           CodeBlock(text: Text(value)).lineLimit(lineLimit)
         }
       }
     }
+  }
+}
+
+/// A key fact: accent dot with a hanging indent.
+struct QuestionBullet<Content: View>: View {
+  let text: Content
+  var body: some View {
+    HStack(alignment: .firstTextBaseline, spacing: 12) {
+      Circle().fill(AppPalette.accent).frame(width: 5, height: 5).alignmentGuide(.firstTextBaseline) { $0[.bottom] + 4 }
+        .accessibilityHidden(true)
+      text.fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, alignment: .leading)
+    }
+  }
+}
+
+/// The question's closing ask: the one thing to answer, set apart from the setup.
+struct QuestionAsk<Content: View>: View {
+  let text: Content
+  var body: some View {
+    text.fontWeight(.semibold).foregroundStyle(AppPalette.primary)
+      .fixedSize(horizontal: false, vertical: true)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.leading, 12)
+      .overlay(alignment: .leading) { Capsule().fill(AppPalette.accent).frame(width: 3) }
   }
 }
 
