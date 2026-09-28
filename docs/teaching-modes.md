@@ -12,6 +12,26 @@ Current product labels: Guided / Practice (default) / Mock interview. Wire value
 
 All three retain the playful, patient practice-partner character. Banter need not become a technical question. Humor targets imaginary systems, not the learner. No hidden requirements, invented progress, automatic finishing or inference of independent mastery from coached work. A valid alternative is not a mistake merely because the model prefers another design.
 
+### Endings — 28 September 2026
+
+Each style ends differently (`endingPolicy` in `prompts/teaching.ts`, feedback prompt `feedback-v3`). The summary job reads the style from the frozen question data and requires that style's extra output, so strict schemas stay free of optional fields. The stored reflection records `guidanceMode`.
+
+| Style | Ending | Extra output |
+|---|---|---|
+| Guided | Lesson recap: "What you worked out", then "Try it solo" | `lesson { learned[0–3], tryAlone }` |
+| Practice | Coaching summary (unchanged) | none |
+| Mock interview | Debrief: a verdict first, then how each area landed and what would pass | `debrief { verdict: pass \| borderline \| not_yet, reason, signals[requirements, design, trade_offs, communication], toPass }` |
+
+The mock verdict judges the answer against the round at the stated level, not the person, and it is not a hiring decision. With little technical work, grounding forces `not_yet` with "There wasn't enough design to judge yet." Reflections written before this change have no extra part and render as Practice.
+
+### Mock interview runs on the clock
+
+- The generator sets `minutes` (10–60) for every question; only Mock interview shows it. Pooled and older questions fall back by level (`roundMinutes`).
+- Starting a question stamps `startedAt` in the challenge data (start route, Library start, retry moment). The clock counts from it, keeps running if you leave, and then counts overtime. It never ends the round.
+- The interviewer receives `interview.timing { limitMinutes, elapsedMinutes }` in text and voice. The mock policy paces it like a real round: steer to the key open decision past halfway, give one short five-minute warning, and invite Finish when time is up.
+- Mock hides Nudge and Show an example. Asking for help in words still works, as the policy requires.
+- Company targeting (future): a target company's format would extend the mock policy, time limit and debrief bar in `teaching.ts`. The question contract and grounding rules would not change.
+
 Choose **Session style** in Prepare or the interview’s … menu. Choices apply to that attempt, not global difficulty. Changing modes preserves the draft and sends no paid request. A pending reply or live audio blocks mode changes. Text and voice share the same conversation policy; voice adds spoken-delivery constraints.
 
 ## Implementation
