@@ -696,7 +696,7 @@ import WidgetKit
         throw APIError(code: "generation_failed", message: "Question preparation failed. Your previous question is safe.", status: 503)
       }
       #endif
-      let challenge = Challenge(guidanceMode: preparation?.guidanceMode ?? .coachMe, warmUp: preparation?.warmUp, interviewStyle: preparation?.interviewStyle ?? .standard, engineeringLevel: preparation?.engineeringLevel ?? settings.selectedLevel,
+      let challenge = Challenge(guidanceMode: preparation?.guidanceMode ?? .coachMe, warmUp: preparation?.warmUp, minutes: 20, interviewStyle: preparation?.interviewStyle ?? .standard, engineeringLevel: preparation?.engineeringLevel ?? settings.selectedLevel,
         id: UUID().uuidString, lifecycle: "ready", title: "Design a reliable job queue",
         prompt: "Design a reliable job queue. Explain retries, ordering, and how failures are handled.",
         topic: preparation?.focus ?? settings.focus, session: SessionDraft(answer: "", revision: 0))
@@ -787,7 +787,7 @@ import WidgetKit
       }
       #endif
       if !fixture { loaded = try await api.send("challenges/\(challenge.id)/start", method: "POST") }
-      else { loaded.lifecycle = "in_progress" }
+      else { loaded.lifecycle = "in_progress"; loaded.startedAt = Date().ISO8601Format() }
     }
     guard loaded.isActive else { throw APIError(code: "inactive", message: "This session is no longer available to start.", status: 409) }
     guard bootstrap?.account.id == account else { throw CancellationError() }
@@ -942,6 +942,23 @@ import WidgetKit
         improve: "Explain what happens when work finishes but its acknowledgement is lost.",
         takeaway: "Make retries safe before making them automatic.",
         strengths: ["Queue durability"], gaps: ["Retry safety"])
+      switch challenge.guidanceMode {
+      case .learnTogether:
+        completed.reflection?.guidanceMode = .learnTogether
+        completed.reflection?.lesson = Lesson(learned: ["A lease lets another worker take over a stalled job", "Retries need a stable operation ID to stay safe"], tryAlone: "Design retries for a payment webhook without any hints.")
+      case .mockInterview:
+        completed.reflection?.guidanceMode = .mockInterview
+        completed.reflection?.debrief = Debrief(
+          verdict: .borderline, reason: "Durable ownership is solid, but a lost acknowledgement would still run the job twice.",
+          signals: [
+            .init(area: "requirements", rating: "strong", note: "Pinned down retries and ordering early."),
+            .init(area: "design", rating: "mixed", note: "Leases are right; completion isn't idempotent yet."),
+            .init(area: "trade_offs", rating: "weak", note: "Didn't weigh at-least-once against exactly-once."),
+            .init(area: "communication", rating: "strong", note: "Clear, in a sensible order."),
+          ],
+          toPass: "Show how a retry recognises work that already finished before running it again.")
+      default: break
+      }
       if !challenge.isWarmUp { memory.sessions.insert(completed, at: 0) }
     }
     bootstrap?.challenge = nil

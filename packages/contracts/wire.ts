@@ -58,6 +58,9 @@ const challenge = challengeSchema.extend({
   guidanceMode: guidanceModeSchema.optional(),
   // Onboarding warm-up: excluded from progress, Recall, evidence and history.
   warmUp: z.boolean().optional(),
+  // The round's time budget (set by the generator) and when the session started; Mock interview runs on this clock.
+  minutes: z.number().int().optional(),
+  startedAt: z.string().optional(),
   interview: interview.optional(),
   difficulty: z.enum(["easy", "medium", "hard"]).optional(),
   engineeringLevel: engineeringLevelSchema.optional(),

@@ -7,6 +7,15 @@ import { conceptId, questionMetadata } from "./taxonomy";
 export const MODEL_ID = "openai/gpt-6-luna";
 export const engineeringLevelSchema = z.enum(["intern", "junior", "mid", "senior", "staff", "principal"]);
 export const levelForDifficulty = (difficulty: string) => difficulty === "easy" ? "junior" : difficulty === "hard" ? "senior" : "mid";
+/** A mock round's time budget; the generator sets `minutes`, and older or pooled questions fall back by level. */
+export function roundMinutes(data: { minutes?: unknown; engineeringLevel?: unknown }): number {
+  if (typeof data.minutes === "number") return data.minutes;
+  return ({ intern: 20, junior: 25, mid: 30, senior: 35, staff: 45, principal: 45 } as Record<string, number>)[String(data.engineeringLevel)] ?? 30;
+}
+export function roundTiming(data: { minutes?: unknown; engineeringLevel?: unknown; startedAt?: unknown }, fallbackStart: string, now = Date.now()) {
+  const started = Date.parse(typeof data.startedAt === "string" ? data.startedAt : fallbackStart);
+  return { limitMinutes: roundMinutes(data), elapsedMinutes: Math.max(0, Math.floor((now - started) / 60000)) };
+}
 export const practiceProfileSchema = z.object({
   goals: z.string().trim().max(600).default(""),
   background: z.string().trim().max(600).default(""),
@@ -77,6 +86,20 @@ export const learningEvidenceSchema = z.object({
   assistance: z.enum(["assisted", "unknown"]),
   sourceTurnId: z.string().optional(),
 });
+export const lessonSchema = z.object({
+  learned: z.array(z.string().min(1).max(160)).max(3),
+  tryAlone: z.string().min(1).max(300),
+});
+export const debriefSchema = z.object({
+  verdict: z.enum(["pass", "borderline", "not_yet"]),
+  reason: z.string().min(1).max(300),
+  signals: z.array(z.object({
+    area: z.enum(["requirements", "design", "trade_offs", "communication"]),
+    rating: z.enum(["strong", "mixed", "weak", "not_shown"]),
+    note: z.string().max(200),
+  })).max(4),
+  toPass: z.string().max(300),
+});
 export const reflectionSchema = z.object({
   evidence: z.array(learningEvidenceSchema).max(3).optional(),
   nextExercise: z.string().min(1).max(400).optional(),
@@ -86,6 +109,10 @@ export const reflectionSchema = z.object({
   takeaway: z.string().min(1).max(1000),
   strengths: z.array(z.string().max(80)).max(4),
   gaps: z.array(z.string().max(80)).max(4),
+  // Each session style ends differently; absent on reflections written before endings existed.
+  guidanceMode: guidanceModeSchema.optional(),
+  lesson: lessonSchema.optional(),
+  debrief: debriefSchema.optional(),
 });
 export const exampleSchema = z.object({
   overview: z.string().min(1).max(3000),
@@ -204,7 +231,7 @@ export function helpSchemaFor(kind: string) {
   });
 }
 
-export const reflectionOutputSchema = reflectionSchema.extend({
+export const reflectionOutputSchema = reflectionSchema.omit({ guidanceMode: true, lesson: true, debrief: true }).extend({
   // Attribution is derived from saved answer turns after inference. It is not
   // model output, and optional properties violate Luna's strict JSON schema.
   evidence: z.array(learningEvidenceSchema.omit({ sourceTurnId: true })).max(2),
@@ -216,3 +243,9 @@ export const reflectionOutputSchema = reflectionSchema.extend({
   improve: z.string().max(500),
   takeaway: z.string().max(300),
 });
+/** The ending's extra part is required model output for its mode, so strict schemas stay free of optional fields. */
+export function reflectionOutputFor(mode: string) {
+  if (mode === "learn_together") return reflectionOutputSchema.extend({ lesson: lessonSchema });
+  if (mode === "mock_interview") return reflectionOutputSchema.extend({ debrief: debriefSchema.extend({ signals: debriefSchema.shape.signals.length(4) }) });
+  return reflectionOutputSchema;
+}

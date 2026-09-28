@@ -834,6 +834,45 @@ final class PracticeUITests: XCTestCase {
     capture("Largest practice modes light", app)
   }
 
+  func testMockInterviewRunsOnTheClockAndEndsWithADebrief() throws {
+    continueAfterFailure = false
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures", "--fixture-dashboard"]
+    app.launch()
+    XCTAssertTrue(app.buttons["Prepare question"].waitForExistence(timeout: 10))
+    app.buttons["Prepare question"].tap()
+    app.buttons["interviewStyle"].tap()
+    let mock = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Mock interview")).firstMatch
+    XCTAssertTrue(mock.waitForExistence(timeout: 5)); mock.tap()
+    app.navigationBars.buttons.element(boundBy: 0).tap()
+    app.buttons["submitPreparation"].tap()
+    XCTAssertTrue(app.buttons["previewStart"].waitForExistence(timeout: 10))
+    app.buttons["previewStart"].tap()
+    let clock = app.descendants(matching: .any)["roundClock"]
+    XCTAssertTrue(clock.waitForExistence(timeout: 5))
+    XCTAssertTrue(clock.label.hasSuffix("minutes left"), clock.label)
+    capture("Mock interview clock", app)
+    // A real round: no nudge or example on tap, only Finish.
+    app.buttons["interviewOptions"].tap()
+    XCTAssertTrue(app.buttons["Finish interview"].waitForExistence(timeout: 3))
+    XCTAssertFalse(app.buttons["Show an example"].exists)
+    XCTAssertFalse(app.buttons["Need a nudge?"].exists)
+    app.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.6)).tap()
+    let editor = app.descendants(matching: .any).matching(identifier: "answerEditor").firstMatch
+    XCTAssertTrue(editor.waitForExistence(timeout: 5))
+    editor.tap(); editor.typeText("Workers lease jobs and record every attempt durably.")
+    app.buttons["shareAnswer"].tap()
+    XCTAssertTrue(app.staticTexts["What happens if a worker stops after completing the operation but before acknowledging it?"].waitForExistence(timeout: 8))
+    app.buttons["interviewOptions"].tap()
+    app.buttons["Finish interview"].tap()
+    app.alerts.buttons["Finish interview"].tap()
+    XCTAssertTrue(app.staticTexts["INTERVIEW DEBRIEF"].waitForExistence(timeout: 8))
+    XCTAssertTrue(app.staticTexts["Borderline. Could go either way."].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.staticTexts["TO PASS"].exists)
+    XCTAssertFalse(clock.exists, "The clock stops once the round is over")
+    capture("Mock interview debrief", app)
+  }
+
   func testInterviewStyle() throws {
     continueAfterFailure = false
     let app = XCUIApplication()

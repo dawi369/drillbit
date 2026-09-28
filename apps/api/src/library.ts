@@ -250,7 +250,7 @@ export async function startQuestion(
   await env.DB.batch([
     env.DB.prepare(
       "INSERT OR IGNORE INTO challenges(id,account_id,lifecycle,data,created_at,available_at) SELECT ?,?,'in_progress',?,?,? WHERE NOT EXISTS(SELECT 1 FROM challenges WHERE account_id=? AND lifecycle IN ('ready','in_progress'))",
-    ).bind(command, account, q.data, now, now, account),
+    ).bind(command, account, JSON.stringify({ ...JSON.parse(q.data), startedAt: now }), now, now, account),
     env.DB.prepare(
       "INSERT OR IGNORE INTO question_attempts SELECT ?,? WHERE EXISTS(SELECT 1 FROM challenges WHERE id=? AND account_id=?)",
     ).bind(command, id, command, account),

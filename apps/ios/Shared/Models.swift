@@ -92,6 +92,29 @@ struct Reflection: Codable, Sendable {
   var takeaway: String
   var strengths: [String]
   var gaps: [String]
+  /// Each session style ends differently; older reflections have none of these.
+  var guidanceMode: GuidanceMode? = nil
+  var lesson: Lesson? = nil
+  var debrief: Debrief? = nil
+}
+/// Guided's ending: what the learner worked out, and one thing to try alone.
+struct Lesson: Codable, Sendable {
+  var learned: [String]
+  var tryAlone: String
+}
+/// Mock interview's ending: would this answer clear the round, and why.
+struct Debrief: Codable, Sendable {
+  enum Verdict: String, Codable, Sendable { case pass, borderline, notYet = "not_yet" }
+  struct Signal: Codable, Sendable, Identifiable {
+    var area: String
+    var rating: String
+    var note: String
+    var id: String { area }
+  }
+  var verdict: Verdict
+  var reason: String
+  var signals: [Signal]
+  var toPass: String
 }
 struct ExampleAnswer: Codable, Sendable {
   struct Part: Codable, Identifiable, Sendable {
@@ -120,6 +143,9 @@ struct Challenge: Codable, Identifiable, Sendable {
   /// Onboarding warm-up: a real generated interview that the server never counts.
   var warmUp: Bool? = nil
   var isWarmUp: Bool { warmUp == true }
+  /// The round's time budget, set by the generator, and when it started; Mock interview runs on this clock.
+  var minutes: Int? = nil
+  var startedAt: String? = nil
   var interviewStyle: InterviewStyle?
   var interview: InterviewState?
   var engineeringLevel: String?

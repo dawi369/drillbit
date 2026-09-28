@@ -100,7 +100,7 @@ export async function retryMoment(env: Env, account: string, sourceId: string, t
   const original = JSON.parse(source.data) as Record<string,unknown>;
   const now = timestamp();
   const data = { ...original, title: `${String(original.title ?? "Interview").slice(0,148)} · Retry`, prompt: turn.prompt,
-    selectionReason: "Retry a moment from a completed interview" };
+    selectionReason: "Retry a moment from a completed interview", startedAt: now };
   await env.DB.batch([
     env.DB.prepare("INSERT INTO challenges(id,account_id,lifecycle,data,created_at,available_at,command_id) VALUES(?,?,'in_progress',?,?,?,?)")
       .bind(command,account,JSON.stringify(data),now,now,command),
@@ -131,7 +131,11 @@ export function groundReflection(raw: unknown, context: any) {
   if (socialOnly) return {...result, summary: "We got acquainted; there isn’t a design to reflect on yet.", worked: [],
     improve: "When you’re ready, pick one piece of the problem to start with.",
     takeaway: "A small first decision is enough to get going.", strengths: [], gaps: [], evidence: [],
-    nextExercise: "Choose one component in the original question and explain its responsibility."};
+    nextExercise: "Choose one component in the original question and explain its responsibility.",
+    ...(result.lesson ? { lesson: { learned: [], tryAlone: "Pick one piece of the problem and make a first decision on your own." } } : {}),
+    ...(result.debrief ? { debrief: { verdict: "not_yet" as const, reason: "There wasn’t enough design to judge yet.",
+      signals: result.debrief.signals.map(signal => ({ ...signal, rating: "not_shown" as const, note: "" })),
+      toPass: "Commit to one concrete design decision and say why." } } : {})};
   result.nextExercise ??= result.improve;
   const concepts: string[] = context.question?.conceptIds ?? context.conceptIds ?? [];
   const assisted = !!context.exampleViewed || (context.adoptions?.length ?? 0) > 0

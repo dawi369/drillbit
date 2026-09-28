@@ -5,6 +5,7 @@ import { boundedContext } from "../src/context";
 import { runJob } from "../src/jobs";
 import { learningEvidence, todayPlan } from "../src/learning";
 import type { Env } from "../src/platform";
+import { roundTiming } from "../src/domain";
 import { accountFor, complete, createJob, detail, settingsFor } from "../src/store";
 import { initializeDatabase } from "./migrations";
 const bindings = {
@@ -24,19 +25,20 @@ afterAll(() => fetchMock.deactivate());
 const sse = (content: string) => (content.match(/[\s\S]{1,24}/g) ?? [])
   .map(part => `data: ${JSON.stringify({ choices: [{ delta: { content: part } }] })}\n\n`).join("") + "data: [DONE]\n\n";
 const streamHeaders = { headers: { "content-type": "text/event-stream" } };
-async function generatedPractice(account: string, warmUp: boolean) {
+async function generatedPractice(account: string, warmUp: boolean, mode = "learn_together") {
   const settings = await settingsFor(bindings, account);
+  const requests: any[] = [];
   const provider = (content: object, stream = false) => fetchMock.get("https://openrouter.ai")
-    .intercept({ path: "/api/v1/chat/completions", method: "POST" })
+    .intercept({ path: "/api/v1/chat/completions", method: "POST", body: (raw: string) => { requests.push(JSON.parse(raw)); return true; } })
     .reply(200, stream ? sse(JSON.stringify(content)) : { choices: [{ message: { content: JSON.stringify(content) } }] }, stream ? streamHeaders : undefined);
   provider({
     kind: "design", scenario: "Link saver", primaryConceptId: "api-design", secondaryConceptIds: [],
     tagEvidence: [{ conceptId: "api-design", requirementIndex: 0 }], targetSkill: "APIs", constraints: [],
-    evaluationCriteria: ["lookup"], ambiguityPolicy: "State assumptions.", title: "Save a link",
+    evaluationCriteria: ["lookup"], ambiguityPolicy: "State assumptions.", title: "Save a link", minutes: 20,
     prompt: `Design a link saver that finds saved links fast (${warmUp ? "warm-up" : "counted"}).`, topic: "system design",
   }, true);
   const id = crypto.randomUUID();
-  await createJob(bindings, account, id, "generate", null, { settings, guidanceMode: "learn_together", primaryConceptId: "api-design", ...(warmUp ? { warmUp: true } : {}) });
+  await createJob(bindings, account, id, "generate", null, { settings, guidanceMode: mode, primaryConceptId: "api-design", ...(warmUp ? { warmUp: true } : {}) });
   await runJob(bindings, id);
   await complete(bindings, account, id, crypto.randomUUID(), "Use a stable request ID for each saved link.", 0, settings);
   const summarize = await bindings.DB.prepare("SELECT id FROM jobs WHERE challenge_id=? AND kind='summarize'").bind(id).first<{ id: string }>();
@@ -44,22 +46,25 @@ async function generatedPractice(account: string, warmUp: boolean) {
     summary: "Clear keys.", worked: ["Stable IDs."], improve: "", takeaway: "Tie the key to the link.", strengths: [], gaps: [],
     nextExercise: "Explain a lost acknowledgement.",
     evidence: [{ conceptId: "api-design", observation: "Used stable IDs.", quote: "Use a stable request ID", signal: "needs_practice", assistance: "unknown" }],
+    ...(mode === "learn_together" ? { lesson: { learned: ["A stable ID lets a retry find the original save"], tryAlone: "Apply stable IDs to a payment retry." } } : {}),
+    ...(mode === "mock_interview" ? { debrief: { verdict: "borderline", reason: "Stable IDs are right; lookup speed was never addressed.", toPass: "Explain the index behind fast lookup.",
+      signals: ["requirements", "design", "trade_offs", "communication"].map(area => ({ area, rating: "mixed", note: "Partly covered." })) } } : {}),
   });
   await runJob(bindings, summarize!.id);
-  return id;
+  return { id, summarizeRequest: requests.at(-1) };
 }
 it("a warm-up is a real generated interview with feedback that never counts, joins the pool or creates Recall", async () => {
   const account = (await accountFor(bindings, crypto.randomUUID())).id;
   await bindings.DB.prepare("UPDATE accounts SET status='active' WHERE id=?").bind(account).run();
-  const counted = await generatedPractice(account, false);
+  const counted = (await generatedPractice(account, false)).id;
   // An eligible pooled question is reused by normal generation, never by a warm-up.
   await bindings.DB.prepare("INSERT INTO questions(id,account_id,data,created_at,eligible,eligibility_updated_at) VALUES(?,?,?,'2026-01-01',1,'2026-01-01')")
     .bind(crypto.randomUUID(), account, JSON.stringify({ title: "Pooled", prompt: "Pooled prompt", primaryConceptId: "api-design", engineeringLevel: (await settingsFor(bindings, account)).engineeringLevel })).run();
-  const warm = await generatedPractice(account, true);
+  const warm = (await generatedPractice(account, true)).id;
   fetchMock.assertNoPendingInterceptors();
   const warmDetail = await detail(bindings, account, warm);
-  expect(warmDetail).toMatchObject({ warmUp: true, lifecycle: "completed", title: "Save a link" });
-  expect(warmDetail.reflection).toMatchObject({ summary: "Clear keys." });
+  expect(warmDetail).toMatchObject({ warmUp: true, lifecycle: "completed", title: "Save a link", minutes: 20 });
+  expect(warmDetail.reflection).toMatchObject({ summary: "Clear keys.", guidanceMode: "learn_together", lesson: { learned: ["A stable ID lets a retry find the original save"] } });
   expect((await detail(bindings, account, counted) as { warmUp?: boolean }).warmUp).toBeUndefined();
   const rows = (sql: string, id: string) => bindings.DB.prepare(sql).bind(id).all().then(r => r.results.length);
   expect(await rows("SELECT 1 FROM question_attempts WHERE challenge_id=?", warm)).toBe(0);
@@ -68,6 +73,24 @@ it("a warm-up is a real generated interview with feedback that never counts, joi
   expect(await rows("SELECT 1 FROM recall_cards WHERE source_challenge_id=?", counted)).toBe(1);
   expect((await todayPlan(bindings, account, null, await settingsFor(bindings, account))).completedTotal).toBe(1);
   expect((await learningEvidence(bindings, account)).map(e => e.sessionId)).toEqual([counted]);
+});
+it("a mock interview ends with a timed debrief and a verdict, not the coaching summary", async () => {
+  const account = (await accountFor(bindings, crypto.randomUUID())).id;
+  await bindings.DB.prepare("UPDATE accounts SET status='active' WHERE id=?").bind(account).run();
+  const { id, summarizeRequest } = await generatedPractice(account, false, "mock_interview");
+  fetchMock.assertNoPendingInterceptors();
+  expect(summarizeRequest.messages[0].content).toContain('<ending mode="mock_interview">');
+  expect(summarizeRequest.messages[1].content).toContain("limitMinutes");
+  expect(summarizeRequest.response_format.json_schema.schema.required).toContain("debrief");
+  const reflection = (await detail(bindings, account, id)).reflection as any;
+  expect(reflection).toMatchObject({ guidanceMode: "mock_interview", debrief: { verdict: "borderline", toPass: "Explain the index behind fast lookup." } });
+  expect(reflection.debrief.signals).toHaveLength(4);
+  expect(reflection.lesson).toBeUndefined();
+});
+it("a round lasts the generator's minutes, falling back by level, and counts from the start", () => {
+  const start = "2026-09-28T10:00:00.000Z";
+  expect(roundTiming({ minutes: 25, startedAt: start }, "2026-09-28T09:00:00.000Z", Date.parse(start) + 10.5 * 60000)).toEqual({ limitMinutes: 25, elapsedMinutes: 10 });
+  expect(roundTiming({ engineeringLevel: "staff" }, start, Date.parse(start))).toEqual({ limitMinutes: 45, elapsedMinutes: 0 });
 });
 it("durably generates a valid challenge and replay does not call the provider again", async () => {
   const account = await accountFor(bindings, crypto.randomUUID());
@@ -100,6 +123,7 @@ it("durably generates a valid challenge and replay does not call the provider ag
               evaluationCriteria: ["local evaluation"],
               ambiguityPolicy: "State reasonable assumptions.",
               title: "Safe flag rollout",
+              minutes: 25,
               prompt:
                 "Design a feature flag control plane that keeps local evaluation available during a regional outage.",
               topic: "system design",

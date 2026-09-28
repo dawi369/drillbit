@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Fault, timestamp } from "./domain";
+import { Fault, roundTiming, timestamp } from "./domain";
 import { historicalSnapshot } from "./history";
 import { consumeUsage, type Env } from "./platform";
 import { INTERVIEW_PROMPT_VERSION } from "./prompts/interviewer";
@@ -70,7 +70,10 @@ export async function requestInterview(env: Env, account: string, id: string, co
   context.style = "standard";
   context.guidanceMode = input.guidanceMode ?? context.guidanceMode;
   const [settings, history] = await Promise.all([settingsFor(env, account), historicalSnapshot(env, account, id, JSON.parse(challenge.data).conceptIds ?? [])]);
-  const payload = JSON.stringify({ settings, action: input, turnId: command, context: { practiceProfile: settings.practiceProfile, promptVersion: INTERVIEW_PROMPT_VERSION, historicalSnapshot: history, currentDraft: session.answer, question: { ...JSON.parse(challenge.data), interviewStyle: context.style }, interview: context } });
+  const data = JSON.parse(challenge.data);
+  // A mock round runs on the clock, so the interviewer can pace it like a real one.
+  const timing = context.guidanceMode === "mock_interview" ? roundTiming(data, challenge.created_at) : undefined;
+  const payload = JSON.stringify({ settings, action: input, turnId: command, context: { practiceProfile: settings.practiceProfile, promptVersion: INTERVIEW_PROMPT_VERSION, historicalSnapshot: history, currentDraft: session.answer, question: { ...data, interviewStyle: context.style }, interview: { ...context, timing } } });
   await env.DB.batch([
     env.DB.prepare(`INSERT OR IGNORE INTO jobs(id,account_id,challenge_id,kind,input,created_at,updated_at) SELECT ?,?,?,'interview',?,?,? WHERE EXISTS(SELECT 1 FROM sessions s JOIN challenges c ON c.id=s.challenge_id WHERE c.id=? AND c.account_id=? AND c.lifecycle='in_progress' AND s.revision=?) AND NOT EXISTS(SELECT 1 FROM jobs WHERE account_id=? AND kind='interview' AND status IN ('pending','running')) AND NOT EXISTS(SELECT 1 FROM voice_sessions WHERE account_id=? AND status IN ('connecting','active') AND expires_at>?)`).bind(command,account,id,payload,now,now,id,account,input.revision,account,account,now),
     env.DB.prepare(`INSERT INTO interview_turns(id,challenge_id,ordinal,kind,prompt,text,job_id,created_at) SELECT ?,?,COALESCE((SELECT MAX(ordinal)+1 FROM interview_turns WHERE challenge_id=?),0),?,?,?,?,? WHERE EXISTS(SELECT 1 FROM jobs WHERE id=?)`).bind(command,id,id,input.kind,context.prompt,input.text,command,now,command),

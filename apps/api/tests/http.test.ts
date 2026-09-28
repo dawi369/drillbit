@@ -425,3 +425,16 @@ it('keeps question formatting off when an older client saves settings without it
  expect((await request('settings',subject,'PUT',{reminderEnabled:false})).status).toBe(200);
  expect(((await (await request('bootstrap',subject)).json()) as any).settings.questionFormatting).toBe(false);
 });
+
+it('starting a ready question stamps when the round began',async()=>{
+ const subject=crypto.randomUUID(); const account=await accountFor(bindings,subject);
+ await bindings.DB.prepare("UPDATE accounts SET status='active' WHERE id=?").bind(account.id).run();
+ const id=crypto.randomUUID();
+ await bindings.DB.prepare("INSERT INTO challenges(id,account_id,lifecycle,data,created_at,available_at) VALUES(?,?,'ready',?,'2026-01-01','2026-01-01')").bind(id,account.id,JSON.stringify({title:'Queue',prompt:'Design a durable job queue for retries.',topic:'System design',minutes:30})).run();
+ await bindings.DB.prepare("INSERT INTO sessions(challenge_id,updated_at) VALUES(?,'2026-01-01')").bind(id).run();
+ const before=Date.now();
+ const started=await (await request('challenges/'+id+'/start',subject,'POST')).json() as any;
+ expect(started).toMatchObject({lifecycle:'in_progress',minutes:30});
+ expect(Date.parse(started.startedAt)).toBeGreaterThanOrEqual(before-1000);
+ expect(wire.Challenge.safeParse(started).success).toBe(true);
+});

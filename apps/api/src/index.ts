@@ -439,9 +439,9 @@ app.post("/v1/challenges/:id/start", async (c) => {
     id = c.req.param("id");
   await ownedChallenge(c.env, a, id);
   await c.env.DB.prepare(
-    "UPDATE challenges SET lifecycle='in_progress' WHERE id=? AND account_id=? AND lifecycle='ready'",
+    "UPDATE challenges SET lifecycle='in_progress',data=json_set(data,'$.startedAt',?) WHERE id=? AND account_id=? AND lifecycle='ready'",
   )
-    .bind(id, a)
+    .bind(timestamp(), id, a)
     .run();
   return c.json(await detail(c.env, a, id));
 });

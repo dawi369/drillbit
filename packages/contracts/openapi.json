@@ -6422,6 +6422,14 @@
                 "warmUp": {
                   "type": "boolean"
                 },
+                "minutes": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "startedAt": {
+                  "type": "string"
+                },
                 "interview": {
                   "type": "object",
                   "properties": {
@@ -6842,6 +6850,104 @@
                             "type": "string",
                             "maxLength": 80
                           }
+                        },
+                        "guidanceMode": {
+                          "type": "string",
+                          "enum": [
+                            "learn_together",
+                            "coach_me",
+                            "mock_interview"
+                          ]
+                        },
+                        "lesson": {
+                          "type": "object",
+                          "properties": {
+                            "learned": {
+                              "maxItems": 3,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              }
+                            },
+                            "tryAlone": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 300
+                            }
+                          },
+                          "required": [
+                            "learned",
+                            "tryAlone"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "debrief": {
+                          "type": "object",
+                          "properties": {
+                            "verdict": {
+                              "type": "string",
+                              "enum": [
+                                "pass",
+                                "borderline",
+                                "not_yet"
+                              ]
+                            },
+                            "reason": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 300
+                            },
+                            "signals": {
+                              "maxItems": 4,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "area": {
+                                    "type": "string",
+                                    "enum": [
+                                      "requirements",
+                                      "design",
+                                      "trade_offs",
+                                      "communication"
+                                    ]
+                                  },
+                                  "rating": {
+                                    "type": "string",
+                                    "enum": [
+                                      "strong",
+                                      "mixed",
+                                      "weak",
+                                      "not_shown"
+                                    ]
+                                  },
+                                  "note": {
+                                    "type": "string",
+                                    "maxLength": 200
+                                  }
+                                },
+                                "required": [
+                                  "area",
+                                  "rating",
+                                  "note"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "toPass": {
+                              "type": "string",
+                              "maxLength": 300
+                            }
+                          },
+                          "required": [
+                            "verdict",
+                            "reason",
+                            "signals",
+                            "toPass"
+                          ],
+                          "additionalProperties": false
                         }
                       },
                       "required": [
@@ -7702,6 +7808,14 @@
                 "warmUp": {
                   "type": "boolean"
                 },
+                "minutes": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "startedAt": {
+                  "type": "string"
+                },
                 "interview": {
                   "type": "object",
                   "properties": {
@@ -8122,6 +8236,104 @@
                             "type": "string",
                             "maxLength": 80
                           }
+                        },
+                        "guidanceMode": {
+                          "type": "string",
+                          "enum": [
+                            "learn_together",
+                            "coach_me",
+                            "mock_interview"
+                          ]
+                        },
+                        "lesson": {
+                          "type": "object",
+                          "properties": {
+                            "learned": {
+                              "maxItems": 3,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              }
+                            },
+                            "tryAlone": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 300
+                            }
+                          },
+                          "required": [
+                            "learned",
+                            "tryAlone"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "debrief": {
+                          "type": "object",
+                          "properties": {
+                            "verdict": {
+                              "type": "string",
+                              "enum": [
+                                "pass",
+                                "borderline",
+                                "not_yet"
+                              ]
+                            },
+                            "reason": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 300
+                            },
+                            "signals": {
+                              "maxItems": 4,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "area": {
+                                    "type": "string",
+                                    "enum": [
+                                      "requirements",
+                                      "design",
+                                      "trade_offs",
+                                      "communication"
+                                    ]
+                                  },
+                                  "rating": {
+                                    "type": "string",
+                                    "enum": [
+                                      "strong",
+                                      "mixed",
+                                      "weak",
+                                      "not_shown"
+                                    ]
+                                  },
+                                  "note": {
+                                    "type": "string",
+                                    "maxLength": 200
+                                  }
+                                },
+                                "required": [
+                                  "area",
+                                  "rating",
+                                  "note"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "toPass": {
+                              "type": "string",
+                              "maxLength": 300
+                            }
+                          },
+                          "required": [
+                            "verdict",
+                            "reason",
+                            "signals",
+                            "toPass"
+                          ],
+                          "additionalProperties": false
                         }
                       },
                       "required": [
@@ -10410,6 +10622,14 @@
           "warmUp": {
             "type": "boolean"
           },
+          "minutes": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "startedAt": {
+            "type": "string"
+          },
           "interview": {
             "type": "object",
             "properties": {
@@ -10830,6 +11050,104 @@
                       "type": "string",
                       "maxLength": 80
                     }
+                  },
+                  "guidanceMode": {
+                    "type": "string",
+                    "enum": [
+                      "learn_together",
+                      "coach_me",
+                      "mock_interview"
+                    ]
+                  },
+                  "lesson": {
+                    "type": "object",
+                    "properties": {
+                      "learned": {
+                        "maxItems": 3,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        }
+                      },
+                      "tryAlone": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 300
+                      }
+                    },
+                    "required": [
+                      "learned",
+                      "tryAlone"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "debrief": {
+                    "type": "object",
+                    "properties": {
+                      "verdict": {
+                        "type": "string",
+                        "enum": [
+                          "pass",
+                          "borderline",
+                          "not_yet"
+                        ]
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 300
+                      },
+                      "signals": {
+                        "maxItems": 4,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "area": {
+                              "type": "string",
+                              "enum": [
+                                "requirements",
+                                "design",
+                                "trade_offs",
+                                "communication"
+                              ]
+                            },
+                            "rating": {
+                              "type": "string",
+                              "enum": [
+                                "strong",
+                                "mixed",
+                                "weak",
+                                "not_shown"
+                              ]
+                            },
+                            "note": {
+                              "type": "string",
+                              "maxLength": 200
+                            }
+                          },
+                          "required": [
+                            "area",
+                            "rating",
+                            "note"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "toPass": {
+                        "type": "string",
+                        "maxLength": 300
+                      }
+                    },
+                    "required": [
+                      "verdict",
+                      "reason",
+                      "signals",
+                      "toPass"
+                    ],
+                    "additionalProperties": false
                   }
                 },
                 "required": [
@@ -11293,6 +11611,104 @@
               "type": "string",
               "maxLength": 80
             }
+          },
+          "guidanceMode": {
+            "type": "string",
+            "enum": [
+              "learn_together",
+              "coach_me",
+              "mock_interview"
+            ]
+          },
+          "lesson": {
+            "type": "object",
+            "properties": {
+              "learned": {
+                "maxItems": 3,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                }
+              },
+              "tryAlone": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300
+              }
+            },
+            "required": [
+              "learned",
+              "tryAlone"
+            ],
+            "additionalProperties": false
+          },
+          "debrief": {
+            "type": "object",
+            "properties": {
+              "verdict": {
+                "type": "string",
+                "enum": [
+                  "pass",
+                  "borderline",
+                  "not_yet"
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300
+              },
+              "signals": {
+                "maxItems": 4,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "area": {
+                      "type": "string",
+                      "enum": [
+                        "requirements",
+                        "design",
+                        "trade_offs",
+                        "communication"
+                      ]
+                    },
+                    "rating": {
+                      "type": "string",
+                      "enum": [
+                        "strong",
+                        "mixed",
+                        "weak",
+                        "not_shown"
+                      ]
+                    },
+                    "note": {
+                      "type": "string",
+                      "maxLength": 200
+                    }
+                  },
+                  "required": [
+                    "area",
+                    "rating",
+                    "note"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "toPass": {
+                "type": "string",
+                "maxLength": 300
+              }
+            },
+            "required": [
+              "verdict",
+              "reason",
+              "signals",
+              "toPass"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -11957,6 +12373,14 @@
                   "warmUp": {
                     "type": "boolean"
                   },
+                  "minutes": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "startedAt": {
+                    "type": "string"
+                  },
                   "interview": {
                     "type": "object",
                     "properties": {
@@ -12377,6 +12801,104 @@
                               "type": "string",
                               "maxLength": 80
                             }
+                          },
+                          "guidanceMode": {
+                            "type": "string",
+                            "enum": [
+                              "learn_together",
+                              "coach_me",
+                              "mock_interview"
+                            ]
+                          },
+                          "lesson": {
+                            "type": "object",
+                            "properties": {
+                              "learned": {
+                                "maxItems": 3,
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 160
+                                }
+                              },
+                              "tryAlone": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 300
+                              }
+                            },
+                            "required": [
+                              "learned",
+                              "tryAlone"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "debrief": {
+                            "type": "object",
+                            "properties": {
+                              "verdict": {
+                                "type": "string",
+                                "enum": [
+                                  "pass",
+                                  "borderline",
+                                  "not_yet"
+                                ]
+                              },
+                              "reason": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 300
+                              },
+                              "signals": {
+                                "maxItems": 4,
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "area": {
+                                      "type": "string",
+                                      "enum": [
+                                        "requirements",
+                                        "design",
+                                        "trade_offs",
+                                        "communication"
+                                      ]
+                                    },
+                                    "rating": {
+                                      "type": "string",
+                                      "enum": [
+                                        "strong",
+                                        "mixed",
+                                        "weak",
+                                        "not_shown"
+                                      ]
+                                    },
+                                    "note": {
+                                      "type": "string",
+                                      "maxLength": 200
+                                    }
+                                  },
+                                  "required": [
+                                    "area",
+                                    "rating",
+                                    "note"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "toPass": {
+                                "type": "string",
+                                "maxLength": 300
+                              }
+                            },
+                            "required": [
+                              "verdict",
+                              "reason",
+                              "signals",
+                              "toPass"
+                            ],
+                            "additionalProperties": false
                           }
                         },
                         "required": [
@@ -12967,6 +13489,14 @@
               "warmUp": {
                 "type": "boolean"
               },
+              "minutes": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "startedAt": {
+                "type": "string"
+              },
               "interview": {
                 "type": "object",
                 "properties": {
@@ -13387,6 +13917,104 @@
                           "type": "string",
                           "maxLength": 80
                         }
+                      },
+                      "guidanceMode": {
+                        "type": "string",
+                        "enum": [
+                          "learn_together",
+                          "coach_me",
+                          "mock_interview"
+                        ]
+                      },
+                      "lesson": {
+                        "type": "object",
+                        "properties": {
+                          "learned": {
+                            "maxItems": 3,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 160
+                            }
+                          },
+                          "tryAlone": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 300
+                          }
+                        },
+                        "required": [
+                          "learned",
+                          "tryAlone"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "debrief": {
+                        "type": "object",
+                        "properties": {
+                          "verdict": {
+                            "type": "string",
+                            "enum": [
+                              "pass",
+                              "borderline",
+                              "not_yet"
+                            ]
+                          },
+                          "reason": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 300
+                          },
+                          "signals": {
+                            "maxItems": 4,
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "area": {
+                                  "type": "string",
+                                  "enum": [
+                                    "requirements",
+                                    "design",
+                                    "trade_offs",
+                                    "communication"
+                                  ]
+                                },
+                                "rating": {
+                                  "type": "string",
+                                  "enum": [
+                                    "strong",
+                                    "mixed",
+                                    "weak",
+                                    "not_shown"
+                                  ]
+                                },
+                                "note": {
+                                  "type": "string",
+                                  "maxLength": 200
+                                }
+                              },
+                              "required": [
+                                "area",
+                                "rating",
+                                "note"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "toPass": {
+                            "type": "string",
+                            "maxLength": 300
+                          }
+                        },
+                        "required": [
+                          "verdict",
+                          "reason",
+                          "signals",
+                          "toPass"
+                        ],
+                        "additionalProperties": false
                       }
                     },
                     "required": [
@@ -13942,6 +14570,14 @@
                   "warmUp": {
                     "type": "boolean"
                   },
+                  "minutes": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "startedAt": {
+                    "type": "string"
+                  },
                   "interview": {
                     "type": "object",
                     "properties": {
@@ -14362,6 +14998,104 @@
                               "type": "string",
                               "maxLength": 80
                             }
+                          },
+                          "guidanceMode": {
+                            "type": "string",
+                            "enum": [
+                              "learn_together",
+                              "coach_me",
+                              "mock_interview"
+                            ]
+                          },
+                          "lesson": {
+                            "type": "object",
+                            "properties": {
+                              "learned": {
+                                "maxItems": 3,
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 160
+                                }
+                              },
+                              "tryAlone": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 300
+                              }
+                            },
+                            "required": [
+                              "learned",
+                              "tryAlone"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "debrief": {
+                            "type": "object",
+                            "properties": {
+                              "verdict": {
+                                "type": "string",
+                                "enum": [
+                                  "pass",
+                                  "borderline",
+                                  "not_yet"
+                                ]
+                              },
+                              "reason": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 300
+                              },
+                              "signals": {
+                                "maxItems": 4,
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "area": {
+                                      "type": "string",
+                                      "enum": [
+                                        "requirements",
+                                        "design",
+                                        "trade_offs",
+                                        "communication"
+                                      ]
+                                    },
+                                    "rating": {
+                                      "type": "string",
+                                      "enum": [
+                                        "strong",
+                                        "mixed",
+                                        "weak",
+                                        "not_shown"
+                                      ]
+                                    },
+                                    "note": {
+                                      "type": "string",
+                                      "maxLength": 200
+                                    }
+                                  },
+                                  "required": [
+                                    "area",
+                                    "rating",
+                                    "note"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "toPass": {
+                                "type": "string",
+                                "maxLength": 300
+                              }
+                            },
+                            "required": [
+                              "verdict",
+                              "reason",
+                              "signals",
+                              "toPass"
+                            ],
+                            "additionalProperties": false
                           }
                         },
                         "required": [
@@ -14943,6 +15677,14 @@
                 "warmUp": {
                   "type": "boolean"
                 },
+                "minutes": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "startedAt": {
+                  "type": "string"
+                },
                 "interview": {
                   "type": "object",
                   "properties": {
@@ -15363,6 +16105,104 @@
                             "type": "string",
                             "maxLength": 80
                           }
+                        },
+                        "guidanceMode": {
+                          "type": "string",
+                          "enum": [
+                            "learn_together",
+                            "coach_me",
+                            "mock_interview"
+                          ]
+                        },
+                        "lesson": {
+                          "type": "object",
+                          "properties": {
+                            "learned": {
+                              "maxItems": 3,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              }
+                            },
+                            "tryAlone": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 300
+                            }
+                          },
+                          "required": [
+                            "learned",
+                            "tryAlone"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "debrief": {
+                          "type": "object",
+                          "properties": {
+                            "verdict": {
+                              "type": "string",
+                              "enum": [
+                                "pass",
+                                "borderline",
+                                "not_yet"
+                              ]
+                            },
+                            "reason": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 300
+                            },
+                            "signals": {
+                              "maxItems": 4,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "area": {
+                                    "type": "string",
+                                    "enum": [
+                                      "requirements",
+                                      "design",
+                                      "trade_offs",
+                                      "communication"
+                                    ]
+                                  },
+                                  "rating": {
+                                    "type": "string",
+                                    "enum": [
+                                      "strong",
+                                      "mixed",
+                                      "weak",
+                                      "not_shown"
+                                    ]
+                                  },
+                                  "note": {
+                                    "type": "string",
+                                    "maxLength": 200
+                                  }
+                                },
+                                "required": [
+                                  "area",
+                                  "rating",
+                                  "note"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "toPass": {
+                              "type": "string",
+                              "maxLength": 300
+                            }
+                          },
+                          "required": [
+                            "verdict",
+                            "reason",
+                            "signals",
+                            "toPass"
+                          ],
+                          "additionalProperties": false
                         }
                       },
                       "required": [
@@ -15945,6 +16785,14 @@
                 "warmUp": {
                   "type": "boolean"
                 },
+                "minutes": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "startedAt": {
+                  "type": "string"
+                },
                 "interview": {
                   "type": "object",
                   "properties": {
@@ -16365,6 +17213,104 @@
                             "type": "string",
                             "maxLength": 80
                           }
+                        },
+                        "guidanceMode": {
+                          "type": "string",
+                          "enum": [
+                            "learn_together",
+                            "coach_me",
+                            "mock_interview"
+                          ]
+                        },
+                        "lesson": {
+                          "type": "object",
+                          "properties": {
+                            "learned": {
+                              "maxItems": 3,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              }
+                            },
+                            "tryAlone": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 300
+                            }
+                          },
+                          "required": [
+                            "learned",
+                            "tryAlone"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "debrief": {
+                          "type": "object",
+                          "properties": {
+                            "verdict": {
+                              "type": "string",
+                              "enum": [
+                                "pass",
+                                "borderline",
+                                "not_yet"
+                              ]
+                            },
+                            "reason": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 300
+                            },
+                            "signals": {
+                              "maxItems": 4,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "area": {
+                                    "type": "string",
+                                    "enum": [
+                                      "requirements",
+                                      "design",
+                                      "trade_offs",
+                                      "communication"
+                                    ]
+                                  },
+                                  "rating": {
+                                    "type": "string",
+                                    "enum": [
+                                      "strong",
+                                      "mixed",
+                                      "weak",
+                                      "not_shown"
+                                    ]
+                                  },
+                                  "note": {
+                                    "type": "string",
+                                    "maxLength": 200
+                                  }
+                                },
+                                "required": [
+                                  "area",
+                                  "rating",
+                                  "note"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "toPass": {
+                              "type": "string",
+                              "maxLength": 300
+                            }
+                          },
+                          "required": [
+                            "verdict",
+                            "reason",
+                            "signals",
+                            "toPass"
+                          ],
+                          "additionalProperties": false
                         }
                       },
                       "required": [
@@ -16884,6 +17830,14 @@
                   "warmUp": {
                     "type": "boolean"
                   },
+                  "minutes": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "startedAt": {
+                    "type": "string"
+                  },
                   "interview": {
                     "type": "object",
                     "properties": {
@@ -17304,6 +18258,104 @@
                               "type": "string",
                               "maxLength": 80
                             }
+                          },
+                          "guidanceMode": {
+                            "type": "string",
+                            "enum": [
+                              "learn_together",
+                              "coach_me",
+                              "mock_interview"
+                            ]
+                          },
+                          "lesson": {
+                            "type": "object",
+                            "properties": {
+                              "learned": {
+                                "maxItems": 3,
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 160
+                                }
+                              },
+                              "tryAlone": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 300
+                              }
+                            },
+                            "required": [
+                              "learned",
+                              "tryAlone"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "debrief": {
+                            "type": "object",
+                            "properties": {
+                              "verdict": {
+                                "type": "string",
+                                "enum": [
+                                  "pass",
+                                  "borderline",
+                                  "not_yet"
+                                ]
+                              },
+                              "reason": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 300
+                              },
+                              "signals": {
+                                "maxItems": 4,
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "area": {
+                                      "type": "string",
+                                      "enum": [
+                                        "requirements",
+                                        "design",
+                                        "trade_offs",
+                                        "communication"
+                                      ]
+                                    },
+                                    "rating": {
+                                      "type": "string",
+                                      "enum": [
+                                        "strong",
+                                        "mixed",
+                                        "weak",
+                                        "not_shown"
+                                      ]
+                                    },
+                                    "note": {
+                                      "type": "string",
+                                      "maxLength": 200
+                                    }
+                                  },
+                                  "required": [
+                                    "area",
+                                    "rating",
+                                    "note"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "toPass": {
+                                "type": "string",
+                                "maxLength": 300
+                              }
+                            },
+                            "required": [
+                              "verdict",
+                              "reason",
+                              "signals",
+                              "toPass"
+                            ],
+                            "additionalProperties": false
                           }
                         },
                         "required": [

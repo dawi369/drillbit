@@ -3,7 +3,7 @@ import { guidanceModeSchema, teachingPolicy, truthfulVoiceProgress, TEACHING_VER
 import { spokenHistory, questionReference, voiceDelegationMessages } from "./prompts/voice-context";
 import { questionTerminology, practicePersonality } from "./prompts/interviewer";
 import { z } from 'zod';
-import { Fault, timestamp, practiceProfileSchema } from './domain';
+import { Fault, timestamp, practiceProfileSchema, roundTiming } from './domain';
 import { consumeUsage, type Env } from './platform';
 import { ownedChallenge, settingsFor } from './store';
 import { interviewFor } from './interview';
@@ -116,7 +116,9 @@ export async function delegateVoice(env:Env,account:string,challenge:string,id:s
   await consumeVoiceUsage(env,account,'voice_reasoning',40);
   const [settings,history,interview,voiceJob]=await Promise.all([settingsFor(env,account),historicalSnapshot(env,account,challenge,JSON.parse(c.data).conceptIds ?? []),interviewFor(env,account,challenge),env.DB.prepare("SELECT input FROM jobs WHERE id=? AND account_id=?").bind(id,account).first<{input:string}>()]);
   const pinnedProfile=voiceJob ? JSON.parse(voiceJob.input).practiceProfile : undefined;
-  const messages=voiceDelegationMessages(JSON.parse(c.data),history,interview,pinnedProfile ?? settings.practiceProfile);
+  const data=JSON.parse(c.data);
+  const timing=interview.guidanceMode==='mock_interview'?roundTiming(data,c.created_at):undefined;
+  const messages=voiceDelegationMessages(data,history,{...interview,timing},pinnedProfile ?? settings.practiceProfile);
   const contextMs=Date.now()-started;
   const voiceSchema=interviewModelSchema({promptVersion:"interviewer-teaching-v3"},z.object({}));
   const response=await provider(env,account,settings,messages,{maxTokens:900,schema:voiceSchema,reasoning:{enabled:false},signal:deadline});

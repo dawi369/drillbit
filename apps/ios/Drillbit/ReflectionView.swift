@@ -2,14 +2,104 @@ import SwiftUI
 
 struct CompletionHeading: View {
   var warmUp = false
+  var mode: GuidanceMode = .coachMe
+  private var copy: (eyebrow: String, title: String) {
+    switch mode {
+    case .learnTogether: ("Lesson recap", "Here’s what you worked out.")
+    case .mockInterview: ("Interview debrief", "Here’s how the round went.")
+    case .coachMe: ("Practice complete", "One idea to carry forward.")
+    }
+  }
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
       DrillbitMark(size: 52, arrives: true).padding(.bottom, 4)
-      SignalEyebrow(text: warmUp ? "Warm-up done" : "Practice complete")
-      Text("One idea to carry forward.")
+      SignalEyebrow(text: warmUp ? "Warm-up done" : copy.eyebrow)
+      Text(copy.title)
         .font(.largeTitle.weight(.semibold)).tracking(-0.8)
         .accessibilityAddTraits(.isHeader)
     }
+  }
+}
+
+/// Guided's ending: the ideas worked through together, then one attempt without help.
+struct LessonRecap: View {
+  let lesson: Lesson
+  var body: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      if !lesson.learned.isEmpty {
+        SignalEyebrow(text: "What you worked out")
+        ForEach(lesson.learned, id: \.self) { idea in
+          Label {
+            Text(idea).fixedSize(horizontal: false, vertical: true)
+          } icon: {
+            Image(systemName: "checkmark.circle.fill").foregroundStyle(AppPalette.success)
+          }
+        }
+      }
+      SignalEyebrow(text: "Try it solo").padding(.top, lesson.learned.isEmpty ? 0 : 8)
+      Text(lesson.tryAlone).fixedSize(horizontal: false, vertical: true)
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("lessonRecap")
+  }
+}
+
+/// Mock interview's ending: the verdict first, then how each part of the round landed.
+struct DebriefCard: View {
+  let debrief: Debrief
+  private var verdict: (title: String, symbol: String, color: Color) {
+    switch debrief.verdict {
+    case .pass: ("You’d pass this round.", "checkmark.seal.fill", AppPalette.success)
+    case .borderline: ("Borderline. Could go either way.", "circle.lefthalf.filled", AppPalette.accent)
+    case .notYet: ("Not this round, yet.", "arrow.uturn.backward.circle.fill", AppPalette.destructive)
+    }
+  }
+  private static let areas = ["requirements": "Requirements", "design": "Design", "trade_offs": "Trade-offs", "communication": "Communication"]
+  private static func rating(_ value: String) -> (String, Color) {
+    switch value {
+    case "strong": ("Strong", AppPalette.success)
+    case "mixed": ("Mixed", AppPalette.accent)
+    case "weak": ("Weak", AppPalette.destructive)
+    default: ("Not shown", AppPalette.secondary)
+    }
+  }
+  var body: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      Label {
+        Text(verdict.title).font(.title2.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
+      } icon: {
+        Image(systemName: verdict.symbol).foregroundStyle(verdict.color)
+      }
+      .accessibilityIdentifier("debriefVerdict")
+      Text(debrief.reason).foregroundStyle(AppPalette.secondary).fixedSize(horizontal: false, vertical: true)
+      VStack(spacing: 0) {
+        ForEach(debrief.signals) { signal in
+          let rating = Self.rating(signal.rating)
+          HStack(alignment: .firstTextBaseline, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+              Text(Self.areas[signal.area] ?? signal.area).font(.subheadline.weight(.semibold))
+              if !signal.note.isEmpty {
+                Text(signal.note).font(.footnote).foregroundStyle(AppPalette.secondary)
+                  .fixedSize(horizontal: false, vertical: true)
+              }
+            }
+            Spacer(minLength: 8)
+            Text(rating.0).font(.footnote.weight(.semibold)).foregroundStyle(rating.1)
+          }
+          .padding(.vertical, 12)
+          .accessibilityElement(children: .combine)
+          if signal.id != debrief.signals.last?.id { Divider() }
+        }
+      }
+      .padding(.horizontal, 16)
+      .background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 12))
+      if !debrief.toPass.isEmpty {
+        SignalEyebrow(text: "To pass")
+        Text(debrief.toPass).fixedSize(horizontal: false, vertical: true)
+      }
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("debrief")
   }
 }
 struct ReflectionView: View {
@@ -25,13 +115,16 @@ struct ReflectionView: View {
   @State private var current: Challenge?
   private var hasReflection: Bool { (current ?? initial).reflection != nil }
   private var warmUp: Bool { initial.isWarmUp }
+  private var mode: GuidanceMode { (current ?? initial).reflection?.guidanceMode ?? (current ?? initial).guidanceMode ?? .coachMe }
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 24) {
-        CompletionHeading(warmUp: warmUp)
+        CompletionHeading(warmUp: warmUp, mode: mode)
         AssistanceSummary(challenge: current ?? initial)
         if let reflection = (current ?? initial).reflection {
           Group {
+          if let debrief = reflection.debrief { DebriefCard(debrief: debrief) }
+          if let lesson = reflection.lesson { LessonRecap(lesson: lesson) }
           ReflectionContent(reflection: reflection)
           // Branch retries and Recall would make the uncounted warm-up count.
           if warmUp {

@@ -52,7 +52,7 @@ export function voiceDelegationMessages(question: any, history: unknown, intervi
   const latestUser = dialogue.map(m => m.role).lastIndexOf('user');
   const messages = messagesFor('interview', {
     practiceProfile, question: questionReference(question), historicalSnapshot: history,
-    interview: {guidanceMode:interview.guidanceMode, turns:[{kind:'voice',voice:dialogue.slice(0, Math.max(0, latestUser)).map(m=>({speaker:m.role,text:m.content}))}]},
+    interview: {guidanceMode:interview.guidanceMode, timing:interview.timing, turns:[{kind:'voice',voice:dialogue.slice(0, Math.max(0, latestUser)).map(m=>({speaker:m.role,text:m.content}))}]},
     action:{kind:'answer',text:latestUser >= 0 ? dialogue[latestUser].content : '[No spoken request yet. Invite me to begin briefly.]'},
   });
   messages[0].content += `

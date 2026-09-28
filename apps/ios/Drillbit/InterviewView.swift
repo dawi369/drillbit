@@ -47,6 +47,9 @@ struct InterviewView: View {
   @State private var guideStep: WarmUpStep?
   @State private var menuFrame: CGRect?
   @State private var showingTools = false
+  /// Fallback start for a round whose start time never reached this device.
+  @State private var openedAt = Date()
+  private var scenarioTitle: String { challenge.scenario?.split(whereSeparator: \.isWhitespace).prefix(2).joined(separator: " ") ?? "System design" }
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.scenePhase) private var phase
   init(model: AppModel, challenge: Challenge) {
@@ -223,7 +226,7 @@ struct InterviewView: View {
       }
     }
     .safeAreaInset(edge: .bottom, spacing: 0) { footer }
-    .navigationTitle(challenge.scenario?.split(whereSeparator: \.isWhitespace).prefix(2).joined(separator: " ") ?? "System design").navigationBarTitleDisplayMode(.inline)
+    .navigationTitle(scenarioTitle).navigationBarTitleDisplayMode(.inline)
     .toolbarBackground(AppPalette.background, for: .navigationBar)
     .toolbarBackground(.visible, for: .navigationBar)
     .task(id: activeID) {
@@ -239,6 +242,15 @@ struct InterviewView: View {
       interview.answer = await model.localAnswer(interview.challenge)
     } } }
     .toolbar {
+      if interview.mode == .mockInterview && interview.finished == nil {
+        ToolbarItem(placement: .principal) {
+          VStack(spacing: 0) {
+            Text(scenarioTitle).font(.subheadline.weight(.semibold)).lineLimit(1)
+            RoundClock(start: Date.fromAPI(challenge.startedAt ?? "") ?? Date.fromAPI(challenge.createdAt ?? "") ?? openedAt, minutes: challenge.minutes ?? 30)
+              .font(.caption)
+          }
+        }
+      }
       // The warm-up has no way out but through: no Close, no Skip.
       if !challenge.isWarmUp {
         ToolbarItem(placement: .cancellationAction) {
@@ -269,8 +281,10 @@ struct InterviewView: View {
             Button { requestAssistance("hint", title: "Nudge") } label: { menuLabel("Need a nudge?", "lightbulb", hint: "A hint toward your next step") }
               .disabled(requestingAssistance || interview.locked || interview.failedTurn != nil || liveVoice?.blocksText == true)
           }
-          Button { requestAssistance("example", title: "Example") } label: { menuLabel("Show an example", AppIcon.text.rawValue, hint: "How a strong answer could go") }
-            .disabled(requestingAssistance || interview.locked || interview.failedTurn != nil || liveVoice?.blocksText == true)
+          if interview.mode != .mockInterview {
+            Button { requestAssistance("example", title: "Example") } label: { menuLabel("Show an example", AppIcon.text.rawValue, hint: "How a strong answer could go") }
+              .disabled(requestingAssistance || interview.locked || interview.failedTurn != nil || liveVoice?.blocksText == true)
+          }
           Button("Session style", systemImage: AppIcon.preferences.rawValue) { sheet = .style }.disabled(interview.locked || liveVoice?.blocksText == true)
           Button { focused = false; confirmFinish = true } label: { menuLabel("Finish interview", AppIcon.checkmark.rawValue, hint: "Wrap up and get your feedback") }
             .disabled(!interview.canFinish)
@@ -685,6 +699,30 @@ struct GuidanceModePicker: View {
       if let onDismiss {
         ToolbarItem(placement: .cancellationAction) { Button("Back", action: onDismiss) }
       }
+    }
+  }
+}
+
+/// A mock round's clock: counts down the time the generator gave the question, then counts the overrun.
+/// It never ends the round; the interviewer paces it and the candidate finishes.
+struct RoundClock: View {
+  let start: Date
+  let minutes: Int
+  var body: some View {
+    TimelineView(.periodic(from: .now, by: 1)) { timeline in
+      let remaining = start.addingTimeInterval(Double(minutes) * 60).timeIntervalSince(timeline.date)
+      let over = remaining < 0
+      let seconds = over ? Int(-remaining) : Int(remaining.rounded(.up))
+      let clock = String(format: "%d:%02d", seconds / 60, seconds % 60)
+      HStack(spacing: 4) {
+        Image(systemName: over ? "exclamationmark.circle.fill" : "timer").imageScale(.small)
+        Text(over ? "+" + clock : clock).monospacedDigit().contentTransition(.numericText(countsDown: !over))
+      }
+      .foregroundStyle(over ? AppPalette.destructive : remaining <= 300 ? AppPalette.accent : AppPalette.secondary)
+      .animation(.snappy, value: seconds)
+      .accessibilityElement(children: .ignore)
+      .accessibilityLabel(over ? "Over time by \(max(1, seconds / 60)) minutes" : "\(max(1, (seconds + 59) / 60)) minutes left")
+      .accessibilityIdentifier("roundClock")
     }
   }
 }

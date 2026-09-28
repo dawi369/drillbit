@@ -13,7 +13,10 @@ import {
     normalizeSettings,
     parseJSON,
     questionGenerationSchema,
+    reflectionOutputFor,
     reflectionOutputSchema,
+    roundMinutes,
+    roundTiming,
     timestamp,
     type Settings,
 } from "./domain";
@@ -88,9 +91,11 @@ export async function runJob(env: Env, id: string) {
     const selection = await selectConcept(env,job.account_id,input.settings,input.primaryConceptId ?? focus);
     const exploratory = ["senior", "staff", "principal"].includes(input.settings.engineeringLevel ?? "")
       && input.guidanceMode !== "learn_together";
+    // minutes is the round's time budget, set by the model; only Mock interview shows the clock.
+    const roundLength = { minutes: z.number().int().min(10).max(60) };
     const generationOutputSchema = exploratory
-      ? questionGenerationSchema.safeExtend({primaryConceptId:z.literal(selection.primaryConceptId),constraints:z.array(z.string().min(1).max(300)).max(0)})
-      : questionGenerationSchema.safeExtend({primaryConceptId:z.literal(selection.primaryConceptId)});
+      ? questionGenerationSchema.safeExtend({primaryConceptId:z.literal(selection.primaryConceptId),constraints:z.array(z.string().min(1).max(300)).max(0),...roundLength})
+      : questionGenerationSchema.safeExtend({primaryConceptId:z.literal(selection.primaryConceptId),...roundLength});
     const restored = !input.instruction && !input.followUp && !input.warmUp ? await env.DB.prepare("SELECT * FROM questions WHERE account_id=? AND eligible=1 AND json_extract(data,'$.engineeringLevel')=? AND (? IS NULL OR json_extract(data,'$.primaryConceptId')=?) ORDER BY eligibility_updated_at,id LIMIT 1").bind(job.account_id,input.settings.engineeringLevel!,input.primaryConceptId??null,input.primaryConceptId??null).first<{id:string;data:string}>() : null;
     const recent = await env.DB.prepare(
       "SELECT c.data,c.lifecycle,c.completed_at,r.data AS reflection FROM challenges c LEFT JOIN reflections r ON r.challenge_id=c.id WHERE c.account_id=? AND c.lifecycle IN ('completed','skipped') AND " + COUNTED + " ORDER BY c.created_at DESC LIMIT 20",
@@ -108,7 +113,7 @@ export async function runJob(env: Env, id: string) {
         kind: "design",
         selection,
         taxonomy: concepts,
-        metadataInstructions: "Design a system-design problem centrally testing selection.primaryConceptId. Return that exact primaryConceptId and 0–2 distinct secondaryConceptIds from the taxonomy. scenario is a 1–3 word noun phrase. tagEvidence is the sole tag list: include the primary concept exactly once and at most two secondary concepts. Each entry has requirementIndex: 0 for prompt, or 1-based index into constraints. Concepts classify the problem, never introduce hidden grading requirements. roleTrack may change scenario vocabulary only; it must not change scope, difficulty, visible requirements or evaluation criteria. targetDate must not change the question. " + (exploratory ? "This is an exploratory interview: constraints MUST be empty. Give one concrete design decision and only the initial context in the prompt. Leave negotiable parameters open for the interview conversation. Do not create hidden requirements or grade unstated limits." : "This is Guided or a lower-level interview: put useful concrete requirements in the prompt or visible constraints so the learner can start without negotiating every assumption."),
+        metadataInstructions: "Design a system-design problem centrally testing selection.primaryConceptId. Return that exact primaryConceptId and 0–2 distinct secondaryConceptIds from the taxonomy. scenario is a 1–3 word noun phrase. tagEvidence is the sole tag list: include the primary concept exactly once and at most two secondary concepts. Each entry has requirementIndex: 0 for prompt, or 1-based index into constraints. Concepts classify the problem, never introduce hidden grading requirements. roleTrack may change scenario vocabulary only; it must not change scope, difficulty, visible requirements or evaluation criteria. targetDate must not change the question. minutes is how long a real interviewer would give this one question in a round, 10–60, scaled to its scope and the level: a focused decision about 15, a full senior system design 35–45. " + (exploratory ? "This is an exploratory interview: constraints MUST be empty. Give one concrete design decision and only the initial context in the prompt. Leave negotiable parameters open for the interview conversation. Do not create hidden requirements or grade unstated limits." : "This is Guided or a lower-level interview: put useful concrete requirements in the prompt or visible constraints so the learner can start without negotiating every assumption."),
         instruction: input.instruction,
         followUp: input.followUp,
         curriculumContext: input.settings.learningPlan ? {
@@ -136,6 +141,7 @@ export async function runJob(env: Env, id: string) {
     data = {
       ...generated,
       title: plainQuestion(generated.title),
+      minutes: roundMinutes({ ...generated, engineeringLevel: input.settings.engineeringLevel }),
       questionId: questionID,
       topic: "System design",
       secondaryConceptIds: generated.tagEvidence.filter(e=>e.conceptId!==generated.primaryConceptId).map(e=>e.conceptId),
@@ -262,14 +268,17 @@ export async function runJob(env: Env, id: string) {
   const context = { ...(frozen
     ? JSON.parse(frozen.data)
     : await detail(env, job.account_id, job.challenge_id)), practiceProfile: input.settings.practiceProfile };
+  // The ending follows the style the session was run in; the frozen context keeps the challenge data under `question`.
+  const round = context.question ?? context;
+  const mode = guidanceMode(round.guidanceMode ?? context.interview?.guidanceMode);
   if (job.kind === "summarize")
     data = await structured(
       env,
       job.account_id,
       input.settings,
       "summarize",
-      context,
-      reflectionOutputSchema,
+      { ...context, guidanceMode: mode, ...(mode === "mock_interview" ? { timing: roundTiming(round, context.createdAt ?? timestamp(), Date.parse(context.completedAt ?? "") || Date.now()) } : {}) },
+      reflectionOutputFor(mode),
     );
   else if (job.kind === "reveal")
     data = await structured(
@@ -281,7 +290,7 @@ export async function runJob(env: Env, id: string) {
       exampleSchema,
     );
   else throw new Error("Unknown job kind");
-  if (job.kind === "summarize") data = groundReflection(data, context);
+  if (job.kind === "summarize") data = { ...groundReflection(data, context), guidanceMode: mode };
   const table = job.kind === "summarize" ? "reflections" : "examples";
   const warmUp = job.kind === "summarize" && !!(await env.DB.prepare("SELECT 1 FROM challenges c WHERE c.id=? AND NOT " + COUNTED).bind(job.challenge_id).first());
   const recallWrites = job.kind === "summarize" && !warmUp
