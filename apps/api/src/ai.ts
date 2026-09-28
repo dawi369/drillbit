@@ -1,11 +1,11 @@
-import { personalizationInstructions } from "./prompts/personalization";
-import { questionFormattingInstructions } from "./prompts/formatting";
-import { teachingPolicy, endingPolicy } from "./prompts/teaching";
 import { z } from "zod";
-import { INTERVIEW_PROMPT_VERSION, interviewerPrompt, isSocialOpening, socialOpeningPrompt } from "./prompts/interviewer";
-import { boundedContext, xmlContext, visibleQuestion } from "./context";
+import { boundedContext, visibleQuestion, xmlContext } from "./context";
 import { Fault, MODEL_ID, timestamp, uuid, type Settings } from "./domain";
 import { consumeUsage, decrypt, type Env } from "./platform";
+import { questionFormattingInstructions } from "./prompts/formatting";
+import { INTERVIEW_PROMPT_VERSION, interviewerPrompt, isSocialOpening, socialOpeningPrompt } from "./prompts/interviewer";
+import { personalizationInstructions } from "./prompts/personalization";
+import { endingPolicy, teachingPolicy } from "./prompts/teaching";
 export type ModelMessage = { role: "system" | "user" | "assistant"; content: string };
 const contextualInterviewVersions = ["interviewer-standard-v4", "interviewer-standard-v5", "interviewer-teaching-v1", "interviewer-teaching-v2", "interviewer-teaching-v3", "interviewer-teaching-v4"];
 const teachingInterviewVersions = ["interviewer-teaching-v1", "interviewer-teaching-v2", "interviewer-teaching-v3", "interviewer-teaching-v4"];

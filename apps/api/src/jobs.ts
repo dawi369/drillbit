@@ -25,8 +25,8 @@ import { interviewSchemaFor } from "./interview";
 import { groundReflection } from "./learning";
 import { selectConcept } from "./library";
 import type { Env } from "./platform";
-import { guidanceMode } from "./prompts/teaching";
 import { plainQuestion } from "./prompts/formatting";
+import { guidanceMode } from "./prompts/teaching";
 import { activeChallenge, COUNTED, detail, dispatch, type Job } from "./store";
 import { concepts } from "./taxonomy";
 export async function runJob(env: Env, id: string) {

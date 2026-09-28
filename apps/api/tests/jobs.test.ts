@@ -2,10 +2,10 @@ import { env, fetchMock } from "cloudflare:test";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { partialJSONString, textDeltas } from "../src/ai";
 import { boundedContext } from "../src/context";
+import { roundTiming } from "../src/domain";
 import { runJob } from "../src/jobs";
 import { learningEvidence, todayPlan } from "../src/learning";
 import type { Env } from "../src/platform";
-import { roundTiming } from "../src/domain";
 import { accountFor, complete, createJob, detail, settingsFor } from "../src/store";
 import { initializeDatabase } from "./migrations";
 const bindings = {

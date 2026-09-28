@@ -1,8 +1,8 @@
-import { learningEvidence } from "./learning";
 import { Fault, timestamp } from "./domain";
-import { concepts, eligibilityInput } from "./taxonomy";
-import { detail, type ChallengeRow, present } from "./store";
+import { learningEvidence } from "./learning";
 import type { Env } from "./platform";
+import { detail, present, type ChallengeRow } from "./store";
+import { concepts, eligibilityInput } from "./taxonomy";
 export type Question = {
   id: string;
   account_id: string;

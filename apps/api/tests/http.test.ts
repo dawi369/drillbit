@@ -1,18 +1,18 @@
 import {
-  env,
-  fetchMock,
-  createExecutionContext,
-  waitOnExecutionContext,
+    createExecutionContext,
+    env,
+    fetchMock,
+    waitOnExecutionContext,
 } from "cloudflare:test";
-import { beforeAll, afterAll, it, expect } from "vitest";
-import { SignJWT, generateKeyPair, exportJWK } from "jose";
-import { app } from "../src/index";
-import { accountFor, createJob } from "../src/store";
+import { SignJWT, exportJWK, generateKeyPair } from "jose";
+import { afterAll, beforeAll, expect, it } from "vitest";
+import { wire } from "../../../packages/contracts/wire";
 import { provider, recordUsage } from "../src/ai";
 import { settingsSchema } from "../src/domain";
-import { initializeDatabase } from "./migrations";
-import { wire } from "../../../packages/contracts/wire";
+import { app } from "../src/index";
 import type { Env } from "../src/platform";
+import { accountFor, createJob } from "../src/store";
+import { initializeDatabase } from "./migrations";
 const bindings = {
   ...env,
   JOBS: { create: async () => ({ id: "test" }) },

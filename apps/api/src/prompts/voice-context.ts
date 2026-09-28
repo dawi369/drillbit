@@ -1,5 +1,5 @@
-import { visibleQuestion } from "../context";
 import { messagesFor, type ModelMessage } from '../ai';
+import { visibleQuestion } from "../context";
 
 /** Provider fragments are transport records, not conversational turns. Never send
  * their IDs/timestamps or repeat the question inside every exchange. */

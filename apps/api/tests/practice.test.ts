@@ -1,19 +1,19 @@
-import { wire } from "../../../packages/contracts/wire";
-import contractFixture from "../../../packages/contracts/fixtures/practice-help.json";
 import { env } from "cloudflare:test";
-import { beforeAll, it, expect, vi } from "vitest";
-import { initializeDatabase } from "./migrations";
-import {
-  accountFor,
-  createJob,
-  complete,
-  detail,
-  settingsFor,
-} from "../src/store";
-import { requestHelp, adopt } from "../src/practice";
-import { runJob } from "../src/jobs";
+import { beforeAll, expect, it, vi } from "vitest";
+import contractFixture from "../../../packages/contracts/fixtures/practice-help.json";
+import { wire } from "../../../packages/contracts/wire";
 import { MODEL_ID, normalizeSettings, settingsSchema } from "../src/domain";
+import { runJob } from "../src/jobs";
 import type { Env } from "../src/platform";
+import { adopt, requestHelp } from "../src/practice";
+import {
+    accountFor,
+    complete,
+    createJob,
+    detail,
+    settingsFor,
+} from "../src/store";
+import { initializeDatabase } from "./migrations";
 const bindings = {
   ...env,
   MANAGED_AI_ENABLED: "true",

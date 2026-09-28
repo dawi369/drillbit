@@ -1,15 +1,15 @@
-import { personalizationInstructions } from "./prompts/personalization";
-import { guidanceModeSchema, teachingPolicy, truthfulVoiceProgress, TEACHING_VERSION } from "./prompts/teaching";
-import { spokenHistory, questionReference, voiceDelegationMessages } from "./prompts/voice-context";
-import { questionTerminology, practicePersonality } from "./prompts/interviewer";
 import { z } from 'zod';
-import { Fault, timestamp, practiceProfileSchema, roundTiming } from './domain';
-import { consumeUsage, type Env } from './platform';
-import { ownedChallenge, settingsFor } from './store';
-import { interviewFor } from './interview';
-import { historicalSnapshot } from './history';
-import { provider, recordUsage, interviewModelSchema } from './ai';
+import { interviewModelSchema, provider, recordUsage } from './ai';
 import { xmlContext } from './context';
+import { Fault, practiceProfileSchema, roundTiming, timestamp } from './domain';
+import { historicalSnapshot } from './history';
+import { interviewFor } from './interview';
+import { consumeUsage, type Env } from './platform';
+import { practicePersonality, questionTerminology } from "./prompts/interviewer";
+import { personalizationInstructions } from "./prompts/personalization";
+import { guidanceModeSchema, TEACHING_VERSION, teachingPolicy, truthfulVoiceProgress } from "./prompts/teaching";
+import { questionReference, spokenHistory, voiceDelegationMessages } from "./prompts/voice-context";
+import { ownedChallenge, settingsFor } from './store';
 
 export const voiceStartSchema = z.object({practiceProfile:practiceProfileSchema.optional(),guidanceMode:guidanceModeSchema.optional(),sdp:z.string().min(1).max(64000),revision:z.number().int().nonnegative()});
 export const voiceFragmentSchema = z.object({id:z.string().min(1).max(160),sequence:z.number().int().nonnegative().max(5999),speaker:z.enum(['user','assistant']),text:z.string().max(8000),startMs:z.number().int().nonnegative(),endMs:z.number().int().nonnegative()}).refine(x=>x.endMs>=x.startMs);
