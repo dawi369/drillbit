@@ -47,7 +47,7 @@ struct PracticeWidgetView: View {
       if let challenge = entry.snapshot?.challenge {
         Text(challenge.title).font(.headline).lineLimit(3)
         if family == .systemMedium {
-          Text(challenge.prompt).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+          Text(QuestionMarkup.plain(challenge.prompt)).font(.caption).foregroundStyle(.secondary).lineLimit(2)
         }
         Spacer(minLength: 4)
         Text(challenge.lifecycle == "in_progress" ? "Resume practice" : "Open challenge").font(

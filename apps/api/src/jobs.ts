@@ -23,6 +23,7 @@ import { groundReflection } from "./learning";
 import { selectConcept } from "./library";
 import type { Env } from "./platform";
 import { guidanceMode } from "./prompts/teaching";
+import { plainQuestion } from "./prompts/formatting";
 import { activeChallenge, COUNTED, detail, dispatch, type Job } from "./store";
 import { concepts } from "./taxonomy";
 export async function runJob(env: Env, id: string) {
@@ -134,6 +135,7 @@ export async function runJob(env: Env, id: string) {
     // Derive the private checklist from visible requirements rather than trusting a second generated rubric.
     data = {
       ...generated,
+      title: plainQuestion(generated.title),
       questionId: questionID,
       topic: "System design",
       secondaryConceptIds: generated.tagEvidence.filter(e=>e.conceptId!==generated.primaryConceptId).map(e=>e.conceptId),

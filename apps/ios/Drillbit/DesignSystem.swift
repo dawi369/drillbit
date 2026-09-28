@@ -728,3 +728,225 @@ extension View {
     }
   }
 }
+
+/// Paces revealed glyphs so bursty network text reads as steady writing, and runs it backwards to stream out.
+@MainActor final class RevealClock {
+  private(set) var cursor = 0.0
+  private var last: Date?
+  private var start = Date.distantPast
+  private var rewindRate: Double?
+  private var reported = false
+  var rewinding: Bool { rewindRate != nil }
+  func reset(after delay: TimeInterval) {
+    cursor = 0; last = nil; start = .now + delay; rewindRate = nil; reported = false
+  }
+  func rewind(over duration: TimeInterval) {
+    rewindRate = max(cursor, 1) / duration; reported = false
+  }
+  /// `report` fires once, when the page is fully written or fully streamed out.
+  func tick(_ now: Date, target: Double, instant: Bool, finished: Bool, report: () -> Void) -> Double {
+    let elapsed = last.map { min(max(now.timeIntervalSince($0), 0), 1.0 / 20) } ?? 0
+    last = now
+    if let rewindRate {
+      cursor = instant ? 0 : max(0, cursor - rewindRate * elapsed)
+      if cursor == 0, !reported { reported = true; report() }
+      return cursor
+    }
+    if instant { cursor = target }
+    else if now >= start, cursor < target {
+      // A steady hand that speeds up with the backlog, so a burst never trails by much more than a second.
+      cursor = min(target, cursor + max(48, (target - cursor) / 0.9) * elapsed)
+    }
+    if finished, cursor >= target, !reported { reported = true; report() }
+    return cursor
+  }
+}
+
+/// Draws glyphs up to `shown`; the leading edge rises out of a slight blur. The caret trails the last visible glyph.
+struct RevealRenderer: TextRenderer {
+  var shown: Double
+  var caret: Double
+  var caretColor: Color
+  var motion: Bool
+  static let edge = 8.0
+
+  func draw(layout: Text.Layout, in context: inout GraphicsContext) {
+    var index = 0.0
+    var tail: CGRect?
+    lines: for line in layout {
+      let count = Double(line.reduce(0) { $0 + $1.count })
+      if index + count + Self.edge <= shown {
+        context.draw(line)
+        index += count
+        tail = line.typographicBounds.rect
+        continue
+      }
+      for run in line {
+        for glyph in run {
+          let progress = (shown - index) / Self.edge
+          guard progress > 0 else { break lines }
+          index += 1
+          tail = glyph.typographicBounds.rect
+          if progress >= 1 { context.draw(glyph); continue }
+          let eased = progress * progress * (3 - 2 * progress)
+          var glyphContext = context
+          glyphContext.opacity = eased
+          if motion {
+            glyphContext.translateBy(x: 0, y: (1 - eased) * 3)
+            glyphContext.addFilter(.blur(radius: (1 - eased) * 2.5))
+          }
+          glyphContext.draw(glyph)
+        }
+      }
+    }
+    guard caret > 0, let first = layout.first?.typographicBounds.rect else { return }
+    let bounds = tail ?? CGRect(x: first.minX, y: first.minY, width: 0, height: first.height)
+    var caretContext = context
+    caretContext.opacity = caret
+    caretContext.fill(
+      Path(roundedRect: CGRect(x: bounds.maxX + 2, y: bounds.minY + bounds.height * 0.12, width: 2, height: bounds.height * 0.76), cornerRadius: 1),
+      with: .color(caretColor))
+  }
+}
+
+/// One piece of streamed copy. Fixed copy is known upfront, so it never proves that the text before it is complete.
+struct StreamSegment {
+  enum Style { case eyebrow, title, note, body, code }
+  var style: Style
+  var text: AttributedString
+  var fixed = false
+  /// Keeps a line and the caret in place while this segment is still empty.
+  var placeholder = false
+  var identifier: String? = nil
+  var length: Double { Double(text.characters.count) }
+}
+
+/// A column of segments written out glyph by glyph, in order, with one shared cursor.
+struct StreamingDocument: View {
+  let clock: RevealClock
+  let segments: [StreamSegment]
+  let finished: Bool
+  let paused: Bool
+  var instant = false
+  /// Shown under an empty page once the wait is noticeable.
+  var waitingHint: String? = nil
+  let settled: () -> Void
+  @State private var slow = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  private static let gap = 8.0
+
+  var body: some View {
+    var offsets: [Double] = []
+    var at = 0.0
+    var target: Double?
+    for (index, segment) in segments.enumerated() {
+      offsets.append(at)
+      // Streamed text is complete once anything non-fixed follows it.
+      let complete = segment.fixed || finished || segments[(index + 1)...].contains { !$0.fixed && $0.length > 0 }
+      if target == nil, !complete { target = at + segment.length }
+      at += segment.length + Self.gap
+    }
+    let end = target ?? max(0, at - Self.gap) + (finished ? RevealRenderer.edge : 0)
+    let empty = !segments.contains { !$0.fixed && $0.length > 0 }
+    return TimelineView(.animation(paused: paused)) { timeline in
+      let cursor = clock.tick(timeline.date, target: end, instant: instant || reduceMotion, finished: finished) {
+        Task { @MainActor in settled() }
+      }
+      let pulse = 0.5 + 0.5 * cos(timeline.date.timeIntervalSinceReferenceDate * 2 * .pi / 1.1)
+      let caret = clock.rewinding || instant || reduceMotion ? 0
+        : finished ? max(0, min(1, (end - cursor) / RevealRenderer.edge))
+        : cursor >= end - 0.01 ? 0.3 + 0.7 * pulse : 1
+      let caretAt = segments.indices.last { !segments[$0].fixed && offsets[$0] <= cursor + 0.001 }
+      VStack(alignment: .leading, spacing: 16) {
+        ForEach(Array(segments.enumerated()), id: \.offset) { index, segment in
+          view(segment, shown: cursor - offsets[index], caret: caretAt == index ? caret : 0)
+        }
+        if let waitingHint, slow, empty, !finished {
+          Text(waitingHint).font(.footnote).foregroundStyle(.secondary).transition(.opacity)
+        }
+      }
+    }
+    .animation(DrillbitMotion.reveal, value: slow && empty && !finished)
+    .task(id: empty && !finished) {
+      slow = false
+      guard waitingHint != nil, empty, !finished else { return }
+      do { try await Task.sleep(for: .seconds(1.6)) } catch { return }
+      slow = true
+    }
+  }
+
+  @ViewBuilder private func view(_ segment: StreamSegment, shown: Double, caret: Double) -> some View {
+    let isEmpty = segment.text.characters.isEmpty
+    let renderer = RevealRenderer(shown: paused ? .infinity : isEmpty ? 0 : shown, caret: caret, caretColor: AppPalette.accent, motion: !reduceMotion)
+    if !isEmpty || segment.placeholder {
+      let text = Text(isEmpty ? AttributedString(" ") : segment.text)
+      switch segment.style {
+      case .eyebrow:
+        text.font(.caption2.weight(.semibold).monospaced()).tracking(1.2).foregroundStyle(AppPalette.accent)
+          .textRenderer(renderer)
+      case .title:
+        text.font(.largeTitle.weight(.semibold)).tracking(-0.8)
+          .fixedSize(horizontal: false, vertical: true)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .textRenderer(renderer)
+          .accessibilityHidden(isEmpty)
+      case .note:
+        text.font(.subheadline).foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+          .textRenderer(renderer)
+          .accessibilityHidden(!paused && shown <= 0)
+      case .body:
+        text.fixedSize(horizontal: false, vertical: true)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .textRenderer(renderer)
+          .textSelection(.enabled)
+          .accessibilityIdentifier(segment.identifier ?? "")
+      case .code:
+        CodeBlock(text: text, renderer: renderer)
+          .opacity(paused ? 1 : min(1, max(0, shown / 4)))
+      }
+    }
+  }
+}
+
+/// A short payload or snippet: monospaced, scrolls sideways instead of wrapping.
+struct CodeBlock: View {
+  let text: Text
+  var renderer = RevealRenderer(shown: .infinity, caret: 0, caretColor: .clear, motion: false)
+  var body: some View {
+    ScrollView(.horizontal, showsIndicators: false) {
+      text.font(.callout.monospaced())
+        .fixedSize()
+        .textRenderer(renderer)
+        .textSelection(.enabled)
+        .padding(12)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(AppPalette.inset, in: RoundedRectangle(cornerRadius: 12))
+  }
+}
+
+/// A question's prompt with its markup rendered, or plain when formatting is off.
+struct QuestionBody: View {
+  let markup: String
+  var lineLimit: Int? = nil
+  @Environment(\.formatsQuestions) private var formatsQuestions
+  var body: some View {
+    let blocks = QuestionMarkup.blocks(markup, formatted: formatsQuestions)
+    VStack(alignment: .leading, spacing: 12) {
+      ForEach(Array((lineLimit == nil ? blocks : Array(blocks.prefix(1))).enumerated()), id: \.offset) { _, block in
+        switch block {
+        case .text(let value):
+          Text(value).lineLimit(lineLimit).fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        case .code(let value):
+          CodeBlock(text: Text(value)).lineLimit(lineLimit)
+        }
+      }
+    }
+  }
+}
+
+extension EnvironmentValues {
+  @Entry var formatsQuestions = true
+}

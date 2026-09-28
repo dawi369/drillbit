@@ -8,19 +8,20 @@ struct InterviewDisclosureText: View {
   let identifier: String
   var previewLines = 3
   var dimsPreview = true
+  /// Renders question markup; interviewer text stays plain.
+  var markup = false
   var onOverflowChange: (Bool) -> Void = { _ in }
   @State private var fullHeight: CGFloat?
   @State private var previewHeight: CGFloat?
   var body: some View {
-    Text(text)
+    content(lineLimit: !expanded && previewHeight == nil ? previewLines : nil)
       .font(.body)
       .foregroundStyle(expanded || !dimsPreview ? Color.primary : Color.secondary)
-      .lineLimit(!expanded && previewHeight == nil ? previewLines : nil)
       .fixedSize(horizontal: false, vertical: true)
       .frame(maxWidth: .infinity, alignment: .leading)
       .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { fullHeight = $0 }
       .overlay(alignment: .topLeading) {
-        Text(text).font(.body).lineLimit(previewLines)
+        content(lineLimit: previewLines).font(.body)
           .fixedSize(horizontal: false, vertical: true)
           .frame(maxWidth: .infinity, alignment: .leading)
           .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { previewHeight = $0 }
@@ -36,6 +37,9 @@ struct InterviewDisclosureText: View {
   private func reportOverflow() {
     guard let fullHeight, let previewHeight else { return }
     onOverflowChange(fullHeight > previewHeight + 0.5)
+  }
+  @ViewBuilder private func content(lineLimit: Int?) -> some View {
+    if markup { QuestionBody(markup: text, lineLimit: lineLimit) } else { Text(text).lineLimit(lineLimit) }
   }
 }
 

@@ -457,3 +457,33 @@ struct TeachingModeTests {
     #expect(delayedTimer.resolve(at: now.advanced(by: .seconds(20))) == .unavailable)
   }
 }
+
+struct QuestionMarkupTests {
+  private func text(_ block: QuestionMarkup.Block?) -> AttributedString? {
+    if case .text(let value) = block { return value }
+    return nil
+  }
+  @Test func rendersInlineTagsAndBlocksWithoutLeakingMarkup() {
+    let blocks = QuestionMarkup.blocks("Use <b>one key</b> and <i>exactly</i> <code>ttl = 300</code>:<pre>{\n  \"id\": 1\n}</pre>Then retry &lt;safely&gt;.")
+    #expect(blocks.count == 3)
+    let first = text(blocks.first)!
+    #expect(String(first.characters) == "Use one key and exactly ttl = 300:")
+    #expect(first.runs.contains { $0.inlinePresentationIntent == .stronglyEmphasized && String(first[$0.range].characters) == "one key" })
+    #expect(first.runs.contains { $0.inlinePresentationIntent == .code && String(first[$0.range].characters) == "ttl = 300" })
+    #expect(blocks[1] == .code("{\n  \"id\": 1\n}"))
+    #expect(String(text(blocks[2])!.characters) == "Then retry <safely>.")
+  }
+  @Test func holdsBackAnUnfinishedTagWhileStreaming() {
+    #expect(String(text(QuestionMarkup.blocks("Design a <co").first)!.characters) == "Design a ")
+    #expect(String(text(QuestionMarkup.blocks("Keep a &l").first)!.characters) == "Keep a ")
+    // An open tag applies to what has arrived so far.
+    let open = text(QuestionMarkup.blocks("Pick <b>one").first)!
+    #expect(open.runs.contains { $0.inlinePresentationIntent == .stronglyEmphasized })
+    #expect(QuestionMarkup.blocks("Payload:<pre>{\n  \"id\"") .last == .code("{\n  \"id\""))
+  }
+  @Test func leavesUnknownTagsLiteralAndStripsWhenFormattingIsOff() {
+    #expect(QuestionMarkup.plain("if a < b and <script>") == "if a < b and <script>")
+    let plain = QuestionMarkup.blocks("Use <b>one</b> key", formatted: false)
+    #expect(plain == [.text(AttributedString("Use one key"))])
+  }
+}

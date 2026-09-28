@@ -1,4 +1,5 @@
 import { personalizationInstructions } from "./prompts/personalization";
+import { questionFormattingInstructions } from "./prompts/formatting";
 import { teachingPolicy } from "./prompts/teaching";
 import { z } from "zod";
 import { INTERVIEW_PROMPT_VERSION, interviewerPrompt, isSocialOpening, socialOpeningPrompt } from "./prompts/interviewer";
@@ -48,6 +49,7 @@ export function messagesFor(kind: string, context: unknown): ModelMessage[] {
   }
   const messages = baseMessagesFor(kind, reference);
   messages[0].content += personalizationInstructions(value.practiceProfile ?? value.settings?.practiceProfile, kind === "generate" ? "question" : kind === "summarize" ? "reflection" : "conversation");
+  if (kind === "generate") messages[0].content += questionFormattingInstructions((value.settings as { questionFormatting?: boolean } | undefined)?.questionFormatting !== false);
   return messages;
 }
 function baseMessagesFor(kind: string, context: unknown): ModelMessage[] {

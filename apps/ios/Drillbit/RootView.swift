@@ -143,6 +143,7 @@ struct RootView: View {
       selectedTab = "home"
       Task { await model.refresh() }
     }
+    .environment(\.formatsQuestions, model.settings.formatsQuestions)
   }
 }
 

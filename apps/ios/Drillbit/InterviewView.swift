@@ -14,6 +14,8 @@ struct InterviewView: View {
   @State private var assistanceTitle = "Help"
   @State private var assistanceText: String?
   @State private var assistanceError: String?
+  @State private var assistanceClock = RevealClock()
+  @State private var assistanceSettled = false
   @State private var requestingAssistance = false
   let model: AppModel
   let challenge: Challenge
@@ -43,10 +45,10 @@ struct InterviewView: View {
   /// The warm-up opens locked; the guided tour releases it.
   @State private var guiding: Bool
   @State private var guideStep: WarmUpStep?
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  @Environment(\.scenePhase) private var phase
   @State private var menuFrame: CGRect?
   @State private var showingTools = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @Environment(\.scenePhase) private var phase
   init(model: AppModel, challenge: Challenge) {
     self.model = model; self.challenge = challenge
     _interview = State(initialValue: InterviewController(model: model, challenge: challenge))
@@ -248,8 +250,6 @@ struct InterviewView: View {
         }
       }
       ToolbarItem(placement: .topBarTrailing) {
-        Menu {
-          if interview.state.wrapUp { Button("Continue interview") { Task { await interview.submit("continue") } } }
         // The tour's last step opens the tools as a popover the guide can see; the system menu gives no open event.
         if guideStep == .menu || showingTools {
           Button { showingTools = true } label: { Image(systemName: AppIcon.more.rawValue) }
@@ -263,6 +263,8 @@ struct InterviewView: View {
             }
             .onChange(of: showingTools) { _, open in if open, guideStep == .menu { advanceGuide() } }
         } else {
+        Menu {
+          if interview.state.wrapUp { Button("Continue interview") { Task { await interview.submit("continue") } } }
           if interview.mode != .mockInterview {
             Button { requestAssistance("hint", title: "Nudge") } label: { menuLabel("Need a nudge?", "lightbulb", hint: "A hint toward your next step") }
               .disabled(requestingAssistance || interview.locked || interview.failedTurn != nil || liveVoice?.blocksText == true)
@@ -282,9 +284,9 @@ struct InterviewView: View {
         }
           .disabled(guiding && guideStep != .menu)
           .accessibilityLabel("Interview options").accessibilityIdentifier("interviewOptions")
+        }
       }
     }
-        }
     .alert("Skip this question?", isPresented: $confirmSkip) {
       Button("Keep practising", role: .cancel) {}
       Button("Skip question", role: .destructive) { Task { await model.skip(challenge.id, answer: interview.answer) } }
@@ -313,9 +315,10 @@ struct InterviewView: View {
         .labelStyle(AssistanceTitleStyle())
       if let assistanceText {
         ScrollView {
-          Text(assistanceText)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .textSelection(.enabled)
+          StreamingDocument(
+            clock: assistanceClock, segments: [StreamSegment(style: .body, text: AttributedString(assistanceText), identifier: "assistanceText")],
+            finished: !requestingAssistance, paused: assistanceSettled,
+            settled: { assistanceSettled = true })
         }
         .frame(maxHeight: 240)
         .transition(.opacity)
@@ -336,7 +339,7 @@ struct InterviewView: View {
     .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: assistanceText == nil)
     .padding(24)
     .frame(maxWidth: 420)
-    .presentationDetents([requestingAssistance ? .height(220) : .height(360)])
+    .presentationDetents([requestingAssistance && assistanceText == nil ? .height(220) : .height(360)])
     .presentationDragIndicator(.visible)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("assistancePopup")
@@ -374,12 +377,12 @@ struct InterviewView: View {
             DisclosureChevron(expanded: !collapsed)
           }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
         }.buttonStyle(InterviewDisclosureButtonStyle())
-          .accessibilityLabel("Original question. " + challenge.displayPrompt)
+          .accessibilityLabel("Original question. " + challenge.plainPrompt)
           .accessibilityValue(collapsed ? "Collapsed" : "Expanded")
           .accessibilityHint(collapsed ? "Expand exchange" : "Collapse exchange")
           .accessibilityIdentifier("exchange-original")
         InterviewDisclosureText(text: challenge.displayPrompt, expanded: !collapsed,
-          identifier: "original" == activeID ? "interviewPrompt" : "earlierPrompt-original")
+          identifier: "original" == activeID ? "interviewPrompt" : "earlierPrompt-original", markup: true)
     }.animation(disclosureMotion, value: collapsed)
   }
   private func enterVoice() async {
@@ -427,6 +430,8 @@ struct InterviewView: View {
     assistanceTitle = title
     assistanceText = nil
     assistanceError = nil
+    assistanceSettled = false
+    assistanceClock.reset(after: 0.1)
     let command = UUID()
     assistanceRequestID = command.uuidString
     sheet = .assistance

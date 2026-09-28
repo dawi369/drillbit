@@ -417,3 +417,11 @@ it('saves a BYOK key only with a model that can do structured output, then uses 
   expect(await bindings.DB.prepare("SELECT model FROM ai_runs WHERE account_id=? AND kind='coach'").bind(account.id).first()).toEqual({model:'anthropic/claude-opus-5.5'});
  }finally{bindings.CREDENTIAL_KEY=oldKey;}
 });
+
+it('keeps question formatting off when an older client saves settings without it',async()=>{
+ const subject=crypto.randomUUID(); const account=await accountFor(bindings,subject);
+ await bindings.DB.prepare("UPDATE accounts SET status='active' WHERE id=?").bind(account.id).run();
+ expect((await request('settings',subject,'PUT',{questionFormatting:false})).status).toBe(200);
+ expect((await request('settings',subject,'PUT',{reminderEnabled:false})).status).toBe(200);
+ expect(((await (await request('bootstrap',subject)).json()) as any).settings.questionFormatting).toBe(false);
+});

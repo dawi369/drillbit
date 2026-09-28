@@ -51,6 +51,22 @@ struct QuestionFlow: View {
     guard guided, failure == nil else { return nil }
     return (question?.isWarmUp ?? draft?.warmUp ?? false) ? "Built from your plan, just to warm up. It won’t count toward your practice." : "Guided practice helps you structure the approach."
   }
+  /// Eyebrow and note are fixed copy but still written out, so the page reads as one voice.
+  private var previewSegments: [StreamSegment] {
+    var segments = [
+      StreamSegment(style: .eyebrow, text: AttributedString("The scenario".uppercased()), fixed: true),
+      StreamSegment(style: .title, text: AttributedString(QuestionMarkup.plain(question?.title ?? draft?.title ?? "")), placeholder: true),
+    ]
+    if let previewNote { segments.append(StreamSegment(style: .note, text: AttributedString(previewNote), fixed: true)) }
+    let blocks = QuestionMarkup.blocks(question?.displayPrompt ?? draft?.prompt ?? "", formatted: model.settings.formatsQuestions)
+    for (index, block) in blocks.enumerated() {
+      switch block {
+      case .text(let value): segments.append(StreamSegment(style: .body, text: value, identifier: index == 0 ? "previewPrompt" : nil))
+      case .code(let value): segments.append(StreamSegment(style: .code, text: AttributedString(value)))
+      }
+    }
+    return segments
+  }
   private func arrival(_ order: Int) -> AnyTransition {
     reduceMotion ? .opacity : .asymmetric(
       insertion: .opacity.combined(with: .offset(y: 12)).animation(DrillbitMotion.entrance.delay(Double(order) * 0.08)),
@@ -93,10 +109,10 @@ struct QuestionFlow: View {
       } else if showingPreview {
         ScrollView {
           VStack(alignment: .leading, spacing: 16) {
-            StreamedQuestion(
-              clock: clock, title: question?.title ?? draft?.title ?? "", note: previewNote,
-              prompt: question?.displayPrompt ?? draft?.prompt ?? "", finished: question != nil || failure != nil,
+            StreamingDocument(
+              clock: clock, segments: previewSegments, finished: question != nil || failure != nil,
               paused: (revealed || failure != nil) && !rewinding, instant: instantReveal,
+              waitingHint: "Writing your question…",
               settled: {
                 if rewinding { rewinding = false; afterRewind?(); afterRewind = nil }
                 else if question != nil { withAnimation(DrillbitMotion.entrance) { revealed = true } }
@@ -214,163 +230,5 @@ struct QuestionFlow: View {
         retryInput = input
       }
     }
-  }
-}
-
-/// Paces revealed glyphs so bursty network text reads as steady writing, and runs it backwards to stream out.
-@MainActor final class RevealClock {
-  private(set) var cursor = 0.0
-  private var last: Date?
-  private var start = Date.distantPast
-  private var rewindRate: Double?
-  private var reported = false
-  var rewinding: Bool { rewindRate != nil }
-  func reset(after delay: TimeInterval) {
-    cursor = 0; last = nil; start = .now + delay; rewindRate = nil; reported = false
-  }
-  func rewind(over duration: TimeInterval) {
-    rewindRate = max(cursor, 1) / duration; reported = false
-  }
-  /// `report` fires once, when the page is fully written or fully streamed out.
-  func tick(_ now: Date, target: Double, instant: Bool, finished: Bool, report: () -> Void) -> Double {
-    let elapsed = last.map { min(max(now.timeIntervalSince($0), 0), 1.0 / 20) } ?? 0
-    last = now
-    if let rewindRate {
-      cursor = instant ? 0 : max(0, cursor - rewindRate * elapsed)
-      if cursor == 0, !reported { reported = true; report() }
-      return cursor
-    }
-    if instant { cursor = target }
-    else if now >= start, cursor < target {
-      // A steady hand that speeds up with the backlog, so a burst never trails by much more than a second.
-      cursor = min(target, cursor + max(48, (target - cursor) / 0.9) * elapsed)
-    }
-    if finished, cursor >= target, !reported { reported = true; report() }
-    return cursor
-  }
-}
-
-/// Draws glyphs up to `shown`; the leading edge rises out of a slight blur. The caret trails the last visible glyph.
-private struct RevealRenderer: TextRenderer {
-  var shown: Double
-  var caret: Double
-  var caretColor: Color
-  var motion: Bool
-  static let edge = 8.0
-
-  func draw(layout: Text.Layout, in context: inout GraphicsContext) {
-    var index = 0.0
-    var tail: CGRect?
-    lines: for line in layout {
-      let count = Double(line.reduce(0) { $0 + $1.count })
-      if index + count + Self.edge <= shown {
-        context.draw(line)
-        index += count
-        tail = line.typographicBounds.rect
-        continue
-      }
-      for run in line {
-        for glyph in run {
-          let progress = (shown - index) / Self.edge
-          guard progress > 0 else { break lines }
-          index += 1
-          tail = glyph.typographicBounds.rect
-          if progress >= 1 { context.draw(glyph); continue }
-          let eased = progress * progress * (3 - 2 * progress)
-          var glyphContext = context
-          glyphContext.opacity = eased
-          if motion {
-            glyphContext.translateBy(x: 0, y: (1 - eased) * 3)
-            glyphContext.addFilter(.blur(radius: (1 - eased) * 2.5))
-          }
-          glyphContext.draw(glyph)
-        }
-      }
-    }
-    guard caret > 0, let first = layout.first?.typographicBounds.rect else { return }
-    let bounds = tail ?? CGRect(x: first.minX, y: first.minY, width: 0, height: first.height)
-    var caretContext = context
-    caretContext.opacity = caret
-    caretContext.fill(
-      Path(roundedRect: CGRect(x: bounds.maxX + 2, y: bounds.minY + bounds.height * 0.12, width: 2, height: bounds.height * 0.76), cornerRadius: 1),
-      with: .color(caretColor))
-  }
-}
-
-/// The preview page, written out glyph by glyph. Fixed copy is written too, so the page reads as one voice.
-private struct StreamedQuestion: View {
-  let clock: RevealClock
-  let title: String
-  let note: String?
-  let prompt: String
-  let finished: Bool
-  let paused: Bool
-  let instant: Bool
-  let settled: () -> Void
-  @State private var slow = false
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  private static let eyebrow = "The scenario".uppercased()
-  private static let gap = 8.0
-
-  var body: some View {
-    let eyebrowLength = Double(Self.eyebrow.count), titleLength = Double(title.count)
-    let noteLength = Double(note?.count ?? 0), promptLength = Double(prompt.count)
-    let titleStart = eyebrowLength + Self.gap
-    let noteStart = titleStart + titleLength + Self.gap
-    let promptStart = noteStart + (note == nil ? 0 : noteLength + Self.gap)
-    // The title is complete once the prompt has started; structured output writes them in that order.
-    let titleDone = finished || !prompt.isEmpty
-    let target = titleDone ? promptStart + promptLength + (finished ? RevealRenderer.edge : 0) : titleStart + titleLength
-    TimelineView(.animation(paused: paused)) { timeline in
-      let cursor = clock.tick(timeline.date, target: target, instant: instant || reduceMotion, finished: finished) {
-        Task { @MainActor in settled() }
-      }
-      let caughtUp = cursor >= target - 0.01
-      let pulse = 0.5 + 0.5 * cos(timeline.date.timeIntervalSinceReferenceDate * 2 * .pi / 1.1)
-      let caret = clock.rewinding || instant || reduceMotion ? 0
-        : finished ? max(0, min(1, (target - cursor) / RevealRenderer.edge))
-        : caughtUp ? 0.3 + 0.7 * pulse : 1
-      let caretAt = cursor < noteStart || !titleDone ? 1 : cursor < promptStart && note != nil ? 2 : 3
-      VStack(alignment: .leading, spacing: 16) {
-        Text(Self.eyebrow)
-          .font(.caption2.weight(.semibold).monospaced()).tracking(1.2).foregroundStyle(AppPalette.accent)
-          .textRenderer(renderer(cursor, caret: 0))
-        Text(title.isEmpty ? " " : title)
-          .font(.largeTitle.weight(.semibold)).tracking(-0.8)
-          .fixedSize(horizontal: false, vertical: true)
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .textRenderer(renderer(title.isEmpty ? 0 : cursor - titleStart, caret: caretAt == 1 ? caret : 0))
-          .accessibilityHidden(title.isEmpty)
-        if slow && title.isEmpty && !finished {
-          Text("Writing your question…").font(.footnote).foregroundStyle(.secondary)
-            .transition(.opacity)
-        }
-        if let note {
-          Text(note).font(.subheadline).foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-            .textRenderer(renderer(cursor - noteStart, caret: caretAt == 2 ? caret : 0))
-            .accessibilityHidden(cursor <= noteStart)
-        }
-        if !prompt.isEmpty {
-          Text(prompt)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .textRenderer(renderer(cursor - promptStart, caret: caretAt == 3 ? caret : 0))
-            .textSelection(.enabled).accessibilityIdentifier("previewPrompt")
-        }
-      }
-    }
-    .animation(DrillbitMotion.reveal, value: slow && title.isEmpty && !finished)
-    .task(id: title.isEmpty && !finished) {
-      slow = false
-      guard title.isEmpty, !finished else { return }
-      // Only mention the wait if it is noticeable.
-      do { try await Task.sleep(for: .seconds(1.6)) } catch { return }
-      slow = true
-    }
-  }
-
-  private func renderer(_ shown: Double, caret: Double) -> RevealRenderer {
-    RevealRenderer(shown: paused ? .infinity : shown, caret: caret, caretColor: AppPalette.accent, motion: !reduceMotion)
   }
 }

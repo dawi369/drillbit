@@ -77,7 +77,7 @@ struct HomeView: View {
               Text(challenge.title).font(.largeTitle.weight(.semibold)).tracking(-0.8)
                 .fixedSize(horizontal: false, vertical: true)
               DrillbitMetadata(text: "\(challenge.topic) · \(challenge.levelLabel)")
-              Text(challenge.displayPrompt).font(.subheadline).foregroundStyle(AppPalette.secondary)
+              Text(challenge.plainPrompt).font(.subheadline).foregroundStyle(AppPalette.secondary)
                 .lineLimit(3).fixedSize(horizontal: false, vertical: true)
               SignalJourney(inProgress: challenge.lifecycle == "in_progress")
               Button(challenge.lifecycle == "in_progress" ? "Resume" : "Open question") {

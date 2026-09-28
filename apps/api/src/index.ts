@@ -243,6 +243,7 @@ app.put("/v1/settings", async (c) => {
   settings.practiceProfile ??= previous.practiceProfile;
   settings.learningPlan ??= previous.learningPlan;
   settings.engineeringLevel ??= previous.engineeringLevel;
+  settings.questionFormatting ??= previous.questionFormatting;
   if (settings.learningPlan?.targetDate !== previous.learningPlan?.targetDate)
     validateLearningPlanDate(settings);
   if (

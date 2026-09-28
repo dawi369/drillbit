@@ -54,6 +54,12 @@ struct PracticeSettings: Codable, Equatable, Sendable {
   var reminderEnabled = false
   var aiMode = "managed"
   var model = "openai/gpt-6-luna"
+  /// Absent means on, matching the server.
+  var questionFormatting: Bool? = nil
+  var formatsQuestions: Bool {
+    get { questionFormatting ?? true }
+    set { questionFormatting = newValue }
+  }
 }
 struct SessionDraft: Codable, Sendable {
   var answer: String
@@ -597,4 +603,105 @@ enum HomeTopicRanking {
       return $0.id < $1.id
     }
   }
+}
+
+/// Question markup: `<b>`, `<i>` and `<code>` inline, `<pre>` blocks. Rendered natively, never as HTML;
+/// anything else stays literal text. Keep the tag set in sync with apps/api/src/prompts/formatting.ts.
+enum QuestionMarkup {
+  enum Block: Equatable, Sendable {
+    case text(AttributedString)
+    case code(String)
+    var length: Int {
+      switch self {
+      case .text(let value): value.characters.count
+      case .code(let value): value.count
+      }
+    }
+  }
+  private static let inline: [String: (InlinePresentationIntent, Bool)] = [
+    "<b>": (.stronglyEmphasized, true), "</b>": (.stronglyEmphasized, false),
+    "<i>": (.emphasized, true), "</i>": (.emphasized, false),
+    "<code>": (.code, true), "</code>": (.code, false),
+  ]
+  private static let tags = Array(inline.keys) + ["<pre>", "</pre>"]
+  private static let entities = ["&lt;": "<", "&gt;": ">", "&amp;": "&"]
+
+  /// Tolerates text that is still streaming: an unfinished tag or entity at the end is held back, and an open tag applies to the rest.
+  static func blocks(_ source: String, formatted: Bool = true) -> [Block] {
+    guard formatted else {
+      let text = plain(source)
+      return text.isEmpty ? [] : [.text(AttributedString(text))]
+    }
+    var blocks: [Block] = []
+    var text = AttributedString()
+    var run = ""
+    var intent: InlinePresentationIntent = []
+    var code: String?
+    func flushRun() {
+      guard !run.isEmpty else { return }
+      var piece = AttributedString(run)
+      if !intent.isEmpty { piece.inlinePresentationIntent = intent }
+      text.append(piece)
+      run = ""
+    }
+    func flushText() {
+      flushRun()
+      let value = trimmingNewlines(text)
+      if !value.characters.allSatisfy(\.isWhitespace) { blocks.append(.text(value)) }
+      text = AttributedString()
+    }
+    var index = source.startIndex
+    scan: while index < source.endIndex {
+      let character = source[index]
+      if character == "<" || character == "&" {
+        let rest = source[index...]
+        let candidates = character == "<" ? tags : Array(entities.keys)
+        if let match = candidates.first(where: { rest.hasPrefix($0) }) {
+          index = source.index(index, offsetBy: match.count)
+          if let value = entities[match] {
+            if code != nil { code? += value } else { run += value }
+          } else if code != nil {
+            if match == "</pre>" { blocks.append(.code(code!.trimmingCharacters(in: .newlines))); code = nil }
+            else { code? += match }
+          } else if match == "<pre>" {
+            flushText()
+            code = ""
+          } else if let (flag, opens) = inline[match] {
+            flushRun()
+            if opens { intent.insert(flag) } else { intent.remove(flag) }
+          }
+          continue
+        }
+        if candidates.contains(where: { $0.hasPrefix(rest) }) { break scan }
+      }
+      if code != nil { code?.append(character) } else { run.append(character) }
+      index = source.index(after: index)
+    }
+    if let code { blocks.append(.code(code.trimmingCharacters(in: .newlines))) } else { flushText() }
+    return blocks
+  }
+
+  static func plain(_ source: String) -> String {
+    blocks(source).map { block in
+      switch block {
+      case .text(let value): String(value.characters)
+      case .code(let value): value
+      }
+    }.joined(separator: "\n")
+  }
+
+  private static func trimmingNewlines(_ value: AttributedString) -> AttributedString {
+    var value = value
+    while let first = value.characters.first, first.isNewline {
+      value.removeSubrange(value.startIndex..<value.characters.index(after: value.startIndex))
+    }
+    while let last = value.characters.last, last.isNewline {
+      value.removeSubrange(value.characters.index(before: value.endIndex)..<value.endIndex)
+    }
+    return value
+  }
+}
+extension Challenge {
+  /// For compact previews, widgets and accessibility labels.
+  var plainPrompt: String { QuestionMarkup.plain(displayPrompt) }
 }

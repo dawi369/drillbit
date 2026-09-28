@@ -46,6 +46,8 @@ export const settingsSchema = z.object({
   reminderEnabled: z.boolean().default(false),
   aiMode: z.enum(["managed", "byok"]).default("managed"),
   model: z.enum([MODEL_ID, "google/gemini-3.1-flash-lite", "google/gemini-2.5-flash-lite"]).default(MODEL_ID),
+  // Absent means on; optional so older clients never reset it.
+  questionFormatting: z.boolean().optional(),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 export const challengeSchema = z.object({

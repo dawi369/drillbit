@@ -89,7 +89,7 @@ struct SessionDetailView: View {
           let date = challenge.completedAt.flatMap { Date.fromAPI($0) }?.formatted(date: .abbreviated, time: .shortened)
           DrillbitMetadata(text: [challenge.levelLabel, date].compactMap { $0 }.joined(separator: " · "))
         }
-        Text(challenge.prompt).foregroundStyle(.secondary)
+        Text(QuestionMarkup.plain(challenge.prompt)).foregroundStyle(.secondary)
         if let interview = challenge.interview, !interview.turns.isEmpty {
           NavigationLink("Interview conversation") { InterviewConversation(state: interview) }
         }
@@ -350,7 +350,7 @@ struct LibraryQuestionView: View {
     SignalList {
       Section {
         Text(question.title).font(.title2.weight(.semibold))
-        DisclosureGroup("Original question") { Text(question.prompt).textSelection(.enabled) }
+        DisclosureGroup("Original question") { QuestionBody(markup: question.prompt).textSelection(.enabled) }
       }
       Section {
         ForEach(question.conceptIds, id: \.self) { id in
@@ -384,7 +384,7 @@ struct LibraryQuestionView: View {
     }
     .sheet(isPresented: $preview, onDismiss: { if let started { model.presented = started; self.started = nil } }) {
       NavigationStack {
-        ScrollView { VStack(alignment: .leading, spacing: 16) { Text(question.title).font(.title2.weight(.semibold)); Text(question.prompt).textSelection(.enabled); if let failure { Text(failure).foregroundStyle(.secondary) } }.frame(maxWidth: .infinity, alignment: .leading).padding(24) }
+        ScrollView { VStack(alignment: .leading, spacing: 16) { Text(question.title).font(.title2.weight(.semibold)); QuestionBody(markup: question.prompt).textSelection(.enabled); if let failure { Text(failure).foregroundStyle(.secondary) } }.frame(maxWidth: .infinity, alignment: .leading).padding(24) }
           .safeAreaInset(edge: .bottom) {
             Button("Start practice") {
               Task {

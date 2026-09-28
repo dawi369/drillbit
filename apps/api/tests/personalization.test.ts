@@ -6,6 +6,7 @@ import type {Env} from '../src/platform';
 import {historicalSnapshot} from '../src/history';
 import {messagesFor} from '../src/ai';
 import {voiceDelegationMessages} from '../src/prompts/voice-context';
+import {plainQuestion} from '../src/prompts/formatting';
 import {practiceProfileSchema,settingsSchema} from '../src/domain';
 const e=env as unknown as Env;
 beforeAll(()=>initializeDatabase(e.DB));
@@ -57,4 +58,14 @@ it('questions receive goals/background only and reflections receive no personali
  const reflection=messagesFor('summarize',{settings:{practiceProfile:profile},practiceProfile:profile});
  expect(JSON.stringify(reflection)).not.toContain(profile.preferences);
  expect(JSON.stringify(reflection)).not.toContain('SQL engineer');
+});
+it('question formatting is on by default, off on request, and stripped for plain previews',async()=>{
+ const on=messagesFor('generate',{settings:{}})[0].content;
+ expect(on).toContain('<question_formatting>');
+ expect(on).toContain('<example>');
+ const off=messagesFor('generate',{settings:{questionFormatting:false}})[0].content;
+ expect(off).toContain('plain text');
+ expect(off).not.toContain('<example>');
+ expect(plainQuestion('Keep <code>ttl</code> &lt; <b>5</b>')).toBe('Keep ttl < 5');
+ expect(settingsSchema.parse({}).questionFormatting).toBeUndefined();
 });

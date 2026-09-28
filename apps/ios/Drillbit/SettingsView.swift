@@ -61,6 +61,10 @@ struct SettingsView: View {
           }
         }
         ReminderPermissionRow()
+        Toggle(isOn: $model.settings.formatsQuestions) {
+          Text("Formatted questions")
+          Text("Bold, italics and code blocks where they help")
+        }.accessibilityIdentifier("questionFormatting")
       }
       Section { NavigationLink("LLM provider") { AIAccessView(model: model) } }
       Section("Appearance") {
