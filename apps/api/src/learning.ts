@@ -145,12 +145,27 @@ export function groundReflection(raw: unknown, context: any) {
     || (context.help ?? []).some((h: any) => h.body)
     || (Array.isArray(context.interview) ? context.interview : context.interview?.turns ?? [])
       .some((t: any) => ["hint", "example"].includes(t.kind));
-  result.evidence = (result.evidence ?? []).filter(e => concepts.includes(e.conceptId)
-    && sources.some(source => source.text.includes(e.quote)))
+  result.evidence = (result.evidence ?? []).flatMap(e => {
+    if (!concepts.includes(e.conceptId)) return [];
+    const quote = sources.map(source => candidateWords(e.quote, source.text)).find(Boolean);
+    return quote ? [{ ...e, quote }] : [];
+  })
     .filter((e,index,all) => all.findIndex(other => other.conceptId === e.conceptId && other.quote === e.quote && other.signal === e.signal) === index)
     .map(e => ({ ...e, assistance: assisted ? "assisted" as const : "unknown" as const,
       sourceTurnId: sources.find(source => source.id && source.text.includes(e.quote))?.id }));
   return result;
+}
+
+// Each replacement is one character for one, so indexes in the normalised text match the original.
+const straightQuotes = (text: string) => text.replace(/[\u2018\u2019\u02BC]/g, "'").replace(/[\u201C\u201D]/g, '"').replace(/\u00A0/g, " ");
+/** The candidate's own words for a model quote, tolerating curly/straight quote swaps and an added or dropped final stop. */
+export function candidateWords(quote: string, text: string): string | undefined {
+  const source = straightQuotes(text);
+  for (const candidate of new Set([quote, quote.replace(/[.!?]+$/, "")])) {
+    const needle = straightQuotes(candidate).trim();
+    const index = needle ? source.indexOf(needle) : -1;
+    if (index >= 0) return text.slice(index, index + needle.length);
+  }
 }
 
 /** Counts are practice exposure. Observations remain attributed model feedback. */

@@ -1,21 +1,30 @@
 import { env } from "cloudflare:test";
 import { beforeAll, expect, it } from "vitest";
-import { initializeDatabase } from "./migrations";
-import { accountFor } from "../src/store";
-import { groundReflection, learningEvidence, recallDeck, reviewRecall, retryMoment, todayPlan } from "../src/learning";
-import { normalizeSettings } from "../src/domain";
-import { exportPage } from "../src/export";
-import { selectConcept } from "../src/library";
-import type { Env } from "../src/platform";
 import recallFixture from "../../../packages/contracts/fixtures/recall.json";
 import tomorrowFixture from "../../../packages/contracts/fixtures/tomorrow.json";
 import { wire } from "../../../packages/contracts/wire";
+import { normalizeSettings } from "../src/domain";
+import { exportPage } from "../src/export";
+import { candidateWords, groundReflection, learningEvidence, recallDeck, retryMoment, reviewRecall, todayPlan } from "../src/learning";
+import { selectConcept } from "../src/library";
+import type { Env } from "../src/platform";
+import { accountFor } from "../src/store";
+import { initializeDatabase } from "./migrations";
 const bindings = {...env,JOBS:{create:async()=>({id:"test"})}} as unknown as Env;
 beforeAll(()=>initializeDatabase(bindings.DB));
 const feedback = {summary:"A concrete retry design.",worked:["Stable keys"],improve:"Bound retention.",takeaway:"State a retention window.",strengths:[],gaps:[],nextExercise:"Choose and justify a retention window for retry keys.",evidence:[{conceptId:"retry-safety",quote:"Use a stable idempotency key",observation:"Identifies duplicate requests.",signal:"demonstrated",assistance:"unknown"}]};
 it("keeps the recall fixture compatible with the public wire contract",()=>{
  expect(wire.RecallDeck.safeParse(recallFixture).success).toBe(true);
  expect(wire.QueuedNextResult.safeParse(tomorrowFixture).success).toBe(true);
+});
+it("grounds a quote in the candidate's own characters despite curly quotes or a changed final stop",()=>{
+ const text="I'd send an idempotency key with every delivery so the receiver can drop repeats";
+ expect(candidateWords("I’d send an idempotency key with every delivery so the receiver can drop repeats.",text)).toBe(text);
+ expect(candidateWords("an idempotency key",text)).toBe("an idempotency key");
+ expect(candidateWords("I’d send a request ID",text)).toBeUndefined();
+ const reflection=groundReflection({...feedback,evidence:[{...feedback.evidence[0],quote:"Use a stable idempotency key.",recall:{prompt:"A retry arrives after a timeout. What stops a second charge?",answer:"The same key finds the first result."}}]},
+  {question:{conceptIds:["retry-safety"]},interview:[{id:"turn",kind:"answer",answer:"Use a stable idempotency key for every payment"}]});
+ expect(reflection.evidence?.[0]).toMatchObject({quote:"Use a stable idempotency key",sourceTurnId:"turn",recall:{prompt:"A retry arrives after a timeout. What stops a second charge?"}});
 });
 it("grounds quotes in candidate work and never upgrades unknown exposure to independent",()=>{
   const context={question:{conceptIds:["retry-safety"]},session:{answer:"Use a stable idempotency key for each payment."},help:[{body:"Choose a stable key."}]};

@@ -1,10 +1,10 @@
-import {env} from 'cloudflare:test';
-import {beforeAll,expect,it} from 'vitest';
-import {initializeDatabase} from './migrations';
+import { env } from 'cloudflare:test';
+import { beforeAll, expect, it } from 'vitest';
 import migration from '../migrations/0013_tickets_and_tomorrow.sql?raw';
-import {accountFor,complete,detail,settingsFor} from '../src/store';
-import {retryMoment,todayPlan} from '../src/learning';
-import type {Env} from '../src/platform';
+import { retryMoment, todayPlan } from '../src/learning';
+import type { Env } from '../src/platform';
+import { accountFor, complete, detail, settingsFor } from '../src/store';
+import { initializeDatabase } from './migrations';
 const e={...env,JOBS:{create:async()=>({id:'test'})}} as unknown as Env;
 beforeAll(()=>initializeDatabase(e.DB));
 async function account() {

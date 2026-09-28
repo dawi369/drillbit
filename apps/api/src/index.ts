@@ -4,7 +4,7 @@ import { streamSSE } from "hono/streaming";
 import { z } from "zod";
 import { messagesFor, provider, recordUsage, structured, textDeltas } from "./ai";
 import { receive, updateContext } from "./companion";
-import { dailyQuestion, dailyQuestionSchema, queueFollowUp, queuedFollowUp, unqueueFollowUp } from "./daily";
+import { dailyQuestion, dailyQuestionSchema, queuedFollowUp, queueFollowUp, unqueueFollowUp } from "./daily";
 import {
     answerSchema,
     Fault,
