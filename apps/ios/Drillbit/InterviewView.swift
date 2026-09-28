@@ -249,7 +249,8 @@ struct InterviewView: View {
     }
     .navigationTitle(scenarioTitle).navigationBarTitleDisplayMode(.inline)
     .toolbarBackground(AppPalette.background, for: .navigationBar)
-    .toolbarBackground(.visible, for: .navigationBar)
+    // The tour's dim lives in the content; a clear bar lets it cover the top too.
+    .toolbarBackground(guideStep == nil ? .visible : .hidden, for: .navigationBar)
     .task(id: activeID) {
       guard sessionRestored, followingLiveEnd, sheet == nil, phase == .active else { return }
       // Let the keyboard and document settle before revealing the new block.
@@ -263,6 +264,11 @@ struct InterviewView: View {
       interview.answer = await model.localAnswer(interview.challenge)
     } } }
     .toolbar {
+      if guideStep != nil && interview.mode != .mockInterview {
+        ToolbarItem(placement: .principal) {
+          Text(scenarioTitle).font(.headline).lineLimit(1).opacity(0.45)
+        }
+      }
       if interview.mode == .mockInterview && interview.finished == nil {
         ToolbarItem(placement: .principal) {
           VStack(spacing: 0) {
@@ -270,6 +276,7 @@ struct InterviewView: View {
             RoundClock(start: Date.fromAPI(challenge.startedAt ?? "") ?? Date.fromAPI(challenge.createdAt ?? "") ?? openedAt, minutes: challenge.minutes ?? 30)
               .font(.caption)
           }
+          .opacity(guideStep == nil ? 1 : 0.45)
         }
       }
       // The warm-up has no way out but through: no Close, no Skip.
@@ -310,6 +317,7 @@ struct InterviewView: View {
           }
         } label: { Image(systemName: AppIcon.more.rawValue) }
           .disabled(guiding)
+          .opacity(guideStep == nil ? 1 : 0.45)
           .accessibilityLabel("Interview options").accessibilityIdentifier("interviewOptions")
         }
       }
