@@ -10,10 +10,10 @@ const examples = [
   "A profile cache sits in front of your database.\n\n• Entries live for <code>ttl = 300</code> seconds\n• The database handles <b>2,000 reads per second</b>\n• A popular profile expires and 500 requests miss at once\n\nWhat happens to the database, and how do you protect it?",
 ];
 
-// Plain-text layout, so it applies with formatting on or off; the app renders paragraphs, "• " lines and the closing ask.
+// Plain-text layout, so it applies with formatting on or off; the app renders paragraphs, "• " lines (the Key facts block) and the closing ask.
 const structure = `
 <question_structure>
-Lay the prompt out for quick reading. Open with one or two sentences of scenario. When the candidate needs key facts (users, scale, limits, existing pieces), give two to four of them, each on its own line starting with "• ". End with the ask on its own line: one sentence naming the decision. Separate these parts with a blank line. No headings. A Mock interview opener is the exception: one short paragraph, no bullets.
+Lay the prompt out for quick reading. Open with one or two sentences of scenario. Then, when the decision turns on them, two to four key facts, each on its own line starting with "• ": the users, scale, limits or existing pieces the answer depends on. One fact per line, under 80 characters, stated plainly with the number where it matters. A key fact is never a requirement to meet, a hint, or the scenario restated. End with the ask on its own line: one sentence naming the decision. Separate these parts with a blank line. No headings. A Mock interview opener is the exception: one short paragraph, no bullets. Other exploratory prompts keep key facts to fixed context (who uses it, what already exists) and leave numbers and limits for the candidate to ask about.
 </question_structure>`;
 
 export function questionFormattingInstructions(enabled: boolean): string {

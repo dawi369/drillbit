@@ -147,6 +147,19 @@ export async function detail(env: Env, account: string, id: string) {
 }
 /** SQL guard for counted practice; onboarding warm-ups are excluded. Expects the challenges alias `c`. */
 export const COUNTED = "COALESCE(json_extract(c.data,'$.warmUp'),0)=0";
+/** What a follow-up question may build on: the finished question, its feedback, the answer and the help used. */
+export async function followUpContext(env: Env, account: string, id: string) {
+  const previous = await detail(env, account, id);
+  if (previous.lifecycle !== "completed")
+    throw new Fault("invalid_follow_up", 409, "Finish the previous practice first.");
+  return {
+    question: present(await ownedChallenge(env, account, id)),
+    reflection: previous.reflection,
+    answer: typeof (previous.session as { answer?: unknown } | null)?.answer === "string" ? (previous.session as { answer: string }).answer.slice(0, 12000) : undefined,
+    assistance: previous.help.map((h) => ({ kind: h.kind, status: h.status, deliveries: h.deliveries, capture: h.capture })),
+    adoptions: previous.adoptions,
+  };
+}
 export function present(row: ChallengeRow) {
   const { evaluationCriteria, ambiguityPolicy, targetSkill, tagEvidence, selectionSnapshot, ...content } =
     parseJSON<Record<string, unknown>>(row.data);
@@ -230,6 +243,9 @@ export async function complete(
     env.DB.prepare(
       `UPDATE challenges SET lifecycle='completed',completed_at=?,command_id=? WHERE id=? AND account_id=? AND lifecycle IN ('ready','in_progress') AND EXISTS(SELECT 1 FROM sessions WHERE challenge_id=? AND command_id=?)`,
     ).bind(now, command, id, account, id, command),
+    env.DB.prepare(
+      `UPDATE challenges SET data=json_set(data,'$.ticket',(SELECT COALESCE(MAX(json_extract(x.data,'$.ticket')),0)+1 FROM challenges x WHERE x.account_id=challenges.account_id)) WHERE id=? AND command_id=? AND lifecycle='completed' AND COALESCE(json_extract(data,'$.warmUp'),0)=0 AND json_extract(data,'$.ticket') IS NULL`,
+    ).bind(id, command),
     env.DB.prepare(
       `INSERT OR IGNORE INTO jobs(id,account_id,challenge_id,kind,input,created_at,updated_at) SELECT ?,account_id,id,'summarize',?,?,? FROM challenges WHERE id=? AND command_id=? AND lifecycle='completed'`,
     ).bind(command, JSON.stringify({ settings }), now, now, id, command),

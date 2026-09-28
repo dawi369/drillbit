@@ -14,9 +14,10 @@ export async function todayPlan(env: Env, account: string, active: ChallengeRow 
   const [counts,due] = await Promise.all([
     env.DB.prepare(`SELECT COUNT(*) completed_total,
       SUM(CASE WHEN completed_at>=? THEN 1 ELSE 0 END) completed_last_seven,
-      SUM(CASE WHEN completed_at>=? THEN 1 ELSE 0 END) completed_today
+      SUM(CASE WHEN completed_at>=? THEN 1 ELSE 0 END) completed_today,
+      MAX(json_extract(c.data,'$.ticket')) last_ticket
       FROM challenges c WHERE account_id=? AND lifecycle='completed' AND ${COUNTED}`)
-      .bind(weekStart,dayStart,account).first<{completed_total:number;completed_last_seven:number;completed_today:number}>(),
+      .bind(weekStart,dayStart,account).first<{completed_total:number;completed_last_seven:number;completed_today:number;last_ticket:number|null}>(),
     env.DB.prepare("SELECT COUNT(*) count FROM recall_cards WHERE account_id=? AND due_at<=?")
       .bind(account,now).first<{count:number}>(),
   ]);
@@ -32,7 +33,9 @@ export async function todayPlan(env: Env, account: string, active: ChallengeRow 
     : (counts?.completed_today ?? 0) > 0 ? "complete_today" : "prepare";
   return { state, completedTotal:total, completedLastSevenDays:counts?.completed_last_seven ?? 0,
     completedToday:counts?.completed_today ?? 0, dueRecallCount:dueCount, recommendedRecallCount,
-    estimatedRecallMinutes:Math.ceil(recommendedRecallCount / 2), dailyGoalMinutes:plan.dailyGoalMinutes };
+    estimatedRecallMinutes:Math.ceil(recommendedRecallCount / 2), dailyGoalMinutes:plan.dailyGoalMinutes,
+    // The number the next finished session gets; unfinished tickets show it provisionally.
+    nextTicket:(counts?.last_ticket ?? 0) + 1 };
 }
 
 export const recallRatingSchema = z.object({
@@ -40,7 +43,7 @@ export const recallRatingSchema = z.object({
   responseMs: z.number().int().min(0).max(3_600_000).optional(),
 });
 
-type RecallRow = { id:string; source_challenge_id:string; concept_id:string; question:string; answer:string; due_at:string; interval_days:number; repetitions:number; lapses:number; created_at:string; updated_at:string; source_title?:string|null; source_completed_at?:string|null; reflection_data?:string|null };
+type RecallRow = { id:string; source_challenge_id:string; concept_id:string; question:string; answer:string; due_at:string; interval_days:number; repetitions:number; lapses:number; created_at:string; updated_at:string; source_title?:string|null; source_completed_at?:string|null; source_ticket?:number|null; reflection_data?:string|null };
 export function presentRecall(row: RecallRow) {
   let evidence: unknown;
   if (row.reflection_data) {
@@ -50,13 +53,13 @@ export function presentRecall(row: RecallRow) {
   return { id:row.id, sourceChallengeId:row.source_challenge_id, conceptId:row.concept_id,
     question:row.question, answer:row.answer, dueAt:row.due_at, intervalDays:row.interval_days,
     repetitions:row.repetitions, lapses:row.lapses, createdAt:row.created_at, updatedAt:row.updated_at,
-    sourceTitle:row.source_title ?? undefined, sourceCompletedAt:row.source_completed_at ?? undefined, evidence };
+    sourceTitle:row.source_title ?? undefined, sourceCompletedAt:row.source_completed_at ?? undefined, sourceTicket:row.source_ticket ?? undefined, evidence };
 }
 
 export async function recallDeck(env: Env, account: string) {
   const now = timestamp();
   const [rows,due] = await Promise.all([env.DB.prepare(`SELECT rc.id,rc.source_challenge_id,rc.concept_id,rc.question,rc.answer,rc.due_at,rc.interval_days,rc.repetitions,rc.lapses,rc.created_at,rc.updated_at,
-    json_extract(c.data,'$.title') source_title,c.completed_at source_completed_at,r.data reflection_data
+    json_extract(c.data,'$.title') source_title,c.completed_at source_completed_at,json_extract(c.data,'$.ticket') source_ticket,r.data reflection_data
     FROM recall_cards rc JOIN challenges c ON c.id=rc.source_challenge_id LEFT JOIN reflections r ON r.challenge_id=rc.source_challenge_id
     WHERE rc.account_id=? ORDER BY CASE WHEN rc.due_at<=? THEN 0 ELSE 1 END,rc.due_at,rc.id LIMIT 100`)
     .bind(account,now).all<RecallRow>(), env.DB.prepare("SELECT COUNT(*) count FROM recall_cards WHERE account_id=? AND due_at<=?").bind(account,now).first<{count:number}>()]);
@@ -97,7 +100,7 @@ export async function retryMoment(env: Env, account: string, sourceId: string, t
   if (await activeChallenge(env,account)) throw new Fault("active_challenge",409,"Finish or skip the current interview before retrying this moment.");
   const turn = await env.DB.prepare("SELECT prompt FROM interview_turns WHERE id=? AND challenge_id=?").bind(turnId,sourceId).first<{prompt:string}>();
   if (!turn) throw new Fault("not_found",404,"Interview moment not found.");
-  const original = JSON.parse(source.data) as Record<string,unknown>;
+  const { ticket: _ticket, ...original } = JSON.parse(source.data) as Record<string,unknown>;
   const now = timestamp();
   const data = { ...original, title: `${String(original.title ?? "Interview").slice(0,148)} · Retry`, prompt: turn.prompt,
     selectionReason: "Retry a moment from a completed interview", startedAt: now };

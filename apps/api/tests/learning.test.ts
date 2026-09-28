@@ -8,12 +8,14 @@ import { exportPage } from "../src/export";
 import { selectConcept } from "../src/library";
 import type { Env } from "../src/platform";
 import recallFixture from "../../../packages/contracts/fixtures/recall.json";
+import tomorrowFixture from "../../../packages/contracts/fixtures/tomorrow.json";
 import { wire } from "../../../packages/contracts/wire";
 const bindings = {...env,JOBS:{create:async()=>({id:"test"})}} as unknown as Env;
 beforeAll(()=>initializeDatabase(bindings.DB));
 const feedback = {summary:"A concrete retry design.",worked:["Stable keys"],improve:"Bound retention.",takeaway:"State a retention window.",strengths:[],gaps:[],nextExercise:"Choose and justify a retention window for retry keys.",evidence:[{conceptId:"retry-safety",quote:"Use a stable idempotency key",observation:"Identifies duplicate requests.",signal:"demonstrated",assistance:"unknown"}]};
 it("keeps the recall fixture compatible with the public wire contract",()=>{
  expect(wire.RecallDeck.safeParse(recallFixture).success).toBe(true);
+ expect(wire.QueuedNextResult.safeParse(tomorrowFixture).success).toBe(true);
 });
 it("grounds quotes in candidate work and never upgrades unknown exposure to independent",()=>{
   const context={question:{conceptIds:["retry-safety"]},session:{answer:"Use a stable idempotency key for each payment."},help:[{body:"Choose a stable key."}]};

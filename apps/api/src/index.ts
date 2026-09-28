@@ -4,7 +4,7 @@ import { streamSSE } from "hono/streaming";
 import { z } from "zod";
 import { messagesFor, provider, recordUsage, structured, textDeltas } from "./ai";
 import { receive, updateContext } from "./companion";
-import { dailyQuestion } from "./daily";
+import { dailyQuestion, dailyQuestionSchema, queueFollowUp, queuedFollowUp, unqueueFollowUp } from "./daily";
 import {
     answerSchema,
     Fault,
@@ -29,6 +29,7 @@ import {
     COUNTED,
     createJob,
     detail,
+    followUpContext,
     ownedChallenge,
     present,
     settingsFor,
@@ -167,6 +168,7 @@ app.get("/v1/bootstrap", async (c) => {
     practiceEpoch: (await c.env.DB.prepare("SELECT value FROM practice_epoch WHERE id=1").first<{value:string}>())!.value,
     settings,
     todayPlan: await todayPlan(c.env, a.id, active, settings),
+    queuedNext: await queuedFollowUp(c.env, a.id),
     challenge: active ? await detail(c.env, a.id, active.id) : null,
     jobs: jobs.results,
     credential,
@@ -275,7 +277,14 @@ app.put("/v1/settings", async (c) => {
   ]);
   return c.json(settings);
 });
-app.post("/v1/daily-question", async c => c.json(await dailyQuestion(c.env,c.get("account").id)));
+app.post("/v1/daily-question", async c => {
+  const raw = await c.req.text();
+  let input: unknown = {};
+  try { if (raw) input = JSON.parse(raw); } catch { throw new Fault("invalid_input", 400, "The request must be valid JSON."); }
+  return c.json(await dailyQuestion(c.env, c.get("account").id, new Date(), dailyQuestionSchema.parse(input)));
+});
+app.put("/v1/challenges/:id/next", async c => c.json({ queuedNext: await queueFollowUp(c.env, c.get("account").id, c.req.param("id")) }));
+app.delete("/v1/challenges/:id/next", async c => c.json({ queuedNext: await unqueueFollowUp(c.env, c.get("account").id, c.req.param("id")) }));
 app.post("/v1/challenges", async (c) => {
   const a = c.get("account").id,
     id = requireCommand(c.req.header("Idempotency-Key"));
@@ -311,28 +320,7 @@ app.post("/v1/challenges", async (c) => {
     .bind(a)
     .first();
   if (pending) return c.json(pending);
-  let followUp: unknown;
-  if (preparation.followUpId) {
-    const previous = await detail(c.env, a, preparation.followUpId);
-    if (previous.lifecycle !== "completed")
-      throw new Fault(
-        "invalid_follow_up",
-        409,
-        "Finish the previous practice first.",
-      );
-    followUp = {
-      question: present(await ownedChallenge(c.env, a, preparation.followUpId)),
-      reflection: previous.reflection,
-      answer: typeof previous.session?.answer === "string" ? previous.session.answer.slice(0, 12000) : undefined,
-      assistance: previous.help.map((h) => ({
-        kind: h.kind,
-        status: h.status,
-        deliveries: h.deliveries,
-        capture: h.capture,
-      })),
-      adoptions: previous.adoptions,
-    };
-  }
+  const followUp = preparation.followUpId ? await followUpContext(c.env, a, preparation.followUpId) : undefined;
   await consumeUsage(c.env, a, "generate", 10);
   return c.json(
     await createJob(c.env, a, id, "generate", null, {

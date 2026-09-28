@@ -1,0 +1,9 @@
+{
+  "queuedNext": {
+    "sourceId": "2f7c3c1e-6a0b-4a8e-9d1f-3b7c2e9a4d10",
+    "title": "Webhooks that land once",
+    "conceptId": "retry-safety",
+    "label": "Retry safety & idempotency",
+    "createdAt": "2026-09-28T19:40:00.000Z"
+  }
+}

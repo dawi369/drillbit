@@ -2315,6 +2315,16 @@
         "summary": "Check the first account-local visit of the day and reuse or prepare a question",
         "operationId": "post_daily_question",
         "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DailyQuestionInput"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful operation",
@@ -2322,6 +2332,220 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DailyQuestion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invite required or account unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not owned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision or lifecycle conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid invitation or provider credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Usage limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Provider temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/challenges/{id}/next": {
+      "put": {
+        "summary": "Let a completed session shape tomorrow's automatic question",
+        "operationId": "put_challenges__id__next",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueuedNextResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invite required or account unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not owned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision or lifecycle conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid invitation or provider credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Usage limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Provider temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Stop a completed session from shaping tomorrow's question",
+        "operationId": "delete_challenges__id__next",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueuedNextResult"
                 }
               }
             }
@@ -6422,6 +6646,11 @@
                 "warmUp": {
                   "type": "boolean"
                 },
+                "ticket": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
                 "minutes": {
                   "type": "integer",
                   "minimum": -9007199254740991,
@@ -6813,6 +7042,26 @@
                               },
                               "sourceTurnId": {
                                 "type": "string"
+                              },
+                              "recall": {
+                                "type": "object",
+                                "properties": {
+                                  "prompt": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160
+                                  },
+                                  "answer": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 320
+                                  }
+                                },
+                                "required": [
+                                  "prompt",
+                                  "answer"
+                                ],
+                                "additionalProperties": false
                               }
                             },
                             "required": [
@@ -7497,6 +7746,26 @@
           "sourceTurnId": {
             "type": "string"
           },
+          "recall": {
+            "type": "object",
+            "properties": {
+              "prompt": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "answer": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 320
+              }
+            },
+            "required": [
+              "prompt",
+              "answer"
+            ],
+            "additionalProperties": false
+          },
           "sessionId": {
             "type": "string"
           },
@@ -7824,6 +8093,11 @@
                 },
                 "warmUp": {
                   "type": "boolean"
+                },
+                "ticket": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
                 },
                 "minutes": {
                   "type": "integer",
@@ -8216,6 +8490,26 @@
                               },
                               "sourceTurnId": {
                                 "type": "string"
+                              },
+                              "recall": {
+                                "type": "object",
+                                "properties": {
+                                  "prompt": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160
+                                  },
+                                  "answer": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 320
+                                  }
+                                },
+                                "required": [
+                                  "prompt",
+                                  "answer"
+                                ],
+                                "additionalProperties": false
                               }
                             },
                             "required": [
@@ -8997,6 +9291,11 @@
           "sourceCompletedAt": {
             "type": "string"
           },
+          "sourceTicket": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
           "evidence": {
             "type": "object",
             "properties": {
@@ -9055,6 +9354,26 @@
               },
               "sourceTurnId": {
                 "type": "string"
+              },
+              "recall": {
+                "type": "object",
+                "properties": {
+                  "prompt": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "answer": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 320
+                  }
+                },
+                "required": [
+                  "prompt",
+                  "answer"
+                ],
+                "additionalProperties": false
               }
             },
             "required": [
@@ -9162,6 +9481,11 @@
                 "sourceCompletedAt": {
                   "type": "string"
                 },
+                "sourceTicket": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
                 "evidence": {
                   "type": "object",
                   "properties": {
@@ -9220,6 +9544,26 @@
                     },
                     "sourceTurnId": {
                       "type": "string"
+                    },
+                    "recall": {
+                      "type": "object",
+                      "properties": {
+                        "prompt": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "answer": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 320
+                        }
+                      },
+                      "required": [
+                        "prompt",
+                        "answer"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
@@ -9360,6 +9704,11 @@
               "sourceCompletedAt": {
                 "type": "string"
               },
+              "sourceTicket": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
               "evidence": {
                 "type": "object",
                 "properties": {
@@ -9418,6 +9767,26 @@
                   },
                   "sourceTurnId": {
                     "type": "string"
+                  },
+                  "recall": {
+                    "type": "object",
+                    "properties": {
+                      "prompt": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "answer": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 320
+                      }
+                    },
+                    "required": [
+                      "prompt",
+                      "answer"
+                    ],
+                    "additionalProperties": false
                   }
                 },
                 "required": [
@@ -9449,6 +9818,143 @@
         "required": [
           "card"
         ],
+        "additionalProperties": false
+      },
+      "QueuedNext": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "conceptId": {
+            "type": "string",
+            "enum": [
+              "data-modeling",
+              "indexing",
+              "transactions",
+              "consistency",
+              "replication",
+              "partitioning",
+              "api-design",
+              "caching",
+              "load-balancing",
+              "rate-limiting",
+              "capacity-planning",
+              "queues",
+              "retry-safety",
+              "coordination",
+              "scheduling",
+              "fault-tolerance",
+              "backpressure",
+              "observability",
+              "migration",
+              "authorization",
+              "tenant-isolation",
+              "data-lifecycle",
+              "multi-region",
+              "cost-efficiency"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sourceId",
+          "title",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "QueuedNextResult": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "queuedNext": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "sourceId": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "conceptId": {
+                    "type": "string",
+                    "enum": [
+                      "data-modeling",
+                      "indexing",
+                      "transactions",
+                      "consistency",
+                      "replication",
+                      "partitioning",
+                      "api-design",
+                      "caching",
+                      "load-balancing",
+                      "rate-limiting",
+                      "capacity-planning",
+                      "queues",
+                      "retry-safety",
+                      "coordination",
+                      "scheduling",
+                      "fault-tolerance",
+                      "backpressure",
+                      "observability",
+                      "migration",
+                      "authorization",
+                      "tenant-isolation",
+                      "data-lifecycle",
+                      "multi-region",
+                      "cost-efficiency"
+                    ]
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "createdAt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "sourceId",
+                  "title",
+                  "createdAt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "queuedNext"
+        ],
+        "additionalProperties": false
+      },
+      "DailyQuestionInput": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "guidanceMode": {
+            "type": "string",
+            "enum": [
+              "learn_together",
+              "coach_me",
+              "mock_interview"
+            ]
+          }
+        },
         "additionalProperties": false
       },
       "Companion": {
@@ -10673,6 +11179,11 @@
           "warmUp": {
             "type": "boolean"
           },
+          "ticket": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
           "minutes": {
             "type": "integer",
             "minimum": -9007199254740991,
@@ -11064,6 +11575,26 @@
                         },
                         "sourceTurnId": {
                           "type": "string"
+                        },
+                        "recall": {
+                          "type": "object",
+                          "properties": {
+                            "prompt": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 160
+                            },
+                            "answer": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 320
+                            }
+                          },
+                          "required": [
+                            "prompt",
+                            "answer"
+                          ],
+                          "additionalProperties": false
                         }
                       },
                       "required": [
@@ -11625,6 +12156,26 @@
                 },
                 "sourceTurnId": {
                   "type": "string"
+                },
+                "recall": {
+                  "type": "object",
+                  "properties": {
+                    "prompt": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    },
+                    "answer": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 320
+                    }
+                  },
+                  "required": [
+                    "prompt",
+                    "answer"
+                  ],
+                  "additionalProperties": false
                 }
               },
               "required": [
@@ -12311,6 +12862,11 @@
                     "const": 20
                   }
                 ]
+              },
+              "nextTicket": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
               }
             },
             "required": [
@@ -12324,6 +12880,65 @@
               "dailyGoalMinutes"
             ],
             "additionalProperties": false
+          },
+          "queuedNext": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "sourceId": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "conceptId": {
+                    "type": "string",
+                    "enum": [
+                      "data-modeling",
+                      "indexing",
+                      "transactions",
+                      "consistency",
+                      "replication",
+                      "partitioning",
+                      "api-design",
+                      "caching",
+                      "load-balancing",
+                      "rate-limiting",
+                      "capacity-planning",
+                      "queues",
+                      "retry-safety",
+                      "coordination",
+                      "scheduling",
+                      "fault-tolerance",
+                      "backpressure",
+                      "observability",
+                      "migration",
+                      "authorization",
+                      "tenant-isolation",
+                      "data-lifecycle",
+                      "multi-region",
+                      "cost-efficiency"
+                    ]
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "createdAt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "sourceId",
+                  "title",
+                  "createdAt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "challenge": {
             "anyOf": [
@@ -12440,6 +13055,11 @@
                   },
                   "warmUp": {
                     "type": "boolean"
+                  },
+                  "ticket": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
                   },
                   "minutes": {
                     "type": "integer",
@@ -12832,6 +13452,26 @@
                                 },
                                 "sourceTurnId": {
                                   "type": "string"
+                                },
+                                "recall": {
+                                  "type": "object",
+                                  "properties": {
+                                    "prompt": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "answer": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 320
+                                    }
+                                  },
+                                  "required": [
+                                    "prompt",
+                                    "answer"
+                                  ],
+                                  "additionalProperties": false
                                 }
                               },
                               "required": [
@@ -13574,6 +14214,11 @@
               "warmUp": {
                 "type": "boolean"
               },
+              "ticket": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
               "minutes": {
                 "type": "integer",
                 "minimum": -9007199254740991,
@@ -13965,6 +14610,26 @@
                             },
                             "sourceTurnId": {
                               "type": "string"
+                            },
+                            "recall": {
+                              "type": "object",
+                              "properties": {
+                                "prompt": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 160
+                                },
+                                "answer": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 320
+                                }
+                              },
+                              "required": [
+                                "prompt",
+                                "answer"
+                              ],
+                              "additionalProperties": false
                             }
                           },
                           "required": [
@@ -14672,6 +15337,11 @@
                   "warmUp": {
                     "type": "boolean"
                   },
+                  "ticket": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
                   "minutes": {
                     "type": "integer",
                     "minimum": -9007199254740991,
@@ -15063,6 +15733,26 @@
                                 },
                                 "sourceTurnId": {
                                   "type": "string"
+                                },
+                                "recall": {
+                                  "type": "object",
+                                  "properties": {
+                                    "prompt": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "answer": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 320
+                                    }
+                                  },
+                                  "required": [
+                                    "prompt",
+                                    "answer"
+                                  ],
+                                  "additionalProperties": false
                                 }
                               },
                               "required": [
@@ -15796,6 +16486,11 @@
                 "warmUp": {
                   "type": "boolean"
                 },
+                "ticket": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
                 "minutes": {
                   "type": "integer",
                   "minimum": -9007199254740991,
@@ -16187,6 +16882,26 @@
                               },
                               "sourceTurnId": {
                                 "type": "string"
+                              },
+                              "recall": {
+                                "type": "object",
+                                "properties": {
+                                  "prompt": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160
+                                  },
+                                  "answer": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 320
+                                  }
+                                },
+                                "required": [
+                                  "prompt",
+                                  "answer"
+                                ],
+                                "additionalProperties": false
                               }
                             },
                             "required": [
@@ -16762,6 +17477,26 @@
                 "sourceTurnId": {
                   "type": "string"
                 },
+                "recall": {
+                  "type": "object",
+                  "properties": {
+                    "prompt": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    },
+                    "answer": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 320
+                    }
+                  },
+                  "required": [
+                    "prompt",
+                    "answer"
+                  ],
+                  "additionalProperties": false
+                },
                 "sessionId": {
                   "type": "string"
                 },
@@ -16920,6 +17655,11 @@
                 },
                 "warmUp": {
                   "type": "boolean"
+                },
+                "ticket": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
                 },
                 "minutes": {
                   "type": "integer",
@@ -17312,6 +18052,26 @@
                               },
                               "sourceTurnId": {
                                 "type": "string"
+                              },
+                              "recall": {
+                                "type": "object",
+                                "properties": {
+                                  "prompt": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160
+                                  },
+                                  "answer": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 320
+                                  }
+                                },
+                                "required": [
+                                  "prompt",
+                                  "answer"
+                                ],
+                                "additionalProperties": false
                               }
                             },
                             "required": [
@@ -17983,6 +18743,11 @@
                   "warmUp": {
                     "type": "boolean"
                   },
+                  "ticket": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
                   "minutes": {
                     "type": "integer",
                     "minimum": -9007199254740991,
@@ -18374,6 +19139,26 @@
                                 },
                                 "sourceTurnId": {
                                   "type": "string"
+                                },
+                                "recall": {
+                                  "type": "object",
+                                  "properties": {
+                                    "prompt": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "answer": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 320
+                                    }
+                                  },
+                                  "required": [
+                                    "prompt",
+                                    "answer"
+                                  ],
+                                  "additionalProperties": false
                                 }
                               },
                               "required": [

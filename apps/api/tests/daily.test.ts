@@ -2,7 +2,7 @@ import {env} from 'cloudflare:test';
 import {beforeAll,it,expect} from 'vitest';
 import {initializeDatabase} from './migrations';
 import {accountFor,settingsFor} from '../src/store';
-import {dailyQuestion} from '../src/daily';
+import {dailyQuestion,queueFollowUp,queuedFollowUp,unqueueFollowUp} from '../src/daily';
 import {reconcile} from '../src/jobs';
 import type {Env} from '../src/platform';
 const e={...env,JOBS:{create:async()=>({id:'test'})}} as unknown as Env;
@@ -36,4 +36,43 @@ it('cron does not generate questions from overdue settings or replace a ready qu
  const a=await account();await e.DB.prepare("UPDATE settings SET next_due='2000-01-01T00:00:00Z' WHERE account_id=?").bind(a).run();
  await reconcile(e);
  expect((await e.DB.prepare("SELECT id FROM jobs WHERE account_id=? AND kind='generate'").bind(a).all()).results).toHaveLength(0);
+});
+async function completedSession(a:string,data:Record<string,unknown>={}) {
+ const id=crypto.randomUUID();
+ await e.DB.prepare("INSERT INTO challenges(id,account_id,lifecycle,data,created_at,available_at,completed_at) VALUES(?,?,'completed',?,'2026-09-27T10:00:00Z','2026-09-27T10:00:00Z','2026-09-27T10:20:00Z')")
+  .bind(id,a,JSON.stringify({title:'Webhooks that land once',prompt:'Design webhook delivery.',topic:'System design',primaryConceptId:'retry-safety',...data})).run();
+ await e.DB.prepare("INSERT INTO sessions(challenge_id,answer,revision,updated_at) VALUES(?,'Retry every failure.',1,'2026-09-27T10:20:00Z')").bind(id).run();
+ return id;
+}
+const generation=async(a:string)=>(await e.DB.prepare("SELECT input FROM jobs WHERE account_id=? AND kind='generate'").bind(a).all<{input:string}>()).results.map(r=>JSON.parse(r.input));
+it('a session saved for tomorrow shapes the next automatic question exactly once, even across devices',async()=>{
+ const a=await account(),source=await completedSession(a);
+ expect(await queueFollowUp(e,a,source)).toMatchObject({sourceId:source,title:'Webhooks that land once',conceptId:'retry-safety',label:'Retry safety & idempotency'});
+ // An already-prepared candidate waits; the requested follow-up goes first.
+ const prepared=crypto.randomUUID();
+ await e.DB.prepare("INSERT INTO challenges(id,account_id,lifecycle,data,created_at,available_at) VALUES(?,?,'prepared',?,'now','now')").bind(prepared,a,JSON.stringify({title:'Prepared',prompt:'Prepared question',topic:'System design'})).run();
+ const day=new Date('2026-09-28T13:00:00Z');
+ await Promise.all([dailyQuestion(e,a,day,{guidanceMode:'mock_interview'}),dailyQuestion(e,a,day,{guidanceMode:'mock_interview'})]);
+ const inputs=await generation(a);
+ expect(inputs).toHaveLength(1);
+ expect(inputs[0]).toMatchObject({followUpId:source,guidanceMode:'mock_interview',followUp:{question:{id:source},answer:'Retry every failure.'}});
+ expect(await queuedFollowUp(e,a)).toBeNull();
+ expect((await e.DB.prepare('SELECT lifecycle FROM challenges WHERE id=?').bind(prepared).first<{lifecycle:string}>())?.lifecycle).toBe('prepared');
+});
+it('the tomorrow queue holds one session, can be cancelled, and never takes unfinished work or a warm-up',async()=>{
+ const a=await account(),first=await completedSession(a),second=await completedSession(a,{title:'Rate limiter'});
+ await queueFollowUp(e,a,first);
+ expect((await queueFollowUp(e,a,second))?.sourceId).toBe(second);
+ expect(await unqueueFollowUp(e,a,first)).toMatchObject({sourceId:second});
+ expect(await unqueueFollowUp(e,a,second)).toBeNull();
+ const warm=await completedSession(a,{warmUp:true});
+ await expect(queueFollowUp(e,a,warm)).rejects.toMatchObject({code:'warm_up'});
+ const open=crypto.randomUUID();
+ await e.DB.prepare("INSERT INTO challenges(id,account_id,lifecycle,data,created_at,available_at) VALUES(?,?,'in_progress',?,'now','now')").bind(open,a,JSON.stringify({title:'Open',prompt:'Open question',topic:'System design'})).run();
+ await expect(queueFollowUp(e,a,open)).rejects.toMatchObject({code:'not_completed'});
+ await expect(queueFollowUp(e,await account(),first)).rejects.toMatchObject({code:'not_found'});
+ // Deleting the source cancels the queue.
+ await queueFollowUp(e,a,first);
+ await e.DB.prepare('DELETE FROM challenges WHERE id=?').bind(first).run();
+ expect(await queuedFollowUp(e,a)).toBeNull();
 });

@@ -78,6 +78,10 @@ export const questionGenerationSchema = questionSpecificationSchema.omit({
  if(new Set(ids).size!==ids.length||!ids.includes(value.primaryConceptId))ctx.addIssue({code:"custom",message:"Include the primary concept exactly once and at most two distinct secondary concepts"});
  if(value.tagEvidence.some(e=>e.requirementIndex>value.constraints.length))ctx.addIssue({code:"custom",message:"Tag reference does not exist"});
 });
+export const recallPromptSchema = z.object({
+  prompt: z.string().min(1).max(160),
+  answer: z.string().min(1).max(320),
+});
 export const learningEvidenceSchema = z.object({
   conceptId,
   observation: z.string().min(1).max(300),
@@ -85,6 +89,8 @@ export const learningEvidenceSchema = z.object({
   signal: z.enum(["demonstrated", "needs_practice"]),
   assistance: z.enum(["assisted", "unknown"]),
   sourceTurnId: z.string().optional(),
+  // The Recall card written for this quote; absent on reflections from before feedback-v4.
+  recall: recallPromptSchema.optional(),
 });
 export const lessonSchema = z.object({
   learned: z.array(z.string().min(1).max(160)).max(3),
@@ -234,7 +240,7 @@ export function helpSchemaFor(kind: string) {
 export const reflectionOutputSchema = reflectionSchema.omit({ guidanceMode: true, lesson: true, debrief: true }).extend({
   // Attribution is derived from saved answer turns after inference. It is not
   // model output, and optional properties violate Luna's strict JSON schema.
-  evidence: z.array(learningEvidenceSchema.omit({ sourceTurnId: true })).max(2),
+  evidence: z.array(learningEvidenceSchema.omit({ sourceTurnId: true, recall: true }).extend({ recall: recallPromptSchema })).max(2),
   nextExercise: z.string().min(1).max(400),
   strengths: z.array(z.string().max(80)).max(2),
   gaps: z.array(z.string().max(80)).max(2),

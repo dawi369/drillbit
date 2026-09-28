@@ -5,6 +5,7 @@ import {
     interventionSchema,
     receiptsSchema,
 } from "../../apps/api/src/companion-contract";
+import { dailyQuestionSchema } from "../../apps/api/src/daily";
 import {
     adoptionSchema,
     answerSchema,
@@ -58,6 +59,8 @@ const challenge = challengeSchema.extend({
   guidanceMode: guidanceModeSchema.optional(),
   // Onboarding warm-up: excluded from progress, Recall, evidence and history.
   warmUp: z.boolean().optional(),
+  // Assigned on completion: the account's highest ticket plus one. Warm-ups and unfinished sessions have none.
+  ticket: z.number().int().positive().optional(),
   // The round's time budget (set by the generator) and when the session started; Mock interview runs on this clock.
   minutes: z.number().int().optional(),
   startedAt: z.string().optional(),
@@ -129,8 +132,9 @@ const challenge = challengeSchema.extend({
     .optional(),
 });
 const libraryQuestion=z.object({id:z.string(),title:z.string(),prompt:z.string(),scenario:z.string(),engineeringLevel:engineeringLevelSchema,primaryConceptId:conceptId,conceptIds:z.array(conceptId).min(1).max(3),eligible:z.boolean(),eligibilityRevision:z.number().int(),lastActivity:z.string().optional(),attemptCount:z.number().int().optional()});
-const recallCard=z.object({id:z.string(),sourceChallengeId:z.string(),conceptId,question:z.string(),answer:z.string(),dueAt:z.string(),intervalDays:z.number().int(),repetitions:z.number().int(),lapses:z.number().int(),createdAt:z.string(),updatedAt:z.string(),sourceTitle:z.string().optional(),sourceCompletedAt:z.string().optional(),evidence:learningEvidenceSchema.optional()});
-const todayPlan=z.object({state:z.enum(["first_session","resume","review_due","question_ready","complete_today","prepare"]),completedTotal:z.number().int().nonnegative(),completedLastSevenDays:z.number().int().nonnegative(),completedToday:z.number().int().nonnegative(),dueRecallCount:z.number().int().nonnegative(),recommendedRecallCount:z.number().int().nonnegative(),estimatedRecallMinutes:z.number().int().nonnegative(),dailyGoalMinutes:z.union([z.literal(5),z.literal(10),z.literal(15),z.literal(20)])});
+const recallCard=z.object({id:z.string(),sourceChallengeId:z.string(),conceptId,question:z.string(),answer:z.string(),dueAt:z.string(),intervalDays:z.number().int(),repetitions:z.number().int(),lapses:z.number().int(),createdAt:z.string(),updatedAt:z.string(),sourceTitle:z.string().optional(),sourceCompletedAt:z.string().optional(),sourceTicket:z.number().int().positive().optional(),evidence:learningEvidenceSchema.optional()});
+const todayPlan=z.object({state:z.enum(["first_session","resume","review_due","question_ready","complete_today","prepare"]),completedTotal:z.number().int().nonnegative(),completedLastSevenDays:z.number().int().nonnegative(),completedToday:z.number().int().nonnegative(),dueRecallCount:z.number().int().nonnegative(),recommendedRecallCount:z.number().int().nonnegative(),estimatedRecallMinutes:z.number().int().nonnegative(),dailyGoalMinutes:z.union([z.literal(5),z.literal(10),z.literal(15),z.literal(20)]),nextTicket:z.number().int().positive().optional()});
+const queuedNext=z.object({sourceId:z.string(),title:z.string(),conceptId:conceptId.optional(),label:z.string().optional(),createdAt:z.string()});
 export const wire = {
   VoiceStart:voiceStartSchema, VoiceEvents:voiceEventsSchema, VoiceDelegate:voiceDelegateSchema,
   VoiceConnection:z.object({id:z.string(),sdp:z.string(),expiresAt:z.string()}),
@@ -147,6 +151,9 @@ export const wire = {
   RecallDeck:z.object({cards:z.array(recallCard),dueCount:z.number().int()}),
   RecallReview:z.object({rating:z.enum(["again","got_it"]),responseMs:z.number().int().min(0).max(3_600_000).optional()}),
   RecallReviewResult:z.object({card:recallCard}),
+  QueuedNext:queuedNext,
+  QueuedNextResult:z.object({queuedNext:queuedNext.nullable()}),
+  DailyQuestionInput:dailyQuestionSchema,
   Companion: companion,
   CompanionUpdate: companionUpdateSchema,
   DeliveryInput: receiptsSchema,
@@ -181,6 +188,7 @@ export const wire = {
     account: z.object({ id: z.string(), status: z.string() }),
     settings: settingsSchema,
     todayPlan: todayPlan.optional(),
+    queuedNext: queuedNext.nullable().optional(),
     challenge: challenge.nullable(),
     jobs: z.array(job),
     credential: z.object({ suffix: z.string(), model: z.string().nullable() }).nullable(),

@@ -45,7 +45,8 @@ async function generatedPractice(account: string, warmUp: boolean, mode = "learn
   provider({
     summary: "Clear keys.", worked: ["Stable IDs."], improve: "", takeaway: "Tie the key to the link.", strengths: [], gaps: [],
     nextExercise: "Explain a lost acknowledgement.",
-    evidence: [{ conceptId: "api-design", observation: "Used stable IDs.", quote: "Use a stable request ID", signal: "needs_practice", assistance: "unknown" }],
+    evidence: [{ conceptId: "api-design", observation: "Used stable IDs.", quote: "Use a stable request ID", signal: "needs_practice", assistance: "unknown",
+      recall: { prompt: "A save times out and the client retries. What stops a second copy of the link?", answer: "The retry carries the same request ID, so the service returns the first save instead of storing another." } }],
     ...(mode === "learn_together" ? { lesson: { learned: ["A stable ID lets a retry find the original save"], tryAlone: "Apply stable IDs to a payment retry." } } : {}),
     ...(mode === "mock_interview" ? { debrief: { verdict: "borderline", reason: "Stable IDs are right; lookup speed was never addressed.", toPass: "Explain the index behind fast lookup.",
       signals: ["requirements", "design", "trade_offs", "communication"].map(area => ({ area, rating: "mixed", note: "Partly covered." })) } } : {}),
@@ -71,6 +72,10 @@ it("a warm-up is a real generated interview with feedback that never counts, joi
   expect(await rows("SELECT 1 FROM question_attempts WHERE challenge_id=?", counted)).toBe(1);
   expect(await rows("SELECT 1 FROM recall_cards WHERE source_challenge_id=?", warm)).toBe(0);
   expect(await rows("SELECT 1 FROM recall_cards WHERE source_challenge_id=?", counted)).toBe(1);
+  expect(await bindings.DB.prepare("SELECT question,answer FROM recall_cards WHERE source_challenge_id=?").bind(counted).first()).toEqual({
+    question: "A save times out and the client retries. What stops a second copy of the link?",
+    answer: "The retry carries the same request ID, so the service returns the first save instead of storing another.",
+  });
   expect((await todayPlan(bindings, account, null, await settingsFor(bindings, account))).completedTotal).toBe(1);
   expect((await learningEvidence(bindings, account)).map(e => e.sessionId)).toEqual([counted]);
 });

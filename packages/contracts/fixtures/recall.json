@@ -3,8 +3,8 @@
     "id": "session:retry-safety",
     "sourceChallengeId": "session",
     "conceptId": "retry-safety",
-    "question": "How would you make retries safe?",
-    "answer": "Use a stable idempotency key and commit the result atomically.",
+    "question": "A worker crashes after charging the card but before recording it. What stops the retry charging twice?",
+    "answer": "The retry sends the same idempotency key, so the payment side returns the stored result instead of charging again.",
     "dueAt": "2026-09-17T08:00:00.000Z",
     "intervalDays": 0,
     "repetitions": 0,
@@ -13,14 +13,33 @@
     "updatedAt": "2026-09-17T08:00:00.000Z",
     "sourceTitle": "Design a reliable job queue",
     "sourceCompletedAt": "2026-09-17T07:55:00.000Z",
+    "sourceTicket": 47,
     "evidence": {
       "conceptId": "retry-safety",
       "observation": "Explained how stable operation keys prevent duplicate effects.",
       "quote": "Use a stable idempotency key and commit the result atomically.",
       "signal": "demonstrated",
       "assistance": "unknown",
-      "sourceTurnId": "turn-retry-safety"
+      "sourceTurnId": "turn-retry-safety",
+      "recall": {
+        "prompt": "A worker crashes after charging the card but before recording it. What stops the retry charging twice?",
+        "answer": "The retry sends the same idempotency key, so the payment side returns the stored result instead of charging again."
+      }
     }
+  }, {
+    "id": "older:caching",
+    "sourceChallengeId": "older",
+    "conceptId": "caching",
+    "question": "Why did your caching decision work?",
+    "answer": "Kept a short TTL on hot profiles. Your evidence: “Cache profiles for 60 seconds.”",
+    "dueAt": "2026-09-20T08:00:00.000Z",
+    "intervalDays": 3,
+    "repetitions": 1,
+    "lapses": 0,
+    "createdAt": "2026-09-14T08:00:00.000Z",
+    "updatedAt": "2026-09-17T08:00:00.000Z",
+    "sourceTitle": "Profile cache",
+    "sourceCompletedAt": "2026-09-14T07:55:00.000Z"
   }],
   "dueCount": 1
 }

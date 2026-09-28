@@ -299,12 +299,13 @@ export async function runJob(env: Env, id: string) {
     ? ((data as z.infer<typeof reflectionOutputSchema>).evidence ?? []).map((e, index) => {
         const reflection = data as z.infer<typeof reflectionOutputSchema>;
         const label = concepts.find(concept => concept.id === e.conceptId)?.label ?? e.conceptId;
-        const question = index === 0 && e.signal === "needs_practice" ? reflection.nextExercise
+        // The written card applies the quote to this question's own facts; the templates are the fallback.
+        const question = e.recall?.prompt ?? (index === 0 && e.signal === "needs_practice" ? reflection.nextExercise
           : e.signal === "needs_practice" ? `What would you change about your ${label.toLowerCase()} decision?`
-          : `Why did your ${label.toLowerCase()} decision work?`;
-        const answer = e.signal === "needs_practice"
+          : `Why did your ${label.toLowerCase()} decision work?`);
+        const answer = e.recall?.answer ?? (e.signal === "needs_practice"
           ? `${e.observation} Next time: ${reflection.improve || reflection.takeaway}`
-          : `${e.observation} Your evidence: “${e.quote}”`;
+          : `${e.observation} Your evidence: “${e.quote}”`);
         const due = e.signal === "needs_practice" ? now : new Date(Date.parse(now) + 3 * 86400000).toISOString();
         return env.DB.prepare(`INSERT INTO recall_cards(id,account_id,source_challenge_id,concept_id,question,answer,due_at,created_at,updated_at)
           SELECT ?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM jobs WHERE id=? AND status='running')
