@@ -162,7 +162,7 @@ private struct DeveloperSettingsSection: View {
 }
 struct LearningPlanSettingsView: View {
   @Bindable var model: AppModel
-  private let objectives = [("interview","An upcoming interview"),("learn","Level up my skills"),("stay_sharp","Keep my skills fresh")]
+  private let objectives = [("interview","An upcoming interview"),("learn","Strengthen up my skills"),("stay_sharp","Keep my skills fresh")]
   private let roles = [("general","A mix of things"),("backend","Backend services"),("frontend","Web frontends"),("full_stack","Full-stack products"),("platform","Platforms and infrastructure"),("data","Data systems"),("mobile","Mobile apps")]
   private let areas = PracticeAreaGroup.all.map { ($0.id, $0.title) }
   private var plan: Binding<LearningPlan> { Binding(get: { model.settings.learningPlan ?? LearningPlan() }, set: { model.settings.learningPlan = $0 }) }

@@ -1199,9 +1199,11 @@ final class PracticeUITests: XCTestCase {
     let app = XCUIApplication()
     app.launchArguments = ["--fixtures", "--fixture-signed-out", "--fixture-walkthrough"]
     app.launch()
-    XCTAssertTrue(app.staticTexts["Think out loud.\nGet sharper."].waitForExistence(timeout: 8))
+    XCTAssertTrue(app.staticTexts["Grills you like\nthe real one.\nWants you to pass."].waitForExistence(timeout: 8))
+    capture("Walkthrough practice", app)
     app.buttons["Continue"].tap()
-    XCTAssertTrue(app.staticTexts["One request ID.\nOne delivery."].exists)
+    XCTAssertTrue(app.staticTexts["It pokes holes.\nYou patch them."].waitForExistence(timeout: 2))
+    capture("Walkthrough feedback", app)
     app.buttons["Continue"].tap()
     XCTAssertTrue(app.staticTexts["One useful idea\nat a time."].exists)
     app.buttons["Continue"].tap()

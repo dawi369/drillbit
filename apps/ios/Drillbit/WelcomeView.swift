@@ -85,11 +85,11 @@ struct WelcomeView: View {
         .frame(height: 260)
         .signalEntrance(1, active: !hasMoved)
       VStack(alignment: .leading, spacing: 20) {
-        SignalEyebrow(text: "System design, out loud")
-        Text("Think out loud.\nGet sharper.")
+        SignalEyebrow(text: "System design mock rounds")
+        Text("Grills you like\nthe real one.\nWants you to pass.")
           .font(.largeTitle.weight(.semibold)).tracking(-0.8)
           .fixedSize(horizontal: false, vertical: true)
-        Text("An AI interviewer for five spare minutes.")
+        Text("One question, a few minutes, honest notes on what to fix.")
           .font(.subheadline).foregroundStyle(AppPalette.secondary)
       }
       .signalEntrance(2, active: !hasMoved)
@@ -98,16 +98,25 @@ struct WelcomeView: View {
 
   private var feedbackProof: some View {
     VStack(alignment: .leading, spacing: 20) {
-      SignalEyebrow(text: "From your answer")
-      Text("“I’d retry every failed delivery.”")
-        .font(.title.weight(.medium)).fixedSize(horizontal: false, vertical: true)
-      SignalRule()
-      SignalEyebrow(text: "The missing guard")
-      Text("One request ID.\nOne delivery.")
-        .font(.largeTitle.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
-      Text("If the first send succeeded, retrying should return its result without sending again.")
-        .foregroundStyle(AppPalette.secondary)
-      fact("Feedback is grounded in your words")
+      SignalEyebrow(text: "How a round goes")
+      Text("It pokes holes.\nYou patch them.")
+        .font(.largeTitle.weight(.semibold)).tracking(-0.8)
+        .fixedSize(horizontal: false, vertical: true)
+      VStack(alignment: .leading, spacing: 12) {
+        turn("You", "If the push fails, I’d just retry it.").signalEntrance(1)
+        VStack(alignment: .leading, spacing: 12) {
+          Divider()
+          turn("Interviewer", "Okay. What if the first one actually went through?")
+        }.signalEntrance(2)
+      }
+      VStack(alignment: .leading, spacing: 8) {
+        SignalRule().padding(.bottom, 12)
+        SignalEyebrow(text: "What you missed")
+        Text("Give each push an idempotency key.")
+          .font(.title3.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
+        Text("Then a retry after a timeout can’t notify someone twice.")
+          .foregroundStyle(AppPalette.secondary).fixedSize(horizontal: false, vertical: true)
+      }.signalEntrance(3)
     }
   }
 
@@ -142,9 +151,12 @@ struct WelcomeView: View {
     }
   }
 
-  private func fact(_ value: String) -> some View {
-    Label(value, systemImage: "checkmark.circle")
-      .font(.subheadline.weight(.medium)).foregroundStyle(AppPalette.accent)
+  private func turn(_ speaker: String, _ text: String) -> some View {
+    VStack(alignment: .leading, spacing: 4) {
+      InterviewRowLabel(text: speaker)
+      Text(text).fixedSize(horizontal: false, vertical: true)
+    }
+    .accessibilityElement(children: .combine)
   }
   private func stage(_ number: String, _ title: String) -> some View {
     HStack(spacing: 20) {
