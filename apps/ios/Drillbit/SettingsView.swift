@@ -222,7 +222,7 @@ struct AIAccessView: View {
         }
         SecureField("OpenRouter key", text: $key).textInputAutocapitalization(.never)
           .autocorrectionDisabled()
-        TextField("Model", text: $modelID, prompt: Text("openai/gpt-6-luna"))
+        TextField("Model ID", text: $modelID, prompt: Text("Model ID, e.g. openai/gpt-6-luna"))
           .textInputAutocapitalization(.never)
           .autocorrectionDisabled()
           .keyboardType(.asciiCapable)
@@ -256,8 +256,6 @@ struct AIAccessView: View {
         }
       } header: {
         Text("OpenRouter")
-      } footer: {
-        Text("Type the OpenRouter model ID, like openai/gpt-6-luna. It has to handle structured output, and we check that when you save.")
       }
       Section {
         Text(
