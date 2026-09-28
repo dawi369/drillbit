@@ -6,9 +6,12 @@ import { messagesFor, provider, recordUsage, structured, textDeltas } from "./ai
 import { receive, updateContext } from "./companion";
 import { dailyQuestion } from "./daily";
 import {
+    answerSchema,
     Fault,
-    MODEL_ID, answerSchema, generationSchema,
-    levelForDifficulty, nextDaily,
+    generationSchema,
+    levelForDifficulty,
+    MODEL_ID,
+    nextDaily,
     parseJSON, practiceProfileSchema, requireCommand, settingsSchema, timestamp,
     uuid, validateLearningPlanDate
 } from "./domain";
@@ -705,10 +708,10 @@ app.put("/v1/credential", async (c) => {
       ciphertext,
       c.env.CREDENTIAL_KEY_VERSION,
       key.slice(-4),
+      model,
       timestamp(),
     ),
     c.env.DB.prepare(
-      model,
       "UPDATE jobs SET status='cancelled' WHERE account_id=? AND status IN ('pending','running') AND json_extract(input,'$.settings.aiMode')='byok'",
     ).bind(a),
     c.env.DB.prepare(

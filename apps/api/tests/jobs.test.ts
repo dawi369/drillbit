@@ -1,12 +1,12 @@
 import { env, fetchMock } from "cloudflare:test";
-import { beforeAll, afterAll, it, expect } from "vitest";
-import { accountFor, complete, createJob, detail, settingsFor } from "../src/store";
-import { learningEvidence, todayPlan } from "../src/learning";
-import { runJob } from "../src/jobs";
-import { boundedContext } from "../src/context";
+import { afterAll, beforeAll, expect, it } from "vitest";
 import { textDeltas } from "../src/ai";
-import { initializeDatabase } from "./migrations";
+import { boundedContext } from "../src/context";
+import { runJob } from "../src/jobs";
+import { learningEvidence, todayPlan } from "../src/learning";
 import type { Env } from "../src/platform";
+import { accountFor, complete, createJob, detail, settingsFor } from "../src/store";
+import { initializeDatabase } from "./migrations";
 const bindings = {
   ...env,
   JOBS: { create: async () => ({ id: "test" }) },

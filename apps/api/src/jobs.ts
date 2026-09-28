@@ -1,30 +1,30 @@
-import { guidanceMode } from "./prompts/teaching";
-import { groundReflection } from "./learning";
+import {
+    WorkflowEntrypoint,
+    type WorkflowEvent,
+    type WorkflowStep,
+} from "cloudflare:workers";
 import { z } from "zod";
-import { historicalSnapshot } from "./history";
-import { concepts } from "./taxonomy";
-import { selectConcept } from "./library";
-import { interviewSchemaFor, normalizeInterviewResult, interviewWrapUp } from "./interview";
+import { streamedInterview, structured } from "./ai";
 import { interventionFor } from "./companion-contract";
 import {
-  WorkflowEntrypoint,
-  type WorkflowEvent,
-  type WorkflowStep,
-} from "cloudflare:workers";
-import {
-  questionGenerationSchema,
-  helpSchemaFor,
-  MODEL_ID,
-  normalizeSettings,
-  exampleSchema,
-  reflectionOutputSchema,
-  parseJSON,
-  timestamp,
-  type Settings,
+    exampleSchema,
+    helpSchemaFor,
+    MODEL_ID,
+    normalizeSettings,
+    parseJSON,
+    questionGenerationSchema,
+    reflectionOutputSchema,
+    timestamp,
+    type Settings,
 } from "./domain";
-import { structured, streamedInterview } from "./ai";
-import { activeChallenge, COUNTED, detail, dispatch, type Job } from "./store";
+import { historicalSnapshot } from "./history";
+import { interviewSchemaFor } from "./interview";
+import { groundReflection } from "./learning";
+import { selectConcept } from "./library";
 import type { Env } from "./platform";
+import { guidanceMode } from "./prompts/teaching";
+import { activeChallenge, COUNTED, detail, dispatch, type Job } from "./store";
+import { concepts } from "./taxonomy";
 export async function runJob(env: Env, id: string) {
   const job = await env.DB.prepare("SELECT j.*,a.status AS account_status,a.subject AS account_subject FROM jobs j JOIN accounts a ON a.id=j.account_id WHERE j.id=?")
     .bind(id).first<Job & {account_status: string; account_subject: string; created_at: string}>();

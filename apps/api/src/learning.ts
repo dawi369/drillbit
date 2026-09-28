@@ -1,10 +1,10 @@
-import { isSocialOpening } from "./prompts/interviewer";
-import { Fault, defaultLearningPlan, reflectionSchema, timestamp, type Settings } from "./domain";
+import { Temporal } from "@js-temporal/polyfill";
+import { z } from "zod";
+import { defaultLearningPlan, Fault, reflectionSchema, timestamp, type Settings } from "./domain";
 import type { Env } from "./platform";
+import { isSocialOpening } from "./prompts/interviewer";
 import type { ChallengeRow } from "./store";
 import { activeChallenge, COUNTED, detail, ownedChallenge } from "./store";
-import { z } from "zod";
-import { Temporal } from "@js-temporal/polyfill";
 
 export async function todayPlan(env: Env, account: string, active: ChallengeRow | null, settings: Settings) {
   const now = timestamp();

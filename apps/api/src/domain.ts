@@ -1,8 +1,8 @@
+import { Temporal } from "@js-temporal/polyfill";
+import { z } from "zod";
+import { captureSchema, receiptSchema } from "./companion-contract";
 import { guidanceModeSchema } from "./prompts/teaching";
 import { conceptId, questionMetadata } from "./taxonomy";
-import { captureSchema, receiptSchema } from "./companion-contract";
-import { z } from "zod";
-import { Temporal } from "@js-temporal/polyfill";
 
 export const MODEL_ID = "openai/gpt-6-luna";
 export const engineeringLevelSchema = z.enum(["intern", "junior", "mid", "senior", "staff", "principal"]);
