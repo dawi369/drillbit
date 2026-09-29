@@ -250,6 +250,7 @@ struct QueuedNext: Codable, Sendable, Equatable {
 }
 struct QueuedNextResult: Codable, Sendable { var queuedNext: QueuedNext? }
 struct DailyQuestionResponse: Codable { var day: String; var challenge: Challenge?; var job: Job? }
+struct DailyQuestionInput: Encodable { var guidanceMode: GuidanceMode? }
 struct HistoryPage: Codable, Sendable {
   var sessions: [Challenge]
   var nextCursor: String?

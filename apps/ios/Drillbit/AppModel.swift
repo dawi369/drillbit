@@ -634,7 +634,8 @@ import WidgetKit
       await sync()
       guard bootstrap?.account.id == account.id else { return }
       guard try await disk.pendingSkips(account: account.id).isEmpty else { return }
-      let result: DailyQuestionResponse = try await api.send("daily-question", method: "POST")
+      let style = memory.sessions.first { !$0.isWarmUp }?.guidanceMode
+      let result: DailyQuestionResponse = try await api.send("daily-question", method: "POST", body: DailyQuestionInput(guidanceMode: style))
       guard bootstrap?.account.id == account.id else { return }
       if let challenge = result.challenge { bootstrap?.challenge = challenge }
       if let job = result.job {
@@ -981,7 +982,12 @@ import WidgetKit
           toPass: "Show how a retry recognises work that already finished before running it again.")
       default: break
       }
-      if !challenge.isWarmUp { memory.sessions.insert(completed, at: 0) }
+      completed.completedAt = Date().ISO8601Format()
+      if !challenge.isWarmUp {
+        completed.ticket = bootstrap?.todayPlan?.nextTicket
+        bootstrap?.todayPlan?.nextTicket? += 1
+        memory.sessions.insert(completed, at: 0)
+      }
     }
     bootstrap?.challenge = nil
     // The tour follows the warm-up's feedback; an uncounted result never becomes Home's completion notice.
@@ -1222,7 +1228,8 @@ import WidgetKit
         completedTotal: ProcessInfo.processInfo.arguments.contains("--fixture-dashboard") ? 12 : 0,
         completedLastSevenDays: ProcessInfo.processInfo.arguments.contains("--fixture-dashboard") ? 4 : 0,
         completedToday: ProcessInfo.processInfo.arguments.contains("--fixture-dashboard") ? 1 : 0,
-        dueRecallCount: 0, recommendedRecallCount: 0, estimatedRecallMinutes: 0, dailyGoalMinutes: 10))
+        dueRecallCount: 0, recommendedRecallCount: 0, estimatedRecallMinutes: 0, dailyGoalMinutes: 10,
+        nextTicket: ProcessInfo.processInfo.arguments.contains("--fixture-dashboard") ? 13 : 1))
     #if DEBUG
     if ProcessInfo.processInfo.arguments.contains("--fixture-dashboard") { bootstrap?.challenge = nil }
     #endif

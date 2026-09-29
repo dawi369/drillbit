@@ -159,8 +159,9 @@ struct HomeView: View {
       }
       .accessibilityElement(children: .combine)
       .accessibilityLabel("Picking today’s question")
+      .accessibilityIdentifier("todayPreparing")
     case .warmUp(let challenge):
-      ticketButton(identifier: "startPractice", action: { flow = QuestionFlowEntry(challenge: challenge) }) {
+      ticketButton(identifier: "startPractice", spoken: challenge?.lifecycle == "in_progress" ? "Resume" : "Start", action: { flow = QuestionFlowEntry(challenge: challenge) }) {
         VStack(alignment: .leading, spacing: 12) {
           TicketHeader(number: "Warm-up", detail: "Doesn’t count")
           Text(challenge?.title ?? "Let’s try one together.").font(.title.weight(.semibold)).tracking(-0.6)
@@ -170,7 +171,7 @@ struct HomeView: View {
         stubRow(title: "Guided", note: GuidanceMode.learnTogether.stubNote, pill: challenge?.lifecycle == "in_progress" ? "Resume" : "Start")
       }
     case .chooseMode:
-      ticketButton(action: { flow = QuestionFlowEntry() }) {
+      ticketButton(spoken: "Choose", action: { flow = QuestionFlowEntry() }) {
         VStack(alignment: .leading, spacing: 12) {
           TicketHeader(number: nextNumber, detail: shortDate)
           Text("Make it your session.").font(.title.weight(.semibold)).tracking(-0.6)
@@ -197,7 +198,7 @@ struct HomeView: View {
     case .done(let session):
       doneTicket(session)
     case .empty:
-      ticketButton(action: { flow = QuestionFlowEntry() }) {
+      ticketButton(identifier: "prepareQuestion", spoken: "Prepare", action: { flow = QuestionFlowEntry() }) {
         VStack(alignment: .leading, spacing: 12) {
           TicketHeader(number: nextNumber, detail: shortDate)
           Text("Nothing picked yet.").font(.title.weight(.semibold)).tracking(-0.6)
@@ -212,8 +213,8 @@ struct HomeView: View {
   private func questionTicket(_ challenge: Challenge) -> some View {
     let resuming = challenge.lifecycle == "in_progress"
     let mode = challenge.guidanceMode ?? .coachMe
-    let lastLine = challenge.turns?.last { $0.role != "user" && !$0.text.isEmpty }.map { QuestionMarkup.plain($0.text) }
-    return ticketButton(identifier: "startPractice", action: {
+    let lastLine = challenge.interview.flatMap { $0.turns.isEmpty ? nil : QuestionMarkup.plain($0.prompt) }
+    return ticketButton(identifier: "startPractice", spoken: resuming ? "Resume" : "Open", action: {
       if resuming { Task { await model.open(challenge) } } else { flow = QuestionFlowEntry(challenge: challenge) }
     }) {
       VStack(alignment: .leading, spacing: 12) {
@@ -330,7 +331,7 @@ struct HomeView: View {
     model.bootstrap?.todayPlan?.nextTicket.map { String(format: "No. %03d", $0) } ?? "Today"
   }
 
-  private func ticketButton<Content: View, Stub: View>(identifier: String? = nil, action: @escaping () -> Void,
+  private func ticketButton<Content: View, Stub: View>(identifier: String? = nil, spoken: String, action: @escaping () -> Void,
     @ViewBuilder content: @escaping () -> Content, @ViewBuilder stub: @escaping () -> Stub) -> some View {
     Button(action: action) {
       Ticket(content: content, stub: stub).contentShape(Rectangle())
@@ -338,6 +339,8 @@ struct HomeView: View {
     .buttonStyle(TicketPressStyle())
     .matchedTransitionSource(id: "today", in: zoom)
     .accessibilityIdentifier(identifier ?? "todayTicket")
+    // The printed pill is decorative for VoiceOver, but Voice Control users say what they see.
+    .accessibilityInputLabels([Text(spoken), Text("Today’s question")])
   }
 
   private func stubRow(title: String, note: String, pill: String) -> some View {
