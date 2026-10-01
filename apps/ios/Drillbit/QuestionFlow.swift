@@ -150,9 +150,10 @@ struct QuestionFlow: View {
                   Text(title)
                     .opacity(starting ? 0 : 1)
                     .blur(radius: starting && !reduceMotion ? 6 : 0)
-                  DrillbitBit(working: starting, height: 22, color: AppPalette.actionInk)
-                    .opacity(starting ? 1 : 0)
-                    .scaleEffect(starting || reduceMotion ? 1 : 0.4)
+                  if starting {
+                    DrillbitSpinner(size: 24, color: AppPalette.actionInk)
+                      .transition(reduceMotion ? .opacity : .scale(scale: 0.4).combined(with: .opacity))
+                  }
                 }
                 .animation(.spring(duration: 0.3, bounce: 0.2), value: starting)
               }.buttonStyle(PracticeButtonStyle())

@@ -183,7 +183,8 @@ it("stops a reply that never closes its JSON and pads with whitespace, keeping t
  const pieces=['{"move":"ask_one","text":"What does the client poll for?","parameters":[]',...Array.from({length:40},()=>'\n   ')];
  let reads=0, body!:ReadableStream;
  const mock=vi.spyOn(globalThis,"fetch").mockImplementation(async(_url,init)=>{
-   expect(JSON.parse(String(init?.body)).provider).toMatchObject({order:["together","fireworks"],require_parameters:true});
+   expect(JSON.parse(String(init?.body)).provider).toMatchObject({order:["together","deepinfra"],require_parameters:true});
+   expect(JSON.parse(String(init?.body)).messages[0].content).toContain("compactly on one line");
    body=new ReadableStream({pull(controller){ controller.enqueue(new TextEncoder().encode('data: '+JSON.stringify({choices:[{delta:{content:pieces[Math.min(reads++,pieces.length-1)]}}]})+'\n\n')); }});
    return new Response(body);
  });

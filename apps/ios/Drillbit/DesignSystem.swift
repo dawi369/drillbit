@@ -985,7 +985,8 @@ struct StreamingDocument: View {
       case .bullet:
         QuestionBullet(text: text.textRenderer(renderer)).opacity(paused || shown > 0 ? 1 : 0)
       case .ask:
-        QuestionAsk(text: text.textRenderer(renderer)).accessibilityIdentifier(segment.identifier ?? "")
+        QuestionAsk(text: text.textRenderer(renderer), reveal: paused ? 1 : min(1, max(0, shown / max(segment.length, 1))))
+          .accessibilityIdentifier(segment.identifier ?? "")
       case .code:
         CodeBlock(text: text, renderer: renderer)
           .opacity(paused ? 1 : min(1, max(0, shown / 4)))
@@ -1055,12 +1056,21 @@ struct QuestionBullet<Content: View>: View {
 /// The question's closing ask: the one thing to answer, set apart from the setup.
 struct QuestionAsk<Content: View>: View {
   let text: Content
+  /// How much of the ask is written; the rule grows alongside it and isn't there before it.
+  var reveal: Double = 1
   var body: some View {
     text.fontWeight(.semibold).foregroundStyle(AppPalette.primary)
       .fixedSize(horizontal: false, vertical: true)
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.leading, 12)
-      .overlay(alignment: .leading) { Capsule().fill(AppPalette.accent).frame(width: 3) }
+      .overlay(alignment: .topLeading) {
+        GeometryReader { proxy in
+          Capsule().fill(AppPalette.accent)
+            .frame(width: 3, height: max(3, proxy.size.height * reveal))
+        }
+        .opacity(reveal > 0 ? 1 : 0)
+        .accessibilityHidden(true)
+      }
   }
 }
 

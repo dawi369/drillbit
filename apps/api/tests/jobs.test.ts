@@ -113,7 +113,7 @@ it("durably generates a valid challenge and replay does not call the provider ag
       body: (raw: string) => {
         const request = JSON.parse(raw);
         expect(request.provider.require_parameters).toBe(true);
-        expect(request.provider.order).toEqual(["together", "fireworks"]);
+        expect(request.provider.order).toEqual(["together", "deepinfra"]);
         expect(request.reasoning.enabled).toBe(false);
         // Question writing waits on the first word, so it runs on the fast model.
         expect(request.model).toBe("deepseek/deepseek-v4.1-flash");

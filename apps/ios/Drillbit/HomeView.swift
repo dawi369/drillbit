@@ -151,7 +151,7 @@ struct HomeView: View {
           }
         }
       } stub: {
-        DrillbitBit(working: true, height: 22)
+        DrillbitSpinner(size: 28)
           .frame(minHeight: 36)
       }
       .accessibilityElement(children: .combine)

@@ -146,6 +146,26 @@ extension Challenge {
   }
 }
 
+/// Loading cue: the drill mark makes one good turn, rests a beat, and turns again while work runs.
+struct DrillbitSpinner: View {
+  var size: CGFloat = 22
+  var color: Color = AppPalette.logoDrill
+  @State private var start = Date.now
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  var body: some View {
+    TimelineView(.animation) { timeline in
+      let time = max(0, timeline.date.timeIntervalSince(start))
+      let progress = min(1, time.truncatingRemainder(dividingBy: 1.4) / 0.9)
+      let eased = progress < 0.5 ? 4 * pow(progress, 3) : 1 - pow(2 - 2 * progress, 3) / 2
+      DrillbitMark(size: size, foreground: color)
+        .rotationEffect(.degrees(reduceMotion ? 0 : 360 * eased))
+        .opacity(reduceMotion ? 0.6 + 0.4 * cos(time * .pi / 0.7) : 1)
+    }
+    .frame(width: size, height: size)
+    .accessibilityHidden(true)
+  }
+}
+
 /// The drill mark as an activity cue: its flutes travel only while real work runs, so it reads as the bit turning.
 struct DrillbitBit: View {
   var working: Bool
@@ -162,11 +182,11 @@ struct DrillbitBit: View {
         context.translateBy(x: size.width / 2, y: size.height / 2)
         context.scaleBy(x: scale, y: scale)
         context.fill(Self.silhouette, with: .color(color))
-        context.drawLayer { layer in
-          layer.clip(to: Self.fluteZone)
-          layer.blendMode = .destinationOut
-          for start in [-255.0, -115, 25, 165] { layer.fill(Self.gap(start + 140 * phase), with: .color(.black)) }
-        }
+        // A drawLayer would composite its cut-outs onto nothing; erase from the silhouette itself.
+        var cut = context
+        cut.clip(to: Self.fluteZone)
+        cut.blendMode = .destinationOut
+        for start in [-255.0, -115, 25, 165] { cut.fill(Self.gap(start + 140 * phase), with: .color(.black)) }
       }
     }
     .frame(width: height * DrillbitGlyph.width / DrillbitGlyph.height, height: height)

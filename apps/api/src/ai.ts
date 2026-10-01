@@ -186,7 +186,7 @@ export async function provider(
       signal: options.signal ?? AbortSignal.timeout(60000),
       body: JSON.stringify({
         model,
-        messages,
+        messages: options.schema && messages[0] ? [{ ...messages[0], content: messages[0].content + "\n" + COMPACT_JSON }, ...messages.slice(1)] : messages,
         provider: { ...(model === FAST_MODEL_ID ? { order: FAST_PROVIDERS } : { sort: "latency" }), ...(options.schema ? { require_parameters: true } : {}) },
         reasoning: options.reasoning ?? { enabled: false },
         stream: options.stream ?? false,
@@ -415,6 +415,8 @@ export function parseModelJSON(raw: string): unknown {
   }
 }
 function runaway(raw: string) { return /\s{64}$/.test(raw); }
+// Pretty-printed output is where providers have looped on whitespace instead of closing the object.
+const COMPACT_JSON = "Write the JSON compactly on one line: no line breaks or indentation outside string values.";
 // The app owns turn routing. Do not ask the model to classify social replies
 // into protocol labels: it should generate the words, not choose lifecycle state.
 export function interviewReasoning(context: unknown): { enabled: false } | { effort: "low" } {

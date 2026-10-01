@@ -315,6 +315,17 @@ export async function runJobSafely(env: Env, id: string) {
     ).bind(timestamp(), id).run();
   }
 }
+/** Interactive work runs now; anything but an interview turn that fails goes to the Workflow and its retries. */
+export async function runJobInline(env: Env, id: string) {
+  try {
+    await runJob(env, id);
+  } catch {
+    const job = await env.DB.prepare("SELECT kind FROM jobs WHERE id=?").bind(id).first<{ kind: string }>();
+    if (job?.kind === "interview") return runJobSafely(env, id);
+    await env.DB.prepare("UPDATE jobs SET status='pending',updated_at=? WHERE id=? AND status='running'").bind(timestamp(), id).run();
+    await dispatch(env, id);
+  }
+}
 export class PracticeWorkflow extends WorkflowEntrypoint<
   Env,
   { jobId: string }
@@ -352,7 +363,7 @@ export async function reconcile(env: Env) {
   // Inline interactive work normally finishes in seconds. If an isolate is
   // terminated mid-request, return the durable command to the Workflow-backed
   // recovery path after a conservative timeout.
-  await env.DB.prepare("UPDATE jobs SET status='pending',updated_at=? WHERE kind IN ('interview','generate') AND status='running' AND updated_at<?")
+  await env.DB.prepare("UPDATE jobs SET status='pending',updated_at=? WHERE kind IN ('interview','generate','summarize') AND status='running' AND updated_at<?")
     .bind(timestamp(), new Date(Date.now() - 120000).toISOString()).run();
   // Recover dispatch failures. Stable workflow IDs prevent duplicate execution.
   const pending = await env.DB.prepare(

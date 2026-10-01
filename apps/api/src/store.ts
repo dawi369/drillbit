@@ -227,6 +227,7 @@ export async function complete(
   revision: number,
   settings: Settings,
   receipts: z.infer<typeof receiptSchema>[] = [],
+  run?: (id: string) => void,
 ) {
   const challenge = await ownedChallenge(env, account, id);
   if (challenge.lifecycle === "completed" && challenge.command_id === command)
@@ -274,5 +275,5 @@ export async function complete(
       409,
       "Your answer changed on another device. Both drafts have been preserved.",
     );
-  await dispatch(env, command);
+  if (run) run(command); else await dispatch(env, command);
 }

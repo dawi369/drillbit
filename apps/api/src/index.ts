@@ -17,7 +17,7 @@ import {
 } from "./domain";
 import { exportPage } from "./export";
 import { cancelInterviewAssistance, interviewInputSchema, interviewStreamSnapshot, requestInterview, retryInterview } from "./interview";
-import { reconcile, runJobSafely } from "./jobs";
+import { reconcile, runJobInline } from "./jobs";
 import { learningEvidence, recallDeck, retryMoment, reviewRecall, todayPlan } from "./learning";
 import { coverage, libraryPage, questionDetail, setEligibility, startQuestion } from "./library";
 import { consumeUsage, encrypt, hash, identity, type Env } from "./platform";
@@ -47,7 +47,7 @@ export const app = new Hono<{
 /** Interactive jobs run in this request when enabled, skipping Workflow startup; the reconciler still recovers them. */
 function inline(c: { env: Env; executionCtx: { waitUntil(work: Promise<unknown>): void } }) {
   return c.env.INTERACTIVE_INLINE_ENABLED === "true"
-    ? (id: string) => c.executionCtx.waitUntil(runJobSafely(c.env, id))
+    ? (id: string) => c.executionCtx.waitUntil(runJobInline(c.env, id))
     : undefined;
 }
 app.use(
@@ -484,6 +484,7 @@ app.post("/v1/challenges/:id/complete", async (c) => {
     body.revision,
     await settingsFor(c.env, a),
     body.receipts ?? [],
+    inline(c),
   );
   return c.json(await detail(c.env, a, id));
 });

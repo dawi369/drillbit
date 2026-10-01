@@ -9,6 +9,8 @@
   "observability": {
     "enabled": true
   },
+  // Run beside the D1 primary (Marseille): each request makes several sequential queries.
+  "placement": { "mode": "targeted", "region": "azure:francesouth" },
   "vars": {
     "CLERK_ISSUER": "https://trusting-finch-496.clerk.accounts.dev",
     "MODEL_ID": "openai/gpt-6-luna",

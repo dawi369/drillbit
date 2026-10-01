@@ -7,8 +7,8 @@ import { conceptId, questionMetadata } from "./taxonomy";
 export const MODEL_ID = "openai/gpt-6-luna";
 /** Interview turns, question writing and voice reasoning wait on the first word; feedback and Recall don't. */
 export const FAST_MODEL_ID = "deepseek/deepseek-v4.1-flash";
-/** Fastest measured first word with strict JSON; pinned so routing never lands on a slower or lower-precision host. */
-export const FAST_PROVIDERS = ["together", "fireworks"];
+/** Fastest measured first word with strict JSON, then the steadiest fallback; pinned so routing never lands on a slower or lower-precision host. */
+export const FAST_PROVIDERS = ["together", "deepinfra"];
 export function managedModel(kind: string) {
   return ["interview", "generate", "voice_reasoning"].includes(kind) ? FAST_MODEL_ID : MODEL_ID;
 }
