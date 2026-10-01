@@ -8,7 +8,7 @@ import { concepts } from './taxonomy';
 
 export const dailyQuestionSchema = z.object({ guidanceMode: guidanceModeSchema.optional() });
 
-export async function dailyQuestion(env: Env, account: string, now = new Date(), input: z.infer<typeof dailyQuestionSchema> = {}) {
+export async function dailyQuestion(env: Env, account: string, now = new Date(), input: z.infer<typeof dailyQuestionSchema> = {}, run?: (id: string) => void) {
  const settings = await settingsFor(env,account);
  const day = Temporal.Instant.from(now.toISOString()).toZonedDateTimeISO(settings.timezone).toPlainDate().toString();
  const claimed = await env.DB.prepare('INSERT OR IGNORE INTO daily_visits(account_id,local_day,created_at) VALUES(?,?,?) RETURNING local_day').bind(account,day,now.toISOString()).first();
@@ -31,7 +31,7 @@ export async function dailyQuestion(env: Env, account: string, now = new Date(),
   settings,
   ...(input.guidanceMode ? {guidanceMode:input.guidanceMode} : {}),
   ...(followUp ? {followUp,followUpId:queued!.source_challenge_id} : {}),
- });
+ }, run);
  if (queued) await env.DB.prepare('DELETE FROM queued_follow_ups WHERE account_id=? AND source_challenge_id=?').bind(account,queued.source_challenge_id).run();
  return {day,job};
 }

@@ -37,28 +37,24 @@ export type Job = {
 export async function accountFor(env: Env, subject: string): Promise<Account> {
   const id = uuid(),
     now = timestamp();
-  await env.DB.prepare(
-    "INSERT INTO accounts(id,subject,last_seen,created_at) VALUES(?,?,?,?) ON CONFLICT(subject) DO UPDATE SET last_seen=excluded.last_seen",
-  )
-    .bind(id, subject, now, now)
-    .run();
-  const account = await env.DB.prepare(
-    "SELECT id,subject,status FROM accounts WHERE subject=?",
-  )
-    .bind(subject)
-    .first<Account>();
+  const defaults = settingsSchema.parse({});
+  // Every authenticated request starts here, so it is one round trip to D1.
+  const [, , selected] = await env.DB.batch([
+    env.DB.prepare(
+      "INSERT INTO accounts(id,subject,last_seen,created_at) VALUES(?,?,?,?) ON CONFLICT(subject) DO UPDATE SET last_seen=excluded.last_seen",
+    ).bind(id, subject, now, now),
+    env.DB.prepare(
+      "INSERT OR IGNORE INTO settings(account_id,data,next_due) SELECT id,?,? FROM accounts WHERE subject=? AND status<>'deleting'",
+    ).bind(JSON.stringify(defaults), nextDaily(defaults), subject),
+    env.DB.prepare("SELECT id,subject,status FROM accounts WHERE subject=?").bind(subject),
+  ]);
+  const account = selected.results[0] as Account | undefined;
   if (!account || account.status === "deleting")
     throw new Fault(
       "account_unavailable",
       403,
       "This account is being deleted.",
     );
-  const defaults = settingsSchema.parse({});
-  await env.DB.prepare(
-    "INSERT OR IGNORE INTO settings(account_id,data,next_due) VALUES(?,?,?)",
-  )
-    .bind(account.id, JSON.stringify(defaults), nextDaily(defaults))
-    .run();
   return account;
 }
 export async function settingsFor(env: Env, id: string) {
@@ -178,6 +174,8 @@ export async function createJob(
   kind: string,
   challengeId: string | null,
   input: unknown,
+  // Interactive work runs right away in this request instead of waiting for a Workflow to start.
+  run?: (id: string) => void,
 ) {
   const existing = await env.DB.prepare("SELECT * FROM jobs WHERE id=?")
     .bind(id)
@@ -210,7 +208,7 @@ export async function createJob(
     )
       .bind(account)
       .first<Job>();
-  await dispatch(env, id);
+  if (run) run(id); else await dispatch(env, id);
   return env.DB.prepare("SELECT * FROM jobs WHERE id=?").bind(id).first<Job>();
 }
 export async function dispatch(env: Env, id: string) {

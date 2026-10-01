@@ -9,7 +9,7 @@ import { interventionFor } from "./companion-contract";
 import {
     exampleSchema,
     helpSchemaFor,
-    MODEL_ID,
+    managedModel,
     normalizeSettings,
     parseJSON,
     questionGenerationSchema,
@@ -89,15 +89,16 @@ export async function runJob(env: Env, id: string) {
     const followUp = input.followUp as {reflection?: {evidence?: {conceptId: string; signal: string}[]}; question?: {primaryConceptId?: string}} | undefined;
     const focus = followUp?.reflection?.evidence?.find(e => e.signal === "needs_practice")?.conceptId
       ?? followUp?.question?.primaryConceptId;
-    const selection = await selectConcept(env,job.account_id,input.settings,input.primaryConceptId ?? focus);
+    const selectionAndPool = Promise.all([
+      selectConcept(env,job.account_id,input.settings,input.primaryConceptId ?? focus),
+      !input.instruction && !input.followUp && !input.warmUp ? env.DB.prepare("SELECT * FROM questions WHERE account_id=? AND eligible=1 AND json_extract(data,'$.engineeringLevel')=? AND (? IS NULL OR json_extract(data,'$.primaryConceptId')=?) ORDER BY eligibility_updated_at,id LIMIT 1").bind(job.account_id,input.settings.engineeringLevel!,input.primaryConceptId??null,input.primaryConceptId??null).first<{id:string;data:string}>() : null,
+      env.DB.prepare(
+        "SELECT c.data,c.lifecycle,c.completed_at,r.data AS reflection FROM challenges c LEFT JOIN reflections r ON r.challenge_id=c.id WHERE c.account_id=? AND c.lifecycle IN ('completed','skipped') AND " + COUNTED + " ORDER BY c.created_at DESC LIMIT 20",
+      ).bind(job.account_id).all(),
+    ]);
+    const [selection, restored, recent] = await selectionAndPool;
     const { context: generationContext, schema: generationOutputSchema } = generationRequest(input, selection,
       await historicalSnapshot(env, job.account_id, "", [selection.primaryConceptId]));
-    const restored = !input.instruction && !input.followUp && !input.warmUp ? await env.DB.prepare("SELECT * FROM questions WHERE account_id=? AND eligible=1 AND json_extract(data,'$.engineeringLevel')=? AND (? IS NULL OR json_extract(data,'$.primaryConceptId')=?) ORDER BY eligibility_updated_at,id LIMIT 1").bind(job.account_id,input.settings.engineeringLevel!,input.primaryConceptId??null,input.primaryConceptId??null).first<{id:string;data:string}>() : null;
-    const recent = await env.DB.prepare(
-      "SELECT c.data,c.lifecycle,c.completed_at,r.data AS reflection FROM challenges c LEFT JOIN reflections r ON r.challenge_id=c.id WHERE c.account_id=? AND c.lifecycle IN ('completed','skipped') AND " + COUNTED + " ORDER BY c.created_at DESC LIMIT 20",
-    )
-      .bind(job.account_id)
-      .all();
     data = restored ? JSON.parse(restored.data) : await streamedStructured(
       env,
       job.account_id,
@@ -106,8 +107,12 @@ export async function runJob(env: Env, id: string) {
       generationContext,
       generationOutputSchema,
       // The preview shows the question as it is written; the row is keyed by job like interview text.
-      raw => env.DB.prepare("INSERT INTO interview_streams(job_id,text) SELECT ?,? WHERE EXISTS(SELECT 1 FROM jobs WHERE id=? AND status='running') ON CONFLICT(job_id) DO UPDATE SET text=excluded.text")
-        .bind(id, JSON.stringify({ title: partialJSONString(raw, "title"), prompt: partialJSONString(raw, "prompt") }), id).run(),
+      raw => {
+        const title = partialJSONString(raw, "title");
+        if (!title) return null;
+        return env.DB.prepare("INSERT INTO interview_streams(job_id,text) SELECT ?,? WHERE EXISTS(SELECT 1 FROM jobs WHERE id=? AND status='running') ON CONFLICT(job_id) DO UPDATE SET text=excluded.text")
+          .bind(id, JSON.stringify({ title, prompt: partialJSONString(raw, "prompt") }), id).run();
+      },
     );
     const generated = data as import("zod").z.infer<
       typeof questionGenerationSchema
@@ -156,7 +161,7 @@ export async function runJob(env: Env, id: string) {
         state,
         JSON.stringify({
           ...(data as object),
-          model: MODEL_ID,
+          model: managedModel("generate"),
           promptVersion: "practice-v2",
           difficulty: input.settings.difficulty,
           engineeringLevel: input.settings.engineeringLevel,
@@ -347,7 +352,7 @@ export async function reconcile(env: Env) {
   // Inline interactive work normally finishes in seconds. If an isolate is
   // terminated mid-request, return the durable command to the Workflow-backed
   // recovery path after a conservative timeout.
-  await env.DB.prepare("UPDATE jobs SET status='pending',updated_at=? WHERE kind='interview' AND status='running' AND updated_at<?")
+  await env.DB.prepare("UPDATE jobs SET status='pending',updated_at=? WHERE kind IN ('interview','generate') AND status='running' AND updated_at<?")
     .bind(timestamp(), new Date(Date.now() - 120000).toISOString()).run();
   // Recover dispatch failures. Stable workflow IDs prevent duplicate execution.
   const pending = await env.DB.prepare(

@@ -4,7 +4,8 @@ import {z} from '../apps/api/node_modules/zod';
 import {messagesFor,interviewModelSchema,interviewReasoning,parseInterviewModelResult} from '../apps/api/src/ai';
 import {interviewSchemaFor} from '../apps/api/src/interview';
 import {voiceDelegationMessages} from '../apps/api/src/prompts/voice-context';
-import {MODEL_ID} from '../apps/api/src/domain';
+import {managedModel} from '../apps/api/src/domain';
+const MODEL_ID=managedModel('interview');
 const key=process.env.OPENROUTER_API_KEY;if(!key)throw new Error('Provider key missing');
 const question={title:'Design a job queue',prompt:'Design a durable job queue with worker failure recovery. Explain retry handling and duplicate effects.',conceptIds:['queues','retry-safety'],engineeringLevel:'senior'};
 const cases=[

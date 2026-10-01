@@ -10,6 +10,8 @@ import { pooled } from "./openrouter";
 const key = process.env.OPENROUTER_API_KEY;
 if (!key) throw Error("OPENROUTER_API_KEY required");
 const models = process.argv.slice(2).length ? process.argv.slice(2) : [MODEL_ID];
+const routing = { sort: "latency", require_parameters: true, ...(process.env.EVAL_PROVIDERS ? { only: process.env.EVAL_PROVIDERS.split(","), allow_fallbacks: false } : {}) };
+const rounds = Number(process.env.EVAL_ROUNDS ?? 2);
 const queue = { title: "Job queue", prompt: "Design a durable job queue. Explain how workers claim jobs, how retries avoid duplicate side effects and how accepted work survives a crash." };
 const payments = { title: "Reliable payment retries", prompt: "Design retries for a payment API when acknowledgements can be lost. Avoid duplicate charges.", constraints: ["An external payment provider accepts idempotency keys."], engineeringLevel: "mid" };
 const cases = [
@@ -23,7 +25,7 @@ async function turn(model: string, context: any) {
   const started = performance.now();
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, signal: AbortSignal.timeout(60000),
-    body: JSON.stringify({ model, messages: messagesFor("interview", context), provider: { sort: "latency", require_parameters: true }, reasoning: process.env.EVAL_REASONING ? { effort: process.env.EVAL_REASONING } : interviewReasoning(context), stream: true, max_tokens: 2400,
+    body: JSON.stringify({ model, messages: messagesFor("interview", context), provider: routing, reasoning: process.env.EVAL_REASONING ? { effort: process.env.EVAL_REASONING } : interviewReasoning(context), stream: true, max_tokens: 2400,
       response_format: { type: "json_schema", json_schema: { name: "drillbit_output", strict: true, schema: z.toJSONSchema(interviewModelSchema(context, schema)) } } }),
   });
   if (!response.ok || !response.body) return { error: `status ${response.status}: ${(await response.text()).slice(0, 160)}` };
@@ -39,7 +41,7 @@ async function question(model: string) {
   const started = performance.now();
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, signal: AbortSignal.timeout(120000),
-    body: JSON.stringify({ model, messages: messagesFor("generate", context), provider: { sort: "latency", require_parameters: true }, reasoning: process.env.EVAL_REASONING ? { effort: process.env.EVAL_REASONING } : { enabled: false }, stream: false, max_tokens: 2400,
+    body: JSON.stringify({ model, messages: messagesFor("generate", context), provider: routing, reasoning: process.env.EVAL_REASONING ? { effort: process.env.EVAL_REASONING } : { enabled: false }, stream: false, max_tokens: 2400,
       response_format: { type: "json_schema", json_schema: { name: "drillbit_output", strict: true, schema: z.toJSONSchema(schema) } } }),
   });
   const ms = performance.now() - started;
@@ -53,7 +55,7 @@ const median = (values: number[]) => values.length ? Math.round([...values].sort
 const guarded = async <T,>(work: () => Promise<T>) => { try { return await work(); } catch (error) { return { error: String(error).slice(0, 120) } as any; } };
 const results = await pooled(models, 4, async model => {
   const turns: any[] = [];
-  for (const round of [0, 1]) for (const sample of cases) turns.push({ case: sample.name, round, ...(await guarded(() => turn(model, sample.context))) });
+  for (let round = 0; round < rounds; round++) for (const sample of cases) turns.push({ case: sample.name, round, ...(await guarded(() => turn(model, sample.context))) });
   return { model, turns, question: { ms: 0, ...(await guarded(() => question(model))) } };
 });
 

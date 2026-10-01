@@ -5,6 +5,13 @@ import { guidanceModeSchema } from "./prompts/teaching";
 import { conceptId, questionMetadata } from "./taxonomy";
 
 export const MODEL_ID = "openai/gpt-6-luna";
+/** Interview turns, question writing and voice reasoning wait on the first word; feedback and Recall don't. */
+export const FAST_MODEL_ID = "deepseek/deepseek-v4.1-flash";
+/** Fastest measured first word with strict JSON; pinned so routing never lands on a slower or lower-precision host. */
+export const FAST_PROVIDERS = ["together", "fireworks"];
+export function managedModel(kind: string) {
+  return ["interview", "generate", "voice_reasoning"].includes(kind) ? FAST_MODEL_ID : MODEL_ID;
+}
 export const engineeringLevelSchema = z.enum(["intern", "junior", "mid", "senior", "staff", "principal"]);
 export const levelForDifficulty = (difficulty: string) => difficulty === "easy" ? "junior" : difficulty === "hard" ? "senior" : "mid";
 /** A mock round's time budget; the generator sets `minutes`, and older or pooled questions fall back by level. */

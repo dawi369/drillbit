@@ -44,6 +44,12 @@ export const app = new Hono<{
   Bindings: Env;
   Variables: { account: Account; requestId: string };
 }>();
+/** Interactive jobs run in this request when enabled, skipping Workflow startup; the reconciler still recovers them. */
+function inline(c: { env: Env; executionCtx: { waitUntil(work: Promise<unknown>): void } }) {
+  return c.env.INTERACTIVE_INLINE_ENABLED === "true"
+    ? (id: string) => c.executionCtx.waitUntil(runJobSafely(c.env, id))
+    : undefined;
+}
 app.use(
   "*",
   bodyLimit({
@@ -129,16 +135,21 @@ app.get("/v1/widget", async (c) => {
 });
 app.use("/v1/*", async (c, next) => {
   const subject = await identity(c.env, c.req.header("Authorization"));
-  const account = await accountFor(c.env, subject);
-  c.set("account", account);
   const permitted = ["/v1/bootstrap", "/v1/invite", "/v1/account"];
+  const [account, epoch] = await Promise.all([
+    accountFor(c.env, subject),
+    c.req.method !== "GET" && !permitted.includes(c.req.path)
+      ? c.env.DB.prepare("SELECT enabled FROM practice_epoch WHERE id=1").first<{enabled:number}>()
+      : null,
+  ]);
+  c.set("account", account);
   if (account.status !== "active" && !permitted.includes(c.req.path))
     throw new Fault(
       "invite_required",
       403,
       "Redeem an invite to start practicing.",
     );
-  if(c.req.method!=="GET" && !permitted.includes(c.req.path) && (await c.env.DB.prepare("SELECT enabled FROM practice_epoch WHERE id=1").first<{enabled:number}>())?.enabled===0)throw new Fault("maintenance",503,"Practice is being updated. Please try again shortly.");
+  if(epoch?.enabled===0)throw new Fault("maintenance",503,"Practice is being updated. Please try again shortly.");
   await next();
 });
 app.get("/v1/taxonomy", c => c.json({version:1,concepts}));
@@ -281,7 +292,7 @@ app.post("/v1/daily-question", async c => {
   const raw = await c.req.text();
   let input: unknown = {};
   try { if (raw) input = JSON.parse(raw); } catch { throw new Fault("invalid_input", 400, "The request must be valid JSON."); }
-  return c.json(await dailyQuestion(c.env, c.get("account").id, new Date(), dailyQuestionSchema.parse(input)));
+  return c.json(await dailyQuestion(c.env, c.get("account").id, new Date(), dailyQuestionSchema.parse(input), inline(c)));
 });
 app.put("/v1/challenges/:id/next", async c => c.json({ queuedNext: await queueFollowUp(c.env, c.get("account").id, c.req.param("id")) }));
 app.delete("/v1/challenges/:id/next", async c => c.json({ queuedNext: await unqueueFollowUp(c.env, c.get("account").id, c.req.param("id")) }));
@@ -334,7 +345,7 @@ app.post("/v1/challenges", async (c) => {
           : {}),
         ...(preparation.engineeringLevel ? { engineeringLevel: preparation.engineeringLevel } : preparation.difficulty ? { engineeringLevel: levelForDifficulty(preparation.difficulty) } : {}),
       },
-    }),
+    }, inline(c)),
     202,
   );
 });
@@ -405,7 +416,7 @@ app.get("/v1/challenges/:id/interview/:turn/stream", async c => {
       const data = JSON.stringify(value);
       if (data !== previous) { await stream.writeSSE({event:"snapshot",data}); previous = data; }
       if (!["pending","running"].includes(value.status)) return;
-      await stream.sleep(200);
+      await stream.sleep(100);
       if (!closed) value = await interviewStreamSnapshot(c.env, account, id, turn);
     }
   });
@@ -414,10 +425,7 @@ app.post("/v1/challenges/:id/voice", async c => c.json(await startVoice(c.env,c.
 app.post("/v1/challenges/:id/voice/:voice/events", async c => c.json(await voiceEvents(c.env,c.get("account").id,c.req.param("id"),c.req.param("voice"),await c.req.json())));
 app.post("/v1/challenges/:id/voice/:voice/delegate", async c => c.json(await delegateVoice(c.env,c.get("account").id,c.req.param("id"),c.req.param("voice"),await c.req.json())));
 app.post("/v1/challenges/:id/interview", async c => {
-  const runImmediately = c.env.INTERACTIVE_INLINE_ENABLED === "true"
-    ? (id: string) => c.executionCtx.waitUntil(runJobSafely(c.env, id))
-    : undefined;
-  return c.json(await requestInterview(c.env,c.get("account").id,c.req.param("id"),requireCommand(c.req.header("Idempotency-Key")),interviewInputSchema.parse(await c.req.json()),runImmediately),202);
+  return c.json(await requestInterview(c.env,c.get("account").id,c.req.param("id"),requireCommand(c.req.header("Idempotency-Key")),interviewInputSchema.parse(await c.req.json()),inline(c)),202);
 });
 app.post("/v1/challenges/:id/interview/:turn/retry", async c => c.json(await retryInterview(c.env,c.get("account").id,c.req.param("id"),c.req.param("turn"),requireCommand(c.req.header("Idempotency-Key"))),202));
 app.post("/v1/challenges/:id/interview/:turn/cancel", async c => c.json(await cancelInterviewAssistance(c.env,c.get("account").id,c.req.param("id"),c.req.param("turn"))));
@@ -541,7 +549,7 @@ app.get("/v1/jobs/:id/stream", async (c) => {
       const data = JSON.stringify(value);
       if (data !== previous) { await stream.writeSSE({ event: "snapshot", data }); previous = data; }
       if (!["pending", "running"].includes(value.status)) return;
-      await stream.sleep(150);
+      await stream.sleep(100);
       if (!closed) value = await snapshot();
     }
   });

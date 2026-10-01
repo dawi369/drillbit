@@ -1,7 +1,7 @@
 /** Synthetic question-writing evaluation for the Key facts block; never reads private practice records. The full run goes to .local/. */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { messagesFor } from "../apps/api/src/ai";
-import { normalizeSettings } from "../apps/api/src/domain";
+import { managedModel, normalizeSettings } from "../apps/api/src/domain";
 import { generationRequest } from "../apps/api/src/generation";
 import { pooled, structuredCall } from "./openrouter";
 
@@ -26,7 +26,7 @@ function shape(prompt: string) {
 const runs = await pooled(combos, 4, async combo => {
   const settings = normalizeSettings({ engineeringLevel: combo.level });
   const { context, schema } = generationRequest({ settings, guidanceMode: combo.mode }, { primaryConceptId: combo.concept, reason: "Evaluation." });
-  const { value, cost, ms } = await structuredCall(messagesFor("generate", context), schema, { enabled: false });
+  const { value, cost, ms } = await structuredCall(messagesFor("generate", context), schema, { enabled: false }, process.env.EVAL_MODEL ?? managedModel("generate"));
   const question = value as { title: string; prompt: string; constraints: string[]; minutes: number; path: string[] };
   const { paragraphs, facts, ask } = shape(question.prompt);
   const exploratory = combo.mode === "mock_interview" || (["senior", "staff"].includes(combo.level) && combo.mode !== "learn_together");

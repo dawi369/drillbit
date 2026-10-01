@@ -3,7 +3,7 @@ import { afterAll, beforeAll, expect, it } from "vitest";
 import { partialJSONString, textDeltas } from "../src/ai";
 import { boundedContext } from "../src/context";
 import { roundTiming } from "../src/domain";
-import { runJob } from "../src/jobs";
+import { reconcile, runJob } from "../src/jobs";
 import { learningEvidence, todayPlan } from "../src/learning";
 import type { Env } from "../src/platform";
 import { accountFor, complete, createJob, detail, settingsFor } from "../src/store";
@@ -113,9 +113,10 @@ it("durably generates a valid challenge and replay does not call the provider ag
       body: (raw: string) => {
         const request = JSON.parse(raw);
         expect(request.provider.require_parameters).toBe(true);
-        expect(request.provider.sort).toBe("latency");
+        expect(request.provider.order).toEqual(["together", "fireworks"]);
         expect(request.reasoning.enabled).toBe(false);
-        expect(request.model).toBe("openai/gpt-6-luna");
+        // Question writing waits on the first word, so it runs on the fast model.
+        expect(request.model).toBe("deepseek/deepseek-v4.1-flash");
         expect(request.messages[0].content).not.toContain("Required JSON schema:");
         expect(request.response_format.type).toBe("json_schema");
         expect(request.response_format.json_schema.schema.properties).toHaveProperty("ambiguityPolicy");
@@ -293,4 +294,19 @@ it("returns durable job intent before slow workflow dispatch completes", async (
   expect(deferred).toHaveLength(1);
   expect(await bindings.DB.prepare("SELECT status FROM jobs WHERE id=?").bind(id).first()).toMatchObject({status:"pending"});
   release(); await Promise.all(deferred);
+});
+it("runs interactive question writing in the request instead of waiting for a workflow to start", async () => {
+  const account = await accountFor(bindings, crypto.randomUUID());
+  let dispatched = 0;
+  const env = {...bindings, JOBS:{create: async () => { dispatched++; return {id:"workflow"}; }}} as unknown as Env;
+  const ran: string[] = [];
+  const id = crypto.randomUUID();
+  await createJob(env,account.id,id,"generate",null,{settings:await settingsFor(bindings,account.id)},job => ran.push(job));
+  expect(ran).toEqual([id]);
+  expect(dispatched).toBe(0);
+  // An isolate that dies mid-run hands the job back to the workflow path.
+  await bindings.DB.prepare("UPDATE jobs SET status='running',updated_at='2000-01-01T00:00:00Z' WHERE id=?").bind(id).run();
+  await reconcile(env);
+  expect(await bindings.DB.prepare("SELECT status FROM jobs WHERE id=?").bind(id).first()).toEqual({status:"pending"});
+  expect(dispatched).toBeGreaterThan(0);
 });

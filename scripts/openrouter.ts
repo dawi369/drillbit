@@ -5,14 +5,14 @@ import { MODEL_ID } from "../apps/api/src/domain";
 const key = process.env.OPENROUTER_API_KEY;
 if (!key) throw Error("OPENROUTER_API_KEY required");
 
-export async function structuredCall(messages: unknown[], schema: z.ZodType, reasoning: { enabled: false } | { effort: "low" }) {
+export async function structuredCall(messages: unknown[], schema: z.ZodType, reasoning: { enabled: false } | { effort: "low" }, model = process.env.EVAL_MODEL ?? MODEL_ID) {
   const started = Date.now();
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     signal: AbortSignal.timeout(120000),
     body: JSON.stringify({
-      model: process.env.EVAL_MODEL ?? MODEL_ID, messages, reasoning, stream: false, max_tokens: 2400,
+      model, messages, reasoning, stream: false, max_tokens: 2400,
       provider: { sort: "latency", require_parameters: true },
       response_format: { type: "json_schema", json_schema: { name: "drillbit_output", strict: true, schema: z.toJSONSchema(schema) } },
     }),

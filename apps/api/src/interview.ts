@@ -53,10 +53,12 @@ export function mockRound(data: Record<string, unknown>, fallbackStart: string, 
 export function interviewWrapUp(_context: unknown, _kind: string) { return null; }
 export function normalizeInterviewResult(output: z.infer<typeof interviewResultSchema>) { return output; }
 export async function interviewFor(env: Env, account: string, id: string) {
-  const challenge = await ownedChallenge(env, account, id);
+  const [challenge, rows, fragments] = await Promise.all([
+    ownedChallenge(env, account, id),
+    env.DB.prepare(`SELECT t.*,j.status,j.error,s.text AS partial FROM interview_turns t JOIN jobs j ON j.id=t.job_id LEFT JOIN interview_streams s ON s.job_id=j.id WHERE t.challenge_id=? ORDER BY t.ordinal`).bind(id).all<any>(),
+    env.DB.prepare("SELECT f.* FROM voice_fragments f JOIN voice_sessions v ON v.id=f.session_id WHERE v.challenge_id=? AND v.account_id=? ORDER BY f.sequence").bind(id,account).all<any>(),
+  ]);
   const data = JSON.parse(challenge.data);
-  const rows = await env.DB.prepare(`SELECT t.*,j.status,j.error,s.text AS partial FROM interview_turns t JOIN jobs j ON j.id=t.job_id LEFT JOIN interview_streams s ON s.job_id=j.id WHERE t.challenge_id=? ORDER BY t.ordinal`).bind(id).all<any>();
-  const fragments = await env.DB.prepare("SELECT f.* FROM voice_fragments f JOIN voice_sessions v ON v.id=f.session_id WHERE v.challenge_id=? AND v.account_id=? ORDER BY f.sequence").bind(id,account).all<any>();
   const turns = rows.results.map(t => ({ id: t.id, ordinal: t.ordinal, kind: t.kind, prompt: t.prompt, text: t.text, createdAt: t.created_at, jobId: t.job_id, status: t.status, error: t.error, partial: t.partial, result: t.result ? JSON.parse(t.result) : null, voice: t.kind === "voice" ? fragments.results.filter(f=>f.session_id===t.id).map(f=>({id:f.id,sequence:f.sequence,speaker:f.speaker,text:f.text,startMs:f.start_ms,endMs:f.end_ms})) : undefined }));
   const last = turns.filter(t => ["answer", "continue"].includes(t.kind) && t.result).at(-1);
   return { guidanceMode: guidanceMode(data.guidanceMode), style: interviewStyleSchema.catch("standard").parse(data.interviewStyle),
@@ -65,8 +67,14 @@ export async function interviewFor(env: Env, account: string, id: string) {
 }
 export async function requestInterview(env: Env, account: string, id: string, command: string, raw: unknown, runImmediately?: (id: string) => void) {
   const input = interviewInputSchema.parse(raw);
-  const challenge = await ownedChallenge(env, account, id);
-  const replay = await env.DB.prepare("SELECT * FROM jobs WHERE id=?").bind(command).first<Job>();
+  // Independent reads share one round trip; the checks below keep their order.
+  const [challenge, replay, voice, context, session] = await Promise.all([
+    ownedChallenge(env, account, id),
+    env.DB.prepare("SELECT * FROM jobs WHERE id=?").bind(command).first<Job>(),
+    assertNoVoice(env,account,id).then(() => null, (error: unknown) => error),
+    interviewFor(env, account, id),
+    env.DB.prepare("SELECT answer,revision FROM sessions WHERE challenge_id=?").bind(id).first<{answer:string; revision:number}>(),
+  ]);
   if (replay) {
     if (replay.account_id !== account || replay.challenge_id !== id || replay.kind !== "interview" || JSON.stringify(JSON.parse(replay.input).action) !== JSON.stringify(input)) throw new Fault("command_reused", 409, "This command belongs to another request.");
     // A running inline execution already owns this command. Re-dispatching it
@@ -74,9 +82,8 @@ export async function requestInterview(env: Env, account: string, id: string, co
     if (replay.status === "pending") runImmediately ? runImmediately(command) : await dispatch(env, command);
     return interviewFor(env, account, id);
   }
-  await assertNoVoice(env,account,id);
+  if (voice) throw voice;
   if (challenge.lifecycle !== "in_progress") throw new Fault("inactive", 409, "Start the interview before sharing.");
-  const context = await interviewFor(env, account, id);
   const promptId = context.turns.filter(t => ["answer","continue"].includes(t.kind) && t.result).at(-1)?.id ?? "original";
   if (input.promptId !== promptId) throw new Fault("revision_conflict",409,"The interviewer has moved on. Review the current question first.");
   if (context.turns.some(t => ["pending", "running", "failed"].includes(t.status))) throw new Fault("interview_pending", 409, "Recover the interviewer's response before continuing.");
@@ -84,13 +91,15 @@ export async function requestInterview(env: Env, account: string, id: string, co
   if (input.kind === "answer" && !input.text) throw new Fault("empty_answer", 400, "Write an answer before sharing.");
   if (input.kind === "clarification" && !input.text) throw new Fault("empty_question", 400, "What would you like to ask?");
   if (input.kind === "continue" && !context.wrapUp) throw new Fault("not_wrapping_up", 409, "Answer the current question first.");
-  const session = await env.DB.prepare("SELECT answer,revision FROM sessions WHERE challenge_id=?").bind(id).first<{answer:string; revision:number}>();
   if (!session || session.revision !== input.revision || (input.kind === "answer" && !input.saveDraft && session.answer.trim() !== input.text)) throw new Fault("revision_conflict", 409, "The draft changed. Review it and try again.");
-  await consumeUsage(env, account, "interview", 50);
+  const [, settings, history] = await Promise.all([
+    consumeUsage(env, account, "interview", 50),
+    settingsFor(env, account),
+    historicalSnapshot(env, account, id, JSON.parse(challenge.data).conceptIds ?? []),
+  ]);
   const now = timestamp();
   context.style = "standard";
   context.guidanceMode = input.guidanceMode ?? context.guidanceMode;
-  const [settings, history] = await Promise.all([settingsFor(env, account), historicalSnapshot(env, account, id, JSON.parse(challenge.data).conceptIds ?? [])]);
   const data = JSON.parse(challenge.data);
   // A mock round runs on the clock, so the interviewer can pace it like a real one.
   const timing = context.guidanceMode === "mock_interview" ? mockRound(data, challenge.created_at, context.turns) : undefined;

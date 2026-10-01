@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { boundedContext, visibleQuestion, xmlContext } from "./context";
-import { Fault, MODEL_ID, timestamp, uuid, type Settings } from "./domain";
+import { FAST_MODEL_ID, FAST_PROVIDERS, Fault, managedModel, MODEL_ID, timestamp, uuid, type Settings } from "./domain";
 import { consumeUsage, decrypt, type Env } from "./platform";
 import { questionFormattingInstructions } from "./prompts/formatting";
 import { INTERVIEW_PROMPT_VERSION, interviewerPrompt, isSocialOpening, socialOpeningPrompt } from "./prompts/interviewer";
@@ -13,6 +13,7 @@ export async function modelAccess(
   env: Env,
   account: string,
   settings: Settings,
+  kind = "",
 ): Promise<{ key: string; model: string }> {
   if (settings.aiMode === "managed") {
     if (env.MANAGED_AI_ENABLED !== "true" || !env.OPENROUTER_API_KEY)
@@ -21,7 +22,7 @@ export async function modelAccess(
         503,
         "Included AI is currently unavailable.",
       );
-    return { key: env.OPENROUTER_API_KEY, model: MODEL_ID };
+    return { key: env.OPENROUTER_API_KEY, model: managedModel(kind) };
   }
   const row = await env.DB.prepare(
     "SELECT id,ciphertext,key_version,model FROM credentials WHERE account_id=?",
@@ -167,11 +168,11 @@ export async function provider(
   account: string,
   settings: Settings,
   messages: ModelMessage[],
-  options: { maxTokens?: number; schema?: z.ZodType; signal?: AbortSignal; stream?: boolean; reasoning?: { enabled: false } | { effort: "low" } } = {},
+  options: { kind?: string; maxTokens?: number; schema?: z.ZodType; signal?: AbortSignal; stream?: boolean; reasoning?: { enabled: false } | { effort: "low" } } = {},
 ) {
   const schema = options.schema ? z.toJSONSchema(options.schema) : undefined;
   const started = Date.now();
-  const { key, model } = await modelAccess(env, account, settings);
+  const { key, model } = await modelAccess(env, account, settings, options.kind);
   await consumeUsage(env, account, "provider_attempt", 100);
   let response: Response;
   try {
@@ -186,7 +187,7 @@ export async function provider(
       body: JSON.stringify({
         model,
         messages,
-        provider: { sort: "latency", ...(options.schema ? { require_parameters: true } : {}) },
+        provider: { ...(model === FAST_MODEL_ID ? { order: FAST_PROVIDERS } : { sort: "latency" }), ...(options.schema ? { require_parameters: true } : {}) },
         reasoning: options.reasoning ?? { enabled: false },
         stream: options.stream ?? false,
         ...(options.stream ? { stream_options: { include_usage: true } } : {}),
@@ -236,7 +237,7 @@ export async function structured<T>(
     account,
     settings,
     messagesFor(kind, context),
-    { schema, reasoning: kind === "summarize" ? {effort: "low"} : {enabled: false} },
+    { kind, schema, reasoning: kind === "summarize" ? {effort: "low"} : {enabled: false} },
   );
   const body = (await response.json()) as {
     choices?: { message?: { content?: string } }[];
@@ -260,7 +261,7 @@ export async function structured<T>(
     );
   }
 }
-/** `structured`, but the raw JSON is published as it arrives. Publishing is best-effort and never blocks the stream. */
+/** `structured`, but the raw JSON is published as it arrives. `publish` returns null until there is something worth showing; publishing never blocks the stream. */
 export async function streamedStructured<T>(
   env: Env,
   account: string,
@@ -268,25 +269,28 @@ export async function streamedStructured<T>(
   kind: string,
   context: unknown,
   schema: z.ZodType<T>,
-  publish: (raw: string) => Promise<unknown>,
+  publish: (raw: string) => Promise<unknown> | null,
 ): Promise<T> {
-  const response = await provider(env, account, settings, messagesFor(kind, context), { schema, stream: true });
+  const response = await provider(env, account, settings, messagesFor(kind, context), { kind, schema, stream: true });
   if (!response.body) throw new Error("missing_stream");
   let raw = "", published = "", publishing: Promise<unknown> | undefined;
   for await (const delta of textDeltas(response.body, usage => recordUsage(env, account, settings, kind, usage))) {
     raw += delta;
     if (raw.length > 50000) throw new Error("oversized_stream");
+    if (runaway(raw)) break;
     if (!publishing) {
+      const write = publish(raw);
+      if (!write) continue;
       published = raw;
-      publishing = Promise.all([publish(raw), new Promise(r => setTimeout(r, 120))])
+      publishing = Promise.all([write, new Promise(r => setTimeout(r, 120))])
         .catch(() => {})
         .finally(() => { publishing = undefined; });
     }
   }
   await publishing;
-  if (published !== raw) await publish(raw).catch(() => {});
+  if (published !== raw) await publish(raw)?.catch(() => {});
   try {
-    return schema.parse(JSON.parse(raw));
+    return schema.parse(parseModelJSON(raw));
   } catch {
     throw new Fault(
       "invalid_output",
@@ -361,7 +365,7 @@ export async function recordUsage(
         .bind(account)
         .first<{ model: string | null }>()
         .catch(() => null))?.model ?? MODEL_ID
-    : MODEL_ID;
+    : managedModel(kind);
   await env.DB.prepare(
     "INSERT INTO ai_runs(id,account_id,kind,model,prompt_version,input_tokens,output_tokens,cost,created_at) SELECT ?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM accounts WHERE id=? AND status='active')",
   )
@@ -404,6 +408,13 @@ export function partialJSONString(raw: string, key: string): string {
   }
   try { const text: string = JSON.parse('"' + raw.slice(start, end) + '"'); return /[\uD800-\uDBFF]$/.test(text) ? text.slice(0, -1) : text; } catch { return ""; }
 }
+/** Strict-schema output whose object a provider left unclosed; the schema still decides what is accepted. */
+export function parseModelJSON(raw: string): unknown {
+  try { return JSON.parse(raw); } catch (error) {
+    try { return JSON.parse(raw.trimEnd() + "}"); } catch { throw error; }
+  }
+}
+function runaway(raw: string) { return /\s{64}$/.test(raw); }
 // The app owns turn routing. Do not ask the model to classify social replies
 // into protocol labels: it should generate the words, not choose lifecycle state.
 export function interviewReasoning(context: unknown): { enabled: false } | { effort: "low" } {
@@ -448,7 +459,7 @@ function isMock(context: unknown) {
 }
 export async function streamedInterview(env: Env, account: string, settings: Settings, context: unknown, schema: z.ZodType, publish: (text: string) => Promise<void>) {
   const controller = new AbortController();
-  const response = await provider(env, account, settings, messagesFor("interview", context), { maxTokens: 900, schema: interviewModelSchema(context, schema), reasoning: interviewReasoning(context), stream: true, signal: AbortSignal.any([controller.signal, AbortSignal.timeout(60000)]) });
+  const response = await provider(env, account, settings, messagesFor("interview", context), { kind: "interview", maxTokens: 900, schema: interviewModelSchema(context, schema), reasoning: interviewReasoning(context), stream: true, signal: AbortSignal.any([controller.signal, AbortSignal.timeout(60000)]) });
   if (!response.body) throw new Error("missing_stream");
   let raw = "", last = "", updated = 0;
   const started = Date.now();
@@ -471,14 +482,16 @@ export async function streamedInterview(env: Env, account: string, settings: Set
     if (failure) throw failure;
     raw += delta;
     if (raw.length > 50000) throw new Error("oversized_stream");
+    // A reply padding whitespace will only stop at the token limit; what came before is all there is.
+    if (runaway(raw)) { controller.abort(); break; }
     const text = partialInterviewText(raw);
-    if (text && first) { first = false; console.info(JSON.stringify({event: "inference_first_text", model: MODEL_ID, afterHeadersMs: Date.now() - started})); }
+    if (text && first) { first = false; console.info(JSON.stringify({event: "inference_first_text", model: settings.aiMode === "byok" ? "byok" : managedModel("interview"), afterHeadersMs: Date.now() - started})); }
     if (text !== last && Date.now() - updated >= 150) { enqueue(text); last = text; updated = Date.now(); }
   }
   } finally {
     while (publishing) await publishing;
   }
-  const output = parseInterviewModelResult(context, schema, JSON.parse(raw));
+  const output = parseInterviewModelResult(context, schema, parseModelJSON(raw));
   while (publishing) await publishing;
   if (failure) throw failure;
   await publish(output.text);

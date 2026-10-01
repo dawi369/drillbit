@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { interviewModelSchema, provider, recordUsage } from './ai';
+import { interviewModelSchema, parseModelJSON, provider, recordUsage } from './ai';
 import { xmlContext } from './context';
 import { Fault, practiceProfileSchema, timestamp } from './domain';
 import { historicalSnapshot } from './history';
@@ -121,9 +121,9 @@ export async function delegateVoice(env:Env,account:string,challenge:string,id:s
   const messages=voiceDelegationMessages(data,history,{...interview,timing},pinnedProfile ?? settings.practiceProfile);
   const contextMs=Date.now()-started;
   const voiceSchema=interviewModelSchema({promptVersion:"interviewer-teaching-v3"},z.object({}));
-  const response=await provider(env,account,settings,messages,{maxTokens:900,schema:voiceSchema,reasoning:{enabled:false},signal:deadline});
+  const response=await provider(env,account,settings,messages,{kind:'voice_reasoning',maxTokens:900,schema:voiceSchema,reasoning:{enabled:false},signal:deadline});
   const body=await response.json() as any;await recordUsage(env,account,settings,'voice_reasoning',body.usage,TEACHING_VERSION+'-'+interview.guidanceMode);
-  const text=(voiceSchema.parse(JSON.parse(body.choices?.[0]?.message?.content)) as {text:string}).text;
+  const text=(voiceSchema.parse(parseModelJSON(body.choices?.[0]?.message?.content)) as {text:string}).text;
   await env.DB.prepare("UPDATE voice_delegations SET status='completed',result=? WHERE session_id=? AND id=?").bind(text,id,delegation).run();
   console.log(JSON.stringify({event:'voice_delegation',contextMs,totalMs:Date.now()-started,inputCharacters:messages.reduce((n,m)=>n+m.content.length,0),mode:interview.guidanceMode}));
   return {text};

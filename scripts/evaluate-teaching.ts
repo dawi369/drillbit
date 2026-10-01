@@ -5,7 +5,8 @@ import {messagesFor,interviewModelSchema,interviewReasoning,parseInterviewModelR
 import {interviewSchemaFor} from '../apps/api/src/interview';
 import {voiceDelegationMessages} from '../apps/api/src/prompts/voice-context';
 import {INTERVIEW_PROMPT_VERSION} from '../apps/api/src/prompts/interviewer';
-import {MODEL_ID} from '../apps/api/src/domain';
+import {managedModel} from '../apps/api/src/domain';
+const MODEL_ID=managedModel('interview');
 const key=process.env.OPENROUTER_API_KEY;
 if(!key) throw new Error('OpenRouter key missing');
 const baseQuestion={title:'API Design for Order Status Updates',prompt:'Design an internal API endpoint that allows a mobile client to poll for order status as it moves through logistics stages. Define the request path, response structure, and how to minimize unnecessary data transfer and server load.',constraints:['Support checks as often as every 5 seconds.'],engineeringLevel:'junior'};
@@ -38,7 +39,14 @@ await Promise.all(['learn_together','coach_me','mock_interview'].map(async guida
     if(!response.ok)throw new Error(`Provider status ${response.status}`);
     const body=await response.json() as any;
     const raw=body.choices[0].message.content;
-    const reply=parseInterviewModelResult(context,interviewSchemaFor('answer'),JSON.parse(raw)).text;
+    let reply:string;
+    try { reply=parseInterviewModelResult(context,interviewSchemaFor('answer'),JSON.parse(raw)).text; }
+    catch(error) {
+     // Count invalid output instead of stopping the run; production would fail this turn.
+     const row={model:MODEL_ID,guidanceMode,transport,case:sample.name,invalid:String(error).slice(0,120),finishReason:body.choices[0].finish_reason,provider:body.provider,tail:String(raw).slice(-160)};
+     results.push(row);console.log(JSON.stringify(row));
+     continue;
+    }
     const row={version:INTERVIEW_PROMPT_VERSION,model:MODEL_ID,guidanceMode,transport,case:sample.name,user:text,reply,ms:Math.round(performance.now()-start),inputTokens:body.usage?.prompt_tokens,cost:body.usage?.cost,reasoningTokens:body.usage?.completion_tokens_details?.reasoning_tokens,finishReason:body.choices[0].finish_reason};
     results.push(row);console.log(JSON.stringify(row));
     // Advance the common scenario with the text response; paired voice tests see

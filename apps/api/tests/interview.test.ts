@@ -177,7 +177,22 @@ it("drains provider tokens while a partial write is slow, with only one writer",
  } finally { release(); }
  try { expect((await result).text).toBe("Hello there from this streamed reply today.");expect(peak).toBe(1);expect(writes.at(-1)).toBe("Hello there from this streamed reply today."); } finally {mock.mockRestore();}
 });
-
+it("stops a reply that never closes its JSON and pads with whitespace, keeping the complete text", async () => {
+ const {a}=await fixture();
+ // Seen from one provider: the object is complete except its final brace, then whitespace until the token limit.
+ const pieces=['{"move":"ask_one","text":"What does the client poll for?","parameters":[]',...Array.from({length:40},()=>'\n   ')];
+ let reads=0, body!:ReadableStream;
+ const mock=vi.spyOn(globalThis,"fetch").mockImplementation(async(_url,init)=>{
+   expect(JSON.parse(String(init?.body)).provider).toMatchObject({order:["together","fireworks"],require_parameters:true});
+   body=new ReadableStream({pull(controller){ controller.enqueue(new TextEncoder().encode('data: '+JSON.stringify({choices:[{delta:{content:pieces[Math.min(reads++,pieces.length-1)]}}]})+'\n\n')); }});
+   return new Response(body);
+ });
+ try {
+   const output=await streamedInterview(e,a,await settingsFor(e,a),{},interviewSchemaFor("answer"),async()=>{});
+   expect(output.text).toBe("What does the client poll for?");
+   expect(reads).toBeLessThan(40);
+ } finally { mock.mockRestore(); }
+});
 it('pins teaching mode per job and preserves it through legacy updates and replay', async()=>{
  for (const mode of ['learn_together','coach_me','mock_interview']) {
   const {a,id}=await fixture('in_depth'),cmd=crypto.randomUUID();

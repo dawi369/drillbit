@@ -2,7 +2,8 @@
 import { z } from "../apps/api/node_modules/zod";
 import { messagesFor, textDeltas, partialInterviewText, interviewModelSchema, parseInterviewModelResult, interviewReasoning } from "../apps/api/src/ai";
 import { interviewSchemaFor } from "../apps/api/src/interview";
-import { MODEL_ID } from "../apps/api/src/domain";
+import { managedModel } from "../apps/api/src/domain";
+const MODEL_ID = managedModel("interview");
 const key = process.env.OPENROUTER_API_KEY;
 if (!key) throw new Error("Provider key missing");
 const context = {question:{title:"Job queue",prompt:"Design a durable job queue. Explain retries and duplicate processing."},interview:{style:"standard",turns:[]},action:{kind:"answer",text:"Workers lease jobs from a durable queue and retry failures with an idempotency key."}};
