@@ -256,3 +256,5 @@ Private backup `.local/before-tickets-20260929.sql` (mode 0600) precedes additiv
 ### Internal TestFlight build 10 — 1 October 2026
 
 Version `2.0.0 (10)` was archived from `main` at `/tmp/drillbit-testflight/Drillbit-build10.xcarchive` and uploaded TestFlight Internal Only with `ExportOptions-build10.plist`; `build10-export.log` records `Upload succeeded` and `EXPORT SUCCEEDED`. It packages the ticket Home and depends on Worker `14a1f57c`. Candidate checks: 132 API/D1 tests, 40 Swift core tests and all 48 UI tests on the iPhone 17 simulator; the signed simulator build signed in against development. Apple processing, tester availability and physical-device acceptance are not yet confirmed. The keychain must be unlocked in the same shell as the archive.
+
+Development Worker `61ce6e95-ac57-4c62-8159-407636b8581c` treats the latest warm-ups' primary concepts as recent in concept selection and adds their scenarios to the history snapshot, so the first real question doesn't rerun the warm-up. No migration. `/health` returned 200.
