@@ -178,9 +178,10 @@ final class PracticeUITests: XCTestCase {
     capture("Voice room question", app)
     app.buttons["voiceFixtureSpeech"].tap()
     app.buttons["voiceHistory"].tap()
+    // History opens at the question; at accessibility sizes the newest lines sit below the fold until Latest.
+    if app.buttons["voiceLatestButton"].waitForExistence(timeout: 2) { app.buttons["voiceLatestButton"].tap() }
     XCTAssertTrue(app.staticTexts["I'd use a durable queue."].waitForExistence(timeout:5))
     XCTAssertTrue(app.staticTexts["Makes sense. What happens when a worker retries?"].exists)
-    if app.buttons["voiceLatestButton"].exists { app.buttons["voiceLatestButton"].tap() }
     XCTAssertTrue(app.staticTexts["Makes sense. What happens when a worker retries?"].isHittable)
     capture("Voice room conversation", app)
     app.buttons["voiceHistory"].tap()
@@ -410,8 +411,8 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.navigationBars["Question preview"].exists)
     XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "answerEditor").firstMatch.exists)
     app.buttons["Choose another question"].tap()
-    XCTAssertTrue(app.buttons["prepareQuestion"].waitForExistence(timeout: 3))
-    app.buttons["prepareQuestion"].tap()
+    XCTAssertTrue(app.buttons["submitPreparation"].waitForExistence(timeout: 3))
+    app.buttons["submitPreparation"].tap()
     XCTAssertTrue(app.buttons["Back to preparation"].waitForExistence(timeout: 8))
     capture("Failed replacement", app)
     app.buttons["Close"].tap()
@@ -434,8 +435,8 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.buttons["homeSettings"].waitForExistence(timeout: 5))
     app.buttons["startPractice"].tap()
     app.buttons["Choose another question"].tap()
-    XCTAssertTrue(app.buttons["prepareQuestion"].waitForExistence(timeout: 3))
-    app.buttons["prepareQuestion"].tap()
+    XCTAssertTrue(app.buttons["submitPreparation"].waitForExistence(timeout: 3))
+    app.buttons["submitPreparation"].tap()
     XCTAssertTrue(app.navigationBars["Question preview"].waitForExistence(timeout: 5))
     app.buttons["Close"].tap()
     XCTAssertTrue(app.buttons["homeSettings"].waitForExistence(timeout: 5))
