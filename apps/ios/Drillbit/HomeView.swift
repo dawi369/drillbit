@@ -171,14 +171,14 @@ struct HomeView: View {
         stubRow(title: "Guided", note: GuidanceMode.learnTogether.stubNote, pill: challenge?.lifecycle == "in_progress" ? "Resume" : "Start")
       }
     case .chooseMode:
-      ticketButton(spoken: "Choose", action: { flow = QuestionFlowEntry() }) {
+      ticketButton(identifier: "chooseFirstSession", spoken: "Choose", action: { flow = QuestionFlowEntry() }) {
         VStack(alignment: .leading, spacing: 12) {
           TicketHeader(number: nextNumber, detail: shortDate)
-          Text("Make it your session.").font(.title.weight(.semibold)).tracking(-0.6)
-          Text("Guided, Practice or Mock interview. Pick how much help you want today.").font(.subheadline).foregroundStyle(AppPalette.secondary)
+          Text("Your first real one.").font(.title.weight(.semibold)).tracking(-0.6)
+          Text("Guided, Practice or Mock interview. Pick how much help you want.").font(.subheadline).foregroundStyle(AppPalette.secondary)
         }
       } stub: {
-        stubRow(title: "Your first real one", note: "This one counts", pill: "Choose")
+        stubRow(title: "This one counts", note: "Start whenever you’re ready", pill: "Choose")
       }
     case .question(let challenge):
       questionTicket(challenge)

@@ -174,6 +174,8 @@ import UIKit
         guard currentAccount else { throw CancellationError() }
         let promptID = state.turns.last(where: { ["answer", "continue"].contains($0.kind) && $0.result != nil })?.id ?? "original"
         pending = try await model.disk.prepareInterviewAnswer(account: account, id: challenge.id, answer: answer, command: command.uuidString, promptID: promptID, style: style, guidanceMode: mode)
+        // The command now carries the latest text; a cancelled autosave must not block applying the reply.
+        savedGeneration = editGeneration
       } else {
         try await flush()
         let local = try await model.disk.load(account: account, challenge: challenge)

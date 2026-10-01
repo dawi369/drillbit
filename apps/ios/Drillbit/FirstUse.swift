@@ -14,7 +14,7 @@ enum WarmUpStep: Int, CaseIterable {
   var message: String {
     switch self {
     case .tools: ""
-    case .reply: "Answer here, or ask something first."
+    case .reply: "Answer here. One line ending in “?” asks the interviewer instead."
     case .voice: "Tap to say it out loud instead."
     }
   }
@@ -248,7 +248,7 @@ struct FirstUseTourTip: View {
   private var content: (index: Int, title: String, message: String) {
     switch model.firstUse.stage {
     case .tourRecall: (1, "Recall makes it stick.", "Quick reviews from your own sessions.")
-    case .tourLibrary: (2, "Everything you’ve done.", "Old interviews and their feedback. Next up: your first real one.")
+    case .tourLibrary: (2, "Everything you’ve done.", "Old interviews and their feedback.")
     default: (0, "Home base.", "Pick up where you left off, or grab a new question.")
     }
   }
@@ -259,7 +259,7 @@ struct FirstUseTourTip: View {
       let tab = 24 + (proxy.size.width - 48) * (CGFloat(content.index) + 0.5) / 3
       CoachCallout(
         title: content.title, message: content.message, index: content.index, count: 3,
-        action: model.firstUse.stage == .tourLibrary ? "Choose my session" : "Next", buttonID: "firstUseTourNext",
+        action: model.firstUse.stage == .tourLibrary ? "Done" : "Next", buttonID: "firstUseTourNext",
         pointer: .bottom, pointerX: tab - (proxy.size.width - width) / 2) { Task { await model.advanceFirstUseTour() } }
         .frame(width: width)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)

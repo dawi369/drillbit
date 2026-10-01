@@ -37,9 +37,7 @@ struct WelcomeView: View {
           }
         }
         .id(page)
-        .transition(reduceMotion ? .identity : .asymmetric(
-          insertion: .offset(x: movingForward ? geometry.size.width : -geometry.size.width),
-          removal: .offset(x: movingForward ? -geometry.size.width : geometry.size.width)))
+        .transition(reduceMotion ? .identity : .deal(forward: movingForward))
         .frame(maxWidth: 560, alignment: .topLeading)
         .padding(.horizontal, 24).padding(.top, 24).padding(.bottom, 24)
         .frame(maxWidth: .infinity)
@@ -49,7 +47,7 @@ struct WelcomeView: View {
     }
     .clipped()
     .safeAreaInset(edge: .top, spacing: 0) {
-      SignalStepProgress(step: page + 1, total: 4)
+      SignalStepProgress(step: page + 1, total: 4, drill: true)
         .frame(maxWidth: 560).padding(.horizontal, 24).padding(.top, 16)
         .frame(maxWidth: .infinity)
         .background(AppPalette.background)

@@ -171,7 +171,10 @@ struct InterviewView: View {
               if showsDraft {
                 VStack(alignment: .leading, spacing: 12) {
                   Divider().accessibilityIdentifier("answerDivider")
-                  InterviewRowLabel(text: "Your reply")
+                  // One line ending in "?" goes to the interviewer as a question, not as your answer.
+                  InterviewRowLabel(text: InterviewComposerIntent.isQuestion(interview.answer) ? "Asking the interviewer" : "Your reply")
+                    .contentTransition(.opacity)
+                    .animation(DrillbitMotion.fast, value: InterviewComposerIntent.isQuestion(interview.answer))
                   if let turn = guidedTurn, let choices = turn.result?.choices, !choices.isEmpty, interview.answer.isEmpty, !interview.locked {
                     GuidedChoices(choices: choices) { choice in
                       interview.edit(choice)
@@ -733,34 +736,88 @@ struct RoundClock: View {
   }
 }
 
-/// Guided's roadmap: where you are in the question and what comes next.
+/// Guided's roadmap: where you are in the question and what comes next. Tap it for every step.
 struct GuidedPathBar: View {
   let steps: [String]
   let current: Int
+  @State private var showingSteps = false
   var body: some View {
     let index = min(max(current, 0), steps.count - 1)
-    VStack(alignment: .leading, spacing: 8) {
-      HStack(spacing: 4) {
-        ForEach(steps.indices, id: \.self) { step in
-          Capsule().fill(step <= index ? AppPalette.accent : AppPalette.hairline).frame(height: 4)
+    Button { showingSteps = true } label: {
+      VStack(alignment: .leading, spacing: 8) {
+        HStack(spacing: 4) {
+          ForEach(steps.indices, id: \.self) { step in
+            Capsule().fill(step <= index ? AppPalette.accent : AppPalette.hairline).frame(height: 4)
+          }
+        }
+        HStack(spacing: 8) {
+          Text("Step \(index + 1) of \(steps.count)").font(.caption.monospacedDigit()).foregroundStyle(AppPalette.accent)
+          Text(steps[index]).font(.subheadline.weight(.semibold)).foregroundStyle(AppPalette.primary).lineLimit(1)
+            .id(index)
+            .transition(.asymmetric(insertion: .opacity.combined(with: .offset(x: 12)), removal: .opacity))
+          Spacer(minLength: 4)
+          Image(systemName: "chevron.down").font(.caption.weight(.semibold)).foregroundStyle(AppPalette.secondary)
         }
       }
-      HStack(spacing: 8) {
-        Text("Step \(index + 1) of \(steps.count)").font(.caption.monospacedDigit()).foregroundStyle(AppPalette.accent)
-        Text(steps[index]).font(.subheadline.weight(.semibold)).foregroundStyle(AppPalette.primary).lineLimit(1)
-          .id(index)
-          .transition(.asymmetric(insertion: .opacity.combined(with: .offset(x: 12)), removal: .opacity))
-      }
+      .padding(.horizontal, 24)
+      .padding(.vertical, 12)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .contentShape(Rectangle())
     }
-    .padding(.horizontal, 24)
-    .padding(.vertical, 12)
-    .frame(maxWidth: .infinity, alignment: .leading)
+    .buttonStyle(.plain)
     .background(AppPalette.background)
     .overlay(alignment: .bottom) { AppPalette.hairline.frame(height: 0.5) }
     .animation(DrillbitMotion.page, value: index)
-    .accessibilityElement(children: .ignore)
+    .popover(isPresented: $showingSteps, arrowEdge: .top) {
+      GuidedPathSteps(steps: steps, current: index).presentationCompactAdaptation(.popover)
+    }
     .accessibilityLabel("Step \(index + 1) of \(steps.count): \(steps[index])")
+    .accessibilityHint("Shows every step")
     .accessibilityIdentifier("guidedPath")
+  }
+}
+
+/// The whole path at a glance: what's done, where you are, what's next.
+private struct GuidedPathSteps: View {
+  let steps: [String]
+  let current: Int
+  var body: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Text("How a strong answer usually goes. You move on as you cover each step.")
+        .font(.footnote).foregroundStyle(AppPalette.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+      VStack(alignment: .leading, spacing: 4) {
+        ForEach(steps.indices, id: \.self) { step in
+          HStack(alignment: .top, spacing: 12) {
+            marker(step).padding(.top, 1)
+            VStack(alignment: .leading, spacing: 2) {
+              Text(steps[step]).font(.subheadline.weight(step == current ? .semibold : .regular))
+                .foregroundStyle(step > current ? AppPalette.secondary : AppPalette.primary)
+                .fixedSize(horizontal: false, vertical: true)
+              if step == current { Text("You’re here").font(.caption.weight(.medium)).foregroundStyle(AppPalette.accent) }
+            }
+          }
+          .padding(.vertical, 6)
+          .accessibilityElement(children: .ignore)
+          .accessibilityLabel("Step \(step + 1)\(step < current ? ", done" : step == current ? ", you’re here" : ""): \(steps[step])")
+        }
+      }
+    }
+    .padding(16)
+    .frame(width: 300, alignment: .leading)
+    .accessibilityIdentifier("guidedPathSteps")
+  }
+  @ViewBuilder private func marker(_ step: Int) -> some View {
+    if step < current {
+      Image(systemName: "checkmark").font(.caption2.weight(.bold)).foregroundStyle(AppPalette.actionInk)
+        .frame(width: 20, height: 20).background(AppPalette.action, in: Circle())
+    } else {
+      Text("\(step + 1)").font(.caption2.weight(.semibold).monospacedDigit())
+        .foregroundStyle(step == current ? AppPalette.actionInk : AppPalette.secondary)
+        .frame(width: 20, height: 20)
+        .background(step == current ? AppPalette.action : .clear, in: Circle())
+        .overlay { Circle().stroke(step == current ? .clear : AppPalette.hairline, lineWidth: 1) }
+    }
   }
 }
 

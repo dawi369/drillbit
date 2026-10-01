@@ -70,7 +70,7 @@ struct PreparationView: View {
         }.accessibilityIdentifier("interviewStyle") }
       }
       Section {
-        TextField("Any custom instructions? (optional)", text: $instruction, axis: .vertical)
+        TextField("Any custom instructions? (e.g. talk like a pirate)", text: $instruction, axis: .vertical)
           .lineLimit(2...4).accessibilityLabel("Optional request")
       }
       Section {

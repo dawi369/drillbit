@@ -404,6 +404,41 @@ struct InterviewTests {
     #expect(shares == 1)
     #expect(interview.failure == nil)
   }
+  @Test func aReplySentRightAfterEditingStillReceivesTheInterviewersResponse() async throws {
+    let container = try ModelContainer(for: Schema(StoreV1.models), configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+    var remote = Challenge(id:"q",lifecycle:"in_progress",title:"Queue",prompt:"How?",topic:"Backend",session:SessionDraft(answer:"",revision:0))
+    var responded = false
+    let url = URL(string:"https://interview.test")!
+    let client = APIClient(baseURL:url,tokenProvider:{ "test" },transport:{ request in
+      let path = request.url!.path
+      if path.hasSuffix("/interview") {
+        let input = try JSONDecoder().decode(InterviewInput.self,from:request.httpBody!)
+        remote.session = SessionDraft(answer:"",revision:input.revision+1)
+        remote.interview = InterviewState(prompt:"How?",turns:[InterviewTurn(id:"t",ordinal:0,kind:"answer",prompt:"How?",text:input.text,createdAt:"now",jobId:"t",status:"running")])
+        return (try JSONEncoder().encode(remote.interview!),HTTPURLResponse(url:request.url!,statusCode:200,httpVersion:nil,headerFields:nil)!)
+      }
+      if responded, var interview = remote.interview {
+        interview.turns[0].status = "completed"
+        interview.turns[0].result = InterviewResponse(outcome:"follow_up",text:"What if the worker dies?")
+        interview.prompt = "What if the worker dies?"
+        remote.interview = interview
+      }
+      return (try JSONEncoder().encode(remote),HTTPURLResponse(url:request.url!,statusCode:200,httpVersion:nil,headerFields:nil)!)
+    })
+    let model = AppModel(container:container,baseURL:url,fixture:false,client:client,monitorNetwork:false)
+    model.bootstrap = Bootstrap(account:.init(id:"a",status:"active"),settings:PracticeSettings(),challenge:remote,jobs:[])
+    let interview = InterviewController(model:model,challenge:remote)
+    await interview.load()
+    // A Guided choice is edited in and sent at once, inside the autosave debounce.
+    interview.edit("Store a done marker per job")
+    await interview.submit("answer")
+    #expect(interview.waiting)
+    responded = true
+    // What the stream watcher does once the reply has finished streaming.
+    await interview.refresh()
+    #expect(!interview.waiting)
+    #expect(interview.state.prompt == "What if the worker dies?")
+  }
 }
 #endif
 

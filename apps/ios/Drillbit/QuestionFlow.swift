@@ -134,7 +134,9 @@ struct QuestionFlow: View {
         .safeAreaInset(edge: .bottom) {
           VStack(spacing: 12) {
             if let question, revealed {
+              let title = question.lifecycle == "in_progress" ? "Resume" : question.isWarmUp ? "Start warm-up" : "Start interview"
               Button {
+                guard !starting else { return }
                 starting = true
                 Task {
                   do {
@@ -144,13 +146,19 @@ struct QuestionFlow: View {
                   starting = false
                 }
               } label: {
-                HStack(spacing: 8) {
-                  if starting { ProgressView().controlSize(.small).tint(AppPalette.actionInk).transition(.iconPop) }
-                  Text(question.lifecycle == "in_progress" ? "Resume" : question.isWarmUp ? "Start warm-up" : "Start interview")
+                // The label gives way to the bit turning in place: same size, same colour, no spinner.
+                ZStack {
+                  Text(title)
+                    .opacity(starting ? 0 : 1)
+                    .blur(radius: starting && !reduceMotion ? 6 : 0)
+                  DrillbitBit(working: starting, height: 22, color: AppPalette.actionInk)
+                    .opacity(starting ? 1 : 0)
+                    .scaleEffect(starting || reduceMotion ? 1 : 0.4)
                 }
-                .animation(DrillbitMotion.fast, value: starting)
-              }.buttonStyle(PracticeButtonStyle()).disabled(starting)
-                .accessibilityLabel(question.lifecycle == "in_progress" ? "Resume" : question.isWarmUp ? "Start warm-up" : "Start interview")
+                .animation(.spring(duration: 0.3, bounce: 0.2), value: starting)
+              }.buttonStyle(PracticeButtonStyle())
+                .allowsHitTesting(!starting)
+                .accessibilityLabel(starting ? "Opening" : title)
                 .accessibilityIdentifier("previewStart")
                 .transition(arrival(0))
             }

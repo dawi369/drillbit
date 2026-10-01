@@ -1012,6 +1012,12 @@ final class PracticeUITests: XCTestCase {
     guide.tap()
     XCTAssertFalse(guide.waitForExistence(timeout: 1))
     XCTAssertTrue(app.buttons["interviewOptions"].isEnabled)
+    // The warm-up's tools work like any interview's, not just Finish.
+    app.buttons["interviewOptions"].tap()
+    app.buttons["Need a nudge?"].tap()
+    XCTAssertTrue(app.otherElements["assistancePopup"].waitForExistence(timeout: 3))
+    XCTAssertTrue(app.buttons["Got it"].waitForExistence(timeout: 8))
+    app.buttons["Got it"].tap()
     editor.tap(); editor.typeText("Start with one table of saved links keyed by user.")
     app.buttons["shareAnswer"].tap()
     XCTAssertTrue(app.staticTexts["What happens if a worker stops after completing the operation but before acknowledging it?"].waitForExistence(timeout: 8))
@@ -1022,6 +1028,11 @@ final class PracticeUITests: XCTestCase {
     let choice = app.buttons["guidedChoice-1"]
     XCTAssertTrue(choice.waitForExistence(timeout: 3))
     capture("Guided path and choices", app)
+    path.tap()
+    XCTAssertTrue(app.descendants(matching: .any)["guidedPathSteps"].waitForExistence(timeout: 3))
+    capture("Guided path steps", app)
+    app.otherElements["PopoverDismissRegion"].tap()
+    XCTAssertFalse(app.descendants(matching: .any)["guidedPathSteps"].waitForExistence(timeout: 1))
     choice.tap()
     XCTAssertTrue(app.buttons["guidedChoice-1"].waitForExistence(timeout: 8))
     XCTAssertTrue(path.label.hasPrefix("Step 2 of 4"), path.label)
@@ -1038,6 +1049,11 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.buttons["firstUseTourNext"].waitForExistence(timeout: 5))
     XCTAssertFalse(app.buttons["todayDone"].exists, "A warm-up never becomes today's done ticket")
     for _ in 0..<3 { app.buttons["firstUseTourNext"].tap() }
+    // The tour ends on Home; the first real session waits until you choose it.
+    XCTAssertFalse(app.navigationBars["Your first session"].waitForExistence(timeout: 2))
+    XCTAssertTrue(app.buttons["chooseFirstSession"].waitForExistence(timeout: 3))
+    capture("First real session waiting on Home", app)
+    app.buttons["chooseFirstSession"].tap()
     XCTAssertTrue(app.navigationBars["Your first session"].waitForExistence(timeout: 5))
     capture("First real session modes", app)
     for _ in 0..<3 where !app.buttons["firstSessionMode-coach_me"].isHittable { app.swipeUp() }

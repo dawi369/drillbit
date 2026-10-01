@@ -4,7 +4,6 @@ import SwiftUI
 struct RootView: View {
   @Bindable var model: AppModel
   @State private var settingsOpen = false
-  @State private var firstSessionSetup = false
   @State private var selectedTab = ProcessInfo.processInfo.arguments.contains("--fixture-recall") ? "recall" : "home"
   @AppStorage("appearance") private var appearance = "dark"
   @Environment(\.scenePhase) private var scenePhase
@@ -66,7 +65,7 @@ struct RootView: View {
     .background(WindowFloorColor().allowsHitTesting(false))
     .onChange(of: model.firstUse.stage) { _, stage in
       if let tab = model.firstUse.tourTab { selectedTab = tab }
-      if stage == .chooseMode { selectedTab = "home"; firstSessionSetup = true }
+      if stage == .chooseMode { selectedTab = "home" }
     }
     .onReceive(NotificationCenter.default.publisher(for: .init("OpenPractice"))) { _ in
       selectedTab = "home"
@@ -79,7 +78,6 @@ struct RootView: View {
     .task {
       await model.launch()
       if let tab = model.firstUse.tourTab { selectedTab = tab }
-      if model.firstUse.stage == .chooseMode { firstSessionSetup = true }
       #if DEBUG
         if model.fixture && ProcessInfo.processInfo.arguments.contains("--fixture-settings") {
           settingsOpen = true
@@ -100,9 +98,6 @@ struct RootView: View {
         .environment(\.colorScheme, appearance == "dark" ? .dark : appearance == "light" ? .light : systemColorScheme)
         .preferredColorScheme(appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
         .interactiveDismissDisabled()
-    }
-    .sheet(isPresented: $firstSessionSetup) {
-      QuestionFlow(model: model) { opened in model.presented = opened }
     }
     .fullScreenCover(item: $model.presented) { challenge in
       NavigationStack { InterviewView(model: model, challenge: challenge) }

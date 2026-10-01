@@ -459,6 +459,8 @@ struct SignalChoiceList<ID: Hashable>: View {
   let options: [SignalChoice<ID>]
   let isSelected: (ID) -> Bool
   var isDisabled: (ID) -> Bool = { _ in false }
+  /// Rows cascade in on arrival, starting at this order.
+  var cascadeFrom: Int? = nil
   let select: (ID) -> Void
 
   var body: some View {
@@ -471,6 +473,7 @@ struct SignalChoiceList<ID: Hashable>: View {
             Divider().padding(.horizontal, 16).opacity(hidesRule ? 0 : 1)
               .animation(DrillbitMotion.selection, value: hidesRule)
           }
+          .pageCascade(cascadeFrom.map { $0 + index })
       }
     }
   }
@@ -501,11 +504,14 @@ struct DrillbitPressStyle: ButtonStyle {
   }
 }
 
-/// Step count above a track; yellow fills the completed share.
+/// Step count above a track; yellow fills the completed share. With `drill`, the bit rides the fill's edge and turns while it advances.
 struct SignalStepProgress<Accessory: View>: View {
   let step: Int
   let total: Int
+  var drill = false
   @ViewBuilder var accessory: () -> Accessory
+  @State private var drilling = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       HStack(spacing: 12) {
@@ -518,17 +524,74 @@ struct SignalStepProgress<Accessory: View>: View {
       Capsule().fill(AppPalette.hairline).frame(height: 2)
         .overlay(alignment: .leading) {
           GeometryReader { proxy in
-            Capsule().fill(AppPalette.action)
-              .frame(width: proxy.size.width * CGFloat(min(step, total)) / CGFloat(max(total, 1)))
+            let filled = proxy.size.width * CGFloat(min(step, total)) / CGFloat(max(total, 1))
+            Capsule().fill(AppPalette.action).frame(width: filled)
+            if drill {
+              // Drawn upright, so a quarter turn points the tip along the track.
+              DrillbitBit(working: drilling, height: 24)
+                .rotationEffect(.degrees(-90))
+                .position(x: max(12, filled - 12), y: 1)
+            }
           }
         }
+        .animation(reduceMotion ? nil : .spring(duration: 0.6, bounce: 0.22), value: step)
         .accessibilityHidden(true)
+    }
+    .task(id: step) {
+      guard drill, !reduceMotion else { return }
+      drilling = true
+      try? await Task.sleep(for: .milliseconds(650))
+      drilling = false
     }
   }
 }
 
 extension SignalStepProgress where Accessory == EmptyView {
-  init(step: Int, total: Int) { self.init(step: step, total: total) { EmptyView() } }
+  init(step: Int, total: Int, drill: Bool = false) { self.init(step: step, total: total, drill: drill) { EmptyView() } }
+}
+
+/// Onboarding pages are dealt, not pushed: the old one slips back soft, the new one lands with a little give.
+struct DealTransition: Transition {
+  var forward: Bool
+  var arriving: Bool
+  func body(content: Content, phase: TransitionPhase) -> some View {
+    let distance: CGFloat = (arriving ? 64 : -28) * (forward ? 1 : -1)
+    content
+      .offset(x: phase.isIdentity ? 0 : distance)
+      .scaleEffect(phase.isIdentity ? 1 : 0.97)
+      .blur(radius: phase.isIdentity ? 0 : 8)
+      .opacity(phase.isIdentity ? 1 : 0)
+  }
+}
+
+extension AnyTransition {
+  static func deal(forward: Bool) -> AnyTransition {
+    .asymmetric(
+      insertion: AnyTransition(DealTransition(forward: forward, arriving: true)).animation(.spring(duration: 0.56, bounce: 0.2).delay(0.05)),
+      removal: AnyTransition(DealTransition(forward: forward, arriving: false)).animation(.easeIn(duration: 0.18)))
+  }
+}
+
+/// A page's pieces settle in one after another, quickly, each with a small spring.
+private struct PageCascade: ViewModifier {
+  let order: Int?
+  @State private var shown = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  func body(content: Content) -> some View {
+    let visible = shown || order == nil || reduceMotion
+    content
+      .opacity(visible ? 1 : 0)
+      .offset(y: visible ? 0 : 14)
+      .blur(radius: visible ? 0 : 3)
+      .onAppear {
+        guard let order, !shown, !reduceMotion else { return }
+        withAnimation(.spring(duration: 0.5, bounce: 0.24).delay(0.1 + Double(order) * 0.045)) { shown = true }
+      }
+  }
+}
+
+extension View {
+  func pageCascade(_ order: Int?) -> some View { modifier(PageCascade(order: order)) }
 }
 
 /// The yellow rule that links a quote to its observation; it draws once on arrival.

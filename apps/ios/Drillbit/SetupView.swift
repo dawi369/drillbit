@@ -49,15 +49,14 @@ struct SetupView: View {
               .font(.largeTitle.weight(.semibold))
               .fixedSize(horizontal: false, vertical: true)
               .accessibilityAddTraits(.isHeader)
+              .pageCascade(0)
             pageContent(coordinator: coordinator)
             if let note = coordinator.reminderNote { Text(note).font(.footnote).foregroundStyle(AppPalette.secondary) }
             if let failure = coordinator.failure { Text(failure).font(.footnote).foregroundStyle(AppPalette.destructive) }
           }
         }
         .id(coordinator.draft.page)
-        .transition(reduceMotion ? .identity : .asymmetric(
-          insertion: .offset(x: movingForward ? geometry.size.width : -geometry.size.width),
-          removal: .offset(x: movingForward ? -geometry.size.width : geometry.size.width)))
+        .transition(reduceMotion ? .identity : .deal(forward: movingForward))
         .frame(maxWidth: 560, alignment: .leading)
         .padding(.horizontal, 24).padding(.top, 24).padding(.bottom, 24)
         .frame(maxWidth: .infinity)
@@ -69,7 +68,7 @@ struct SetupView: View {
     .containerBackground(AppPalette.background, for: .navigation)
     .safeAreaInset(edge: .top, spacing: 0) {
       if coordinator.draft.page >= 0 {
-        SignalStepProgress(step: coordinator.draft.page + 1, total: 5)
+        SignalStepProgress(step: coordinator.draft.page + 1, total: 5, drill: true)
           .frame(maxWidth: 560).padding(.horizontal, 24).padding(.top, 16)
           .frame(maxWidth: .infinity)
           .background(AppPalette.background)
@@ -136,8 +135,9 @@ struct SetupView: View {
       VStack(alignment: .leading, spacing: 12) {
         Text("Your priority right now. You’ll learn and practise in every path.")
           .font(.subheadline).foregroundStyle(AppPalette.secondary)
+          .pageCascade(1)
         SignalChoiceList(options: objectives.map { SignalChoice(id: $0.0, title: $0.1) },
-          isSelected: { coordinator.draft.objective == $0 }) { coordinator.draft.objective = $0 }
+          isSelected: { coordinator.draft.objective == $0 }, cascadeFrom: 2) { coordinator.draft.objective = $0 }
       }
     case 1:
       VStack(alignment: .leading, spacing: 24) {
@@ -162,19 +162,22 @@ struct SetupView: View {
           .accessibilityLabel("Your work")
           .accessibilityValue(roles.first { $0.0 == coordinator.draft.roleTrack }?.1 ?? "A mix of things")
         }
+        .pageCascade(1)
         VStack(alignment: .leading, spacing: 12) {
           Text("How familiar is system design?").font(.headline)
           Text("This sets the depth of your questions. You can change it later.").font(.subheadline).foregroundStyle(AppPalette.secondary)
           SignalChoiceList(options: startingPoints.map { SignalChoice(id: $0.0, title: $0.1) },
-            isSelected: { coordinator.draft.level == $0 }) { coordinator.draft.level = $0 }
+            isSelected: { coordinator.draft.level == $0 }, cascadeFrom: 3) { coordinator.draft.level = $0 }
         }
+        .pageCascade(2)
       }
     case 2:
       VStack(alignment: .leading, spacing: 12) {
         Text("Explore everything, or pick up to three areas.").font(.subheadline).foregroundStyle(AppPalette.secondary)
+          .pageCascade(1)
         SignalChoiceList(options: [SignalChoice(id: "", title: "A bit of everything")] + areas.map { SignalChoice(id: $0.0, title: $0.1) },
           isSelected: { $0.isEmpty ? coordinator.draft.weakAreas.isEmpty : coordinator.draft.weakAreas.contains($0) },
-          isDisabled: { !$0.isEmpty && !coordinator.draft.weakAreas.contains($0) && coordinator.draft.weakAreas.count == 3 }) { id in
+          isDisabled: { !$0.isEmpty && !coordinator.draft.weakAreas.contains($0) && coordinator.draft.weakAreas.count == 3 }, cascadeFrom: 2) { id in
           if id.isEmpty { coordinator.draft.weakAreas = [] }
           else if coordinator.draft.weakAreas.contains(id) { coordinator.draft.weakAreas.remove(id) }
           else if coordinator.draft.weakAreas.count < 3 { coordinator.draft.weakAreas.insert(id) }
@@ -185,7 +188,7 @@ struct SetupView: View {
         VStack(alignment: .leading, spacing: 12) {
           SignalEyebrow(text: "Daily commitment")
           SignalChoiceList(options: [5, 10, 15, 20].map { SignalChoice(id: $0, title: "\($0) minutes") },
-            isSelected: { coordinator.draft.dailyGoalMinutes == $0 }) { coordinator.draft.dailyGoalMinutes = $0 }
+            isSelected: { coordinator.draft.dailyGoalMinutes == $0 }, cascadeFrom: 1) { coordinator.draft.dailyGoalMinutes = $0 }
         }
         VStack(alignment: .leading, spacing: 16) {
           if coordinator.draft.objective == "interview" {
@@ -224,6 +227,7 @@ struct SetupView: View {
         .tint(AppPalette.accent)
         .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: coordinator.draft.reminderEnabled)
         .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: coordinator.draft.targetDate != nil)
+        .pageCascade(5)
       }
     default:
       summary(coordinator.draft)
@@ -234,16 +238,19 @@ struct SetupView: View {
     let pace = "\(draft.dailyGoalMinutes) minutes a day"
     let headline = draft.objective == "interview" ? "Interview prep, \(pace)." : draft.objective == "stay_sharp" ? "Staying sharp, \(pace)." : "Leveling up, \(pace)."
     return VStack(alignment: .leading, spacing: 16) {
-      Text(headline).font(.title2.weight(.semibold))
-      LabeledContent("Goal", value: objectives.first { $0.0 == draft.objective }?.1 ?? "Learn system design")
-      Divider()
-      LabeledContent("You build", value: roles.first { $0.0 == draft.roleTrack }?.1 ?? "A mix of things")
-      Divider()
-      LabeledContent("Experience", value: startingPoints.first { $0.0 == draft.level }?.1 ?? "I’ve designed a few systems")
-      Divider()
-      LabeledContent("Focus", value: draft.weakAreas.isEmpty ? "A bit of everything" : draft.weakAreas.compactMap { id in areas.first { $0.0 == id }?.1 }.sorted().joined(separator: ", "))
+      Text(headline).font(.title2.weight(.semibold)).pageCascade(1)
+      Group {
+        LabeledContent("Goal", value: objectives.first { $0.0 == draft.objective }?.1 ?? "Learn system design").pageCascade(2)
+        Divider()
+        LabeledContent("You build", value: roles.first { $0.0 == draft.roleTrack }?.1 ?? "A mix of things").pageCascade(3)
+        Divider()
+        LabeledContent("Experience", value: startingPoints.first { $0.0 == draft.level }?.1 ?? "I’ve designed a few systems").pageCascade(4)
+        Divider()
+        LabeledContent("Focus", value: draft.weakAreas.isEmpty ? "A bit of everything" : draft.weakAreas.compactMap { id in areas.first { $0.0 == id }?.1 }.sorted().joined(separator: ", ")).pageCascade(5)
+      }
       Text("First up is a warm-up question. It doesn’t count, so just try stuff.")
         .font(.subheadline).foregroundStyle(AppPalette.secondary).padding(.top, 12)
+        .pageCascade(6)
     }
   }
   private func title(for page: Int) -> String { ["What brings you here?","Where are you starting?","What sparks your curiosity?","Find your rhythm.","Here’s your plan."][max(0, min(page,4))] }
