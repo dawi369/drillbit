@@ -118,7 +118,6 @@ struct QuestionFlow: View {
             StreamingDocument(
               clock: clock, segments: previewSegments, finished: question != nil || failure != nil,
               paused: (revealed || failure != nil) && !rewinding, instant: instantReveal,
-              waitingHint: "Writing your question…",
               settled: {
                 if rewinding { rewinding = false; afterRewind?(); afterRewind = nil }
                 else if question != nil { withAnimation(DrillbitMotion.entrance) { revealed = true } }

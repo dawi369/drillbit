@@ -899,10 +899,7 @@ struct StreamingDocument: View {
   let finished: Bool
   let paused: Bool
   var instant = false
-  /// Shown under an empty page once the wait is noticeable.
-  var waitingHint: String? = nil
   let settled: () -> Void
-  @State private var slow = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   private static let gap = 8.0
 
@@ -918,7 +915,6 @@ struct StreamingDocument: View {
       at += segment.length + Self.gap
     }
     let end = target ?? max(0, at - Self.gap) + (finished ? RevealRenderer.edge : 0)
-    let empty = !segments.contains { !$0.fixed && $0.length > 0 }
     return TimelineView(.animation(paused: paused)) { timeline in
       let cursor = clock.tick(timeline.date, target: end, instant: instant || reduceMotion, finished: finished) {
         Task { @MainActor in settled() }
@@ -943,17 +939,7 @@ struct StreamingDocument: View {
             view(segments[group[0]], shown: cursor - offsets[group[0]], caret: caretAt == group[0] ? caret : 0)
           }
         }
-        if let waitingHint, slow, empty, !finished {
-          Text(waitingHint).font(.footnote).foregroundStyle(.secondary).transition(.opacity)
-        }
       }
-    }
-    .animation(DrillbitMotion.reveal, value: slow && empty && !finished)
-    .task(id: empty && !finished) {
-      slow = false
-      guard waitingHint != nil, empty, !finished else { return }
-      do { try await Task.sleep(for: .seconds(1.6)) } catch { return }
-      slow = true
     }
   }
 

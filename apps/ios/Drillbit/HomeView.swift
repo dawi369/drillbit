@@ -151,11 +151,8 @@ struct HomeView: View {
           }
         }
       } stub: {
-        HStack(spacing: 12) {
-          DrillbitBit(working: true, height: 22)
-          Text("Picking today’s question…").font(.subheadline).foregroundStyle(AppPalette.secondary)
-        }
-        .frame(minHeight: 36)
+        DrillbitBit(working: true, height: 22)
+          .frame(minHeight: 36)
       }
       .accessibilityElement(children: .combine)
       .accessibilityLabel("Picking today’s question")
