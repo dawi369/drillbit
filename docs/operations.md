@@ -252,3 +252,7 @@ Command-line signing over SSH needs the login keychain unlocked in the same sess
 ### Tickets and the tomorrow queue — 29 September 2026
 
 Private backup `.local/before-tickets-20260929.sql` (mode 0600) precedes additive migration `0013_tickets_and_tomorrow.sql`, which backfills per-account ticket numbers and adds `queued_follow_ups`. Development Worker `14a1f57c-8d9b-401f-b308-d18111d3d68f` serves ticket numbers, `PUT`/`DELETE /v1/challenges/{id}/next`, the optional `guidanceMode` body on `/v1/daily-question` and `feedback-v4` Recall cards. `/health` returned 200; unauthenticated bootstrap, next and daily-question returned 401. Older clients ignore the new fields. The development database had no completed sessions, so the backfill numbered nothing.
+
+### Internal TestFlight build 10 — 1 October 2026
+
+Version `2.0.0 (10)` was archived from `main` at `/tmp/drillbit-testflight/Drillbit-build10.xcarchive` and uploaded TestFlight Internal Only with `ExportOptions-build10.plist`; `build10-export.log` records `Upload succeeded` and `EXPORT SUCCEEDED`. It packages the ticket Home and depends on Worker `14a1f57c`. Candidate checks: 132 API/D1 tests, 40 Swift core tests and all 48 UI tests on the iPhone 17 simulator; the signed simulator build signed in against development. Apple processing, tester availability and physical-device acceptance are not yet confirmed. The keychain must be unlocked in the same shell as the archive.
