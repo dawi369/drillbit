@@ -14,6 +14,7 @@ import {
   coverage,
 } from "../src/library";
 import { questionMetadata, concepts } from "../src/taxonomy";
+import { historicalSnapshot } from "../src/history";
 import type { Env } from "../src/platform";
 const bindings = {
   ...env,
@@ -201,6 +202,17 @@ it("selection honors an explicit concept and never treats skips as completed pra
   expect(
     (await selectConcept(bindings, account, "senior")).primaryConceptId,
   ).not.toBe("queues");
+});
+it("the first real question moves away from the warm-up's concept", async () => {
+  const account = (await accountFor(bindings, crypto.randomUUID())).id;
+  const before = (await selectConcept(bindings, account, "senior")).primaryConceptId;
+  const now = new Date().toISOString();
+  await env.DB.prepare(
+    "INSERT INTO challenges(id,account_id,lifecycle,data,created_at,available_at,completed_at) VALUES(?,?,'completed',?,?,?,?)",
+  ).bind(crypto.randomUUID(), account, JSON.stringify({ warmUp: true, primaryConceptId: before, scenario: "Link saver" }), now, now, now).run();
+  expect((await selectConcept(bindings, account, "senior")).primaryConceptId).not.toBe(before);
+  expect((await selectConcept(bindings, account, "senior", before)).primaryConceptId).toBe(before);
+  expect((await historicalSnapshot(bindings, account)).warmUps).toEqual([{ scenario: "Link saver", primaryConceptId: before }]);
 });
 it("validates all canonical tags, scenario word limits and distinct evidence", () => {
   for (const concept of concepts)

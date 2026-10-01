@@ -304,6 +304,13 @@ export async function selectConcept(
   )
     .bind(account)
     .all<{ id: string }>();
+  // Warm-ups never enter the question pool, but the next question shouldn't feel like a rerun of one.
+  const warmUps = await env.DB.prepare(
+    "SELECT json_extract(data,'$.primaryConceptId') id FROM challenges WHERE account_id=? AND COALESCE(json_extract(data,'$.warmUp'),0)=1 ORDER BY created_at DESC,id DESC LIMIT 2",
+  )
+    .bind(account)
+    .all<{ id: string }>();
+  recent.results.push(...warmUps.results.filter(row => row.id));
   const candidates = concepts
     .filter((c) => !recent.results.some((r) => r.id === c.id))
     .map((c) => ({ id: c.id, ...rows.results.find((r) => r.id === c.id) }))

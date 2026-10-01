@@ -4,7 +4,7 @@ import { COUNTED } from "./store";
 
 /** Bounded factual snapshot; no raw old answers or inferred skill scores. */
 export async function historicalSnapshot(env: Env, account: string, excludeAttempt = "", relevantConcepts: string[] = []) {
-  const [rows, coverage, evidence] = await Promise.all([env.DB.prepare(`SELECT c.id,c.data,c.lifecycle,c.completed_at,c.created_at,r.data AS feedback
+  const [rows, coverage, evidence, warmUps] = await Promise.all([env.DB.prepare(`SELECT c.id,c.data,c.lifecycle,c.completed_at,c.created_at,r.data AS feedback
     FROM challenges c LEFT JOIN reflections r ON r.challenge_id=c.id
     WHERE c.account_id=? AND c.id<>? AND c.lifecycle IN ('completed','skipped') AND ${COUNTED}
     ORDER BY COALESCE(c.completed_at,c.created_at) DESC,c.id DESC LIMIT 8`)
@@ -17,6 +17,8 @@ export async function historicalSnapshot(env: Env, account: string, excludeAttem
       GROUP BY engineeringLevel,t.value ORDER BY engineeringLevel,t.value`).bind(account,account)
       .all<{engineeringLevel:string|null;conceptId:string;completedAttempts:number;lastPractised:string|null}>(),
     learningEvidence(env,account),
+    env.DB.prepare(`SELECT c.data FROM challenges c WHERE c.account_id=? AND c.id<>? AND NOT ${COUNTED} ORDER BY c.created_at DESC,c.id DESC LIMIT 2`)
+      .bind(account, excludeAttempt).all<{data:string}>(),
   ]);
   const latest = new Map<string, typeof evidence>();
   for (const item of evidence) {
@@ -32,6 +34,8 @@ export async function historicalSnapshot(env: Env, account: string, excludeAttem
     coverageScope: "Up to 18 level/concept aggregates, question-relevant first then less-practised. Counts cover all completed history; omitted concepts are unknown, not zero.",
     learning: relevant.slice(0,6).map(item=>({conceptId:item.conceptId,signal:item.signal,observation:item.observation.slice(0,320),quote:item.quote.slice(0,240),assistance:item.assistance,sessionId:item.sessionId,at:item.at,provenance:"quoted candidate work with fallible model interpretation; newer evidence supersedes older observations"})),
     generatedAt: new Date().toISOString(),
+    warmUps: warmUps.results.map(row => { const q = JSON.parse(row.data); return { scenario: String(q.scenario ?? q.title ?? "").slice(0,100), primaryConceptId: q.primaryConceptId ?? null }; }),
+    warmUpScope: "Onboarding warm-ups: never practice evidence. Only avoid reusing their scenario for a new question.",
     attempts: rows.results.map(row => {
       const q = JSON.parse(row.data), feedback = row.feedback ? JSON.parse(row.feedback) : null;
       return { attemptId: row.id, scenario: String(q.scenario ?? q.title ?? "").slice(0,100),
