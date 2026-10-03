@@ -44,15 +44,6 @@ struct RootView: View {
               }
             }
           }
-          .allowsHitTesting(model.firstUse.tourTab == nil)
-          .accessibilityHidden(model.firstUse.tourTab != nil)
-          .overlay(alignment: .bottom) {
-            if model.firstUse.tourTab != nil && model.presented == nil {
-              FirstUseTourTip(model: model).padding(.bottom, 80)
-                .transition(.opacity)
-            }
-          }
-          .animation(DrillbitMotion.page, value: model.firstUse.stage)
           .transition(.opacity)
         }
       } else {
@@ -63,10 +54,6 @@ struct RootView: View {
     .animation(DrillbitMotion.page, value: stage)
     .preferredColorScheme(model.fixture && ProcessInfo.processInfo.arguments.contains("--dark") ? .dark : appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
     .background(WindowFloorColor().allowsHitTesting(false))
-    .onChange(of: model.firstUse.stage) { _, stage in
-      if let tab = model.firstUse.tourTab { selectedTab = tab }
-      if stage == .chooseMode { selectedTab = "home" }
-    }
     .onReceive(NotificationCenter.default.publisher(for: .init("OpenPractice"))) { _ in
       selectedTab = "home"
       Task { await model.refresh() }
@@ -77,7 +64,6 @@ struct RootView: View {
     }
     .task {
       await model.launch()
-      if let tab = model.firstUse.tourTab { selectedTab = tab }
       #if DEBUG
         if model.fixture && ProcessInfo.processInfo.arguments.contains("--fixture-settings") {
           settingsOpen = true
@@ -142,26 +128,29 @@ struct RootView: View {
   }
 }
 
-/// Neutral surface while Clerk and the account cache restore. Progress appears
-/// only if restoration is slow, so fast launches never flash a spinner.
+/// Neutral surface while Clerk and the account cache restore. Bit sits exactly where the launch screen drew him,
+/// then drills only if restoration is slow, so fast launches never show a loading state.
 private struct LaunchSurface: View {
   var message: String?
   var retry: () -> Void
   @State private var slow = false
   var body: some View {
     VStack(spacing: 32) {
-      DrillbitMark(size: 68).alignmentGuide(.launchMark) { $0[VerticalAlignment.center] }
+      BitView(mood: message != nil ? .concerned : slow ? .drilling : .idle)
+        .frame(width: BitLaunch.size.width, height: BitLaunch.size.height)
+        .alignmentGuide(.launchMark) { $0[VerticalAlignment.center] }
       if let message {
         Text(message).foregroundStyle(.secondary).multilineTextAlignment(.center)
         Button("Try again", action: retry)
       } else {
-        ProgressView().controlSize(.small).opacity(slow ? 1 : 0)
-          .accessibilityLabel("Restoring your session")
+        Text("Picking up where you left off…").font(.subheadline).foregroundStyle(.secondary)
+          .opacity(slow ? 1 : 0)
+          .accessibilityHidden(!slow)
       }
     }
     .animation(DrillbitMotion.fast, value: slow)
     .padding(.horizontal, 24)
-    // Mirrors the system launch screen (LaunchMark on LaunchBackground): the drill at the exact screen centre.
+    // Mirrors the system launch screen (LaunchBit on LaunchBackground): Bit at the exact screen centre.
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: Alignment(horizontal: .center, vertical: .launchMark))
     .ignoresSafeArea()
     .background(AppPalette.background)

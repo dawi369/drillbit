@@ -35,6 +35,7 @@ async function generatedPractice(account: string, warmUp: boolean, mode = "learn
     kind: "design", scenario: "Link saver", primaryConceptId: "api-design", secondaryConceptIds: [],
     tagEvidence: [{ conceptId: "api-design", requirementIndex: 0 }], targetSkill: "APIs", constraints: [],
     evaluationCriteria: ["lookup"], ambiguityPolicy: "State assumptions.", title: "Save a link", minutes: 20, path: ["Pin down lookups", "Sketch the API", "Choose the storage"],
+    opener: "Let's start small. A saved link has to come back fast. What does a client look it up by?",
     prompt: `Design a link saver that finds saved links fast (${warmUp ? "warm-up" : "counted"}).`, topic: "system design",
   }, true);
   const id = crypto.randomUUID();
@@ -120,6 +121,7 @@ it("durably generates a valid challenge and replay does not call the provider ag
         expect(request.messages[0].content).not.toContain("Required JSON schema:");
         expect(request.response_format.type).toBe("json_schema");
         expect(request.response_format.json_schema.schema.properties).toHaveProperty("ambiguityPolicy");
+        expect(request.response_format.json_schema.schema.required).toContain("opener");
         expect(request.stream).toBe(true);
         return true;
       },
@@ -133,6 +135,7 @@ it("durably generates a valid challenge and replay does not call the provider ag
               ambiguityPolicy: "State reasonable assumptions.",
               title: "Safe flag rollout",
               minutes: 25, path: ["Pin down the outage", "Sketch evaluation", "Plan rollout"],
+              opener: "A region just went dark. What should a flag check do right now?",
               prompt:
                 "Design a feature flag control plane that keeps local evaluation available during a regional outage.",
               topic: "system design",
@@ -146,6 +149,7 @@ it("durably generates a valid challenge and replay does not call the provider ag
   await runJob(bindings, id);
   const result = await detail(bindings, account.id, id);
   expect(result.lifecycle).toBe("ready");
+  expect((result as { opener?: string }).opener).toBe("A region just went dark. What should a flag check do right now?");
   expect(result.guidanceMode).toBe("learn_together");
   expect(result.session?.revision).toBe(0);
   expect(

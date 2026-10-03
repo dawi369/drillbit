@@ -42,10 +42,10 @@ struct InterviewView: View {
   @State private var topInset: CGFloat = 0
   @State private var lastCaret: CGRect?
   @State private var focused = false
-  /// The warm-up opens locked; the guided tour releases it.
-  @State private var guiding: Bool
-  @State private var guideStep: WarmUpStep?
-  @State private var showingTools = false
+  @State private var openerClock = RevealClock()
+  @State private var openerSettled = false
+  /// The opener types itself in only when the round is new; a resumed round shows it at once.
+  @State private var openerTypes: Bool
   /// Fallback start for a round whose start time never reached this device.
   @State private var openedAt = Date()
   private var scenarioTitle: String { challenge.scenario?.split(whereSeparator: \.isWhitespace).prefix(2).joined(separator: " ") ?? "System design" }
@@ -59,19 +59,14 @@ struct InterviewView: View {
   init(model: AppModel, challenge: Challenge) {
     self.model = model; self.challenge = challenge
     _interview = State(initialValue: InterviewController(model: model, challenge: challenge))
-    _guiding = State(initialValue: challenge.isWarmUp)
+    let types = challenge.interview?.turns.isEmpty ?? true
+    let clock = RevealClock()
+    // Lets the page settle before the interviewer starts talking.
+    clock.reset(after: 0.8)
+    _openerTypes = State(initialValue: types)
+    _openerClock = State(initialValue: clock)
   }
-  private var guideKey: String { interview.key + ":guided" }
-  private func advanceGuide() {
-    if let next = guideStep?.next {
-      guideStep = next
-      if next == .reply { withAnimation(documentMotion) { position.scrollTo(id: "draft", anchor: .bottom) } }
-      return
-    }
-    guideStep = nil
-    withAnimation(reduceMotion ? nil : DrillbitMotion.page) { guiding = false }
-    Task { try? await model.disk.cache(key: guideKey, data: Data()) }
-  }
+  private var firstReply: Bool { !interview.displayState.turns.contains { $0.kind == "answer" } }
   private var exchanges: [InterviewExchange] { InterviewExchange.document(original: challenge.displayPrompt, state: interview.displayState) }
   private var activeID: String { exchanges.last?.id ?? "original" }
   private var completedAssistance: String? {
@@ -97,9 +92,6 @@ struct InterviewView: View {
         InterviewVoiceRoom(voice: voice, interview: interview, question: { questionDisclosure(collapsed: voiceQuestionCollapsed) { voiceQuestionCollapsed.toggle() } }, leave: leaveVoiceRoom)
       } else { workspace }
     }
-    .overlayPreferenceValue(WarmUpAnchorKey.self) { anchors in
-      if guiding && interview.finished == nil { WarmUpGuide(step: guideStep, anchors: anchors, advance: advanceGuide).transition(.opacity) }
-    }
     .animation(reduceMotion ? nil : DrillbitMotion.page, value: interview.finished != nil)
     .sensoryFeedback(.impact(weight: .light), trigger: acceptedAnswerID) { _, accepted in accepted != nil }
     .background(AppPalette.background)
@@ -120,16 +112,6 @@ struct InterviewView: View {
       await voice.restore()
       voice.prepareIfAllowed()
       sessionRestored = true
-      if guiding {
-        if (try? await model.disk.cached(key: guideKey)) != nil { guiding = false; return }
-        // A moment to take in the screen, then the question opens and the tour starts by opening the tools.
-        try? await Task.sleep(for: .seconds(1.2))
-        withAnimation(disclosureMotion) { _ = reading.collapsed.remove("original") }
-        try? await Task.sleep(for: .milliseconds(450))
-        guideStep = .tools
-        try? await Task.sleep(for: .milliseconds(450))
-        showingTools = true
-      }
     }
     .task(id: "\(interview.streamTurn?.jobId ?? ""):\(interview.streamEpoch):\(phase == .active)") {
       if phase == .active { await interview.watchResponse() }
@@ -191,10 +173,9 @@ struct InterviewView: View {
                     enabled: !interview.locked && interview.failedTurn == nil && interview.voice?.blocksText != true,
                     revealCaret: revealCaret)
                     .fixedSize(horizontal: false, vertical: true)
-                    .warmUpAnchor(.step(.reply))
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { editorFrame = $0 }
                     .overlay(alignment: .topLeading) {
-                      if interview.answer.isEmpty { Text("Answer or ask a question…").foregroundStyle(.tertiary).padding(.top, 8).allowsHitTesting(false).accessibilityHidden(true) }
+                      if interview.answer.isEmpty { Text(firstReply ? "A sentence is fine. Send when you’ve got a first take." : "Answer or ask a question…").foregroundStyle(.tertiary).padding(.top, 8).allowsHitTesting(false).accessibilityHidden(true) }
                     }
                 }.id("draft").transition(.identity)
               }
@@ -226,7 +207,6 @@ struct InterviewView: View {
         .accessibilityHidden(!readingLoaded)
     }
     .accessibilityIdentifier("interviewDocument")
-    .warmUpAnchor(.document)
     .coordinateSpace(name: "interviewDocument")
     .scrollPosition($position)
     .scrollDismissesKeyboard(.interactively)
@@ -252,8 +232,7 @@ struct InterviewView: View {
     }
     .navigationTitle(scenarioTitle).navigationBarTitleDisplayMode(.inline)
     .toolbarBackground(AppPalette.background, for: .navigationBar)
-    // The tour's dim lives in the content; a clear bar lets it cover the top too.
-    .toolbarBackground(guideStep == nil ? .visible : .hidden, for: .navigationBar)
+    .toolbarBackground(.visible, for: .navigationBar)
     .task(id: activeID) {
       guard sessionRestored, followingLiveEnd, sheet == nil, phase == .active else { return }
       // Let the keyboard and document settle before revealing the new block.
@@ -267,11 +246,6 @@ struct InterviewView: View {
       interview.answer = await model.localAnswer(interview.challenge)
     } } }
     .toolbar {
-      if guideStep != nil && interview.mode != .mockInterview {
-        ToolbarItem(placement: .principal) {
-          Text(scenarioTitle).font(.headline).lineLimit(1).opacity(0.45)
-        }
-      }
       if interview.mode == .mockInterview && interview.finished == nil {
         ToolbarItem(placement: .principal) {
           VStack(spacing: 0) {
@@ -279,7 +253,6 @@ struct InterviewView: View {
             RoundClock(start: Date.fromAPI(challenge.startedAt ?? "") ?? Date.fromAPI(challenge.createdAt ?? "") ?? openedAt, minutes: challenge.minutes ?? 30)
               .font(.caption)
           }
-          .opacity(guideStep == nil ? 1 : 0.45)
         }
       }
       // The warm-up has no way out but through: no Close, no Skip.
@@ -293,16 +266,6 @@ struct InterviewView: View {
         }
       }
       ToolbarItem(placement: .topBarTrailing) {
-        // The tour's first stop opens the tools for you; the system menu can't be opened in code.
-        if guideStep == .tools || showingTools {
-          Button { showingTools = true } label: { Image(systemName: AppIcon.more.rawValue) }
-            .accessibilityLabel("Interview options").accessibilityIdentifier("interviewOptions")
-            .popover(isPresented: $showingTools, arrowEdge: .top) {
-              WarmUpTools(showsNudge: interview.mode != .mockInterview) { showingTools = false }
-                .presentationCompactAdaptation(.popover)
-            }
-            .onChange(of: showingTools) { _, open in if !open, guideStep == .tools { advanceGuide() } }
-        } else {
         Menu {
           if interview.state.wrapUp { Button("Continue interview") { Task { await interview.submit("continue") } } }
           if interview.mode != .mockInterview {
@@ -319,10 +282,7 @@ struct InterviewView: View {
             Button("Skip question", systemImage: AppIcon.skip.rawValue, role: .destructive) { confirmSkip = true }.disabled(interview.voice?.blocksText == true)
           }
         } label: { Image(systemName: AppIcon.more.rawValue) }
-          .disabled(guiding)
-          .opacity(guideStep == nil ? 1 : 0.45)
           .accessibilityLabel("Interview options").accessibilityIdentifier("interviewOptions")
-        }
       }
     }
     .alert("Skip this question?", isPresented: $confirmSkip) {
@@ -505,6 +465,16 @@ struct InterviewView: View {
       }
       if exchange.id == "original" {
         originalQuestion
+        if let opener = challenge.opener {
+          VStack(alignment: .leading, spacing: 4) {
+            InterviewRowLabel(text: "Interviewer")
+            StreamingDocument(
+              clock: openerClock, segments: [StreamSegment(style: .body, text: AttributedString(opener), identifier: "interviewOpener")],
+              finished: true, paused: openerSettled || !openerTypes, instant: !openerTypes,
+              settled: { openerSettled = true })
+          }
+          .padding(.top, 12)
+        }
       } else {
         InterviewTurnRow(title: "Interviewer", text: exchange.prompt, expanded: !collapsed,
           identifier: "exchange-" + exchange.id,
@@ -650,7 +620,14 @@ struct InterviewView: View {
       }
         .buttonStyle(DrillbitIconButtonStyle())
         .disabled(checkingVoice || liveVoice == nil || interview.locked || interview.voice?.blocksText == true).accessibilityLabel("Live voice").accessibilityIdentifier("liveVoice")
-        .warmUpAnchor(.step(.voice))
+      if interview.mode != .mockInterview {
+        Button("Need a nudge?") { requestAssistance("hint", title: "Nudge") }
+          .font(.subheadline.weight(.medium))
+          .tint(AppPalette.secondary)
+          .frame(minHeight: 44)
+          .disabled(requestingAssistance || interview.locked || interview.failedTurn != nil || liveVoice?.blocksText == true)
+          .accessibilityIdentifier("inlineNudge")
+      }
       Spacer(minLength: 0)
         Button {
           focused = false

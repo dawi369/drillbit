@@ -64,6 +64,11 @@ const challenge = challengeSchema.extend({
   // The round's time budget (set by the generator) and when the session started; Mock interview runs on this clock.
   minutes: z.number().int().optional(),
   startedAt: z.string().optional(),
+  // The interviewer's first line, written with the question; older and pooled questions may have none.
+  opener: z.string().optional(),
+  // Set when this question was prepared as a free rep; swapped marks its one included swap.
+  freeRepAt: z.string().optional(),
+  swapped: z.boolean().optional(),
   interview: interview.optional(),
   difficulty: z.enum(["easy", "medium", "hard"]).optional(),
   engineeringLevel: engineeringLevelSchema.optional(),
@@ -189,6 +194,8 @@ export const wire = {
     settings: settingsSchema,
     todayPlan: todayPlan.optional(),
     queuedNext: queuedNext.nullable().optional(),
+    // freeReps is false while the gate is off or the account is unlimited.
+    practice: z.object({ freeReps: z.boolean(), available: z.boolean(), nextFreeRepAt: z.string().nullable() }).optional(),
     challenge: challenge.nullable(),
     jobs: z.array(job),
     credential: z.object({ suffix: z.string(), model: z.string().nullable() }).nullable(),

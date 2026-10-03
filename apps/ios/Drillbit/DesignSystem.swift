@@ -39,7 +39,6 @@ enum AppPalette {
   static let destructive = adaptive(0xF0817B, 0xAD3333)
   static let success = adaptive(0x97CFB0, 0x286A50)
   // Brand colours from docs/design/logo.
-  static let logoDrill = adaptive(0xFFCC65, 0x1F2430)
   static let logoInk = adaptive(0xF3F4F6, 0x1F2430)
   static let logoDot = adaptive(0xFFCC65, 0xE0A030)
 }
@@ -60,70 +59,19 @@ enum DrillbitMotion {
   static let stream = Animation.easeOut(duration: 0.18)
 }
 
-/// The drill from docs/design/logo: cap, two flutes and tip, in 240 × 680 source units centred on the origin.
-enum DrillbitGlyph {
-  static let width: CGFloat = 240
-  static let height: CGFloat = 680
-
-  static func segment(_ index: Int) -> Path {
-    func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: x, y: y) }
-    var path = Path()
-    switch index {
-    case 0:
-      path.move(to: p(-120, -316))
-      path.addQuadCurve(to: p(-96, -340), control: p(-120, -340))
-      path.addLine(to: p(96, -340))
-      path.addQuadCurve(to: p(120, -316), control: p(120, -340))
-      path.addLine(to: p(120, -255))
-      path.addCurve(to: p(0, -185), control1: p(120, -227.5), control2: p(43.5, -201.2))
-      path.addCurve(to: p(-120, -115), control1: p(-43.5, -168.8), control2: p(-120, -142.5))
-    case 1, 2:
-      let dy: CGFloat = index == 1 ? 0 : 140
-      path.move(to: p(-120, -61 + dy))
-      path.addCurve(to: p(0, -131 + dy), control1: p(-120, -88.5 + dy), control2: p(-43.5, -114.8 + dy))
-      path.addCurve(to: p(120, -201 + dy), control1: p(43.5, -147.2 + dy), control2: p(120, -173.5 + dy))
-      path.addLine(to: p(120, -115 + dy))
-      path.addCurve(to: p(0, -45 + dy), control1: p(120, -87.5 + dy), control2: p(43.5, -61.2 + dy))
-      path.addCurve(to: p(-120, 25 + dy), control1: p(-43.5, -28.8 + dy), control2: p(-120, -2.5 + dy))
-    default:
-      path.move(to: p(-120, 219))
-      path.addCurve(to: p(0, 149), control1: p(-120, 191.5), control2: p(-43.5, 165.2))
-      path.addCurve(to: p(120, 79), control1: p(43.5, 132.8), control2: p(120, 106.5))
-      path.addLine(to: p(120, 248))
-      path.addLine(to: p(12, 330.8))
-      path.addQuadCurve(to: p(-12, 330.8), control: p(0, 340))
-      path.addLine(to: p(-120, 248))
-    }
-    path.closeSubpath()
-    return path
-  }
-}
-
-struct DrillbitDrillShape: Shape {
-  var segments: [Int] = [0, 1, 2, 3]
-  func path(in rect: CGRect) -> Path {
-    let scale = min(rect.width / DrillbitGlyph.width, rect.height / DrillbitGlyph.height)
-    let place = CGAffineTransform(translationX: rect.midX, y: rect.midY).scaledBy(x: scale, y: scale)
-    var path = Path()
-    for index in segments { path.addPath(DrillbitGlyph.segment(index), transform: place) }
-    return path
-  }
-}
-
-/// The full wordmark from docs/design/logo, drawn in its 670 × 194 view box.
+/// The wordmark from docs/design/logo, fitted to the letters' own 574 × 148 bounds.
 struct DrillbitLogoShape: Shape {
-  enum Part { case drill, letters, dots }
+  enum Part { case letters, dots }
   let part: Part
+  static let width: CGFloat = 574
+  static let height: CGFloat = 148
 
   func path(in rect: CGRect) -> Path {
-    let scale = min(rect.width / 670, rect.height / 194)
-    let fit = CGAffineTransform(translationX: rect.midX - 335 * scale, y: rect.midY - 97 * scale)
-      .scaledBy(x: scale, y: scale).translatedBy(x: 0, y: 170)
+    let scale = min(rect.width / Self.width, rect.height / Self.height)
+    let fit = CGAffineTransform(translationX: rect.midX - Self.width / 2 * scale, y: rect.midY - Self.height / 2 * scale)
+      .scaledBy(x: scale, y: scale).translatedBy(x: 0, y: 146)
     var path = Path()
     switch part {
-    case .drill:
-      let drill = CGAffineTransform(translationX: 33.6, y: -73).scaledBy(x: 0.28, y: 0.28)
-      for index in 0..<4 { path.addPath(DrillbitGlyph.segment(index), transform: drill) }
     case .letters:
       var strokes = Path()
       strokes.addEllipse(in: CGRect(x: 12, y: -89.5, width: 79, height: 79))
@@ -134,50 +82,25 @@ struct DrillbitLogoShape: Shape {
       strokes.move(to: CGPoint(x: 139, y: -50))
       strokes.addCurve(to: CGPoint(x: 178.5, y: -89.5), control1: CGPoint(x: 139, y: -71.82), control2: CGPoint(x: 156.68, y: -89.5))
       strokes.move(to: CGPoint(x: 505.5, y: -88)); strokes.addLine(to: CGPoint(x: 561.5, y: -88))
-      path = strokes.strokedPath(StrokeStyle(lineWidth: 24)).applying(CGAffineTransform(translationX: 107.2, y: 0))
+      path = strokes.strokedPath(StrokeStyle(lineWidth: 24))
     case .dots:
-      path.addEllipse(in: CGRect(x: 107.2 + 208.5 - 14, y: -142, width: 28, height: 28))
-      path.addEllipse(in: CGRect(x: 107.2 + 475.5 - 14, y: -142, width: 28, height: 28))
+      path.addEllipse(in: CGRect(x: 208.5 - 14, y: -142, width: 28, height: 28))
+      path.addEllipse(in: CGRect(x: 475.5 - 14, y: -142, width: 28, height: 28))
     }
     return path.applying(fit)
-  }
-}
-
-/// The drill alone. Rare moments let its segments arrive top to bottom.
-struct DrillbitMark: View {
-  /// Height in points; width follows the drill's proportions.
-  var size: CGFloat = 52
-  var foreground: Color = AppPalette.logoDrill
-  var arrives = false
-  @State private var arrived = false
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-  var body: some View {
-    ZStack {
-      ForEach(0..<4, id: \.self) { index in
-        let shown = !arrives || arrived
-        DrillbitDrillShape(segments: [index]).fill(foreground)
-          .offset(y: shown || reduceMotion ? 0 : -size * 0.08)
-          .opacity(shown ? 1 : 0)
-          .animation(reduceMotion ? nil : DrillbitMotion.celebrate.delay(0.1 + Double(index) * 0.07), value: arrived)
-      }
-    }
-    .frame(width: size * DrillbitGlyph.width / DrillbitGlyph.height, height: size)
-    .onAppear { if arrives { arrived = true } }
-    .accessibilityHidden(true)
   }
 }
 
 struct DrillbitLogo: View {
   var compact = false
   var body: some View {
-    let height: CGFloat = compact ? 28 : 40
+    // Keeps the letters the size they were beside the drill.
+    let height: CGFloat = compact ? 22 : 30
     ZStack {
-      DrillbitLogoShape(part: .drill).fill(AppPalette.logoDrill)
       DrillbitLogoShape(part: .letters).fill(AppPalette.logoInk)
       DrillbitLogoShape(part: .dots).fill(AppPalette.logoDot)
     }
-    .frame(width: height * 670 / 194, height: height)
+    .frame(width: height * DrillbitLogoShape.width / DrillbitLogoShape.height, height: height)
     .accessibilityElement(children: .ignore)
     .accessibilityLabel("Drillbit")
   }
@@ -504,13 +427,11 @@ struct DrillbitPressStyle: ButtonStyle {
   }
 }
 
-/// Step count above a track; yellow fills the completed share. With `drill`, the bit rides the fill's edge and turns while it advances.
+/// Step count above a track; yellow fills the completed share.
 struct SignalStepProgress<Accessory: View>: View {
   let step: Int
   let total: Int
-  var drill = false
   @ViewBuilder var accessory: () -> Accessory
-  @State private var drilling = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
@@ -524,30 +445,17 @@ struct SignalStepProgress<Accessory: View>: View {
       Capsule().fill(AppPalette.hairline).frame(height: 2)
         .overlay(alignment: .leading) {
           GeometryReader { proxy in
-            let filled = proxy.size.width * CGFloat(min(step, total)) / CGFloat(max(total, 1))
-            Capsule().fill(AppPalette.action).frame(width: filled)
-            if drill {
-              // Drawn upright, so a quarter turn points the tip along the track.
-              DrillbitBit(working: drilling, height: 24)
-                .rotationEffect(.degrees(-90))
-                .position(x: max(12, filled - 12), y: 1)
-            }
+            Capsule().fill(AppPalette.action).frame(width: proxy.size.width * CGFloat(min(step, total)) / CGFloat(max(total, 1)))
           }
         }
         .animation(reduceMotion ? nil : .spring(duration: 0.6, bounce: 0.22), value: step)
         .accessibilityHidden(true)
     }
-    .task(id: step) {
-      guard drill, !reduceMotion else { return }
-      drilling = true
-      try? await Task.sleep(for: .milliseconds(650))
-      drilling = false
-    }
   }
 }
 
 extension SignalStepProgress where Accessory == EmptyView {
-  init(step: Int, total: Int, drill: Bool = false) { self.init(step: step, total: total, drill: drill) { EmptyView() } }
+  init(step: Int, total: Int) { self.init(step: step, total: total) { EmptyView() } }
 }
 
 /// Onboarding pages are dealt, not pushed: the old one slips back soft, the new one lands with a little give.

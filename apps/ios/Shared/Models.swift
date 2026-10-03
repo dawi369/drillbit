@@ -16,10 +16,21 @@ struct LearningPlan: Codable, Equatable, Sendable {
 
 /// Device-local onboarding progress is account-scoped, never tied to a generated question.
 struct FirstUseProgress: Codable, Equatable, Sendable {
-  enum Stage: String, Codable, Sendable { case walkthrough, tourHome, tourRecall, tourLibrary, chooseMode, complete }
+  /// `firstRep` runs from setup to the first rep's feedback.
+  enum Stage: String, Codable, Sendable { case firstRep, complete }
   var stage: Stage = .complete
-  var tourTab: String? {
-    switch stage { case .tourHome: "home"; case .tourRecall: "recall"; case .tourLibrary: "library"; default: nil }
+  /// The first counted rep, once finished: its feedback offers the reminder, and Home points at its Recall card.
+  var firstRepID: String? = nil
+  var reminderOffered = false
+  var recallIntroduced = false
+  init(stage: Stage = .complete) { self.stage = stage }
+  init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    // Warm-up and tab-tour stages from earlier builds have nothing left to show.
+    stage = (try? container.decode(Stage.self, forKey: .stage)) ?? .complete
+    firstRepID = try container.decodeIfPresent(String.self, forKey: .firstRepID)
+    reminderOffered = try container.decodeIfPresent(Bool.self, forKey: .reminderOffered) ?? false
+    recallIntroduced = try container.decodeIfPresent(Bool.self, forKey: .recallIntroduced) ?? false
   }
 }
 
@@ -156,6 +167,11 @@ struct Challenge: Codable, Identifiable, Sendable {
   var startedAt: String? = nil
   /// Guided's roadmap: the steps a strong answer works through, in order.
   var path: [String]? = nil
+  /// The interviewer's first line, written with the question; older and pooled questions have none.
+  var opener: String? = nil
+  /// Set when this question was prepared as a free rep; `swapped` marks its one included swap.
+  var freeRepAt: String? = nil
+  var swapped: Bool? = nil
   var interviewStyle: InterviewStyle?
   var interview: InterviewState?
   var engineeringLevel: String?
@@ -227,6 +243,13 @@ struct Bootstrap: Codable, Sendable {
   var credential: Credential?
   var todayPlan: TodayPlan?
   var queuedNext: QueuedNext? = nil
+  var practice: PracticeAccess? = nil
+}
+/// Free reps apply only while the server's gate is on; `freeReps` is false for unlimited accounts.
+struct PracticeAccess: Codable, Sendable, Equatable {
+  var freeReps: Bool
+  var available: Bool
+  var nextFreeRepAt: String?
 }
 struct TodayPlan: Codable, Sendable, Equatable {
   var state: String

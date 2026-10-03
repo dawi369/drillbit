@@ -40,19 +40,20 @@ struct QuestionFlow: View {
   @State private var account: String?
   @State private var visible = true
   @State private var initialized = false
-  // Warm-up rerolls are capped silently; the button just goes away.
+  // The first rep includes one swap; the button just goes away after it.
   @State private var rerolls = 0
-  private var warmingUp: Bool { model.firstUse.stage == .walkthrough }
+  private var firstRep: Bool { model.firstUse.stage == .firstRep }
   @Environment(\.dismiss) private var dismiss
   @Environment(\.scenePhase) private var scenePhase
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  /// The warm-up's framing is on the plan page already, so its preview carries no note.
+  @Environment(\.dynamicTypeSize) private var typeSize
   private var previewNote: String? {
     let guided = (question?.guidanceMode ?? draft?.guidanceMode) == .learnTogether
-    let warmUp = question?.isWarmUp ?? draft?.warmUp ?? false
-    guard guided, !warmUp, failure == nil else { return nil }
+    guard guided, failure == nil else { return nil }
     return "Guided practice helps you structure the approach."
   }
+  /// Bit shows up only while the question is being written, then gets out of the way.
+  private var writing: Bool { question == nil && failure == nil }
   /// Eyebrow and note are fixed copy but still written out, so the page reads as one voice.
   private var previewSegments: [StreamSegment] {
     var segments = [
@@ -80,7 +81,7 @@ struct QuestionFlow: View {
   }
   var body: some View {
     NavigationStack {
-      if browseTopics && selectedTopic == nil && selectedCustomTopic == nil && model.firstUse.stage != .walkthrough {
+      if browseTopics && selectedTopic == nil && selectedCustomTopic == nil && !firstRep {
         SignalList {
           Section("Core areas") {
             if let selectedArea {
@@ -124,7 +125,7 @@ struct QuestionFlow: View {
               })
             if let failure {
               Text(failure).foregroundStyle(.secondary).transition(.opacity)
-              if warmingUp { Button("Try again") { prepare(nil) } }
+              if firstRep { Button("Try again") { prepare(nil) } }
               else { Button("Back to preparation") { showingPreview = false } }
             }
           }.frame(maxWidth: .infinity, alignment: .leading).padding(24)
@@ -132,8 +133,11 @@ struct QuestionFlow: View {
           .accessibilityIdentifier("questionPreviewScroll")
         .safeAreaInset(edge: .bottom) {
           VStack(spacing: 12) {
+            if writing && !typeSize.isAccessibilitySize {
+              BitView(mood: .drilling).frame(height: 56).transition(.opacity)
+            }
             if let question, revealed {
-              let title = question.lifecycle == "in_progress" ? "Resume" : question.isWarmUp ? "Start warm-up" : "Start interview"
+              let title = question.lifecycle == "in_progress" ? "Resume" : "Start interview"
               Button {
                 guard !starting else { return }
                 starting = true
@@ -145,38 +149,30 @@ struct QuestionFlow: View {
                   starting = false
                 }
               } label: {
-                // The label gives way to the bit turning in place: same size, same colour, no spinner.
-                ZStack {
-                  Text(title)
-                    .opacity(starting ? 0 : 1)
-                    .blur(radius: starting && !reduceMotion ? 6 : 0)
-                  if starting {
-                    DrillbitSpinner(size: 24, color: AppPalette.actionInk)
-                      .transition(reduceMotion ? .opacity : .scale(scale: 0.4).combined(with: .opacity))
-                  }
-                }
-                .animation(.spring(duration: 0.3, bounce: 0.2), value: starting)
+                Text(starting ? "Opening…" : title).contentTransition(.opacity)
+                  .animation(reduceMotion ? nil : DrillbitMotion.fast, value: starting)
               }.buttonStyle(PracticeButtonStyle())
                 .allowsHitTesting(!starting)
                 .accessibilityLabel(starting ? "Opening" : title)
                 .accessibilityIdentifier("previewStart")
                 .transition(arrival(0))
             }
-            if let question, revealed, question.lifecycle == "ready" && (!question.isWarmUp || rerolls < 3) {
+            if let question, revealed, question.lifecycle == "ready" && (firstRep ? rerolls < 1 : model.mayStartRep(swapping: question)) {
               Button("Choose another question") { chooseAnother(question) }
                 .disabled(starting)
                 .transition(arrival(1))
             }
           }.padding(16).background(AppPalette.background)
+            .animation(reduceMotion ? nil : DrillbitMotion.fast, value: writing)
         }.navigationTitle("Question preview").navigationBarTitleDisplayMode(.inline)
           .containerBackground(AppPalette.background, for: .navigation)
-          .toolbar { if !warmingUp { Button("Close") { dismiss() } } }
+          .toolbar { if !firstRep { Button("Close") { dismiss() } } }
       } else {
         PreparationView(model: model, source: source, initialCustomTopic: selectedCustomTopic, submit: { prepare($0) }, recovery: retryInput ?? recovery)
       }
     }.background(AppPalette.background)
       .presentationBackground(AppPalette.background)
-      .interactiveDismissDisabled(warmingUp)
+      .interactiveDismissDisabled(firstRep)
       .onAppear {
       visible = true
       guard !initialized else { return }
@@ -184,13 +180,13 @@ struct QuestionFlow: View {
       account = model.bootstrap?.account.id
       selectedArea = area
       if let initial { question = initial; showingPreview = true; instantReveal = true; revealed = true }
-      else if warmingUp { prepare(nil) }
+      else if firstRep { prepare(nil) }
     }
     .onDisappear { visible = false }
     .onChange(of: scenePhase) { _, phase in if phase == .background { visible = false; dismiss() } }
     .onChange(of: model.bootstrap?.account.id) { _, value in if value != account { dismiss() } }
   }
-  /// During onboarding the model turns a nil input into the warm-up request.
+  /// During the first rep the model turns a nil input into the first question's request.
   private func prepare(_ input: PreparationInput?) {
     showingPreview = true
     question = nil
@@ -208,7 +204,7 @@ struct QuestionFlow: View {
     instantReveal = false
     rewinding = true
     clock.rewind(over: 0.5)
-    guard current.isWarmUp else {
+    guard firstRep else {
       afterRewind = { showingPreview = false; question = nil; draft = nil }
       return
     }

@@ -1,82 +1,89 @@
-#!/usr/bin/env swift
-// Renders docs/design/logo/drillbit-icon.svg as the opaque 1024 px App Store icon, plus the launch mark.
+// Renders the opaque 1024 px App Store icon and the launch screen's Bit with his own rig and renderer.
+// Run from the repo root:
+//   swiftc -parse-as-library scripts/generate-app-icon.swift apps/ios/Drillbit/BitRig.swift \
+//     apps/ios/Drillbit/BitRenderer.swift -o /tmp/drillbit-icon && /tmp/drillbit-icon
 import AppKit
+import SwiftUI
 
-let side = 1024
-guard let context = CGContext(
-  data: nil, width: side, height: side, bitsPerComponent: 8, bytesPerRow: 0,
-  space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
-) else { fatalError("Could not create icon context") }
+@main
+struct GenerateAppIcon {
+  static let side = 1024
 
-// Work in SVG coordinates: origin top left, y down.
-context.translateBy(x: 0, y: CGFloat(side))
-context.scaleBy(x: 1, y: -1)
+  @MainActor static func main() throws {
+    let output = URL(fileURLWithPath: CommandLine.arguments.dropFirst().first
+      ?? "apps/ios/Drillbit/Assets.xcassets/AppIcon.appiconset/AppIcon.png")
+    try icon().write(to: output)
+    try launchMark(output.deletingLastPathComponent().deletingLastPathComponent()
+      .appendingPathComponent("LaunchBit.imageset"))
+  }
 
-func color(_ hex: UInt32) -> CGColor {
-  CGColor(srgbRed: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255,
-          blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
+  /// Bit mid-hop: tipped over a little, leaning into it and glancing up.
+  static var pose: BitPose {
+    var pose = BitPose()
+    pose.phase = 3.0
+    pose.headX = 6
+    pose.tipX = -3
+    pose.squash = 1.03
+    pose.lookX = 0.5
+    pose.lookY = -0.35
+    pose.eyeWidth = 6.4
+    pose.left = BitEye(top: 9.6, bottom: 9.6)
+    pose.right = pose.left
+    pose.blush = 0.6
+    return pose
+  }
+
+  @MainActor static func icon() -> Data {
+    let art = Canvas { context, size in
+      context.fill(Path(CGRect(origin: .zero, size: size)), with: .linearGradient(
+        Gradient(colors: [rgb(0x272D3A), rgb(0x1B1F29)]), startPoint: .zero, endPoint: CGPoint(x: 0, y: size.height)))
+      context.fill(Path(ellipseIn: CGRect(x: 112, y: 120, width: 800, height: 800)), with: .radialGradient(
+        Gradient(colors: [rgb(0xFFCC65, 0.16), rgb(0xFFCC65, 0)]), center: CGPoint(x: 512, y: 520), startRadius: 0, endRadius: 400))
+      var shadow = context
+      shadow.translateBy(x: 560, y: 930)
+      shadow.scaleBy(x: 1, y: 0.16)
+      shadow.fill(Path(ellipseIn: CGRect(x: -150, y: -150, width: 300, height: 300)), with: .radialGradient(
+        Gradient(colors: [rgb(0x000000, 0.45), rgb(0x000000, 0)]), center: .zero, startRadius: 0, endRadius: 150))
+      var bit = context
+      bit.translateBy(x: 512, y: 500)
+      bit.rotate(by: .degrees(-12))
+      bit.scaleBy(x: 4.7, y: 4.7)
+      bit.translateBy(x: -100, y: -111)
+      BitRenderer.draw(pose, style: BitFinish.satin.style, in: &bit, size: BitShape.viewBox, shadow: false)
+    }
+    .frame(width: CGFloat(side), height: CGFloat(side))
+    let renderer = ImageRenderer(content: art)
+    renderer.scale = 1
+    // The App Store icon must be opaque, so flatten onto a context without alpha.
+    guard
+      let image = renderer.cgImage,
+      let flat = CGContext(data: nil, width: side, height: side, bitsPerComponent: 8, bytesPerRow: 0,
+        space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)
+    else { fatalError("Could not render app icon") }
+    flat.draw(image, in: CGRect(x: 0, y: 0, width: side, height: side))
+    guard let opaque = flat.makeImage(), let png = NSBitmapImageRep(cgImage: opaque).representation(using: .png, properties: [:])
+    else { fatalError("Could not encode app icon") }
+    return png
+  }
+
+  /// Launch screen: Bit's idle rest pose at the size the app's restoring surface shows him.
+  /// Raster, because PDF export drops his clips, blends and soft shadow.
+  @MainActor static func launchMark(_ folder: URL) throws {
+    let art = Canvas { context, size in
+      BitRenderer.draw(BitPose.rest(.idle), style: BitFinish.satin.style, in: &context, size: size)
+    }
+    .frame(width: BitLaunch.size.width, height: BitLaunch.size.height)
+    for scale in [2, 3] {
+      let renderer = ImageRenderer(content: art)
+      renderer.scale = CGFloat(scale)
+      guard let image = renderer.cgImage, let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
+      else { fatalError("Could not render launch mark") }
+      try png.write(to: folder.appendingPathComponent("LaunchBit@\(scale)x.png"))
+    }
+  }
+
+  static func rgb(_ hex: UInt32, _ opacity: Double = 1) -> Color {
+    Color(.sRGB, red: Double((hex >> 16) & 0xFF) / 255, green: Double((hex >> 8) & 0xFF) / 255,
+      blue: Double(hex & 0xFF) / 255, opacity: opacity)
+  }
 }
-func gradient(_ stops: [(CGFloat, UInt32)]) -> CGGradient {
-  CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB), colors: stops.map { color($0.1) } as CFArray,
-             locations: stops.map(\.0))!
-}
-
-context.drawLinearGradient(gradient([(0, 0x272D3A), (1, 0x1B1F29)]),
-                           start: .zero, end: CGPoint(x: 0, y: side), options: [])
-
-func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: x, y: y) }
-let drill = CGMutablePath()
-drill.move(to: p(-120, -316))
-drill.addQuadCurve(to: p(-96, -340), control: p(-120, -340))
-drill.addLine(to: p(96, -340))
-drill.addQuadCurve(to: p(120, -316), control: p(120, -340))
-drill.addLine(to: p(120, -255))
-drill.addCurve(to: p(0, -185), control1: p(120, -227.5), control2: p(43.5, -201.2))
-drill.addCurve(to: p(-120, -115), control1: p(-43.5, -168.8), control2: p(-120, -142.5))
-drill.closeSubpath()
-for dy: CGFloat in [0, 140] {
-  drill.move(to: p(-120, -61 + dy))
-  drill.addCurve(to: p(0, -131 + dy), control1: p(-120, -88.5 + dy), control2: p(-43.5, -114.8 + dy))
-  drill.addCurve(to: p(120, -201 + dy), control1: p(43.5, -147.2 + dy), control2: p(120, -173.5 + dy))
-  drill.addLine(to: p(120, -115 + dy))
-  drill.addCurve(to: p(0, -45 + dy), control1: p(120, -87.5 + dy), control2: p(43.5, -61.2 + dy))
-  drill.addCurve(to: p(-120, 25 + dy), control1: p(-43.5, -28.8 + dy), control2: p(-120, -2.5 + dy))
-  drill.closeSubpath()
-}
-drill.move(to: p(-120, 219))
-drill.addCurve(to: p(0, 149), control1: p(-120, 191.5), control2: p(-43.5, 165.2))
-drill.addCurve(to: p(120, 79), control1: p(43.5, 132.8), control2: p(120, 106.5))
-drill.addLine(to: p(120, 248))
-drill.addLine(to: p(12, 330.8))
-drill.addQuadCurve(to: p(-12, 330.8), control: p(0, 340))
-drill.addLine(to: p(-120, 248))
-drill.closeSubpath()
-
-context.translateBy(x: 512, y: 512)
-context.addPath(drill)
-context.clip()
-context.drawLinearGradient(gradient([(0, 0xFFDA8A), (0.45, 0xFFCC65), (1, 0xE9AE45)]),
-                           start: p(-120, 0), end: p(120, 0), options: [])
-
-guard
-  let image = context.makeImage(),
-  let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
-else { fatalError("Could not render app icon") }
-
-let output = CommandLine.arguments.dropFirst().first
-  ?? "apps/ios/Drillbit/Assets.xcassets/AppIcon.appiconset/AppIcon.png"
-try png.write(to: URL(fileURLWithPath: output))
-
-// Launch screen mark: the flat drill at the same 24 × 68 pt size as the app's restoring surface.
-let mark = URL(fileURLWithPath: output).deletingLastPathComponent().deletingLastPathComponent()
-  .appendingPathComponent("LaunchMark.imageset/LaunchMark.pdf")
-var box = CGRect(x: 0, y: 0, width: 24, height: 68)
-guard let pdf = CGContext(mark as CFURL, mediaBox: &box, nil) else { fatalError("Could not create launch mark") }
-pdf.beginPDFPage(nil)
-pdf.translateBy(x: 12, y: 34)
-pdf.scaleBy(x: 0.1, y: -0.1)
-pdf.addPath(drill)
-pdf.setFillColor(color(0xFFCC65))
-pdf.fillPath()
-pdf.endPDFPage()
-pdf.closePDF()

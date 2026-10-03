@@ -7,8 +7,10 @@ import { INTERVIEW_PROMPT_VERSION, interviewerPrompt, isSocialOpening, socialOpe
 import { personalizationInstructions } from "./prompts/personalization";
 import { endingPolicy, teachingPolicy } from "./prompts/teaching";
 export type ModelMessage = { role: "system" | "user" | "assistant"; content: string };
-const contextualInterviewVersions = ["interviewer-standard-v4", "interviewer-standard-v5", "interviewer-teaching-v1", "interviewer-teaching-v2", "interviewer-teaching-v3", "interviewer-teaching-v4"];
-const teachingInterviewVersions = ["interviewer-teaching-v1", "interviewer-teaching-v2", "interviewer-teaching-v3", "interviewer-teaching-v4"];
+const contextualInterviewVersions = ["interviewer-standard-v4", "interviewer-standard-v5", "interviewer-teaching-v1", "interviewer-teaching-v2", "interviewer-teaching-v3", "interviewer-teaching-v4", "interviewer-teaching-v5"];
+const teachingInterviewVersions = ["interviewer-teaching-v1", "interviewer-teaching-v2", "interviewer-teaching-v3", "interviewer-teaching-v4", "interviewer-teaching-v5"];
+/** Editions that return move, parameters and the Guided/Mock fields. */
+const structuredInterviewVersions = ["interviewer-teaching-v4", "interviewer-teaching-v5"];
 export async function modelAccess(
   env: Env,
   account: string,
@@ -427,7 +429,7 @@ export function interviewReasoning(context: unknown): { enabled: false } | { eff
 }
 export function interviewModelSchema(context: unknown, legacySchema: z.ZodType): z.ZodType {
   const version = (context as { promptVersion?: string }).promptVersion ?? INTERVIEW_PROMPT_VERSION;
-  if (version === "interviewer-teaching-v4") {
+  if (structuredInterviewVersions.includes(version)) {
     const base = z.object({
       move: z.enum(["chat", "acknowledge", "ask_one", "answer_question", "correct", "hint", "example"]),
       text: z.string().trim().min(1).max(2400),
@@ -440,7 +442,7 @@ export function interviewModelSchema(context: unknown, legacySchema: z.ZodType):
 }
 export function parseInterviewModelResult(context: unknown, schema: z.ZodType, value: unknown) {
   const c = context as { promptVersion?: string; action?: { kind?: string; text?: string } };
-  const isV4 = (c.promptVersion ?? INTERVIEW_PROMPT_VERSION) === "interviewer-teaching-v4";
+  const isV4 = structuredInterviewVersions.includes(c.promptVersion ?? INTERVIEW_PROMPT_VERSION);
   const candidate = isV4 && value && typeof value === "object" && !Array.isArray(value)
     ? {parameters: [], ...(isGuided(context) ? {choices: [], step: 0} : isMock(context) ? {curveball: false} : {}), ...value} : value;
   const parsed = interviewModelSchema(context, schema).parse(candidate) as { text: string; parameters?: {label:string;value:string}[]; choices?: string[]; step?: number; curveball?: boolean };

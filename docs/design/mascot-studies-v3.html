@@ -1,0 +1,872 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bit · Drillbit mascot study 03</title>
+<style>
+  * { box-sizing: border-box; }
+  :root {
+    color-scheme: dark;
+    --bg: #1F2430; --surface: #282F3D; --text: #E5E7EB; --text-2: #A5AFBF; --accent: #F4C46B;
+    --divider: #404C5E; --selected: #303A4A;
+    --stage: radial-gradient(120% 90% at 50% 36%, #343D4F 0%, #272E3B 55%, #1F2430 100%);
+    --grid: rgba(165, 175, 191, .22);
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  [data-stage="light"] { --stage: radial-gradient(120% 90% at 50% 36%, #FFFFFF 0%, #EEF2F7 55%, #E1E8F1 100%); --grid: rgba(89, 106, 128, .2); }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  main { max-width: 1180px; margin: 0 auto; padding: 48px 24px 96px; }
+  button { font: inherit; color: inherit; }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .hero { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(300px, 1fr); gap: 40px; align-items: center; }
+  .stage { position: relative; display: grid; place-items: center; width: 100%; padding: 0; border: 0; border-radius: 12px; background: var(--stage); overflow: hidden; cursor: pointer; }
+  .stage::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle, var(--grid) 1px, transparent 1.6px) center / 16px 16px; -webkit-mask-image: radial-gradient(closest-side at 50% 52%, #000, transparent); mask-image: radial-gradient(closest-side at 50% 52%, #000, transparent); }
+  .stage > .bit { position: relative; }
+  .hero .stage { aspect-ratio: 1; }
+  .hero .stage .bit { width: 70%; }
+  .bit { display: block; aspect-ratio: 200 / 220; }
+  .bit.square { aspect-ratio: 1; }
+  .bit svg { display: block; width: 100%; height: 100%; overflow: visible; }
+
+  .panel { display: grid; gap: 28px; }
+  .eyebrow, .label, .rig dt { font: 12px/1.4 var(--mono); }
+  .eyebrow { color: var(--accent); margin: 0 0 8px; }
+  h1 { font-size: 44px; line-height: 1; letter-spacing: -.02em; margin: 0 0 12px; }
+  .lede { margin: 0; color: var(--text-2); max-width: 44ch; }
+  .label { color: var(--text-2); margin: 0 0 8px; }
+  .segmented { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 4px; padding: 4px; background: var(--surface); border: 1px solid var(--divider); border-radius: 12px; }
+  .segmented button { border: 0; background: none; padding: 8px 12px; border-radius: 8px; cursor: pointer; color: var(--text-2); }
+  .segmented button[aria-pressed="true"] { background: var(--selected); color: var(--text); }
+  .swatches { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  #moods { grid-template-columns: repeat(3, 1fr); }
+  .swatches button { display: grid; justify-items: center; gap: 8px; padding: 12px 4px; border: 1px solid transparent; border-radius: 12px; background: none; cursor: pointer; color: var(--text-2); font-size: 13px; }
+  .swatches button[aria-pressed="true"] { border-color: var(--divider); background: var(--surface); color: var(--text); }
+  .swatch { width: 32px; height: 32px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08); }
+  .finish-note { margin: 12px 0 0; color: var(--text-2); min-height: 3em; }
+
+  section { margin-top: 72px; }
+  section > h2 { font-size: 22px; letter-spacing: -.01em; margin: 0 0 4px; }
+  section > p { margin: 0 0 20px; color: var(--text-2); max-width: 70ch; }
+  .row { display: grid; gap: 16px; }
+  .row.five { grid-template-columns: repeat(5, 1fr); }
+  .row.finishes { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+  .row.six { grid-template-columns: repeat(6, 1fr); }
+  .cell { display: grid; gap: 12px; align-content: start; }
+  .cell .stage { aspect-ratio: 1; }
+  .cell .stage .bit { width: 80%; }
+  .cell .stage[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--accent); }
+  .caption { color: var(--text-2); font-size: 13px; line-height: 1.45; }
+  .caption b { display: block; font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+  .icon .caption { font: 12px/1.4 var(--mono); }
+
+  .icons { display: flex; flex-wrap: wrap; align-items: end; gap: 32px; }
+  .icon { display: grid; justify-items: center; gap: 8px; }
+  .tile { display: grid; place-items: center; width: var(--s); height: var(--s); border-radius: calc(var(--s) * .2237); background: linear-gradient(#272D3A, #1B1F29); overflow: hidden; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .05); }
+  .tile .bit { width: 100%; }
+
+  .rig { display: grid; grid-template-columns: max-content 1fr; gap: 8px 24px; margin: 0; padding: 20px 24px; background: var(--surface); border: 1px solid var(--divider); border-radius: 12px; }
+  .rig dt { color: var(--accent); padding-top: 2px; }
+  .rig dd { margin: 0; color: var(--text-2); }
+
+  @media (max-width: 900px) {
+    .hero { grid-template-columns: 1fr; }
+    .row.five, .row.six { grid-template-columns: repeat(3, 1fr); }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="hero">
+    <button type="button" class="stage" id="hero" aria-label="Boop Bit"></button>
+    <div class="panel">
+      <div>
+        <p class="eyebrow">mascot study 03</p>
+        <h1>Bit</h1>
+        <p class="lede">Same Bit, more feel. Rim light on both edges, glossy eyes, motion blur when it spins up, and it perks up when you get close. Poke it.</p>
+      </div>
+      <div>
+        <p class="label" id="mood-label">Mood</p>
+        <div class="segmented" id="moods" role="group" aria-labelledby="mood-label"></div>
+      </div>
+      <div>
+        <p class="label" id="finish-label">Finish</p>
+        <div class="swatches" id="finishes" role="group" aria-labelledby="finish-label"></div>
+        <p class="finish-note" id="finish-note"></p>
+      </div>
+      <div>
+        <p class="label" id="stage-label">Stage</p>
+        <div class="segmented" id="stages" role="group" aria-labelledby="stage-label">
+          <button type="button" data-stage="dark" aria-pressed="true">Dark</button>
+          <button type="button" data-stage="light" aria-pressed="false">Light</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <section>
+    <h2>Finishes</h2>
+    <p>Same shape and rig, different surface. Tap one to try it on up top.</p>
+    <div class="row finishes" id="finish-row"></div>
+  </section>
+
+  <section>
+    <h2>Expressions</h2>
+    <p>No mouth unless it's talking or stoked. The eyes are one shape with a top and a bottom curve, so every expression morphs into the next.</p>
+    <div class="row six" id="mood-row"></div>
+  </section>
+
+  <section>
+    <h2>As the app icon</h2>
+    <p>Same art on the existing <code>#232834</code> tile. Still reads at 29&nbsp;pt.</p>
+    <div class="icons" id="icon-row"></div>
+  </section>
+
+  <section>
+    <h2>Rig</h2>
+    <p>Every pose is about ten numbers and every transition is a spring. That maps one-to-one onto Rive state machine inputs or a SwiftUI <code>Canvas</code> driven by a timeline.</p>
+    <dl class="rig">
+      <dt>look.x · look.y</dt><dd>Eyes slide around the cylinder, so they squash near the edge. The body leans after them and the tip lags behind.</dd>
+      <dt>squash</dt><dd>Volume-keeping stretch on a soft spring: breathing, hops and boops all jiggle.</dd>
+      <dt>attention</dt><dd>Pointer distance. Get close and the eyes widen and it spins up a little.</dd>
+      <dt>spin</dt><dd>Flute phase. 0.35 idle, 14 drilling. The flutes are real helices, so they wrap around the edges; past about 4 they pick up a vertical motion blur.</dd>
+      <dt>eye.top · eye.bottom</dt><dd>One path: dot, blink, ^ happy, flat-topped focus, one-eyed squint.</dd>
+      <dt>mouth</dt><dd>0 hides it. Talking drives it from a level, which could be the voice room's audio meter.</dd>
+      <dt>dots · chips</dt><dd>Thinking dots orbit like a halo and pass behind the head. Drilling flicks off shavings.</dd>
+    </dl>
+  </section>
+</main>
+<script>
+  const TAU = Math.PI * 2;
+  const CX = 100, TOP = 38, R = 44, DOME = 36, SHANK = 92, H = 146, FLUTE_T = 66, RAMP = 12, PITCH = 54, NOTCH = 6;
+  const EYE_T = 46, PIV = H * .55, FLOOR = 206;
+  const M = 24;
+  const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const clamp = (v, a = -1, b = 1) => Math.max(a, Math.min(b, v));
+  const fx = v => Math.round(v * 100) / 100;
+
+  const radius = t => {
+    if (t <= 0 || t >= H) return 0;
+    if (t < DOME) { const u = (DOME - t) / DOME; return R * Math.pow(1 - Math.pow(u, 2.2), 1 / 2.2); }
+    if (t <= SHANK) return R;
+    return R * Math.pow(1 - Math.pow((t - SHANK) / (H - SHANK), 1.7), .8);
+  };
+  const ramp = u => { const v = clamp((u - FLUTE_T) / RAMP, 0, 1); return 1 - (1 - v) * (1 - v); };
+  // Even 1.4-unit spacing through the flutes so moving notches don't alias between samples.
+  const TS = [
+    ...Array.from({ length: 24 }, (_, i) => DOME * (1 - Math.cos(Math.PI / 2 * i / 24))),
+    ...Array.from({ length: Math.ceil((H - 8 - DOME) / 1.4) }, (_, i) => DOME + i * 1.4),
+    ...Array.from({ length: 9 }, (_, i) => H - 8 + 8 * Math.sin(Math.PI / 2 * i / 8)),
+  ];
+  const S = TS.length - 1;
+  const RS = TS.map(radius);
+
+  const curve = (p, move = true) => {
+    let d = `${move ? 'M' : 'L'}${fx(p[0][0])} ${fx(p[0][1])}`;
+    for (let i = 0; i < p.length - 1; i++) {
+      const a = p[Math.max(i - 1, 0)], b = p[i], c = p[i + 1], e = p[Math.min(i + 2, p.length - 1)];
+      d += `C${fx(b[0] + (c[0] - a[0]) / 6)} ${fx(b[1] + (c[1] - a[1]) / 6)} ${fx(c[0] - (e[0] - b[0]) / 6)} ${fx(c[1] - (e[1] - b[1]) / 6)} ${fx(c[0])} ${fx(c[1])}`;
+    }
+    return d;
+  };
+  const loop = p => {
+    const n = p.length;
+    let d = `M${fx(p[0][0])} ${fx(p[0][1])}`;
+    for (let i = 0; i < n; i++) {
+      const a = p[(i - 1 + n) % n], b = p[i], c = p[(i + 1) % n], e = p[(i + 2) % n];
+      d += `C${fx(b[0] + (c[0] - a[0]) / 6)} ${fx(b[1] + (c[1] - a[1]) / 6)} ${fx(c[0] - (e[0] - b[0]) / 6)} ${fx(c[1] - (e[1] - b[1]) / 6)} ${fx(c[0])} ${fx(c[1])}`;
+    }
+    return d + 'Z';
+  };
+  const eyePath = (w, top, bot) => {
+    const a = top * 1.333, b = bot * 1.333;
+    return `M${fx(-w)} 0C${fx(-w)} ${fx(-a)} ${fx(w)} ${fx(-a)} ${fx(w)} 0C${fx(w)} ${fx(b)} ${fx(-w)} ${fx(b)} ${fx(-w)} 0Z`;
+  };
+  const mouthPath = o => {
+    const w = 3.6 + 3 * o, d = (1 + 7 * o) * 1.333;
+    return `M${fx(-w)} 0Q0 ${fx(1 + o)} ${fx(w)} 0C${fx(w)} ${fx(d)} ${fx(-w)} ${fx(d)} ${fx(-w)} 0Z`;
+  };
+  const talk = t => {
+    if (Math.sin(t * 1.25) + Math.sin(t * .53) * .6 < -.4) return .06;
+    return .18 + .82 * Math.max(0, Math.sin(t * 12.5 + Math.sin(t * 2.9) * 2.2)) * (.6 + .4 * Math.sin(t * 4.7));
+  };
+
+  const texture = kind => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 160;
+    const g = c.getContext('2d');
+    if (kind === 'grain') {
+      const img = g.createImageData(160, 160);
+      for (let i = 0; i < img.data.length; i += 4) {
+        const v = Math.random();
+        img.data[i] = img.data[i + 1] = img.data[i + 2] = v > .5 ? 255 : 50;
+        img.data[i + 3] = Math.abs(v - .5) * 2 * 26;
+      }
+      g.putImageData(img, 0, 0);
+    } else if (kind === 'brushed') {
+      for (let y = 0; y < 160; y++) {
+        g.fillStyle = Math.random() < .8 ? `rgba(255,255,255,${Math.random() * .16})` : `rgba(60,35,5,${Math.random() * .04})`;
+        g.fillRect(0, y, 160, 1);
+        for (let k = 0; k < 3; k++) {
+          const x = Math.random() * 160, w = 20 + Math.random() * 90;
+          g.fillStyle = `rgba(255,255,255,${Math.random() * .2})`;
+          g.fillRect(x, y, w, 1);
+          g.fillRect(x - 160, y, w, 1);
+        }
+      }
+    } else if (kind === 'speckle') {
+      for (let i = 0; i < 190; i++) {
+        const x = Math.random() * 160, y = Math.random() * 160, r = .5 + Math.random() ** 2 * 1.7;
+        g.fillStyle = Math.random() < .8 ? `rgba(118,64,16,${.25 + Math.random() * .4})` : `rgba(255,252,240,${.5 + Math.random() * .4})`;
+        for (const ox of [-160, 0, 160]) for (const oy of [-160, 0, 160]) { g.beginPath(); g.arc(x + ox, y + oy, r, 0, TAU); g.fill(); }
+      }
+    } else if (kind === 'felt') {
+      g.lineCap = 'round';
+      for (let i = 0; i < 1400; i++) {
+        const x = Math.random() * 160, y = Math.random() * 160, a = Math.random() * TAU, l = 1.5 + Math.random() * 3.5;
+        g.strokeStyle = Math.random() < .55 ? `rgba(255,248,230,${.15 + Math.random() * .25})` : `rgba(120,70,10,${.08 + Math.random() * .16})`;
+        g.lineWidth = .5 + Math.random() * .5;
+        for (const ox of [-160, 0, 160]) for (const oy of [-160, 0, 160]) {
+          g.beginPath(); g.moveTo(x + ox, y + oy); g.lineTo(x + ox + Math.cos(a) * l, y + oy + Math.sin(a) * l); g.stroke();
+        }
+      }
+    } else if (kind === 'grid') {
+      for (let i = 0; i < 16; i++) {
+        g.fillStyle = `rgba(255,255,255,${i % 4 === 0 ? .7 : .3})`;
+        g.fillRect(i * 10, 0, 1, 160);
+        g.fillRect(0, i * 10, 160, 1);
+      }
+    }
+    return c.toDataURL();
+  };
+  const TEXTURES = Object.fromEntries(['grain', 'brushed', 'speckle', 'felt', 'grid'].map(k => [k, texture(k)]));
+
+  const DARK_SHADOW = [[0, '#000', .42], [1, '#000', 0]];
+  const FINISHES = {
+    satin: {
+      label: 'Satin', swatch: 'radial-gradient(circle at 35% 30%, #FFE3A3, #FFCA62 45%, #D9962F)',
+      note: 'Soft-touch amber with a velvet sheen on both edges. Warm, calm, reads at any size. The safe pick.',
+      base: '#FFCA62', groove: '#E39B3B', grooveShade: ['#7A4508', .32], grooveTop: ['#7A4508', 0, 1], lip: ['#FFF4D8', .7, 1.1],
+      rimL: ['#FFF8E8', .28], rimW: 4.2, tipGlint: .3, bandBlur: 1.8,
+      shade: [[0, '#FFFFFF', .2], [.22, '#FFFFFF', .05], [.5, '#FFFFFF', 0], [.78, '#6B4106', .12], [1, '#4A2C04', .34]],
+      vshade: [[0, '#FFFFFF', .1], [.3, '#FFFFFF', 0], [.7, '#4A2C04', 0], [1, '#4A2C04', .2]],
+      bands: [{ a: -.62, t: [6, 146], color: '#FFFFFF', layers: [[.5, .06], [.3, .08], [.14, .1]] }],
+      spec: { o: .6, rx: 7.5, ry: 12 }, rim: ['#FFF1C9', .6], texture: 'grain', textureOpacity: .35,
+      eye: '#232834', blush: '#FF8A6A', dots: '#A8BCD1', chip: '#FFD98A', sparkle: '#FFF2C8', shadow: DARK_SHADOW,
+    },
+    gummy: {
+      label: 'Gummy', swatch: 'radial-gradient(circle at 40% 35%, #FFF3C9, #FFB02E 45%, #E0710A)',
+      note: 'Gummy candy. Glows from inside, a glossy softbox reflection, a couple of trapped bubbles, and light focuses into a bright spot in its shadow.',
+      base: '#FFAE2E', glow: [[0, '#FFE7A6', .9], [.5, '#FFC650', .45], [1, '#FFAE2E', 0]], back: ['#E07A12', .22],
+      groove: '#F28C14', grooveShade: ['#C2620A', .28], grooveTop: ['#C2620A', 0, 1], lip: ['#FFFFFF', .9, 1.2],
+      shade: [[0, '#FFE9B0', .35], [.12, '#FFFFFF', 0], [.55, '#FFFFFF', 0], [.85, '#D4650A', .22], [1, '#A84C06', .45]],
+      vshade: [[0, '#FFFFFF', 0], [.62, '#FFFFFF', 0], [1, '#FFF0C0', .55]],
+      bands: [
+        { a: -.74, t: [10, 60], color: '#FFFFFF', layers: [[.36, .16], [.24, .55]] },
+        { a: -.6, t: [96, 132], color: '#FFFFFF', layers: [[.1, .3]] },
+        { a: .78, t: [20, 120], color: '#FFF3D0', layers: [[.08, .25]] },
+      ],
+      spec: { o: 0, rx: 1, ry: 1 }, dot: .95, rimL: ['#FFF6DC', .55], rim: ['#FFF4D6', .75], rimW: 4.5, tipGlint: .7, bandBlur: .5,
+      bubbles: [[30, .5, 1.6], [104, -.2, 1.3], [118, .9, .9]],
+      eye: '#2A1E14', blush: '#FF6A3D', dots: '#FFD27A', chip: '#FFC24F', sparkle: '#FFF6D8',
+      shadow: [[0, '#FFAE2E', .55], [1, '#FFAE2E', 0]], caustic: '#FFE9A8',
+    },
+    anodized: {
+      label: 'Anodized', swatch: 'linear-gradient(90deg, #8A5510, #FFF3CF 18%, #F6B530 34%, #F6B530 60%, #9A5E0E 82%, #E3ECFF)',
+      note: 'Anodized gold aluminum, bead-blasted smooth. A hard key highlight, a cool sky edge, and crisp bright chamfers where the flutes cut in.',
+      base: '#F5A623', groove: '#B8680A', grooveShade: ['#3D1C00', .5], grooveTop: ['#2E1500', .45, 1], lip: ['#FFF6D6', 1, 1.3],
+      shade: [[0, '#8A4A00', .35], [.08, '#FFE08A', .35], [.22, '#FFFFFF', 0], [.55, '#FFFFFF', 0], [.75, '#7A3E00', .25], [.92, '#5A2C00', .5], [1, '#3A1A00', .65]],
+      vshade: [[0, '#FFFFFF', .18], [.18, '#FFFFFF', 0], [.8, '#2A1802', 0], [1, '#2A1802', .2]],
+      bands: [
+        { a: -.44, t: [2, 146], color: '#FFE9A8', layers: [[.28, .55]] },
+        { a: -.44, t: [4, 144], color: '#FFFBEA', layers: [[.09, .85]] },
+        { a: .08, t: [8, 140], color: '#FFE9A8', layers: [[.06, .25]] },
+        { a: .8, t: [8, 140], color: '#E3ECFF', layers: [[.12, .35]] },
+      ],
+      spec: { o: .6, rx: 3.5, ry: 6 }, rimL: ['#FFE7B0', .35], rim: ['#E3ECFF', .4], tipGlint: .9, bandBlur: 1.6,
+      eye: '#232834', blush: '#FF8A6A', dots: '#A8BCD1', chip: '#FFE3A1', sparkle: '#FFFFFF', shadow: DARK_SHADOW,
+    },
+    glazed: {
+      label: 'Glazed', swatch: 'radial-gradient(circle at 35% 30%, #FFF4DA, #FFD07C 50%, #E8962E)',
+      note: 'Speckled ceramic. The glaze pools darker in the flutes and toward the tip, with a wet highlight on the point.',
+      base: '#FFD07C', groove: '#E08A24', grooveShade: ['#94500A', .3], grooveTop: ['#94500A', 0, 1], lip: ['#FFFBEF', .85, 1.1],
+      rimL: ['#FFFFFF', .3], tipGlint: .85,
+      shade: [[0, '#FFFFFF', .2], [.25, '#FFFFFF', 0], [.6, '#FFFFFF', 0], [.85, '#7A4508', .12], [1, '#5A3206', .3]],
+      vshade: [[0, '#FFFFFF', .08], [.3, '#FFFFFF', 0], [.7, '#B8651A', 0], [1, '#B8651A', .34]],
+      bands: [{ a: -.58, t: [8, 140], color: '#FFFFFF', layers: [[.36, .07], [.11, .32]] }],
+      spec: { o: .9, rx: 6, ry: 10 }, rim: ['#FFF6E0', .5], texture: 'speckle', textureOpacity: .85, bandBlur: .8,
+      eye: '#2A2420', blush: '#FF8A6A', dots: '#A8BCD1', chip: '#FFDFA0', sparkle: '#FFF6E0', shadow: DARK_SHADOW,
+    },
+    ember: {
+      label: 'Ember', swatch: 'radial-gradient(circle at 50% 58%, #FFC24F 0 16%, #FF9F2E 22%, #2A313F 30%)',
+      note: 'Night mode. The flutes flicker like hot metal, the eyes glow, and sparks drift up even when it\'s chilling.',
+      rimL: ['#8FA6C2', .18], tipGlint: .2, flicker: true, embers: true,
+      base: '#2A313F', groove: '#FFC24F', grooveH: 8, grooveGlow: ['#FFB43A', .3, 6], grooveShade: ['#FF8A1F', .5], grooveTop: ['#FFF2C8', 0, 1], lip: ['#FFF2C8', .7, 1],
+      shade: [[0, '#A8BCD1', .14], [.25, '#A8BCD1', 0], [.6, '#000', 0], [1, '#000', .4]],
+      vshade: [[0, '#A8BCD1', .1], [.3, '#A8BCD1', 0], [.8, '#FFB43A', 0], [1, '#FFB43A', .22]],
+      bands: [{ a: -.62, t: [6, 146], color: '#C9D6E6', layers: [[.3, .05], [.13, .1]] }],
+      spec: { o: .35, rx: 7, ry: 11 }, rim: ['#A8BCD1', .7], texture: 'grain', textureOpacity: .35, bandBlur: 1.5,
+      eye: '#FFCC65', eyeGlow: ['#FFB43A', .5, 4], blush: '#FF8A6A', dots: '#FFCC65', chip: '#FFCC65', sparkle: '#FFE7A8', shadow: [[0, '#FFB43A', .32], [1, '#FFB43A', 0]],
+    },
+    oxide: {
+      label: 'Black oxide', swatch: 'radial-gradient(circle at 35% 30%, #9AA3B5, #2E3038 50%, #15161A)',
+      note: 'The coating on real shop bits. Dark gunmetal, a blue-violet temper sheen on one edge and bronze on the other.',
+      base: '#353842', groove: '#1B1D22', grooveShade: ['#000000', .35], grooveTop: ['#000000', .4, 1], lip: ['#D8E2F0', .75, 1.1],
+      shade: [[0, '#9FB0D0', .16], [.2, '#FFFFFF', 0], [.6, '#000', 0], [1, '#000', .45]],
+      vshade: [[0, '#C9D6E6', .14], [.25, '#C9D6E6', 0], [1, '#000', .25]],
+      bands: [
+        { a: -.48, t: [3, 146], color: '#E8EEF8', layers: [[.26, .16], [.1, .35]] },
+        { a: .7, t: [10, 140], color: '#FFC78A', layers: [[.14, .2]] },
+      ],
+      spec: { o: .35, rx: 4, ry: 7 }, rimL: ['#8C7CFF', .4], rim: ['#FFB877', .45], rimW: 4, texture: 'brushed', textureOpacity: .14, tipGlint: .6, bandBlur: 1.6,
+      eye: '#FFCC65', blush: '#FF8A6A', dots: '#FFCC65', chip: '#C9D6E6', sparkle: '#FFE7A8', shadow: DARK_SHADOW,
+    },
+    tempered: {
+      label: 'Tempered', swatch: 'linear-gradient(180deg, #F6CF6A 0 35%, #C9822E 55%, #8A4FC8 75%, #3F63D8)',
+      note: 'Heat tint, like a bit that has been working hard. Straw gold up top, then bronze, purple, and blue at the tip.',
+      base: '#F2BE52', groove: '#B57A22', grooveShade: ['#2E1A03', .35], grooveTop: ['#2E1A03', .3, 1], lip: ['#FFF7DE', .85, 1.1],
+      shade: [[0, '#FFFFFF', .14], [.2, '#FFFFFF', 0], [.55, '#FFFFFF', 0], [.82, '#24123A', .2], [1, '#120A24', .45]],
+      vshade: [[0, '#FFFFFF', .1], [.42, '#C9822E', 0], [.58, '#C9822E', .42], [.72, '#8A4FC8', .55], [.86, '#4A62D8', .7], [1, '#2E4AC0', .8]],
+      bands: [
+        { a: -.48, t: [3, 146], color: '#FFF6E0', layers: [[.3, .12], [.14, .45]] },
+        { a: .66, t: [10, 140], color: '#CFE0FF', layers: [[.08, .3]] },
+      ],
+      spec: { o: .45, rx: 4, ry: 7 }, rimL: ['#FFE7B0', .25], rim: ['#BFD4FF', .6], texture: 'brushed', textureOpacity: .12, tipGlint: .8, bandBlur: 1.4,
+      eye: '#232834', blush: '#FF8A6A', dots: '#A8BCD1', chip: '#C9B6FF', sparkle: '#FFF2C8', shadow: DARK_SHADOW,
+    },
+    plush: {
+      label: 'Plush', swatch: 'radial-gradient(circle at 40% 35%, #FFE2A0, #FFC85A 60%, #E8A23E)',
+      note: 'A stuffed toy. Felt, stitched seams down the flutes, fuzzy edges, and shiny button eyes.',
+      base: '#FFC65A', groove: '#F0A944', grooveShade: ['#9A5A0C', .18], grooveTop: ['#7A4508', .6, 1.1], stitch: '2.4 2', lip: ['#FFF0CC', .35, 1.6],
+      shade: [[0, '#FFF1D0', .3], [.14, '#FFFFFF', 0], [.6, '#FFFFFF', 0], [.86, '#7A4508', .1], [1, '#5A3206', .26]],
+      vshade: [[0, '#FFFFFF', .06], [.3, '#FFFFFF', 0], [.7, '#5A3206', 0], [1, '#5A3206', .18]],
+      bands: [], spec: { o: 0, rx: 1, ry: 1 }, rimL: ['#FFF4DC', .5], rim: ['#FFF4DC', .45], rimW: 7, texture: 'felt', textureOpacity: .7,
+      outline: ['#FFC65A', .95, 2.4, '.01 2.3'],
+      eye: '#232834', blush: '#FF7A5C', dots: '#A8BCD1', chip: '#FFE2A0', sparkle: '#FFF2C8', shadow: DARK_SHADOW,
+    },
+    blueprint: {
+      label: 'Blueprint', swatch: 'repeating-linear-gradient(0deg, rgba(255,255,255,.3) 0 1px, transparent 1px 6px), repeating-linear-gradient(90deg, rgba(255,255,255,.3) 0 1px, transparent 1px 6px), #2563B8',
+      note: 'System design mode. A line drawing on a grid with a centerline, and the flutes on the back drawn dashed like a proper technical drawing.',
+      base: '#2563B8', groove: 'none', grooveShade: ['#000000', 0], grooveTop: ['#FFFFFF', .9, 1], lip: ['#FFFFFF', .9, 1], lipFalloff: 1,
+      backStroke: ['#FFFFFF', .4, .8, '3 2'],
+      shade: [[0, '#FFFFFF', .06], [.3, '#FFFFFF', 0], [.7, '#000', 0], [1, '#0A1E40', .3]],
+      vshade: [[0, '#FFFFFF', 0], [1, '#FFFFFF', 0]],
+      bands: [], spec: { o: 0, rx: 1, ry: 1 }, rim: ['#FFFFFF', 0], texture: 'grid', textureOpacity: .3,
+      outline: ['#FFFFFF', .95, 1.3], centerline: ['#FFFFFF', .45],
+      eye: '#FFFFFF', blush: '#7FB2FF', dots: '#FFFFFF', chip: '#FFFFFF', sparkle: '#FFFFFF', shadow: [[0, '#2563B8', .5], [1, '#2563B8', 0]],
+    },
+  };
+
+  const MOODS = {
+    idle:      { label: 'Idle', note: 'Just vibing. Blinks, breathes, glances around.', ew: 6, l: [9, 9], r: [9, 9], spin: .35, float: 3 },
+    listening: { label: 'Listening', note: 'Big eyes, leans in. All ears, no ears.', ew: 6.6, l: [10.2, 10.2], r: [10.2, 10.2], spin: .2, float: 2, lean: 1.8, blush: .35 },
+    thinking:  { label: 'Thinking', note: 'Squints, looks up, dots orbit. Working on it.', ew: 5.8, l: [8.6, 8.6], r: [5.6, 8.6], spin: 1.2, float: 3, look: [.62, -.85], dots: 1 },
+    talking:   { label: 'Talking', note: 'The mouth only shows up when it has something to say.', ew: 6, l: [8.8, 8], r: [8.8, 8], spin: .5, float: 2.4, mouth: 'talk', blush: .25 },
+    happy:     { label: 'Happy', note: 'You nailed it. Hops, squishes, sparkles.', ew: 6.4, l: [7.2, -3.6], r: [7.2, -3.6], spin: 2.4, float: 2, mouth: .5, blush: 1, hop: true, noBlink: true },
+    drilling:  { label: 'Drilling', note: 'Digging into your answer. Locks in, spins up, flicks shavings.', ew: 6.2, l: [4, 8.8], r: [4, 8.8], spin: 14, float: .6, sink: 8, squash: -.035, chips: true, shake: 1 },
+  };
+
+  const pointer = { x: 0, y: 0, at: -1e9 };
+  addEventListener('pointermove', e => { pointer.x = e.clientX; pointer.y = e.clientY; pointer.at = performance.now() / 1000; }, { passive: true });
+
+  const stops = list => list.map(([o, c, a]) => `<stop offset="${o}" stop-color="${c}" stop-opacity="${a}"/>`).join('');
+  const sp = (v, k, c) => ({ v, t: v, vel: 0, k, c });
+  let count = 0;
+
+  class Bit {
+    constructor(host, { finish = 'satin', mood = 'idle', tracks = true, still = false, viewBox = '0 0 200 220' } = {}) {
+      Object.assign(this, { host, finish, mood, baseMood: mood, tracks, still, viewBox });
+      this.uid = `b${count++}`;
+      this.seed = Math.random() * 10;
+      this.phase = Math.random() * TAU;
+      this.look = { x: 0, y: 0 };
+      this.glanceIn = 1 + Math.random() * 2;
+      this.blink = { next: 1 + Math.random() * 3, t: -1 };
+      this.hopIn = 0; this.hops = 0; this.orbit = Math.random() * TAU; this.chipAcc = 0; this.emberAcc = 0; this.particles = [];
+      this.near = 0; this.burstNext = false;
+      this.visible = true;
+      this.s = {
+        lookX: sp(0, 140, 17), lookY: sp(0, 140, 17), headX: sp(0, 90, 12), tipX: sp(0, 40, 6),
+        sy: sp(1, 260, 11), hop: sp(0, 70, 7), sink: sp(0, 40, 12),
+        ew: sp(5.6, 320, 26), lt: sp(8.4, 320, 26), lb: sp(8.4, 320, 26), rt: sp(8.4, 320, 26), rb: sp(8.4, 320, 26),
+        mouth: sp(0, 600, 40), blush: sp(0, 60, 14), spin: sp(still ? 0 : .35, 8, 5.5), dots: sp(0, 50, 14), near: sp(0, 40, 12),
+      };
+      this.render();
+      new IntersectionObserver(([e]) => { this.visible = e.isIntersecting; }).observe(host);
+    }
+
+    setMood(mood) {
+      clearTimeout(this.boopTimer);
+      if (mood === 'happy' && this.mood !== 'happy') { this.hopIn = .05; this.hops = 0; }
+      this.mood = this.baseMood = mood;
+    }
+
+    setFinish(finish) { this.finish = finish; this.render(); }
+
+    boop() {
+      this.s.sy.vel -= 3.2;
+      this.s.headX.vel += (Math.random() - .5) * 90;
+      this.s.spin.vel += 12;
+      this.burstNext = true;
+      if (this.mood !== 'happy') { this.hopIn = .12; this.hops = 0; }
+      this.mood = 'happy';
+      clearTimeout(this.boopTimer);
+      this.boopTimer = setTimeout(() => { this.mood = this.baseMood; }, 1500);
+    }
+
+    render() {
+      const f = FINISHES[this.finish], u = this.uid;
+      const eye = side => `<g data-r="eye${side}">
+          ${f.eyeGlow ? `<path data-r="eye${side}Glow" fill="${f.eyeGlow[0]}" fill-opacity=".5" stroke="${f.eyeGlow[0]}" stroke-opacity="${f.eyeGlow[1]}" stroke-width="${f.eyeGlow[2]}" stroke-linejoin="round" filter="url(#${u}-blur)"/>` : ''}
+          <path data-r="eye${side}Path" fill="${f.eye}" stroke="${f.eye}" stroke-width="1.2" stroke-linejoin="round"/>
+          <ellipse data-r="eye${side}Refl" fill="#fff" fill-opacity=".16"/>
+          <circle data-r="eye${side}Glint" r="1.7" fill="#fff"/>
+          <circle data-r="eye${side}Glint2" r=".8" fill="#fff" fill-opacity=".85"/>
+        </g>`;
+      const rimL = f.rimL || ['#FFFFFF', 0], fall = f.lipFalloff ?? .2;
+      this.host.innerHTML = `<svg viewBox="${this.viewBox}" aria-hidden="true">
+        <defs>
+          <clipPath id="${u}-clip"><path data-r="clip"/></clipPath>
+          <linearGradient id="${u}-shade">${stops(f.shade)}</linearGradient>
+          <linearGradient id="${u}-vshade" x1="0" x2="0" y1="0" y2="1">${stops(f.vshade)}</linearGradient>
+          <linearGradient id="${u}-rim">${stops([[0, rimL[0], rimL[1]], [.16, rimL[0], 0], [.72, f.rim[0], 0], [1, f.rim[0], f.rim[1]]])}</linearGradient>
+          <linearGradient id="${u}-lip">${stops([[0, f.lip[0], f.lip[1]], [.5, f.lip[0], f.lip[1] * (fall + (1 - fall) * .75)], [1, f.lip[0], f.lip[1] * fall]])}</linearGradient>
+          ${f.caustic ? `<radialGradient id="${u}-caustic">${stops([[0, f.caustic, .9], [.5, f.caustic, .35], [1, f.caustic, 0]])}</radialGradient>` : ''}
+          <radialGradient id="${u}-blush">${stops([[0, f.blush, .95], [.55, f.blush, .55], [1, f.blush, 0]])}</radialGradient>
+          <radialGradient id="${u}-tip">${stops([[0, '#fff', f.tipGlint || 0], [1, '#fff', 0]])}</radialGradient>
+          <filter id="${u}-mblur" x="-.1" y="-.3" width="1.2" height="1.6"><feGaussianBlur data-r="mblur" stdDeviation="0 0"/></filter>
+          <radialGradient id="${u}-spec">${stops([[0, '#fff', f.spec.o], [.55, '#fff', f.spec.o * .35], [1, '#fff', 0]])}</radialGradient>
+          ${f.glow ? `<radialGradient id="${u}-glow" cx=".42" cy=".34" r=".62">${stops(f.glow)}</radialGradient>` : ''}
+          <radialGradient id="${u}-shadow">${stops(f.shadow)}</radialGradient>
+          ${f.eyeGlow ? `<filter id="${u}-blur" x="-1" y="-1" width="3" height="3"><feGaussianBlur stdDeviation="2.4"/></filter>` : ''}
+          ${f.bandBlur ? `<filter id="${u}-hblur" x="-.5" y="-.1" width="2" height="1.2"><feGaussianBlur stdDeviation="${f.bandBlur}"/></filter>` : ''}
+          ${f.texture ? `<pattern id="${u}-tex" data-r="tex" patternUnits="userSpaceOnUse" width="80" height="80"><image href="${TEXTURES[f.texture]}" width="80" height="80"/></pattern>` : ''}
+        </defs>
+        <ellipse data-r="shadow" fill="url(#${u}-shadow)"/>
+        <ellipse data-r="shadowCore" fill="url(#${u}-shadow)"/>
+        ${f.caustic ? `<ellipse data-r="caustic" fill="url(#${u}-caustic)"/>` : ''}
+        <g data-r="dotsBack" fill="${f.dots}"><circle/><circle/><circle/></g>
+        <path data-r="base" fill="${f.base}"/>
+        <g clip-path="url(#${u}-clip)">
+          ${f.glow ? `<path data-r="glow" fill="url(#${u}-glow)"/>` : ''}
+          ${f.back ? `<path data-r="back" fill="${f.back[0]}" fill-opacity="${f.back[1]}"/>` : ''}
+          ${f.backStroke ? `<path data-r="back" fill="none" stroke="${f.backStroke[0]}" stroke-opacity="${f.backStroke[1]}" stroke-width="${f.backStroke[2]}" stroke-dasharray="${f.backStroke[3]}"/>` : ''}
+          ${(f.bubbles || []).map((_, i) => `<circle data-r="bub${i}" fill="#fff" fill-opacity=".16" stroke="#fff" stroke-opacity=".6" stroke-width=".6"/>`).join('')}
+          <g data-r="flutes">
+            ${f.grooveGlow ? `<path data-r="grooveGlow" fill="none" stroke="${f.grooveGlow[0]}" stroke-opacity="${f.grooveGlow[1]}" stroke-width="${f.grooveGlow[2]}" stroke-linejoin="round"/>` : ''}
+            <path data-r="groove" fill="${f.groove}"/>
+            <path data-r="grooveShade" fill="${f.grooveShade[0]}" fill-opacity="${f.grooveShade[1]}"/>
+            <path data-r="grooveTop" fill="none" stroke="${f.grooveTop[0]}" stroke-opacity="${f.grooveTop[1]}" stroke-width="${f.grooveTop[2]}" stroke-linecap="round" ${f.stitch ? `stroke-dasharray="${f.stitch}"` : ''}/>
+            <path data-r="lip" fill="none" stroke="url(#${u}-lip)" stroke-width="${f.lip[2]}" stroke-linecap="round"/>
+          </g>
+          ${f.texture ? `<rect x="-40" y="-40" width="280" height="300" fill="url(#${u}-tex)" opacity="${f.textureOpacity ?? .4}"/>` : ''}
+          <path data-r="shade" fill="url(#${u}-shade)"/>
+          <path data-r="vshade" fill="url(#${u}-vshade)"/>
+          <g ${f.bandBlur ? `filter="url(#${u}-hblur)"` : ''}>${f.bands.map((b, i) => b.layers.map(([, o], j) => `<path data-r="hl${i}_${j}" fill="${b.color}" fill-opacity="${o}"/>`).join('')).join('')}</g>
+          <ellipse data-r="spec" fill="url(#${u}-spec)"/>
+          ${f.dot ? `<circle data-r="specDot" r="1.7" fill="#fff" fill-opacity="${f.dot}"/>` : ''}
+          ${f.tipGlint ? `<ellipse data-r="tipGlint" rx="2" ry="6" fill="url(#${u}-tip)"/>` : ''}
+          <path data-r="rim" fill="none" stroke="url(#${u}-rim)" stroke-width="${f.rimW || 3.2}"/>
+        </g>
+        ${f.outline ? `<path data-r="outline" fill="none" stroke="${f.outline[0]}" stroke-opacity="${f.outline[1]}" stroke-width="${f.outline[2]}" stroke-linecap="round" stroke-linejoin="round" ${f.outline[3] ? `stroke-dasharray="${f.outline[3]}"` : ''}/>` : ''}
+        ${f.centerline ? `<path data-r="center" fill="none" stroke="${f.centerline[0]}" stroke-opacity="${f.centerline[1]}" stroke-width=".7" stroke-dasharray="9 2.5 1.5 2.5"/>` : ''}
+        <g>
+          <ellipse data-r="blushL" rx="7" ry="4" fill="url(#${u}-blush)"/>
+          <ellipse data-r="blushR" rx="7" ry="4" fill="url(#${u}-blush)"/>
+          ${eye('L')}${eye('R')}
+          <path data-r="mouth" fill="${f.eye}"/>
+        </g>
+        <g data-r="dotsFront" fill="${f.dots}"><circle/><circle/><circle/></g>
+        <g data-r="chips">${'<circle r="0"/>'.repeat(18)}</g>
+      </svg>`;
+      this.el = {};
+      this.host.querySelectorAll('[data-r]').forEach(n => { this.el[n.dataset.r] = n; });
+    }
+
+    aim(t, dt) {
+      if (this.tracks && t - pointer.at < 2.5) {
+        const r = this.host.getBoundingClientRect(), span = Math.max(r.width, 180);
+        const dx = pointer.x - r.left - r.width / 2, dy = pointer.y - r.top - r.height * .4;
+        this.look.x = clamp(dx / span * 1.6);
+        this.look.y = clamp(dy / span * 1.6);
+        this.near = clamp(1 - Math.hypot(dx, dy) / (span * .8), 0, 1);
+        return;
+      }
+      this.near = 0;
+      if (REDUCED || this.still) return;
+      this.glanceIn -= dt;
+      if (this.glanceIn > 0) return;
+      this.glanceIn = 1.4 + Math.random() * 2.6;
+      const next = Math.random() < .6 ? { x: Math.random() * 1.5 - .75, y: Math.random() * .9 - .45 } : { x: 0, y: 0 };
+      if (Math.hypot(next.x - this.look.x, next.y - this.look.y) > .6 && this.blink.t < 0 && Math.random() < .6) this.blink.t = 0;
+      this.look = next;
+    }
+
+    blinkAmount(dt, m) {
+      if (REDUCED || m.noBlink) { this.blink.t = -1; return 0; }
+      this.blink.next -= dt;
+      if (this.blink.next <= 0 && this.blink.t < 0) {
+        this.blink.t = 0;
+        this.blink.next = Math.random() < .18 ? .32 : 2.2 + Math.random() * 3.4;
+      }
+      if (this.blink.t < 0) return 0;
+      this.blink.t += dt;
+      const p = this.blink.t / .17;
+      if (p >= 1) { this.blink.t = -1; return 0; }
+      return p < .45 ? Math.sin(p / .45 * Math.PI / 2) : .5 + .5 * Math.cos((p - .45) / .55 * Math.PI);
+    }
+
+    emit(p) { if (this.particles.length < 18) this.particles.push(p); }
+
+    burst(f, X, Y) {
+      for (let i = 0; i < 7; i++) {
+        const a = -Math.PI + Math.PI * (i + .5) / 7 + (Math.random() - .5) * .3, v = 70 + Math.random() * 50;
+        this.emit({ x: X(10) + Math.cos(a) * 30, y: Y(10) + Math.sin(a) * 14, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 20, g: 60, life: 0, max: .6 + Math.random() * .3, r: 1.5 + Math.random(), color: f.sparkle });
+      }
+    }
+
+    update(dt, t) {
+      const f = FINISHES[this.finish], m = MOODS[this.mood], s = this.s, el = this.el;
+      const calm = REDUCED || this.still;
+      this.aim(t, dt);
+      const blink = this.blinkAmount(dt, m);
+      const look = m.look || [this.look.x, this.look.y];
+      const near = s.near.v, opened = v => v > 0 ? v + near * .9 : v;
+      s.near.t = m.chips ? 0 : this.near;
+      s.lookX.t = look[0]; s.lookY.t = look[1];
+      s.headX.t = s.lookX.v * 5 * (m.lean || 1) + (calm || m.chips ? 0 : Math.sin(t * .8 + this.seed) * 1.4);
+      s.tipX.t = s.headX.v * .2;
+      s.ew.t = m.ew + near * .35;
+      [s.lt.t, s.lb.t] = m.l.map(opened); [s.rt.t, s.rb.t] = m.r.map(opened);
+      s.mouth.t = m.mouth === 'talk' ? (REDUCED ? .5 : talk(t + this.seed)) : (m.mouth || 0);
+      s.blush.t = m.blush || 0;
+      s.spin.t = calm ? 0 : m.spin + near * .8;
+      s.dots.t = m.dots || 0;
+      s.sink.t = this.still ? 0 : m.sink || 0;
+      s.sy.t = 1 + (this.still ? 0 : m.squash || 0) + (calm ? 0 : Math.sin(t * 1.6 + this.seed - .9) * .014)
+        - blink * .025 + s.mouth.v * .025 - (m.hop && !calm && this.hopIn < .16 ? .08 : 0);
+
+      const X0 = u => CX + s.headX.v * Math.pow(1 - u / H, 1.4), Y0 = u => TOP + PIV + (u - PIV) * s.sy.v;
+      if (m.hop && !calm) {
+        this.hopIn -= dt;
+        if (this.hopIn <= 0) {
+          s.hop.vel -= 210; s.sy.vel += 2.2;
+          if (this.hops++ % 3 === 0) this.burst(f, X0, Y0);
+          this.hopIn = 1.05;
+        }
+      }
+      if (this.burstNext) { this.burstNext = false; if (!calm) this.burst(f, X0, Y0); }
+
+      const h = dt / 2;
+      for (const k in s) {
+        const p = s[k];
+        if (REDUCED) { p.v = p.t; p.vel = 0; continue; }
+        for (let i = 0; i < 2; i++) { p.vel += (p.k * (p.t - p.v) - p.c * p.vel) * h; p.v += p.vel * h; }
+      }
+      this.phase = ((this.phase + s.spin.v * dt) % TAU + TAU) % TAU;
+
+      const floatY = calm ? 0 : Math.sin(t * 1.6 + this.seed) * (m.float ?? 3);
+      const shake = m.shake && !calm ? Math.sin(t * 70) * .7 * m.shake : 0;
+      const sy = s.sy.v, sx = 1 / Math.sqrt(sy), hx = s.headX.v, tx = s.tipX.v;
+      const baseY = TOP + floatY + s.hop.v + s.sink.v;
+      const Y = u => baseY + PIV + (u - PIV) * sy;
+      const X = u => CX + shake + tx + (hx - tx) * Math.pow(1 - u / H, 1.4);
+      const at = (u, a) => { const v = clamp(u, 0, H); return [X(v) + radius(v) * sx * Math.sin(a), Y(v)]; };
+
+      // Each flute is a helix u(a) = U0 - PITCH * a / TAU that only exists below FLUTE_T.
+      const gh = f.grooveH || 14;
+      const U0s = [0, 1].map(k => FLUTE_T + PITCH * (this.phase + k * Math.PI) / TAU);
+      const notch = (u, a) => {
+        let best = 0;
+        for (const U0 of U0s) {
+          const d = ((u - U0 + PITCH * a / TAU) % PITCH + PITCH) % PITCH, open = ramp(u - d), g = gh * open;
+          if (d < g) best = Math.max(best, open * Math.sin(Math.PI * d / g));
+        }
+        return best;
+      };
+      // The outline is the outermost surface point around the edge, so the land on either side of a flute
+      // cuts the notch into a V whose sides are the flute edges themselves.
+      const indent = (u, side) => {
+        if (notch(u, side) === 0) return 0;
+        const r = radius(u) * sx, depth = NOTCH * radius(u) / R;
+        let best = 0;
+        for (let i = -24; i <= 24; i++) {
+          const da = i * .03, x = (r - depth * notch(u, side + da)) * Math.cos(da);
+          if (x > best) best = x;
+        }
+        return r - best;
+      };
+      // Resample each edge densely inside every flute crossing so notches keep their shape while they move.
+      const edgeTs = side => {
+        const extra = [], skip = [];
+        for (const U0 of U0s) for (let m = -2; m <= 3; m++) {
+          const uc = U0 - PITCH * (side + TAU * m) / TAU, g = gh * ramp(uc);
+          if (g < .05 || uc >= H) continue;
+          for (let k = 0; k <= 16; k++) { const t = uc + g * k / 16; if (t < H) extra.push(t); }
+          skip.push([uc - .7, uc + g + .7]);
+        }
+        return [...TS.filter(t => t === 0 || t === H || !skip.some(([a, b]) => t > a && t < b)), ...extra].sort((a, b) => a - b);
+      };
+      const edge = (t, dir) => [X(t) + dir * (radius(t) * sx - indent(t, dir * Math.PI / 2)), Y(t)];
+      const right = edgeTs(Math.PI / 2), left = edgeTs(-Math.PI / 2);
+      const pts = [...right.map(t => edge(t, 1)), ...left.slice(1, -1).reverse().map(t => edge(t, -1))];
+      const body = loop(pts);
+      for (const k of ['clip', 'base', 'glow', 'shade', 'vshade', 'rim', 'outline']) el[k]?.setAttribute('d', body);
+      if (el.center) {
+        const axis = [[X(0), Y(0) - 14]];
+        for (let u = 0; u <= H; u += 14.6) axis.push([X(u), Y(u)]);
+        axis.push([X(H), Y(H) + 14]);
+        el.center.setAttribute('d', curve(axis));
+      }
+
+      let bands = '', shades = '', tops = '', lips = '', backs = '';
+      const poly = (a, b) => curve(a) + curve(b.slice().reverse(), false) + 'Z';
+      const pass = (U0, a1, a2) => {
+        const end = Math.min(a2, (U0 - FLUTE_T) * TAU / PITCH);
+        if (end <= a1 + .002 || U0 - PITCH * end / TAU > H + 1) return null;
+        // Fixed angular grid plus the exact run-out point, so the V tip slides instead of stepping.
+        const step = Math.PI / M, angles = [];
+        for (let a = a1; a < end - step * .3; a += step) angles.push(a);
+        angles.push(end);
+        if (angles.length < 2) angles.unshift(a1);
+        const up = [], mid = [], lo = [];
+        for (const a of angles) {
+          const u = U0 - PITCH * a / TAU, g = gh * ramp(u);
+          up.push(at(u, a)); mid.push(at(u + g * .42, a)); lo.push(at(u + g, a));
+        }
+        return { up, mid, lo, top: curve(up), lip: curve(lo) };
+      };
+      for (const U0 of U0s) {
+        for (let n = -3; n <= 2; n++) {
+          const a = TAU * n, front = pass(U0, a - Math.PI / 2, a + Math.PI / 2);
+          if (front) { bands += poly(front.up, front.lo); shades += poly(front.up, front.mid); tops += front.top; lips += front.lip; }
+          if (el.back) { const back = pass(U0, a + Math.PI / 2, a + Math.PI * 1.5); if (back) backs += poly(back.up, back.lo); }
+        }
+      }
+      el.groove.setAttribute('d', bands);
+      el.grooveGlow?.setAttribute('d', bands);
+      el.grooveShade.setAttribute('d', shades);
+      el.grooveTop.setAttribute('d', tops);
+      el.lip.setAttribute('d', lips);
+      el.back?.setAttribute('d', backs);
+      el.tex?.setAttribute('patternTransform', `translate(${fx(hx + shake)} ${fx(baseY - TOP)})`);
+
+      const blur = clamp((Math.abs(s.spin.v) - 4) / 9, 0, 1);
+      if (blur > .02) { el.mblur.setAttribute('stdDeviation', `0 ${fx(blur * 2.2)}`); el.flutes.setAttribute('filter', `url(#${this.uid}-mblur)`); }
+      else el.flutes.removeAttribute('filter');
+      if (f.flicker) {
+        const heat = calm ? 1 : .8 + .2 * (Math.sin(t * 13.1) * .5 + Math.sin(t * 7.3 + 1) * .3 + Math.sin(t * 23.7) * .2);
+        el.grooveGlow.setAttribute('stroke-opacity', fx(f.grooveGlow[1] * heat * (1 + blur * .6)));
+        el.groove.setAttribute('fill-opacity', fx(.82 + .18 * heat));
+        for (const side of ['L', 'R']) el[`eye${side}Glow`].setAttribute('opacity', fx(calm ? 1 : .75 + .25 * Math.sin(t * 2.1 + this.seed)));
+      }
+      (f.bubbles || []).forEach(([u, a0, r], i) => {
+        const a = a0 + this.phase, c = Math.cos(a), v = clamp(u, 0, H), b = el[`bub${i}`];
+        b.setAttribute('cx', fx(X(v) + radius(v) * sx * .72 * Math.sin(a))); b.setAttribute('cy', fx(Y(v)));
+        b.setAttribute('r', fx(r * (.8 + .2 * c))); b.setAttribute('opacity', fx(.35 + .65 * Math.max(0, c)));
+      });
+
+      f.bands.forEach((b, i) => b.layers.forEach(([w], j) => {
+        const L = [], Rr = [];
+        for (let q = 0; q <= S; q++) {
+          const u = TS[q];
+          if (u < b.t[0] || u > b.t[1]) continue;
+          const half = w / 2 * Math.sqrt(Math.sin(Math.PI * (u - b.t[0]) / (b.t[1] - b.t[0])));
+          L.push([X(u) + RS[q] * sx * Math.sin(b.a - half), Y(u)]);
+          Rr.push([X(u) + RS[q] * sx * Math.sin(b.a + half), Y(u)]);
+        }
+        el[`hl${i}_${j}`].setAttribute('d', curve(L) + curve(Rr.reverse(), false) + 'Z');
+      }));
+
+      const [scx, scy] = at(14, -.62);
+      el.spec.setAttribute('cx', fx(scx)); el.spec.setAttribute('cy', fx(scy));
+      el.spec.setAttribute('rx', fx(f.spec.rx * sx)); el.spec.setAttribute('ry', fx(f.spec.ry * sy));
+      el.spec.setAttribute('transform', `rotate(-24 ${fx(scx)} ${fx(scy)})`);
+      if (el.specDot) { const [dx, dy] = at(9, -.22); el.specDot.setAttribute('cx', fx(dx)); el.specDot.setAttribute('cy', fx(dy)); }
+      if (el.tipGlint) {
+        const [gx, gy] = at(H - 17, -.55), [ax, ay] = at(H - 26, -.55), [bx, by] = at(H - 8, -.55);
+        el.tipGlint.setAttribute('cx', fx(gx)); el.tipGlint.setAttribute('cy', fx(gy));
+        el.tipGlint.setAttribute('transform', `rotate(${fx(Math.atan2(by - ay, bx - ax) * 180 / Math.PI - 90)} ${fx(gx)} ${fx(gy)})`);
+      }
+
+      const phi = s.lookX.v * .55, ly = s.lookY.v;
+      const place = (node, u, a, extra = '') => {
+        const c = Math.cos(a), [x, y] = at(u, a);
+        node.setAttribute('transform', `translate(${fx(x)} ${fx(y)}) scale(${fx(Math.max(c, 0))} 1)${extra}`);
+        return c;
+      };
+      const ue = EYE_T + ly * 3.4, k = 1 - .92 * blink;
+      for (const [side, dir, top, bot] of [['L', -1, s.lt.v, s.lb.v], ['R', 1, s.rt.v, s.rb.v]]) {
+        const c = place(el[`eye${side}`], ue, phi + dir * .37);
+        el[`eye${side}`].setAttribute('opacity', c > .12 ? 1 : 0);
+        const tp = top * k, bt = bot * k, d = eyePath(s.ew.v, tp, bt);
+        el[`eye${side}Path`].setAttribute('d', d);
+        el[`eye${side}Glow`]?.setAttribute('d', d);
+        const g = el[`eye${side}Glint`], g2 = el[`eye${side}Glint2`], refl = el[`eye${side}Refl`];
+        const shine = clamp((Math.min(tp, bt) - 3) / 4, 0, 1);
+        g.setAttribute('cx', fx(-s.ew.v * .3)); g.setAttribute('cy', fx(-tp * .42)); g.setAttribute('opacity', fx(shine));
+        g2.setAttribute('cx', fx(s.ew.v * .3)); g2.setAttribute('cy', fx(bt * .28)); g2.setAttribute('opacity', fx(shine));
+        refl.setAttribute('cy', fx(bt * .55)); refl.setAttribute('rx', fx(s.ew.v * .55)); refl.setAttribute('ry', fx(clamp(bt * .2, 0, 2)));
+        refl.setAttribute('opacity', fx(shine));
+      }
+      const ub = EYE_T + 8.5 + ly * 3.4;
+      for (const [side, dir] of [['L', -1], ['R', 1]]) {
+        const c = place(el[`blush${side}`], ub, phi + dir * .72);
+        el[`blush${side}`].setAttribute('opacity', fx(c > 0 ? s.blush.v * .6 : 0));
+      }
+      const mo = Math.max(0, s.mouth.v);
+      place(el.mouth, EYE_T + 13 + ly * 3.4, phi);
+      el.mouth.setAttribute('d', mouthPath(mo));
+      el.mouth.setAttribute('opacity', fx(clamp(mo * 6, 0, 1)));
+
+      this.orbit += dt * (calm ? 0 : 2.4);
+      const [ocx, ocy] = [X(8), Y(4) - 4], orx = (R + 15) * sx, dots = clamp(s.dots.v, 0, 1);
+      el.dotsFront.setAttribute('opacity', fx(dots)); el.dotsBack.setAttribute('opacity', fx(dots * .55));
+      [3.2, 2.5, 1.9].forEach((size, i) => {
+        const th = this.orbit - i * .45, sin = Math.sin(th), r = dots > .01 ? size * (.85 + .15 * sin) : 0;
+        const front = el.dotsFront.children[i], back = el.dotsBack.children[i];
+        for (const [node, on] of [[front, sin > 0], [back, sin <= 0]]) {
+          node.setAttribute('cx', fx(ocx + orx * Math.cos(th))); node.setAttribute('cy', fx(ocy + 8 * sin));
+          node.setAttribute('r', on ? fx(r) : 0);
+        }
+      });
+
+      if (m.chips && !calm) {
+        this.chipAcc += dt * 24;
+        while (this.chipAcc >= 1) {
+          this.chipAcc--;
+          const u = FLUTE_T + 10 + Math.random() * (H - FLUTE_T - 26), side = Math.random() < .5 ? -1 : 1;
+          this.emit({ x: X(u) + side * radius(u) * sx, y: Y(u), vx: side * (40 + Math.random() * 70), vy: -(40 + Math.random() * 80), g: 300, life: 0, max: .5 + Math.random() * .4, r: 1.3 + Math.random() * 1.5, color: f.chip });
+        }
+      }
+      if (f.embers && !m.chips && !calm) {
+        this.emberAcc += dt * 1.4;
+        while (this.emberAcc >= 1) {
+          this.emberAcc--;
+          const u = FLUTE_T + 14 + Math.random() * 50, a = (Math.random() - .5) * 2.4;
+          const [ex, ey] = at(u, a);
+          this.emit({ x: ex, y: ey, vx: (Math.random() - .5) * 10, vy: -(14 + Math.random() * 16), g: -4, life: 0, max: 1.6 + Math.random() * .9, r: .8 + Math.random() * .8, color: f.chip });
+        }
+      }
+      this.particles = this.particles.filter(p => (p.life += dt) < p.max);
+      const chips = el.chips.children;
+      for (let i = 0; i < chips.length; i++) {
+        const p = this.particles[i], c = chips[i];
+        if (!p) { c.setAttribute('r', 0); continue; }
+        p.vy += p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+        const life = 1 - p.life / p.max;
+        c.setAttribute('cx', fx(p.x)); c.setAttribute('cy', fx(p.y));
+        c.setAttribute('r', fx(p.r * (.5 + .5 * life))); c.setAttribute('fill', p.color); c.setAttribute('opacity', fx(life));
+      }
+
+      const gap = FLOOR - Y(H), sk = clamp(1.3 - gap / 38, .3, 1);
+      el.shadow.setAttribute('cx', fx(X(H))); el.shadow.setAttribute('cy', FLOOR);
+      el.shadow.setAttribute('rx', fx(34 * sk)); el.shadow.setAttribute('ry', fx(5.5 * sk));
+      el.shadow.setAttribute('opacity', fx(this.still ? 0 : sk * .8));
+      el.shadowCore.setAttribute('cx', fx(X(H))); el.shadowCore.setAttribute('cy', FLOOR);
+      el.shadowCore.setAttribute('rx', fx(15 * sk)); el.shadowCore.setAttribute('ry', fx(2.6 * sk));
+      el.shadowCore.setAttribute('opacity', fx(this.still ? 0 : sk * sk));
+      if (el.caustic) {
+        el.caustic.setAttribute('cx', fx(X(H))); el.caustic.setAttribute('cy', FLOOR);
+        el.caustic.setAttribute('rx', fx(10 * sk)); el.caustic.setAttribute('ry', fx(1.8 * sk));
+        el.caustic.setAttribute('opacity', fx(this.still ? 0 : sk * sk));
+      }
+    }
+  }
+
+  const state = { finish: 'satin', mood: 'idle' };
+  const bits = [];
+  const host = cls => { const n = document.createElement('span'); n.className = `bit ${cls || ''}`; return n; };
+
+  const heroStage = document.getElementById('hero');
+  const heroHost = host();
+  heroStage.append(heroHost);
+  const hero = new Bit(heroHost);
+  bits.push(hero);
+  heroStage.addEventListener('pointerdown', () => hero.boop());
+  heroStage.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); hero.boop(); } });
+
+  const moodButtons = Object.entries(MOODS).map(([key, m]) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.textContent = m.label; b.setAttribute('aria-pressed', String(key === state.mood));
+    b.addEventListener('click', () => {
+      state.mood = key; hero.setMood(key);
+      moodButtons.forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    });
+    document.getElementById('moods').append(b);
+    return b;
+  });
+
+  const finishBits = [], moodBits = [], iconBits = [];
+  const note = document.getElementById('finish-note');
+  const swatchButtons = {};
+  const finishStages = {};
+  const selectFinish = key => {
+    state.finish = key;
+    note.textContent = FINISHES[key].note;
+    hero.setFinish(key);
+    [...moodBits, ...iconBits].forEach(b => b.setFinish(key));
+    Object.entries(swatchButtons).forEach(([k, b]) => b.setAttribute('aria-pressed', String(k === key)));
+    Object.entries(finishStages).forEach(([k, b]) => b.setAttribute('aria-pressed', String(k === key)));
+  };
+
+  for (const [key, f] of Object.entries(FINISHES)) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.innerHTML = `<span class="swatch" style="background: ${f.swatch}"></span>${f.label}`;
+    b.addEventListener('click', () => selectFinish(key));
+    document.getElementById('finishes').append(b);
+    swatchButtons[key] = b;
+
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.innerHTML = `<button type="button" class="stage" aria-label="Use the ${f.label} finish"></button><span class="caption"><b>${f.label}</b></span>`;
+    const stage = cell.querySelector('.stage');
+    const h = host();
+    stage.append(h);
+    stage.addEventListener('click', () => { selectFinish(key); finishBits.find(x => x.finish === key)?.boop(); });
+    finishStages[key] = stage;
+    document.getElementById('finish-row').append(cell);
+    finishBits.push(new Bit(h, { finish: key }));
+  }
+
+  for (const [key, m] of Object.entries(MOODS)) {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.innerHTML = `<div class="stage" role="img" aria-label="Bit, ${m.label.toLowerCase()}"></div><span class="caption"><b>${m.label}</b>${m.note}</span>`;
+    const h = host();
+    cell.querySelector('.stage').append(h);
+    document.getElementById('mood-row').append(cell);
+    moodBits.push(new Bit(h, { mood: key }));
+  }
+
+  for (const size of [180, 120, 60, 40, 29]) {
+    const cell = document.createElement('div');
+    cell.className = 'icon';
+    cell.innerHTML = `<span class="tile" style="--s: ${size}px"></span><span class="caption">${size} pt</span>`;
+    const h = host('square');
+    cell.querySelector('.tile').append(h);
+    document.getElementById('icon-row').append(cell);
+    iconBits.push(new Bit(h, { tracks: false, still: true, viewBox: '14 25 172 172' }));
+  }
+
+  bits.push(...finishBits, ...moodBits, ...iconBits);
+  selectFinish(state.finish);
+
+  document.querySelectorAll('#stages button').forEach(b => b.addEventListener('click', () => {
+    document.documentElement.dataset.stage = b.dataset.stage;
+    document.querySelectorAll('#stages button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  }));
+
+  let last = performance.now();
+  const frame = now => {
+    const dt = Math.min(.05, (now - last) / 1000);
+    last = now;
+    for (const b of bits) if (b.visible) b.update(dt, now / 1000);
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+</script>
+</body>
+</html>

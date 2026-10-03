@@ -232,42 +232,81 @@ struct InterviewTests {
     await #expect(throws: ClerkAPIError.self) { try await APIClient.signedOutWhenSessionIsGone { throw offline } }
     #expect(try await APIClient.signedOutWhenSessionIsGone { "token" } == "token")
   }
-  @Test func warmUpIsAGeneratedGuidedInterviewThatLeadsIntoTheTourUncounted() async throws {
+  @Test func firstRepIsACountedGuidedInterviewThatEndsOnboarding() async throws {
     let container = try ModelContainer(for: Schema(StoreV1.models), configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     let model = AppModel(container: container, baseURL: URL(string: "https://example.invalid")!, fixture: true, monitorNetwork: false)
     model.bootstrap = Bootstrap(account: .init(id: "a", status: "active"), settings: PracticeSettings(), challenge: nil, jobs: [])
-    model.settings.onboardingComplete = true
-    try await model.setFirstUse(FirstUseProgress(stage: .walkthrough))
-    let warmUp = try await model.generateForPreview()
-    #expect(warmUp.isWarmUp)
-    #expect(warmUp.guidanceMode == .learnTogether)
-    #expect(model.firstUse.stage == .walkthrough)
-    let opened = try await model.openForPreview(warmUp)
+    try await model.setFirstUse(FirstUseProgress(stage: .firstRep))
+    let first = try await model.generateForPreview()
+    #expect(!first.isWarmUp)
+    #expect(first.guidanceMode == .learnTogether)
+    #expect(first.opener?.isEmpty == false)
+    // The one included swap replaces the ready question in place.
+    let swapped = try await model.generateForPreview()
+    #expect(swapped.id != first.id)
+    #expect(model.bootstrap?.challenge?.id == swapped.id)
+    let opened = try await model.openForPreview(swapped)
     #expect(opened.lifecycle == "in_progress")
     let finished = try await model.finish(opened, answer: "Start with one table of saved links.")
-    #expect(finished.isWarmUp)
-    #expect(model.firstUse.stage == .tourHome)
-    #expect(model.completionNoticeAccount == nil)
-    #expect(model.memory.sessions.isEmpty)
-    // Skipping a fresh warm-up also moves on to the tour.
-    try await model.setFirstUse(FirstUseProgress(stage: .walkthrough))
+    #expect(model.firstUse.stage == .complete)
+    #expect(model.firstUse.firstRepID == finished.id)
+    #expect(model.settings.onboardingComplete)
+    #expect(model.completionNoticeAccount == "a")
+    #expect(model.memory.sessions.first?.id == finished.id)
+    // The reminder is offered once, whatever the answer.
+    await model.answerReminderOffer(false)
+    #expect(model.firstUse.reminderOffered)
+    #expect(!model.settings.reminderEnabled)
+    // Skipping a fresh first rep also ends onboarding.
+    try await model.setFirstUse(FirstUseProgress(stage: .firstRep))
     let skipped = try await model.generateForPreview()
     await model.skip(skipped.id)
-    #expect(model.firstUse.stage == .tourHome)
+    #expect(model.firstUse.stage == .complete)
   }
 
-  @Test func walkthroughProgressRestoresPerAccountAndResetClearsIt() async throws {
+  @Test func freeRepGateAllowsTheIncludedSwapAndSaysWhenTheRepReturns() async throws {
     let container = try ModelContainer(for: Schema(StoreV1.models), configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     let model = AppModel(container: container, baseURL: URL(string: "https://example.invalid")!, fixture: true, monitorNetwork: false)
     model.bootstrap = Bootstrap(account: .init(id: "a", status: "active"), settings: PracticeSettings(), challenge: nil, jobs: [])
-    let progress = FirstUseProgress(stage: .tourRecall)
+    #expect(model.mayStartRep())
+    model.bootstrap?.practice = PracticeAccess(freeReps: true, available: true)
+    let question = try await model.generateForPreview()
+    #expect(question.freeRepAt != nil)
+    #expect(!model.mayStartRep())
+    #expect(model.mayStartRep(swapping: question))
+    let swapped = try await model.generateForPreview(PreparationInput(focus: "System design", kind: "design", difficulty: "medium", replaceId: question.id))
+    #expect(swapped.swapped == true)
+    #expect(!model.mayStartRep(swapping: swapped))
+    let monday = try #require(Calendar.current.date(byAdding: .day, value: 5, to: .now))
+    model.bootstrap?.practice = PracticeAccess(freeReps: true, available: false, nextFreeRepAt: monday.ISO8601Format())
+    #expect(model.nextFreeRep != nil)
+    #expect(AppModel.freeRepLine(monday) == "Your free rep comes back \(monday.formatted(.dateTime.weekday(.wide))).")
+    #expect(AppModel.freeRepLine(.now) == "Your free rep comes back later today.")
+  }
+
+  @Test func setupCountdownIsArithmeticFromTheChosenDate() throws {
+    let calendar = Calendar(identifier: .gregorian)
+    let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 10, day: 2, hour: 22)))
+    let date = { (days: Int) in calendar.date(byAdding: .day, value: days, to: now)! }
+    #expect(SetupView.countdown(to: date(0), now: now, calendar: calendar) == "That’s today. One quick rep to warm up.")
+    #expect(SetupView.countdown(to: date(1), now: now, calendar: calendar) == "That’s tomorrow. One good rep tonight.")
+    #expect(SetupView.countdown(to: date(12), now: now, calendar: calendar) == "12 days out. A rep a day gets you 12 shots.")
+  }
+
+  @Test func firstUseProgressRestoresPerAccountAndResetClearsIt() async throws {
+    let container = try ModelContainer(for: Schema(StoreV1.models), configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+    let model = AppModel(container: container, baseURL: URL(string: "https://example.invalid")!, fixture: true, monitorNetwork: false)
+    model.bootstrap = Bootstrap(account: .init(id: "a", status: "active"), settings: PracticeSettings(), challenge: nil, jobs: [])
+    var progress = FirstUseProgress(stage: .firstRep)
+    progress.firstRepID = "q"
     try await model.setFirstUse(progress)
     let reopened = DiskStore(modelContainer: container)
     let data = try #require(await reopened.cached(key: "first-use:a"))
     #expect(try JSONDecoder().decode(FirstUseProgress.self, from: data) == progress)
-    // Progress saved by the retired authored rehearsal still decodes.
-    let legacy = Data(#"{"stage":"walkthrough","step":"collapse","draft":"","question":"How many?","answer":""}"#.utf8)
-    #expect(try JSONDecoder().decode(FirstUseProgress.self, from: legacy).stage == .walkthrough)
+    // Warm-up and tab-tour stages from earlier builds have nothing left to show.
+    for legacy in [#"{"stage":"walkthrough","step":"collapse","draft":"","question":"How many?","answer":""}"#, #"{"stage":"tourRecall"}"#, #"{"stage":"chooseMode"}"#] {
+      #expect(try JSONDecoder().decode(FirstUseProgress.self, from: Data(legacy.utf8)).stage == .complete)
+    }
     #expect(try await reopened.cached(key: "first-use:b") == nil)
     try await reopened.clearPractice(account: "b")
     #expect(try await reopened.cached(key: "first-use:a") != nil)

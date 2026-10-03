@@ -253,6 +253,9 @@ for (const [method, path, summary, schema] of operations) {
         content: json("Error"),
       },
       "429": { description: "Usage limit reached", content: json("Error") },
+      ...(["post challenges", "post jobs/{id}/retry", "post questions/{id}/start", "post challenges/{id}/retry-moment/{turn}"].includes(method + " " + path)
+        ? { "402": { description: "Free rep already used; code practice_gate. Bootstrap practice.nextFreeRepAt says when it returns.", content: json("Error") } }
+        : {}),
     },
   };
 }

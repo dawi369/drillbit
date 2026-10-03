@@ -2,6 +2,7 @@ import { Temporal } from '@js-temporal/polyfill';
 import { z } from 'zod';
 import { Fault, reflectionSchema, timestamp } from './domain';
 import { consumeUsage, type Env } from './platform';
+import { onFreeReps } from './practice-gate';
 import { guidanceModeSchema } from './prompts/teaching';
 import { activeChallenge, createJob, detail, followUpContext, ownedChallenge, settingsFor } from './store';
 import { concepts } from './taxonomy';
@@ -23,7 +24,8 @@ export async function dailyQuestion(env: Env, account: string, now = new Date(),
  if (active) return {day,challenge:await detail(env,account,active.id)};
  const pending = await env.DB.prepare("SELECT * FROM jobs WHERE account_id=? AND kind='generate' AND status IN ('pending','running') LIMIT 1").bind(account).first();
  if (pending) return {day,job:pending};
- if (!claimed) return {day};
+ // Free reps are spent on purpose, never on a question nobody opens.
+ if (!claimed || onFreeReps(env,account)) return {day};
  // A failed check/generation consumes today's automatic opportunity; Retry is explicit.
  await consumeUsage(env,account,'generate',10);
  const followUp = queued ? await followUpContext(env,account,queued.source_challenge_id).catch(() => undefined) : undefined;

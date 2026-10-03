@@ -12,7 +12,7 @@ struct CompletionHeading: View {
   }
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
-      DrillbitMark(size: 52, arrives: true).padding(.bottom, 4)
+      BitView(greets: true).frame(height: 64).padding(.bottom, 4)
       SignalEyebrow(text: warmUp ? "Warm-up done" : copy.eyebrow)
       Text(copy.title)
         .font(.largeTitle.weight(.semibold)).tracking(-0.8)
@@ -123,18 +123,21 @@ struct ReflectionView: View {
         AssistanceSummary(challenge: current ?? initial)
         if let reflection = (current ?? initial).reflection {
           Group {
-          if let debrief = reflection.debrief { DebriefCard(debrief: debrief) }
-          if let lesson = reflection.lesson { LessonRecap(lesson: lesson) }
-          ReflectionContent(reflection: reflection)
-          // Branch retries and Recall would make the uncounted warm-up count.
+          ReflectionContent(reflection: reflection, showsEnding: true)
+          // Branch retries and Recall would make an uncounted legacy warm-up count.
           if warmUp {
-            Text("That’s the whole loop. This one didn’t count; your real practice starts after a quick tour.")
+            Text("That’s the whole loop. This one didn’t count.")
               .foregroundStyle(AppPalette.secondary).fixedSize(horizontal: false, vertical: true)
-            Button("Show me around") { leave() }.buttonStyle(PracticeButtonStyle())
+            Button("Done") { leave() }.buttonStyle(PracticeButtonStyle())
               .accessibilityIdentifier("warmUpTour")
           } else {
+          if offersReminder { reminderOffer }
           completionAction(reflection: reflection)
-          if let turns = (current ?? initial).interview?.turns.filter({ $0.kind == "answer" }), !turns.isEmpty {
+          if !model.mayStartRep(), let next = model.nextFreeRep {
+            Text(AppModel.freeRepLine(next)).font(.subheadline).foregroundStyle(AppPalette.secondary)
+              .accessibilityIdentifier("freeRepNotice")
+          }
+          if model.mayStartRep(), let turns = (current ?? initial).interview?.turns.filter({ $0.kind == "answer" }), !turns.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
               SignalEyebrow(text: "Other moments")
               ForEach(turns.suffix(3)) { turn in
@@ -184,8 +187,10 @@ struct ReflectionView: View {
             model.presented = nil
             NotificationCenter.default.post(name: .init("OpenRecall"), object: nil)
           }.buttonStyle(PracticeButtonStyle(secondary: true))
-          Button("Practise this next") { preparingFollowUp = true }
-            .buttonStyle(PracticeButtonStyle(secondary: true))
+          if model.mayStartRep() {
+            Button("Practise this next") { preparingFollowUp = true }
+              .buttonStyle(PracticeButtonStyle(secondary: true))
+          }
           if hasLearningAction(reflection) {
             Button("Done for today") { leave() }
           }
@@ -219,8 +224,8 @@ struct ReflectionView: View {
   }
   @ViewBuilder private func completionAction(reflection: Reflection) -> some View {
     let challenge = current ?? initial
-    let matched = reflection.evidence?.first(where: { $0.signal == "needs_practice" && $0.sourceTurnId != nil })
-      .flatMap { evidence in challenge.interview?.turns.first { $0.id == evidence.sourceTurnId } }
+    let matched = model.mayStartRep() ? reflection.evidence?.first(where: { $0.signal == "needs_practice" && $0.sourceTurnId != nil })
+      .flatMap { evidence in challenge.interview?.turns.first { $0.id == evidence.sourceTurnId } } : nil
     if let turn = matched {
       Button("Retry this moment") { Task {
         retryingTurn = turn.id
@@ -239,30 +244,60 @@ struct ReflectionView: View {
     }
   }
   private func hasLearningAction(_ reflection: Reflection) -> Bool {
-    reflection.evidence?.contains { $0.signal == "needs_practice" && $0.sourceTurnId != nil } == true
+    (model.mayStartRep() && reflection.evidence?.contains { $0.signal == "needs_practice" && $0.sourceTurnId != nil } == true)
       || model.recall.dueCount > 0
+  }
+  private var offersReminder: Bool {
+    model.firstUse.firstRepID == initial.id && !model.firstUse.reminderOffered && !model.settings.reminderEnabled
+  }
+  private var reminderOffer: some View {
+    let minutes = model.settings.dailyMinutes
+    let time = Calendar.current.date(from: DateComponents(hour: minutes / 60, minute: minutes % 60))?.formatted(date: .omitted, time: .shortened) ?? "9:00"
+    return VStack(alignment: .leading, spacing: 12) {
+      VStack(alignment: .leading, spacing: 4) {
+        Text("Want a nudge tomorrow?").font(.headline)
+        Text("Every day at \(time). Change it in Settings.").font(.subheadline).foregroundStyle(AppPalette.secondary)
+      }
+      .accessibilityElement(children: .combine)
+      HStack(spacing: 12) {
+        Button("Remind me") { Task { await model.answerReminderOffer(true) } }
+          .buttonStyle(PracticeButtonStyle())
+          .accessibilityIdentifier("reminderOfferAccept")
+        Button("No thanks") { Task { await model.answerReminderOffer(false) } }
+          .buttonStyle(PracticeButtonStyle(secondary: true))
+      }
+    }
+    .signalInset(padding: 16)
+    .transition(.opacity)
+    .accessibilityIdentifier("reminderOffer")
   }
   private func leave() { model.presented = nil; Task { await model.refresh() } }
 }
 struct ReflectionContent: View {
   var reflection: Reflection
-  private var featuredEvidence: LearningEvidence? {
-    reflection.evidence?.first { $0.signal == "needs_practice" } ?? reflection.evidence?.first
-  }
+  /// The live completion shows Guided's recap or Mock's debrief between the lead and the details.
+  var showsEnding = false
+  private var strength: LearningEvidence? { reflection.evidence?.first { $0.signal == "demonstrated" } }
+  private var gap: LearningEvidence? { reflection.evidence?.first { $0.signal == "needs_practice" } }
+  private var workedLine: String? { strength == nil ? reflection.worked.first : nil }
+  private var fixLine: String? { gap == nil && !reflection.improve.isEmpty ? reflection.improve : nil }
   var body: some View {
     VStack(alignment: .leading, spacing: 24) {
-      if let evidence = featuredEvidence {
-        SignalEyebrow(text: "From this answer")
-        Text("“\(evidence.quote)”")
-          .font(.title2.weight(.medium)).textSelection(.enabled)
-          .fixedSize(horizontal: false, vertical: true)
-        SignalRule()
-        SignalEyebrow(text: evidence.signal == "demonstrated" ? "What worked" : "The missing guard")
-        Text(evidence.observation).font(.title2.weight(.semibold))
-          .fixedSize(horizontal: false, vertical: true)
+      // Every rep leads with one thing that worked and one thing to fix, in the person's own words where possible.
+      if strength != nil || workedLine != nil || gap != nil || fixLine != nil {
+        VStack(alignment: .leading, spacing: 16) {
+          if strength != nil || workedLine != nil { point("What worked", evidence: strength, line: workedLine) }
+          if (strength != nil || workedLine != nil) && (gap != nil || fixLine != nil) { SignalRule() }
+          if gap != nil || fixLine != nil { point("What to fix", evidence: gap, line: fixLine) }
+        }
+        .accessibilityIdentifier("feedbackLead")
       } else {
         SignalEyebrow(text: "Your reflection")
         Text(reflection.takeaway).font(.title2.weight(.semibold))
+      }
+      if showsEnding {
+        if let debrief = reflection.debrief { DebriefCard(debrief: debrief) }
+        if let lesson = reflection.lesson { LessonRecap(lesson: lesson) }
       }
       if !reflection.summary.isEmpty {
         Text(reflection.summary).foregroundStyle(AppPalette.secondary)
@@ -278,7 +313,7 @@ struct ReflectionContent: View {
             Text(reflection.improve)
           }
           if let evidence = reflection.evidence {
-            ForEach(evidence.filter { $0.id != featuredEvidence?.id }) { item in
+            ForEach(evidence.filter { $0.id != strength?.id && $0.id != gap?.id }) { item in
               VStack(alignment: .leading, spacing: 4) {
                 Text("“\(item.quote)”").textSelection(.enabled)
                 Text(item.observation).foregroundStyle(AppPalette.secondary)
@@ -294,6 +329,21 @@ struct ReflectionContent: View {
         .padding(.top, 12)
       }
     }
+  }
+  private func point(_ title: String, evidence: LearningEvidence?, line: String?) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      SignalEyebrow(text: title)
+      if let evidence {
+        Text("“\(evidence.quote)”")
+          .font(.title3.weight(.medium)).textSelection(.enabled)
+          .fixedSize(horizontal: false, vertical: true)
+        Text(evidence.observation).font(.title3.weight(.semibold))
+          .fixedSize(horizontal: false, vertical: true)
+      } else if let line {
+        Text(line).font(.title3.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
+      }
+    }
+    .accessibilityElement(children: .combine)
   }
 }
 struct ExampleView: View {

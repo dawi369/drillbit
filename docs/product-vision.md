@@ -4,6 +4,10 @@ Product council consensus · 9 September 2026
 
 **Status:** product direction endorsed by the user, with the tone and deferred-Speak decisions below added on 9 September 2026. This is not an implementation or release claim. [Architecture](architecture.md) describes the implemented baseline; [acceptance](acceptance.md) records verified behavior and remaining release gates.
 
+### Latest revision: first run and the practice gate
+
+On 2 October 2026 the user approved [§16](#16-first-run-and-the-practice-gate--2-october-2026): the first run is one real, counted rep reached in two questions, and the paywall sits on the next rep. This supersedes the warm-up-based activation flow in [architecture](architecture.md#activation-and-guided-curriculum--18-september-2026).
+
 ### Latest revision: Interview room
 
 The user approved the [interviewer council direction](interviewer-council.md): one interviewer, explicit Share answer, and Interview style (Quick / Standard / In-depth). It supersedes the mode-based native interaction below. The durable implementation and compatibility boundaries are recorded in [architecture](architecture.md#interview-room--9-september-2026).
@@ -43,7 +47,9 @@ The intended feeling is a quiet practice room: easy to enter, undemanding while 
 
 ### What stays out
 
-No avatar, animated AI orb, streak guilt, compulsory timer, live scoring, decorative dashboards, mandatory résumé upload or setup questionnaire before each question. No executable coding IDE or diagram canvas in this iteration. Guided is openly supported self-practice, not a hidden overlay for an external interview.
+No animated AI orb as a stand-in for thinking, streak guilt, compulsory timer, live scoring, decorative dashboards, mandatory résumé upload or setup questionnaire before each question. No executable coding IDE or diagram canvas in this iteration. Guided is openly supported self-practice, not a hidden overlay for an external interview.
+
+**Revised 2 October 2026:** Drillbit has a mascot, Bit (the drill bit with two dot eyes). Bit appears around practice (Welcome, sign-in, setup and arriving feedback), never inside the answer workspace, and its moods reflect real state rather than simulated thought. Possible “evolutions” tied to practice or streaks are a concept only. See [architecture](architecture.md#bit-the-mascot--2-october-2026).
 
 ## 2. One workspace, independent choices
 
@@ -477,3 +483,50 @@ Solo and assistance reviewers approved the concrete consensus; the voice reviewe
 The text implementation now covers explicit Solo/Coach/Guided help, durable help recovery and Stop, keyboard writing/dictation, disabled Speak, preparation with safe replacement, conservative assistance history, frozen review context, outline/example/draft adoption with preview and undo, and context-aware similar questions. Native rendering and backend contracts remain separate for a future Kotlin client. Gemini 3.1 Flash Lite is the sole model in both AI access modes.
 
 Evaluator criteria are derived from visible requirements, which is a deliberate refinement of the council's hidden-but-fair rubric proposal. Selection-specific replacement and linked retry/revision lineage remain deferred. No live audio session, recording permission, speech transport or audio model is implemented. See [acceptance](acceptance.md) for observed tests and release gaps; this checkpoint is implementation status, not a claim of TestFlight readiness.
+
+## 16. First run and the practice gate — 2 October 2026
+
+A second council (Jobs-, Chesky-, Miyamoto- and Ive-inspired lenses; interpretive, not endorsements) worked from three reference posts the user chose: a mascot-led paywall full of motion, character-led onboarding flows, and a guide character with a personal number. One critique round followed. The result replaces the current first run: four walkthrough pages, five setup questions, an uncounted warm-up, a five-step guide, three tab coachmarks and the first-session sheet.
+
+**Promise:** one real interview rep, tailored enough to feel personal, with feedback worth acting on, before Drillbit asks for anything.
+
+### Flow
+
+1. **Welcome.** One screen: Bit hops, the promise, the condensed sample exchange and Get started. Existing users sign in from here.
+2. **Sign in.** Apple, Google or GitHub. The invite field appears only while access is invite-gated.
+3. **Two questions.** Goal (interview coming up, getting sharper, keeping fresh), then familiarity. Bit asks in short bubbles; the screen reads fully without them, and VoiceOver reads them as text. Choosing an interview reveals an optional date, and a date shows arithmetic from the person's own input (“12 days out. A rep a day gets you 12 shots.”). Role, focus, daily minutes and support take defaults and stay editable in Settings and preparation.
+4. **The first question.** Bit drills only while generation runs, the question streams in, and Bit hops once when it lands. One swap is allowed.
+5. **First rep, counted.** Guided by default. The question opens with one concrete first decision that can be answered in a sentence (“A worker can crash at any point. What should a client be able to rely on?”). The nudge stays inline. Nothing blocks the screen; each control explains itself in one line the first time it matters.
+6. **Feedback.** One strength and one gap, quoted from the person's own words. Bit hops, then rests content.
+7. **Home.** Recall and Library are introduced where they first have something to show, not with tab coachmarks.
+8. **Next rep.** The practice gate.
+
+### The practice gate
+
+- One Superwall placement, `practice_rep`, set to Gated and registered on every action that starts a rep: Home, retry, similar question and Library. A non-gated paywall would run paid work after dismissal.
+- Free: the first rep, then one bounded rep per week. Unused reps do not accumulate, so there is nothing to feel guilty about. Recall, Library and past feedback stay free. Free reps cap interviewer follow-ups and nudges on the server. Whether voice is paid-only is open.
+- Dismissing the paywall returns to Home with when the next free rep arrives (“Your free rep comes back Monday.”).
+- An optional 7-day trial is offered on the paywall, never at signup. A trial timeline states only true things: real dates, and a reminder step only when notifications are on and the reminder is scheduled.
+- The paywall is a remote template: graphite or paper, the yellow action and practice-specific copy. It cannot run the Bit renderer, and its VoiceOver and large-text behaviour is verified separately.
+- The Worker authorizes: quota and entitlement are checked before every paid model call, and Superwall's client-side decision never grants access. Entitlements sync from Superwall webhooks keyed by the account ID (already a UUIDv4), with a fallback for webhook delay.
+- No paywall during the invite beta.
+
+### What we take from the references
+
+Keep a guide character (Bit's bubbles), visible progress, staged arrivals and animated choice cards. The 550 ms entrance and the celebrate spring are reserved for the question arriving and feedback arriving. Adapt the stakes number into arithmetic from the person's input, the “building your plan” wait into the real generation, and the trial rail into true steps only. Reject gradients and serif display type (system fonts and semantic colours stay), streak flames, “% off forever” offers, savings-badge theatrics and fake progress. If more warmth is wanted, the smallest consistent step is the app icon's soft amber glow behind Bit on Welcome and the paywall.
+
+### Dissent and open questions
+
+- The Miyamoto-inspired lens preferred two counted free reps per month, so a learner can act on the first feedback before meeting the gate. Chosen: gate the next rep; the weekly free rep is the honest way to wait.
+- One weekly rep has to be affordable and still convert. Measure per-rep cost with `scripts/measure-inference.ts`, and keep the allowance a server-side setting per cohort, because Superwall cannot A/B what the server enforces.
+- This adds surfaces during the 1.0 freeze in the [release checklist](1.0-release-checklist.md).
+
+### Decisions for the build — 2 October 2026
+
+- **Welcome** keeps the promise and the sample exchange on one screen, with the app icon's soft amber glow behind Bit. The Recall page and the local try go.
+- **Setup** asks goal and familiarity. Bit asks each one: the bubble is the screen's heading. Role defaults to “A mix of things”.
+- **Opener:** the generator also writes the interviewer's first line, personal to the setup. It types itself in when the person presses Start, with Guided's reply chips below it, and costs no extra model call.
+- **No guide:** the reply box and the nudge explain themselves in copy. Feedback leads with one strength and one gap, each quoted, on every rep. The daily reminder is offered once, under the first feedback (“Want a nudge tomorrow?”). Home gets one line pointing at the first Recall card. Bit drills in every question preview.
+- **Gate without Superwall:** every action that starts a rep calls one client hook, and the Worker tracks free reps behind a switch that stays off during the beta. A rep is used when its question is prepared, with one swap included, and a failed preparation does not use it. Free reps come back 7 days after the last one, cap interviewer follow-ups at 8 and nudges at 2 (configurable), and do not get an automatic daily question. A blocked person sees “Your free rep comes back Thursday.” on Home. Voice keeps today's daily limit of 6 starts per UTC day. While the switch is on, only an environment allowlist is unlimited, until Superwall supplies entitlements.
+
+This section is direction, not an implementation claim.

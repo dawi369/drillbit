@@ -1465,6 +1465,16 @@
               }
             }
           },
+          "402": {
+            "description": "Free rep already used; code practice_gate. Bootstrap practice.nextFreeRepAt says when it returns.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Invite required or account unavailable",
             "content": {
@@ -1983,6 +1993,16 @@
           },
           "401": {
             "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Free rep already used; code practice_gate. Bootstrap practice.nextFreeRepAt says when it returns.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3118,6 +3138,16 @@
           },
           "401": {
             "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Free rep already used; code practice_gate. Bootstrap practice.nextFreeRepAt says when it returns.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4921,6 +4951,16 @@
               }
             }
           },
+          "402": {
+            "description": "Free rep already used; code practice_gate. Bootstrap practice.nextFreeRepAt says when it returns.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Invite required or account unavailable",
             "content": {
@@ -6659,6 +6699,15 @@
                 "startedAt": {
                   "type": "string"
                 },
+                "opener": {
+                  "type": "string"
+                },
+                "freeRepAt": {
+                  "type": "string"
+                },
+                "swapped": {
+                  "type": "boolean"
+                },
                 "interview": {
                   "type": "object",
                   "properties": {
@@ -8106,6 +8155,15 @@
                 },
                 "startedAt": {
                   "type": "string"
+                },
+                "opener": {
+                  "type": "string"
+                },
+                "freeRepAt": {
+                  "type": "string"
+                },
+                "swapped": {
+                  "type": "boolean"
                 },
                 "interview": {
                   "type": "object",
@@ -11192,6 +11250,15 @@
           "startedAt": {
             "type": "string"
           },
+          "opener": {
+            "type": "string"
+          },
+          "freeRepAt": {
+            "type": "string"
+          },
+          "swapped": {
+            "type": "boolean"
+          },
           "interview": {
             "type": "object",
             "properties": {
@@ -12940,6 +13007,29 @@
               }
             ]
           },
+          "practice": {
+            "type": "object",
+            "properties": {
+              "freeReps": {
+                "type": "boolean"
+              },
+              "available": {
+                "type": "boolean"
+              },
+              "nextFreeRepAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "freeReps",
+              "available",
+              "nextFreeRepAt"
+            ],
+            "additionalProperties": false
+          },
           "challenge": {
             "anyOf": [
               {
@@ -13068,6 +13158,15 @@
                   },
                   "startedAt": {
                     "type": "string"
+                  },
+                  "opener": {
+                    "type": "string"
+                  },
+                  "freeRepAt": {
+                    "type": "string"
+                  },
+                  "swapped": {
+                    "type": "boolean"
                   },
                   "interview": {
                     "type": "object",
@@ -14227,6 +14326,15 @@
               "startedAt": {
                 "type": "string"
               },
+              "opener": {
+                "type": "string"
+              },
+              "freeRepAt": {
+                "type": "string"
+              },
+              "swapped": {
+                "type": "boolean"
+              },
               "interview": {
                 "type": "object",
                 "properties": {
@@ -15349,6 +15457,15 @@
                   },
                   "startedAt": {
                     "type": "string"
+                  },
+                  "opener": {
+                    "type": "string"
+                  },
+                  "freeRepAt": {
+                    "type": "string"
+                  },
+                  "swapped": {
+                    "type": "boolean"
                   },
                   "interview": {
                     "type": "object",
@@ -16498,6 +16615,15 @@
                 },
                 "startedAt": {
                   "type": "string"
+                },
+                "opener": {
+                  "type": "string"
+                },
+                "freeRepAt": {
+                  "type": "string"
+                },
+                "swapped": {
+                  "type": "boolean"
                 },
                 "interview": {
                   "type": "object",
@@ -17669,6 +17795,15 @@
                 "startedAt": {
                   "type": "string"
                 },
+                "opener": {
+                  "type": "string"
+                },
+                "freeRepAt": {
+                  "type": "string"
+                },
+                "swapped": {
+                  "type": "boolean"
+                },
                 "interview": {
                   "type": "object",
                   "properties": {
@@ -18755,6 +18890,15 @@
                   },
                   "startedAt": {
                     "type": "string"
+                  },
+                  "opener": {
+                    "type": "string"
+                  },
+                  "freeRepAt": {
+                    "type": "string"
+                  },
+                  "swapped": {
+                    "type": "boolean"
                   },
                   "interview": {
                     "type": "object",

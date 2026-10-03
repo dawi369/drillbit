@@ -176,6 +176,8 @@ export async function createJob(
   input: unknown,
   // Interactive work runs right away in this request instead of waiting for a Workflow to start.
   run?: (id: string) => void,
+  // A condition the insert must not meet, evaluated atomically with it.
+  unless?: { sql: string; binds: unknown[] },
 ) {
   const existing = await env.DB.prepare("SELECT * FROM jobs WHERE id=?")
     .bind(id)
@@ -195,9 +197,9 @@ export async function createJob(
   }
   const now = timestamp();
   await env.DB.prepare(
-    "INSERT OR IGNORE INTO jobs(id,account_id,challenge_id,kind,input,created_at,updated_at) VALUES(?,?,?,?,?,?,?)",
+    "INSERT OR IGNORE INTO jobs(id,account_id,challenge_id,kind,input,created_at,updated_at) SELECT ?,?,?,?,?,?,?" + (unless ? " WHERE NOT " + unless.sql : ""),
   )
-    .bind(id, account, challengeId, kind, JSON.stringify(input), now, now)
+    .bind(id, account, challengeId, kind, JSON.stringify(input), now, now, ...(unless?.binds ?? []))
     .run();
   if (
     kind === "generate" &&

@@ -44,7 +44,7 @@ targets:
           - CFBundleURLSchemes: [drillbit, dawi.drillbit]
         UILaunchScreen:
           UIColorName: LaunchBackground
-          UIImageName: LaunchMark
+          UIImageName: LaunchBit
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIBackgroundModes: [fetch]
         BGTaskSchedulerPermittedIdentifiers: [dawi.drillbit.refresh]

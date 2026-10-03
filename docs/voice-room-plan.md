@@ -32,7 +32,7 @@ Choose Question / Conversation as two in-page views over shared state. Reject se
 - Small top navigation context uses the current scenario. An ordinary Question / Conversation selector changes the main content; controls stay in place.
 - The existing question component is the visual anchor: title, short description, explicit expand/collapse affordance, full requirements on expansion. It uses the same canonical data and disclosure state as writing; only the active page renders it. No additional question modal.
 - The body scrolls naturally when expanded, especially at accessibility text sizes. Content never sits behind controls without sufficient safe-area clearance.
-- No score, countdown, chat avatar or continuously animated orb. An optional small level indicator may be added only if driven by measured audio; it communicates audio activity, not thought or understanding. The first implementation does not depend on it.
+- No score, countdown or chat avatar. The room's presence is the measured-audio orb, which stands for the interviewer; the mascot Bit does not replace it. It communicates audio activity, not thought or understanding.
 - The interviewer provides the personality: brief acknowledgement, room to think, natural interruptions, playfulness when appropriate. Silence does not automatically trigger a hint or a visual warning.
 
 ### Conversation view

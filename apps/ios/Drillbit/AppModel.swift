@@ -35,15 +35,36 @@ import WidgetKit
     guard bootstrap?.account.id == account else { throw CancellationError() }
     firstUse = value
   }
-  func advanceFirstUseTour() async {
-    var next = firstUse
-    switch next.stage {
-    case .tourHome: next.stage = .tourRecall
-    case .tourRecall: next.stage = .tourLibrary
-    case .tourLibrary: next.stage = .chooseMode
-    default: return
-    }
-    do { try await setFirstUse(next) } catch { self.error = "Couldn’t save your walkthrough. Try again." }
+  /// The one reminder offer, under the first rep's feedback.
+  func answerReminderOffer(_ accepted: Bool) async {
+    var progress = firstUse
+    progress.reminderOffered = true
+    try? await setFirstUse(progress)
+    guard accepted, await requestReminderPermission() else { return }
+    settings.reminderEnabled = true
+    do { try await saveSettingsLocally(); try await reconcileReminder() } catch let failure { error = failure.localizedDescription }
+  }
+  func markRecallIntroduced() async {
+    guard !firstUse.recallIntroduced else { return }
+    var progress = firstUse
+    progress.recallIntroduced = true
+    try? await setFirstUse(progress)
+  }
+  /// Every action that starts a rep asks here first; Superwall's `practice_rep` placement will sit behind it.
+  func mayStartRep(swapping current: Challenge? = nil) -> Bool {
+    guard let practice = bootstrap?.practice, practice.freeReps else { return true }
+    if let current, current.freeRepAt != nil, current.swapped != true { return true }
+    return practice.available
+  }
+  /// When a spent free rep comes back; nil while practice is open.
+  var nextFreeRep: Date? {
+    guard let practice = bootstrap?.practice, practice.freeReps, !practice.available else { return nil }
+    return practice.nextFreeRepAt.flatMap(Date.fromAPI)
+  }
+  static func freeRepLine(_ date: Date, calendar: Calendar = .current) -> String {
+    if calendar.isDateInToday(date) { return "Your free rep comes back later today." }
+    if calendar.isDateInTomorrow(date) { return "Your free rep comes back tomorrow." }
+    return "Your free rep comes back \(date.formatted(.dateTime.weekday(.wide)))."
   }
   var error: String?
   var completionNoticeAccount: String?
@@ -674,14 +695,14 @@ import WidgetKit
     guard !busy, let account = bootstrap?.account.id else {
       throw APIError(code: "busy", message: "A question is already being prepared.", status: 409)
     }
-    // The onboarding warm-up is generated from the saved plan like any question; the server never counts it.
-    let warmingUp = firstUse.stage == .walkthrough
+    // The first rep is a counted Guided question from the saved plan; its one swap replaces the ready question.
+    let firstRep = firstUse.stage == .firstRep
     var preparation = preparation
-    if warmingUp {
+    if firstRep && preparation == nil {
       let current = bootstrap?.challenge
       preparation = PreparationInput(guidanceMode: .learnTogether, focus: settings.focus, kind: "design",
         difficulty: settings.difficulty, engineeringLevel: settings.selectedLevel,
-        replaceId: current?.lifecycle == "ready" ? current?.id : nil, warmUp: true)
+        replaceId: current?.lifecycle == "ready" ? current?.id : nil)
     }
     busy = true
     defer { busy = false; preparingDraft = nil }
@@ -689,7 +710,7 @@ import WidgetKit
       self.preparingDraft = draft
       onDraft?(draft)
     }
-    if firstUse.stage == .chooseMode || warmingUp {
+    if firstRep {
       syncSettingsInBackground()
       await settingsSyncTask?.value
       guard bootstrap?.account.id == account else { throw CancellationError() }
@@ -705,7 +726,7 @@ import WidgetKit
     preparationFailure = nil
     failedPreparation = nil
     failedPreparationSource = nil
-    let draft = QuestionDraft(guidanceMode: preparation?.guidanceMode ?? .coachMe, warmUp: preparation?.warmUp ?? false)
+    let draft = QuestionDraft(guidanceMode: preparation?.guidanceMode ?? .coachMe)
     if fixture {
       #if DEBUG
       if ProcessInfo.processInfo.arguments.contains("--fixture-slow-generation") {
@@ -719,7 +740,12 @@ import WidgetKit
         throw APIError(code: "generation_failed", message: "Question preparation failed. Your previous question is safe.", status: 503)
       }
       #endif
-      let challenge = Challenge(guidanceMode: preparation?.guidanceMode ?? .coachMe, warmUp: preparation?.warmUp, minutes: 20, path: ["Pin down what the queue promises", "Sketch the job lifecycle", "Handle worker failures", "Make retries safe"], interviewStyle: preparation?.interviewStyle ?? .standard, engineeringLevel: preparation?.engineeringLevel ?? settings.selectedLevel,
+      let replaced = bootstrap?.challenge.flatMap { $0.id == preparation?.replaceId ? $0 : nil }
+      let challenge = Challenge(guidanceMode: preparation?.guidanceMode ?? .coachMe, minutes: 20, path: ["Pin down what the queue promises", "Sketch the job lifecycle", "Handle worker failures", "Make retries safe"],
+        opener: "You’ve designed a few systems, so let’s skip the basics. A worker can crash at any point. What should a client be able to rely on?",
+        freeRepAt: bootstrap?.practice?.freeReps == true ? replaced?.freeRepAt ?? Date().ISO8601Format() : nil,
+        swapped: replaced?.freeRepAt != nil ? true : nil,
+        interviewStyle: preparation?.interviewStyle ?? .standard, engineeringLevel: preparation?.engineeringLevel ?? settings.selectedLevel,
         id: UUID().uuidString, lifecycle: "ready", title: "Design a reliable job queue",
         prompt: "Design a reliable job queue. Explain retries, ordering, and how failures are handled.",
         topic: preparation?.focus ?? settings.focus, session: SessionDraft(answer: "", revision: 0))
@@ -736,14 +762,20 @@ import WidgetKit
         guard bootstrap?.account.id == account else { throw CancellationError() }
       }
       bootstrap?.challenge = challenge
-      if firstUse.stage == .chooseMode { var completed = firstUse; completed.stage = .complete; try await setFirstUse(completed) }
+      if bootstrap?.practice?.freeReps == true, replaced?.freeRepAt == nil { bootstrap?.practice?.available = false }
       return challenge
     }
     guard bootstrap?.account.id == account else { throw CancellationError() }
     if try await !disk.pending(account: account).isEmpty {
       throw APIError(code: "practice_pending", message: "Couldn’t prepare a new question right now. Try again shortly.", status: 0)
     }
-    let result: GenerationResponse = try await api.send("challenges", method: "POST", body: preparation, command: UUID().uuidString)
+    let result: GenerationResponse
+    do { result = try await api.send("challenges", method: "POST", body: preparation, command: UUID().uuidString) }
+    catch let failure as APIError where failure.code == "practice_gate" {
+      // Home learns when the free rep comes back.
+      Task { await refresh() }
+      throw failure
+    }
     let challenge: Challenge
     if let existing = result.challenge { challenge = existing }
     else if let id = result.id {
@@ -763,7 +795,6 @@ import WidgetKit
     } else { throw APIError(code: "missing_question", message: "The question is not available yet. Check Home shortly.", status: 0) }
     guard bootstrap?.account.id == account else { throw CancellationError() }
     bootstrap?.challenge = challenge
-    if firstUse.stage == .chooseMode { var completed = firstUse; completed.stage = .complete; try await setFirstUse(completed) }
     if let bootstrap { try await disk.cache(key: "bootstrap:" + account, data: JSONEncoder().encode(bootstrap)) }
     Task {
       guard bootstrap?.account.id == account else { return }
@@ -990,26 +1021,30 @@ import WidgetKit
       }
     }
     bootstrap?.challenge = nil
-    // The tour follows the warm-up's feedback; an uncounted result never becomes Home's completion notice.
-    if challenge.isWarmUp { try? await setFirstUse(FirstUseProgress(stage: .tourHome)) }
-    else { completionNoticeAccount = bootstrap?.account.id }
+    // Uncounted legacy warm-ups never become Home's completion notice.
+    if !challenge.isWarmUp { completionNoticeAccount = bootstrap?.account.id }
+    if firstUse.stage == .firstRep {
+      var done = FirstUseProgress()
+      if !challenge.isWarmUp { done.firstRepID = challenge.id }
+      try? await setFirstUse(done)
+    }
     await completeOnboarding()
     return completed
   }
-  /// Setup stays on screen behind the warm-up; Home replaces it only once the warm-up is over.
+  /// Setup stays on screen behind the first rep; Home replaces it only once the rep is over.
   func completeOnboarding() async {
     guard let account = bootstrap?.account.id, !settings.onboardingComplete else { return }
     settings.onboardingComplete = true
     do { try await saveSettingsLocally() } catch let failure { error = failure.localizedDescription }
-    try? await disk.cache(key: "onboarding:" + account, data: Data())
+    try? await disk.cache(key: "onboarding-v2:" + account, data: Data())
   }
   func skip(_ id: String, answer: String? = nil) async {
     guard let account = bootstrap?.account.id else { return }
     await perform {
       if !fixture { try await disk.queueSkip(account: account, id: id, answer: answer) }
       guard bootstrap?.account.id == account else { return }
-      // Skipping the warm-up skips it for good; onboarding continues with the tour.
-      if firstUse.stage == .walkthrough { try? await setFirstUse(FirstUseProgress(stage: .tourHome)) }
+      // Skipping the first rep still ends onboarding; Home takes over.
+      if firstUse.stage == .firstRep { try? await setFirstUse(FirstUseProgress()) }
       await completeOnboarding()
       locallySkipped[account, default: []].insert(id)
       if bootstrap?.challenge?.id == id { bootstrap?.challenge = nil }
@@ -1166,7 +1201,6 @@ import WidgetKit
   }
   private func seedFixture() {
     settings.onboardingComplete = true
-    if ProcessInfo.processInfo.arguments.contains("--fixture-walkthrough") { firstUse = FirstUseProgress(stage: .walkthrough) }
     #if DEBUG
     if ProcessInfo.processInfo.arguments.contains("--fixture-onboarding") { settings.onboardingComplete = false }
     if ProcessInfo.processInfo.arguments.contains("--fixture-long-focus") { settings.focus = "Distributed backend systems, database performance, cache consistency, and safe cross-team migrations" }
@@ -1232,6 +1266,10 @@ import WidgetKit
         nextTicket: ProcessInfo.processInfo.arguments.contains("--fixture-dashboard") ? 13 : 1))
     #if DEBUG
     if ProcessInfo.processInfo.arguments.contains("--fixture-dashboard") { bootstrap?.challenge = nil }
+    if ProcessInfo.processInfo.arguments.contains("--fixture-free-reps") { bootstrap?.practice = PracticeAccess(freeReps: true, available: true) }
+    if ProcessInfo.processInfo.arguments.contains("--fixture-gate") {
+      bootstrap?.practice = PracticeAccess(freeReps: true, available: false, nextFreeRepAt: Date().addingTimeInterval(3 * 86_400).ISO8601Format())
+    }
     #endif
   }
 }

@@ -19,6 +19,10 @@ export interface Env {
   MANAGED_AI_ENABLED: string;
   COMPANION_AUTO_ENABLED?: string;
   INTERACTIVE_INLINE_ENABLED?: string;
+  PRACTICE_GATE?: string;
+  PRACTICE_UNLIMITED_ACCOUNTS?: string;
+  FREE_REP_FOLLOW_UPS?: string;
+  FREE_REP_NUDGES?: string;
 }
 const jwks = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
 export async function identity(env: Env, authorization?: string) {

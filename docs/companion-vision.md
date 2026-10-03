@@ -20,7 +20,7 @@ Generated writing uses preview → append/replace → server revision check → 
 
 - System fonts, semantic foreground colours, SwiftUI regular material, 12-point corners and 4-point spacing increments.
 - A fixed 100-point companion allocation while assisted, independent of response length. Accessibility sizes use an 80-point compact button with a full accessibility label. The editor therefore does not resize on hint arrival.
-- Restrained blue/violet border illumination. No screen-wide effect, looping gradient, orb, fake scanning, streamed tokens, sound or automatic haptics.
+- Restrained blue/violet border illumination. No screen-wide effect, looping gradient, orb, fake scanning, streamed tokens, sound or automatic haptics. The mascot Bit is not drawn in the companion or the writing workspace.
 - Completed guidance enters over 350 ms with at most 4 points of movement. Replacements use 200 ms; border illumination settles over 600 ms. Results are held while typing or a sheet/alert is open.
 - Quiet: mode and subdued availability copy. Requesting: illumination only after a real request starts; delayed native progress after one second. Suggestion: one thought, tap to expand. Paused: explicit Resume. Unavailable: compact connection copy and preserved writing; no automatic inference retry.
 - Reduced Motion removes movement/animated illumination; Reduced Transparency selects an opaque semantic background. No focus requests or VoiceOver announcements occur on arrival.

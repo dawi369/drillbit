@@ -14,7 +14,9 @@
 		17939E1CE6DADB13BEED9C8F /* AppDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DCB42472B027EF8556E83E2 /* AppDiagnostics.swift */; };
 		18B4090F1EFA1BAD814B974F /* PreparationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D48C7CE46F73492E41D2DDDD /* PreparationView.swift */; };
 		19BDB2BD78083CFC15FFCF77 /* LiveVoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87BD787A61C3C037E268829C /* LiveVoice.swift */; };
+		1C4095680EF8C258B0FC0879 /* BitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8BD0996355C1121C323D9E2 /* BitTests.swift */; };
 		20212ED453359321401BBE55 /* CompanionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39439B81E58CADD0F8243F46 /* CompanionTests.swift */; };
+		2027DBB976212CFEA63A6BE4 /* BitView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17CD35FA19967623C29EB147 /* BitView.swift */; };
 		2657C9E9ADBD72C612B2A458 /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F9D42BA7EF7B514FEACC7F6 /* SetupView.swift */; };
 		2BCD05DC191DB1D3AC6E50FD /* SharedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8049B9471B01CBFBD8C80764 /* SharedStore.swift */; };
 		2C57626CC9CE91B722872E1D /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7437833C09799CF7937BCDD7 /* RootView.swift */; };
@@ -28,6 +30,7 @@
 		60C8FC1C39DFF81C6C1F19A8 /* ClerkKit in Frameworks */ = {isa = PBXBuildFile; productRef = D0E2F449415E69EBA68ED8CD /* ClerkKit */; };
 		70BF4744A694732D3FFBCDBC /* CompanionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A193915AEBBE5F30D2A8AECA /* CompanionCoordinator.swift */; };
 		7DD8D81CCC22B716F6BA3C47 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01713294F3436278FCEE46B6 /* Models.swift */; };
+		80F82D669F2089A6E63149CD /* BitRig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13F8E4917CAF05B015AA09E0 /* BitRig.swift */; };
 		841482E9982EA21DA42B92E3 /* Ticket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 137147215B8FA4CA44DA4451 /* Ticket.swift */; };
 		868D112482709522C36A981D /* PracticeWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF83E5C54AF9B2C1262CAB8 /* PracticeWorkspace.swift */; };
 		8D4370BA4D4B112FDA7560A6 /* PracticeCompanion.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCDB9D254A54D86DF356AC77 /* PracticeCompanion.swift */; };
@@ -44,6 +47,7 @@
 		D090F4FDF85CBD331AA6CAB7 /* DrillbitWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 150BB0656D2594F45A3E045B /* DrillbitWidget.swift */; };
 		D8B1269DC65D854F474432E6 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8E06A264C65F45E7AD14AD1 /* AppModel.swift */; };
 		DAC50998C02EF3CB03CAF744 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EB6666339982040006AC57A /* HomeView.swift */; };
+		DE0942626B20E564770F34F3 /* BitRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82CAC54FBF8FD27088584441 /* BitRenderer.swift */; };
 		E151B6BC51DB2FE7D15DA008 /* VoiceTranscript.swift in Sources */ = {isa = PBXBuildFile; fileRef = 658B4C2655924F8CC0AE95C3 /* VoiceTranscript.swift */; };
 		E4DF89EDCDE360281E583E6A /* DrillbitWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 9A2B037FAEC89AAC90414A59 /* DrillbitWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		EA7151E7DC60BF9B5C5A521E /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 165CE5F9FA389F64A4730557 /* APIClient.swift */; };
@@ -96,9 +100,11 @@
 		01713294F3436278FCEE46B6 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		04CE1C0E2D55B42FFFD0982A /* CompanionPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionPanel.swift; sourceTree = "<group>"; };
 		137147215B8FA4CA44DA4451 /* Ticket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ticket.swift; sourceTree = "<group>"; };
+		13F8E4917CAF05B015AA09E0 /* BitRig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitRig.swift; sourceTree = "<group>"; };
 		150BB0656D2594F45A3E045B /* DrillbitWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrillbitWidget.swift; sourceTree = "<group>"; };
 		153D45AC2868C4FBAF088C71 /* PracticeEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeEvidence.swift; sourceTree = "<group>"; };
 		165CE5F9FA389F64A4730557 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		17CD35FA19967623C29EB147 /* BitView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitView.swift; sourceTree = "<group>"; };
 		1BA600A70A653AC369122638 /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
 		1DCB42472B027EF8556E83E2 /* AppDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDiagnostics.swift; sourceTree = "<group>"; };
 		20B8BC792201909C6B627383 /* InterviewDocumentRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterviewDocumentRows.swift; sourceTree = "<group>"; };
@@ -116,12 +122,14 @@
 		7437833C09799CF7937BCDD7 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		7ED772ACFEBFA6EBE9753089 /* ContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContractTests.swift; sourceTree = "<group>"; };
 		8049B9471B01CBFBD8C80764 /* SharedStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedStore.swift; sourceTree = "<group>"; };
+		82CAC54FBF8FD27088584441 /* BitRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitRenderer.swift; sourceTree = "<group>"; };
 		87BD787A61C3C037E268829C /* LiveVoice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveVoice.swift; sourceTree = "<group>"; };
 		90A5D549D2FB1410F6D6B59B /* DrillbitTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = DrillbitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		92066D96F6C016361FF268E4 /* InterviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterviewView.swift; sourceTree = "<group>"; };
 		9A2B037FAEC89AAC90414A59 /* DrillbitWidget.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = DrillbitWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		9A7106218805AC5263A12438 /* Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persistence.swift; sourceTree = "<group>"; };
 		A193915AEBBE5F30D2A8AECA /* CompanionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionCoordinator.swift; sourceTree = "<group>"; };
+		A8BD0996355C1121C323D9E2 /* BitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitTests.swift; sourceTree = "<group>"; };
 		AD095763BDFB10A241582226 /* ReflectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReflectionView.swift; sourceTree = "<group>"; };
 		B8F2A363927CDF8EB6A14D5C /* InterviewVoiceRoom.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterviewVoiceRoom.swift; sourceTree = "<group>"; };
 		BA47F5B6A6BBF68259182059 /* FirstUse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirstUse.swift; sourceTree = "<group>"; };
@@ -180,6 +188,9 @@
 				1DCB42472B027EF8556E83E2 /* AppDiagnostics.swift */,
 				C8E06A264C65F45E7AD14AD1 /* AppModel.swift */,
 				F69DED8C37D39A2D21CC2A84 /* Assets.xcassets */,
+				82CAC54FBF8FD27088584441 /* BitRenderer.swift */,
+				13F8E4917CAF05B015AA09E0 /* BitRig.swift */,
+				17CD35FA19967623C29EB147 /* BitView.swift */,
 				A193915AEBBE5F30D2A8AECA /* CompanionCoordinator.swift */,
 				04CE1C0E2D55B42FFFD0982A /* CompanionPanel.swift */,
 				FDE151C29EEC1990D2C7E840 /* DesignSystem.swift */,
@@ -251,6 +262,7 @@
 		E69BAD5772928980B3139B7C /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				A8BD0996355C1121C323D9E2 /* BitTests.swift */,
 				39439B81E58CADD0F8243F46 /* CompanionTests.swift */,
 				7ED772ACFEBFA6EBE9753089 /* ContractTests.swift */,
 				44C89C686607D2F20377EADE /* InterviewTests.swift */,
@@ -417,6 +429,9 @@
 				EA7151E7DC60BF9B5C5A521E /* APIClient.swift in Sources */,
 				17939E1CE6DADB13BEED9C8F /* AppDiagnostics.swift in Sources */,
 				D8B1269DC65D854F474432E6 /* AppModel.swift in Sources */,
+				DE0942626B20E564770F34F3 /* BitRenderer.swift in Sources */,
+				80F82D669F2089A6E63149CD /* BitRig.swift in Sources */,
+				2027DBB976212CFEA63A6BE4 /* BitView.swift in Sources */,
 				70BF4744A694732D3FFBCDBC /* CompanionCoordinator.swift in Sources */,
 				387B66BE5AA3210DD6C8A017 /* CompanionPanel.swift in Sources */,
 				B60776186F24C169754719F2 /* DesignSystem.swift in Sources */,
@@ -454,6 +469,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1C4095680EF8C258B0FC0879 /* BitTests.swift in Sources */,
 				20212ED453359321401BBE55 /* CompanionTests.swift in Sources */,
 				ECEC2C8AFBB8086D0EA78BEC /* ContractTests.swift in Sources */,
 				38084B68C426518EDAE4F208 /* InterviewTests.swift in Sources */,

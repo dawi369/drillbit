@@ -1,6 +1,7 @@
 import { Fault, timestamp } from "./domain";
 import { learningEvidence } from "./learning";
 import type { Env } from "./platform";
+import { claimFreeRep } from "./practice-gate";
 import { detail, present, type ChallengeRow } from "./store";
 import { concepts, eligibilityInput } from "./taxonomy";
 export type Question = {
@@ -247,10 +248,11 @@ export async function startQuestion(
     return detail(env, account, command);
   }
   const now = timestamp();
+  const freeRep = await claimFreeRep(env, account);
   await env.DB.batch([
     env.DB.prepare(
       "INSERT OR IGNORE INTO challenges(id,account_id,lifecycle,data,created_at,available_at) SELECT ?,?,'in_progress',?,?,? WHERE NOT EXISTS(SELECT 1 FROM challenges WHERE account_id=? AND lifecycle IN ('ready','in_progress'))",
-    ).bind(command, account, JSON.stringify({ ...JSON.parse(q.data), startedAt: now }), now, now, account),
+    ).bind(command, account, JSON.stringify({ ...JSON.parse(q.data), startedAt: now, ...freeRep }), now, now, account),
     env.DB.prepare(
       "INSERT OR IGNORE INTO question_attempts SELECT ?,? WHERE EXISTS(SELECT 1 FROM challenges WHERE id=? AND account_id=?)",
     ).bind(command, id, command, account),

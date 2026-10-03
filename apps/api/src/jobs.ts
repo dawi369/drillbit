@@ -81,6 +81,8 @@ export async function runJob(env: Env, id: string) {
     primaryConceptId?: string;
     followUp?: unknown;
     warmUp?: boolean;
+    freeRepAt?: string;
+    swapped?: boolean;
   }>(job.input);
   input.settings = normalizeSettings(input.settings);
   const now = timestamp();
@@ -168,6 +170,7 @@ export async function runJob(env: Env, id: string) {
           interviewStyle: input.interviewStyle ?? "standard",
           guidanceMode: guidanceMode(input.guidanceMode),
           ...(input.warmUp ? { warmUp: true } : {}),
+          ...(input.freeRepAt ? { freeRepAt: input.freeRepAt, ...(input.swapped ? { swapped: true } : {}) } : {}),
         }),
         now,
         input.availableAt ?? now,
@@ -176,7 +179,7 @@ export async function runJob(env: Env, id: string) {
       ),
       // A warm-up never joins the question pool or Library.
       ...(input.warmUp ? [] : [
-        env.DB.prepare("INSERT OR IGNORE INTO questions(id,account_id,data,created_at,eligibility_updated_at) SELECT ?,account_id,data,created_at,created_at FROM challenges WHERE id=?").bind(questionID,id),
+        env.DB.prepare("INSERT OR IGNORE INTO questions(id,account_id,data,created_at,eligibility_updated_at) SELECT ?,account_id,json_remove(data,'$.freeRepAt','$.swapped'),created_at,created_at FROM challenges WHERE id=?").bind(questionID,id),
         env.DB.prepare("INSERT OR IGNORE INTO question_attempts(challenge_id,question_id) SELECT id,? FROM challenges WHERE id=?").bind(questionID,id),
         env.DB.prepare("UPDATE questions SET eligible=0,eligibility_revision=eligibility_revision+1 WHERE id=? AND EXISTS(SELECT 1 FROM question_attempts WHERE challenge_id=?)").bind(questionID,id),
       ]),

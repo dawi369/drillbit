@@ -2,6 +2,7 @@ import { z } from "zod";
 import { Fault, roundTiming, timestamp } from "./domain";
 import { historicalSnapshot } from "./history";
 import { consumeUsage, type Env } from "./platform";
+import { freeRepLimit } from "./practice-gate";
 import { INTERVIEW_PROMPT_VERSION } from "./prompts/interviewer";
 import { guidanceMode, guidanceModeSchema } from "./prompts/teaching";
 import { dispatch, ownedChallenge, settingsFor, type Job } from "./store";
@@ -88,6 +89,7 @@ export async function requestInterview(env: Env, account: string, id: string, co
   if (input.promptId !== promptId) throw new Fault("revision_conflict",409,"The interviewer has moved on. Review the current question first.");
   if (context.turns.some(t => ["pending", "running", "failed"].includes(t.status))) throw new Fault("interview_pending", 409, "Recover the interviewer's response before continuing.");
   if (context.turns.length >= 40) throw new Fault("interview_limit", 429, "This interview has reached its limit. Finish to review your work.");
+  freeRepLimit(env, account, JSON.parse(challenge.data), input.kind, context.turns);
   if (input.kind === "answer" && !input.text) throw new Fault("empty_answer", 400, "Write an answer before sharing.");
   if (input.kind === "clarification" && !input.text) throw new Fault("empty_question", 400, "What would you like to ask?");
   if (input.kind === "continue" && !context.wrapUp) throw new Fault("not_wrapping_up", 409, "Answer the current question first.");

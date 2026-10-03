@@ -7,16 +7,16 @@ struct HomeView: View {
   @State private var started: Challenge?
   @State private var skipping: Challenge?
   @State private var chooseAfterSkip = false
-  @Namespace private var zoom
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @Environment(\.dynamicTypeSize) private var typeSize
+  @State private var bitCheers = 0
 
   private enum Today {
     case preparing(QuestionDraft?)
-    case warmUp(Challenge?)
-    case chooseMode
     case question(Challenge)
     case failed(String)
     case done(Challenge)
+    case waiting(Date)
     case empty
   }
   private var preparing: Bool {
@@ -24,22 +24,20 @@ struct HomeView: View {
   }
   private var today: Today {
     if preparing { return .preparing(model.preparingDraft) }
-    if model.firstUse.stage == .walkthrough { return .warmUp(model.bootstrap?.challenge.flatMap { $0.isWarmUp ? $0 : nil }) }
-    if model.firstUse.stage == .chooseMode { return .chooseMode }
     if let challenge = model.bootstrap?.challenge { return .question(challenge) }
     if let failure = model.preparationFailure { return .failed(failure) }
     if let session = todaysSession { return .done(session) }
+    if let next = model.nextFreeRep { return .waiting(next) }
     return .empty
   }
   /// Changes when the ticket switches state, never while a title streams or jobs poll.
   private var todayState: String {
     switch today {
     case .preparing: "preparing"
-    case .warmUp(let challenge): "warm-up|\(challenge?.id ?? "")|\(challenge?.lifecycle ?? "")"
-    case .chooseMode: "choose"
     case .question(let challenge): "question|\(challenge.id)|\(challenge.lifecycle)"
     case .failed: "failed"
     case .done(let session): "done|\(session.id)"
+    case .waiting: "waiting"
     case .empty: "empty"
     }
   }
@@ -60,6 +58,9 @@ struct HomeView: View {
           afterTicket
         }
         .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: todayState)
+        .onChange(of: todayState) { old, new in
+          if old == "preparing", new.hasPrefix("question") { bitCheers += 1 }
+        }
         ForEach(model.bootstrap?.jobs.filter { $0.status == "failed" && $0.kind != "help" } ?? []) { job in
           VStack(alignment: .leading, spacing: 8) {
             Text(job.error ?? "Preparation couldn’t finish.").font(.subheadline).foregroundStyle(.secondary)
@@ -86,8 +87,8 @@ struct HomeView: View {
     .sheet(item: $flow, onDismiss: {
       if let started { model.presented = started; self.started = nil }
     }) { entry in
+      // A plain sheet: the zoom's snapshot of the ticket settled late with its own shadow.
       QuestionFlow(model: model, initial: entry.challenge, source: entry.source, recovery: entry.recovery, browseTopics: entry.browseTopics, area: entry.area, onStart: { started = $0 })
-        .navigationTransition(.zoom(sourceID: "today", in: zoom))
     }
     .task {
       while !Task.isCancelled {
@@ -114,8 +115,28 @@ struct HomeView: View {
       Text(Date.now.formatted(.dateTime.weekday(.wide)))
         .font(.largeTitle.weight(.bold)).tracking(-0.6)
         .accessibilityAddTraits(.isHeader)
-      Text(subtitle).font(.subheadline).foregroundStyle(AppPalette.secondary)
-        .fixedSize(horizontal: false, vertical: true)
+      HStack(alignment: .top, spacing: 0) {
+        Text(subtitle).font(.subheadline).foregroundStyle(AppPalette.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+        // Accessibility sizes give the title and subtitle the full width.
+        if !typeSize.isAccessibilitySize {
+          Spacer(minLength: 8)
+          BitView(mood: bitMood, cheers: bitCheers)
+            .frame(height: 72)
+            .padding(.top, -32)
+            .padding(.horizontal, -8)
+            .padding(.bottom, -16)
+        }
+      }
+    }
+  }
+  /// Bit only reflects what Home already says in text.
+  private var bitMood: BitMood {
+    switch today {
+    case .preparing: .drilling
+    case .failed: .concerned
+    case .done: .content
+    default: .idle
     }
   }
   private var subtitle: String {
@@ -144,39 +165,19 @@ struct HomeView: View {
     case .preparing(let draft):
       Ticket {
         VStack(alignment: .leading, spacing: 12) {
-          TicketHeader(number: model.firstUse.stage == .walkthrough ? "Warm-up" : nextNumber, detail: shortDate)
+          TicketHeader(number: nextNumber, detail: shortDate)
           StreamingLine(text: draft?.title ?? "", font: .title.weight(.semibold))
           if let prompt = draft?.prompt, !prompt.isEmpty {
             Text(QuestionMarkup.plain(prompt)).font(.subheadline).foregroundStyle(AppPalette.secondary).lineLimit(3)
           }
         }
       } stub: {
-        DrillbitSpinner(size: 28)
-          .frame(minHeight: 36)
+        // Bit drills in the header meanwhile; one animated Bit per screen.
+        stubText(title: "Drilling one out", note: "Takes a few seconds")
       }
       .accessibilityElement(children: .combine)
       .accessibilityLabel("Picking today’s question")
       .accessibilityIdentifier("todayPreparing")
-    case .warmUp(let challenge):
-      ticketButton(identifier: "startPractice", spoken: challenge?.lifecycle == "in_progress" ? "Resume" : "Start", action: { flow = QuestionFlowEntry(challenge: challenge) }) {
-        VStack(alignment: .leading, spacing: 12) {
-          TicketHeader(number: "Warm-up", detail: "Doesn’t count")
-          Text(challenge?.title ?? "Let’s try one together.").font(.title.weight(.semibold)).tracking(-0.6)
-          Text("Built from your plan. It won’t count, so just try stuff.").font(.subheadline).foregroundStyle(AppPalette.secondary)
-        }
-      } stub: {
-        stubRow(title: "Guided", note: GuidanceMode.learnTogether.stubNote, pill: challenge?.lifecycle == "in_progress" ? "Resume" : "Start")
-      }
-    case .chooseMode:
-      ticketButton(identifier: "chooseFirstSession", spoken: "Choose", action: { flow = QuestionFlowEntry() }) {
-        VStack(alignment: .leading, spacing: 12) {
-          TicketHeader(number: nextNumber, detail: shortDate)
-          Text("Your first real one.").font(.title.weight(.semibold)).tracking(-0.6)
-          Text("Guided, Practice or Mock interview. Pick how much help you want.").font(.subheadline).foregroundStyle(AppPalette.secondary)
-        }
-      } stub: {
-        stubRow(title: "This one counts", note: "Start whenever you’re ready", pill: "Choose")
-      }
     case .question(let challenge):
       questionTicket(challenge)
     case .failed(let failure):
@@ -194,6 +195,19 @@ struct HomeView: View {
       }
     case .done(let session):
       doneTicket(session)
+    case .waiting(let next):
+      Ticket {
+        VStack(alignment: .leading, spacing: 12) {
+          TicketHeader(number: nextNumber, detail: shortDate)
+          Text(AppModel.freeRepLine(next)).font(.title2.weight(.semibold)).tracking(-0.4)
+            .fixedSize(horizontal: false, vertical: true)
+          Text("Recall and Library are still open in the meantime.").font(.subheadline).foregroundStyle(AppPalette.secondary)
+        }
+      } stub: {
+        stubText(title: "Free reps", note: "One a week, on the house")
+      }
+      .accessibilityElement(children: .combine)
+      .accessibilityIdentifier("freeRepWaiting")
     case .empty:
       ticketButton(identifier: "prepareQuestion", spoken: "Prepare", action: { flow = QuestionFlowEntry() }) {
         VStack(alignment: .leading, spacing: 12) {
@@ -229,14 +243,14 @@ struct HomeView: View {
       }
     }
     .contextMenu {
-      if challenge.lifecycle == "ready" {
+      if challenge.lifecycle == "ready" && model.mayStartRep(swapping: challenge) {
         Button("Regenerate", systemImage: AppIcon.retry.rawValue) { Task {
           do { _ = try await model.generateForPreview(PreparationInput(focus: "System design", kind: "design", difficulty: model.settings.difficulty, engineeringLevel: challenge.engineeringLevel, replaceId: challenge.id)) }
           catch { model.preparationFailure = error.localizedDescription }
         } }
         Button("Choose focus or level", systemImage: AppIcon.preferences.rawValue) { flow = QuestionFlowEntry() }
       }
-      if resuming {
+      if resuming && model.mayStartRep() {
         Button("Choose another question", systemImage: AppIcon.regenerate.rawValue) { chooseAfterSkip = true; skipping = challenge }
       }
       Button("Skip question", systemImage: AppIcon.skip.rawValue, role: .destructive) { chooseAfterSkip = false; skipping = challenge }
@@ -270,7 +284,6 @@ struct HomeView: View {
       .contentShape(Rectangle())
     }
     .buttonStyle(TicketPressStyle())
-    .matchedTransitionSource(id: "today", in: zoom)
     .accessibilityIdentifier("todayDone")
   }
 
@@ -279,9 +292,14 @@ struct HomeView: View {
       VStack(alignment: .leading, spacing: 4) {
         Text(tomorrowLine).font(.subheadline).foregroundStyle(AppPalette.secondary)
           .fixedSize(horizontal: false, vertical: true)
-        Button("One more?") { flow = QuestionFlowEntry() }
-          .font(.subheadline.weight(.semibold)).frame(minHeight: 44)
-          .accessibilityIdentifier("oneMore")
+        if let next = model.nextFreeRep {
+          Text(AppModel.freeRepLine(next)).font(.subheadline).foregroundStyle(AppPalette.secondary)
+            .accessibilityIdentifier("freeRepNotice")
+        } else {
+          Button("One more?") { flow = QuestionFlowEntry() }
+            .font(.subheadline.weight(.semibold)).frame(minHeight: 44)
+            .accessibilityIdentifier("oneMore")
+        }
       }
       .padding(.horizontal, 4)
     } else if case .question = today, let queued = model.bootstrap?.queuedNext {
@@ -297,12 +315,18 @@ struct HomeView: View {
   private func recallRow(_ plan: TodayPlan) -> some View {
     let now = Date.now
     let quote = model.recall.cards.first { Date.fromAPI($0.dueAt).map { $0 <= now } ?? false }?.evidence?.quote
-    return Button { NotificationCenter.default.post(name: .init("OpenRecall"), object: nil) } label: {
+    // The first rep's cards get one plain introduction instead of a tab tour.
+    let introducing = model.firstUse.firstRepID != nil && !model.firstUse.recallIntroduced
+    let count = plan.dueRecallCount
+    return Button {
+      if introducing { Task { await model.markRecallIntroduced() } }
+      NotificationCenter.default.post(name: .init("OpenRecall"), object: nil)
+    } label: {
       HStack(alignment: .center, spacing: 12) {
         VStack(alignment: .leading, spacing: 4) {
           Text("Recall").font(.subheadline.weight(.semibold)).foregroundStyle(AppPalette.primary)
-          Text(quote.map { "“\($0)”" } ?? "A few things from past sessions, ready to test.")
-            .font(.subheadline).foregroundStyle(AppPalette.secondary).lineLimit(2).multilineTextAlignment(.leading)
+          Text(introducing ? "\(count) \(count == 1 ? "card" : "cards") from your first rep. A quick check now makes it stick." : quote.map { "“\($0)”" } ?? "A few things from past sessions, ready to test.")
+            .font(.subheadline).foregroundStyle(AppPalette.secondary).lineLimit(introducing ? 3 : 2).multilineTextAlignment(.leading)
         }
         Spacer(minLength: 8)
         Text("\(plan.dueRecallCount) due").font(.caption.weight(.medium).monospaced()).textCase(.uppercase)
@@ -334,7 +358,6 @@ struct HomeView: View {
       Ticket(content: content, stub: stub).contentShape(Rectangle())
     }
     .buttonStyle(TicketPressStyle())
-    .matchedTransitionSource(id: "today", in: zoom)
     .accessibilityIdentifier(identifier ?? "todayTicket")
     // The printed pill is decorative for VoiceOver, but Voice Control users say what they see.
     .accessibilityInputLabels([Text(spoken), Text("Today’s question")])

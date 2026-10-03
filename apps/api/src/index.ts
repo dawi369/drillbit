@@ -22,6 +22,7 @@ import { learningEvidence, recallDeck, retryMoment, reviewRecall, todayPlan } fr
 import { coverage, libraryPage, questionDetail, setEligibility, startQuestion } from "./library";
 import { consumeUsage, encrypt, hash, identity, type Env } from "./platform";
 import { adopt, requestHelp } from "./practice";
+import { freeRepTaken, onFreeReps, practiceAccess, practiceGateFault } from "./practice-gate";
 import {
     accountFor,
     activeChallenge,
@@ -180,6 +181,7 @@ app.get("/v1/bootstrap", async (c) => {
     settings,
     todayPlan: await todayPlan(c.env, a.id, active, settings),
     queuedNext: await queuedFollowUp(c.env, a.id),
+    practice: await practiceAccess(c.env, a.id),
     challenge: active ? await detail(c.env, a.id, active.id) : null,
     jobs: jobs.results,
     credential,
@@ -332,22 +334,28 @@ app.post("/v1/challenges", async (c) => {
     .first();
   if (pending) return c.json(pending);
   const followUp = preparation.followUpId ? await followUpContext(c.env, a, preparation.followUpId) : undefined;
+  // A free rep is spent when its question is prepared; one swap of that question is part of the same rep.
+  const replaced = preparation.replaceId && active ? parseJSON<{ freeRepAt?: string; swapped?: boolean }>(active.data) : undefined;
+  const swap = replaced?.freeRepAt && !replaced.swapped;
+  const freeRep = !onFreeReps(c.env, a) ? {} : swap ? { freeRepAt: replaced!.freeRepAt, swapped: true } : { freeRepAt: timestamp() };
+  const unless = "freeRepAt" in freeRep && !swap ? freeRepTaken(a) : undefined;
+  if (unless && await c.env.DB.prepare("SELECT 1 WHERE " + unless.sql).bind(...unless.binds).first()) throw practiceGateFault();
   await consumeUsage(c.env, a, "generate", 10);
-  return c.json(
-    await createJob(c.env, a, id, "generate", null, {
-      ...preparation,
-      followUp,
-      settings: {
-        ...(await settingsFor(c.env, a)),
-        ...(preparation.focus ? { focus: preparation.focus } : {}),
-        ...(preparation.difficulty
-          ? { difficulty: preparation.difficulty }
-          : {}),
-        ...(preparation.engineeringLevel ? { engineeringLevel: preparation.engineeringLevel } : preparation.difficulty ? { engineeringLevel: levelForDifficulty(preparation.difficulty) } : {}),
-      },
-    }, inline(c)),
-    202,
-  );
+  const job = await createJob(c.env, a, id, "generate", null, {
+    ...preparation,
+    followUp,
+    ...freeRep,
+    settings: {
+      ...(await settingsFor(c.env, a)),
+      ...(preparation.focus ? { focus: preparation.focus } : {}),
+      ...(preparation.difficulty
+        ? { difficulty: preparation.difficulty }
+        : {}),
+      ...(preparation.engineeringLevel ? { engineeringLevel: preparation.engineeringLevel } : preparation.difficulty ? { engineeringLevel: levelForDifficulty(preparation.difficulty) } : {}),
+    },
+  }, inline(c), unless);
+  if (!job) throw practiceGateFault();
+  return c.json(job, 202);
 });
 app.put("/v1/challenges/:id/companion", async (c) =>
   c.json(
@@ -565,11 +573,17 @@ app.post("/v1/jobs/:id/retry", async (c) => {
   if (!old || old.status !== "failed" || ["help", "interview"].includes(old.kind))
     throw new Fault("not_retryable", 409, "This operation cannot be retried.");
   const id = requireCommand(c.req.header("Idempotency-Key"));
+  const input = parseJSON<{ freeRepAt?: string; swapped?: boolean }>(old.input);
+  // A retried preparation is a fresh rep; the failed one never counted.
+  const unless = old.kind === "generate" && onFreeReps(c.env, a) ? freeRepTaken(a) : undefined;
+  if (unless && await c.env.DB.prepare("SELECT 1 WHERE " + unless.sql).bind(...unless.binds).first()) throw practiceGateFault();
   await consumeUsage(c.env, a, old.kind, old.kind === "summarize" ? 20 : 10);
+  const { swapped: _swapped, ...rest } = input;
   const job = await createJob(c.env, a, id, old.kind, old.challenge_id, {
-    ...parseJSON<object>(old.input),
+    ...(unless ? { ...rest, freeRepAt: timestamp() } : input),
     settings: await settingsFor(c.env, a),
-  });
+  }, undefined, unless);
+  if (!job) throw practiceGateFault();
   await c.env.DB.prepare(
     "UPDATE jobs SET status='cancelled' WHERE id=? AND status='failed'",
   )
