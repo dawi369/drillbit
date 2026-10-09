@@ -230,6 +230,7 @@ export async function complete(
   settings: Settings,
   receipts: z.infer<typeof receiptSchema>[] = [],
   run?: (id: string) => void,
+  guidanceMode?: string,
 ) {
   const challenge = await ownedChallenge(env, account, id);
   if (challenge.lifecycle === "completed" && challenge.command_id === command)
@@ -244,6 +245,10 @@ export async function complete(
     env.DB.prepare(
       `UPDATE challenges SET lifecycle='completed',completed_at=?,command_id=? WHERE id=? AND account_id=? AND lifecycle IN ('ready','in_progress') AND EXISTS(SELECT 1 FROM sessions WHERE challenge_id=? AND command_id=?)`,
     ).bind(now, command, id, account, id, command),
+    // Only the winning completion may record the style it finished in; the frozen context below reads it.
+    ...(guidanceMode ? [env.DB.prepare(
+      `UPDATE challenges SET data=json_set(data,'$.guidanceMode',?) WHERE id=? AND command_id=? AND lifecycle='completed'`,
+    ).bind(guidanceMode, id, command)] : []),
     env.DB.prepare(
       `UPDATE challenges SET data=json_set(data,'$.ticket',(SELECT COALESCE(MAX(json_extract(x.data,'$.ticket')),0)+1 FROM challenges x WHERE x.account_id=challenges.account_id)) WHERE id=? AND command_id=? AND lifecycle='completed' AND COALESCE(json_extract(data,'$.warmUp'),0)=0 AND json_extract(data,'$.ticket') IS NULL`,
     ).bind(id, command),

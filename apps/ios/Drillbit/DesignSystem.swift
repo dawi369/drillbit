@@ -107,184 +107,11 @@ struct DrillbitLogo: View {
 }
 
 /// Linear audio levels (0...1) written by the voice transport and read by
-/// `SignalPresence` every frame. Deliberately unobserved: no view invalidation.
+/// `BitView` every frame. Deliberately unobserved: no view invalidation.
 @MainActor final class VoiceLevels {
   var input = 0.0
   var output = 0.0
   func reset() { input = 0; output = 0 }
-}
-
-/// The interviewer's presence: a slowly turning particle orb around a warm core.
-/// Live levels ripple the silver shell (you) and swell the yellow core (interviewer).
-/// Reduce Motion, Still mode and background render one still frame.
-struct SignalPresence: View {
-  enum Mode: Equatable { case still, ambient, connecting, live, muted }
-  var mode: Mode = .ambient
-  var density = 520
-  var levels: VoiceLevels? = nil
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  @Environment(\.scenePhase) private var scenePhase
-  @State private var visible = false
-  @State private var dynamics = PresenceDynamics()
-
-  var body: some View {
-    let particles = SignalParticle.field(density)
-    let still = reduceMotion || mode == .still
-    // Only true background pauses; system sheets (Sign in with Apple) leave it turning.
-    let paused = still || !visible || scenePhase == .background
-    let interval = ProcessInfo.processInfo.isLowPowerModeEnabled ? 1.0 / 20 : 1.0 / 30
-    TimelineView(.animation(minimumInterval: interval, paused: paused)) { timeline in
-      let frame = still ? PresenceFrame.rest(mode) : paused ? dynamics.current : dynamics.advance(to: timeline.date, mode: mode, levels: levels)
-      Canvas { context, size in
-        SignalPresenceRenderer.draw(particles, frame: frame, in: &context, size: size)
-      }
-    }
-    .onAppear { visible = true }
-    .onDisappear { visible = false }
-    .accessibilityHidden(true)
-  }
-}
-
-struct PresenceFrame: Sendable {
-  var time = 0.0
-  var motion = 0.0
-  var input = 0.0
-  var output = 0.0
-  var quiet = 0.0
-  var connecting = 0.0
-  var spin = 0.0
-  static func rest(_ mode: SignalPresence.Mode) -> PresenceFrame {
-    PresenceFrame(quiet: mode == .muted ? 1 : 0)
-  }
-}
-
-/// Frame-clock state for one presence view: smoothed levels and mode blends.
-@MainActor final class PresenceDynamics {
-  private var last: Date?
-  private var frame = PresenceFrame()
-  var current: PresenceFrame { frame }
-
-  func advance(to date: Date, mode: SignalPresence.Mode, levels: VoiceLevels?) -> PresenceFrame {
-    // Accumulated time: pauses and resumes continue smoothly instead of jumping.
-    let dt = min(0.1, max(0, date.timeIntervalSince(last ?? date)))
-    last = date
-    let live = mode == .live
-    frame.time += dt
-    frame.input = approach(frame.input, live ? levels?.input ?? 0 : 0, dt, attack: 0.06, release: 0.28)
-    frame.output = approach(frame.output, live ? levels?.output ?? 0 : 0, dt, attack: 0.06, release: 0.28)
-    frame.quiet = approach(frame.quiet, mode == .muted ? 1 : 0, dt, attack: 0.2, release: 0.2)
-    frame.connecting = approach(frame.connecting, mode == .connecting ? 1 : 0, dt, attack: 0.25, release: 0.25)
-    frame.motion = approach(frame.motion, 1, dt, attack: 0.6, release: 0.6)
-    // Integrated so speech speeds the turn without the orb jumping.
-    frame.spin += dt * (0.1 + 0.3 * max(frame.input, frame.output)) * (1 - 0.7 * frame.quiet)
-    return frame
-  }
-
-  private func approach(_ value: Double, _ target: Double, _ dt: Double, attack: Double, release: Double) -> Double {
-    value + (target - value) * (1 - exp(-dt / (target > value ? attack : release)))
-  }
-}
-
-struct SignalParticle: Sendable {
-  enum Layer: Sendable { case core, shell, dust }
-  static let depthBuckets = 8
-  var layer: Layer
-  var theta: Double
-  var height: Double
-  var ring: Double
-  var radius: Double
-  var size: Double
-  var warm: Bool
-  var phase: Double
-  var response: Double
-
-  @MainActor private static var cache: [Int: [SignalParticle]] = [:]
-
-  /// Deterministic: the same density always produces the same orb.
-  @MainActor static func field(_ density: Int) -> [SignalParticle] {
-    if let cached = cache[density] { return cached }
-    var seed: UInt64 = 0x5349474E414C
-    func unit() -> Double {
-      seed = seed &* 6364136223846793005 &+ 1442695040888963407
-      return Double(seed >> 11) / Double(1 << 53)
-    }
-    var particles: [SignalParticle] = []
-    particles.reserveCapacity(density)
-    for _ in 0..<density {
-      let pick = unit()
-      let layer: Layer = pick < 0.22 ? .core : pick < 0.93 ? .shell : .dust
-      let theta = unit() * .pi * 2
-      let height = unit() * 2 - 1
-      let radius: Double
-      let size: Double
-      switch layer {
-      case .core:
-        let gaussian = sqrt(-2 * log(max(unit(), 1e-9))) * cos(2 * .pi * unit())
-        radius = min(0.5, abs(gaussian) * 0.2)
-        size = 1.2 + unit() * 1.2
-      case .shell:
-        // A thin shell keeps a readable sphere edge when projected.
-        radius = 0.8 + (unit() + unit() + unit() - 1.5) * 0.055
-        size = 0.8 + unit()
-      case .dust:
-        radius = 1.0 + unit() * 0.28
-        size = 0.5 + unit() * 0.6
-      }
-      let warm = layer == .core || (layer == .shell && unit() < 0.05)
-      particles.append(SignalParticle(layer: layer, theta: theta, height: height, ring: sqrt(1 - height * height),
-        radius: radius, size: size, warm: warm, phase: unit() * .pi * 2, response: 0.6 + 0.8 * unit()))
-    }
-    cache[density] = particles
-    return particles
-  }
-}
-
-enum SignalPresenceRenderer {
-  static func draw(_ particles: [SignalParticle], frame: PresenceFrame, in context: inout GraphicsContext, size: CGSize) {
-    let cx = Double(size.width) / 2, cy = Double(size.height) / 2
-    let scale = Double(min(size.width, size.height)) * 0.4
-    let breath = frame.connecting * (0.5 + 0.5 * sin(frame.time * 2.4)) * 0.35
-    let listening = max(frame.input, breath)
-    let speaking = max(frame.output, breath)
-    let quiet = 1 - 0.45 * frame.quiet
-    let contraction = 1 - 0.06 * frame.quiet
-    let tilt = 0.38 + 0.05 * sin(frame.time * 0.23) * frame.motion
-    let cosTilt = cos(tilt), sinTilt = sin(tilt)
-
-    let glow = scale * (0.62 + 0.25 * speaking)
-    context.fill(Path(ellipseIn: CGRect(x: cx - glow, y: cy - glow, width: 2 * glow, height: 2 * glow)),
-      with: .radialGradient(Gradient(colors: [AppPalette.action.opacity((0.2 + 0.22 * speaking) * quiet), AppPalette.action.opacity(0)]),
-        center: CGPoint(x: cx, y: cy), startRadius: 0, endRadius: glow))
-
-    let buckets = SignalParticle.depthBuckets
-    var warm = Array(repeating: Path(), count: buckets)
-    var grain = Array(repeating: Path(), count: buckets)
-    for particle in particles {
-      var radius = particle.radius * contraction * (1 + 0.02 * sin(frame.time * 0.8 + particle.phase) * frame.motion)
-      switch particle.layer {
-      case .core: radius *= 1 + speaking * 0.45 * particle.response
-      case .shell: radius *= 1 + listening * (0.05 + 0.07 * sin(3 * particle.theta + frame.time * 5 + particle.phase)) * particle.response
-      case .dust: radius *= 1 + (listening + speaking) * 0.06
-      }
-      // Dust turns slower than the shell, which reads as depth.
-      let angle = particle.theta + frame.spin * (particle.layer == .dust ? 0.6 : 1)
-      let x = radius * particle.ring * cos(angle)
-      let z0 = radius * particle.ring * sin(angle)
-      let y0 = radius * particle.height
-      let y = y0 * cosTilt - z0 * sinTilt
-      let z = y0 * sinTilt + z0 * cosTilt
-      let depth = min(1, max(0, (z / 1.28 + 1) / 2))
-      let dot = particle.size * (0.55 + 0.9 * depth)
-      let rect = CGRect(x: cx + x * scale - dot / 2, y: cy + y * scale - dot / 2, width: dot, height: dot)
-      let bucket = min(buckets - 1, Int(depth * Double(buckets)))
-      if particle.warm { warm[bucket].addEllipse(in: rect) } else { grain[bucket].addEllipse(in: rect) }
-    }
-    for bucket in 0..<buckets {
-      let depth = (Double(bucket) + 0.5) / Double(buckets)
-      context.fill(grain[bucket], with: .color(AppPalette.grain.opacity(min(1, (0.08 + 0.72 * depth) * (1 + listening * 0.6)) * quiet)))
-      context.fill(warm[bucket], with: .color(AppPalette.action.opacity(min(1, (0.4 + 0.6 * depth) * (1 + speaking * 0.5)) * quiet)))
-    }
-  }
 }
 
 struct SignalEyebrow: View {
@@ -696,6 +523,9 @@ enum AppIcon: String, CaseIterable {
   case microphone = "mic.fill"
   case microphoneMuted = "mic.slash.fill"
   case history = "clock.arrow.circlepath"
+  case transcript = "text.bubble"
+  case end = "xmark"
+  case write = "square.and.pencil"
   case collapsed = "chevron.right"
   case expanded = "chevron.down"
 }

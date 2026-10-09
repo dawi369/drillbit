@@ -12508,6 +12508,14 @@
               ],
               "additionalProperties": false
             }
+          },
+          "guidanceMode": {
+            "type": "string",
+            "enum": [
+              "learn_together",
+              "coach_me",
+              "mock_interview"
+            ]
           }
         },
         "required": [
@@ -14162,6 +14170,19 @@
                     "type": "string"
                   },
                   "checkedAt": {
+                    "type": "string"
+                  },
+                  "remaining": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "resetsAt": {
                     "type": "string"
                   }
                 },

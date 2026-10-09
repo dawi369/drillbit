@@ -33,7 +33,9 @@ struct GrowingInterviewEditor: UIViewRepresentable {
   func sizeThatFits(_ proposal: ProposedViewSize, uiView: UITextView, context: Context) -> CGSize? {
     guard let width = proposal.width, width > 0 else { return nil }
     let size = uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
-    return CGSize(width: width, height: max((uiView.font?.lineHeight ?? 22) * 6 + 16, size.height))
+    // Six lines read as a page at regular sizes; at accessibility sizes that is most of the screen, so three.
+    let minimumLines: CGFloat = uiView.traitCollection.preferredContentSizeCategory.isAccessibilityCategory ? 3 : 6
+    return CGSize(width: width, height: max((uiView.font?.lineHeight ?? 22) * minimumLines + 16, size.height))
   }
   @MainActor final class Coordinator: NSObject, UITextViewDelegate {
     var parent: GrowingInterviewEditor

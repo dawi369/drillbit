@@ -112,9 +112,7 @@ struct SetupView: View {
             Toggle("I know the date", isOn: Binding(get: { coordinator.draft.targetDate != nil }, set: { coordinator.draft.targetDate = $0 ? Date() : nil }))
             if let date = coordinator.draft.targetDate {
               DatePicker("Interview date", selection: Binding(get: { date }, set: { coordinator.draft.targetDate = $0 }), in: Calendar.current.startOfDay(for: Date())..., displayedComponents: .date)
-              Text(Self.countdown(to: date))
-                .font(.headline)
-                .contentTransition(.numericText())
+              InterviewCountdown(days: Self.daysUntil(date), line: Self.countdown(to: date))
                 .animation(reduceMotion ? nil : DrillbitMotion.selection, value: date)
                 .accessibilityIdentifier("interviewCountdown")
             }
@@ -132,17 +130,40 @@ struct SetupView: View {
           .pageCascade(1)
         SignalChoiceList(options: startingPoints.map { SignalChoice(id: $0.0, title: $0.1) },
           isSelected: { coordinator.draft.level == $0 }, cascadeFrom: 2) { coordinator.draft.level = $0 }
+        Text(Self.levelPromise(coordinator.draft.level))
+          .font(.callout.weight(.medium))
+          .foregroundStyle(AppPalette.primary)
+          .fixedSize(horizontal: false, vertical: true)
+          .padding(16)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .background(AppPalette.accentSoft, in: RoundedRectangle(cornerRadius: 12))
+          .contentTransition(.opacity)
+          .animation(reduceMotion ? nil : DrillbitMotion.selection, value: coordinator.draft.level)
+          .pageCascade(6)
+          .accessibilityIdentifier("levelPromise")
       }
     }
   }
 
   /// Arithmetic from the person's own date: honest, never a promise.
+  static func daysUntil(_ date: Date, now: Date = .now, calendar: Calendar = .current) -> Int {
+    calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: date)).day ?? 0
+  }
   static func countdown(to date: Date, now: Date = .now, calendar: Calendar = .current) -> String {
-    let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: date)).day ?? 0
+    let days = daysUntil(date, now: now, calendar: calendar)
     switch days {
     case ..<1: return "That’s today. One quick rep to warm up."
     case 1: return "That’s tomorrow. One good rep tonight."
-    default: return "\(days) days out. A rep a day gets you \(days) shots."
+    default: return "\(days) days until your interview. Let’s find one thing to sharpen today."
+    }
+  }
+  /// What the chosen level actually changes about the questions.
+  static func levelPromise(_ level: String) -> String {
+    switch level {
+    case "junior": "We’ll start with the building blocks and work through them together."
+    case "senior": "Expect tradeoffs and failure modes, not definitions."
+    case "staff": "We’ll go straight to the hard tradeoffs. Expect pushback."
+    default: "We’ll skip the definitions and push on your decisions."
     }
   }
 
@@ -172,5 +193,35 @@ struct SetupView: View {
       try await model.saveSettingsLocally()
       showingQuestion = true
     } catch { coordinator.failure = error.localizedDescription }
+  }
+}
+
+/// The person's own date as one big number; today and tomorrow read as a sentence instead.
+private struct InterviewCountdown: View {
+  let days: Int
+  let line: String
+  @ScaledMetric(relativeTo: .largeTitle) private var numeral: CGFloat = 64
+  var body: some View {
+    Group {
+      if days >= 2 {
+        VStack(alignment: .leading, spacing: 4) {
+          HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text("\(days)")
+              .font(.system(size: numeral, weight: .bold))
+              .monospacedDigit()
+              .contentTransition(.numericText(value: Double(days)))
+              .foregroundStyle(AppPalette.accent)
+            Text("days until your interview").font(.title3.weight(.semibold))
+              .fixedSize(horizontal: false, vertical: true)
+          }
+          Text("Let’s find one thing to sharpen today.").font(.subheadline).foregroundStyle(AppPalette.secondary)
+        }
+      } else {
+        Text(line).font(.headline).fixedSize(horizontal: false, vertical: true)
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(line)
   }
 }

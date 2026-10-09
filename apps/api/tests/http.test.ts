@@ -415,6 +415,25 @@ it('saves a BYOK key only with a model that can do structured output, then uses 
   await recordUsage(bindings,account.id,settings,'coach',{prompt_tokens:3,completion_tokens:2});
   expect(models).toEqual(['nobody/not-a-model','anthropic/claude-opus-5.5','anthropic/claude-opus-5.5']);
   expect(await bindings.DB.prepare("SELECT model FROM ai_runs WHERE account_id=? AND kind='coach'").bind(account.id).first()).toEqual({model:'anthropic/claude-opus-5.5'});
+
+  // Replacing or removing the key cancels pending work that depended on it; managed-mode work is untouched.
+  // (D1 allows one active help job per account, so the managed job is a different kind.)
+  const byokJob=crypto.randomUUID(), managedJob=crypto.randomUUID();
+  await createJob(bindings,account.id,byokJob,'help',null,{settings:{...settings,aiMode:'byok'},action:{kind:'hint'}});
+  await createJob(bindings,account.id,managedJob,'summarize',null,{settings:{...settings,aiMode:'managed'}});
+  openrouter(200);
+  expect((await request('credential',subject,'PUT',{key:'sk-or-v1-replacement-key-4321'})).status).toBe(200);
+  const statuses=async()=>Object.fromEntries((await bindings.DB.prepare('SELECT id,status FROM jobs WHERE id IN (?,?)').bind(byokJob,managedJob).all<{id:string;status:string}>()).results.map(r=>[r.id,r.status]));
+  expect(await statuses()).toEqual({[byokJob]:'cancelled',[managedJob]:'pending'});
+  // A key without a model keeps the default model.
+  expect(((await (await request('bootstrap',subject)).json()) as any).credential).toEqual({suffix:'4321',model:'openai/gpt-6-luna'});
+  const again=crypto.randomUUID();
+  await createJob(bindings,account.id,again,'help',null,{settings:{...settings,aiMode:'byok'},action:{kind:'hint'}});
+  expect((await request('credential',subject,'DELETE')).status).toBe(200);
+  expect((await bindings.DB.prepare('SELECT status FROM jobs WHERE id=?').bind(again).first())).toEqual({status:'cancelled'});
+  expect(await bindings.DB.prepare('SELECT id FROM credentials WHERE account_id=?').bind(account.id).first()).toBeNull();
+  // With BYOK still selected and no key, nothing falls back to the managed key.
+  await expect(provider(bindings,account.id,settings,[{role:'user',content:'hi'}])).rejects.toMatchObject({code:'credential_required'});
  }finally{bindings.CREDENTIAL_KEY=oldKey;}
 });
 

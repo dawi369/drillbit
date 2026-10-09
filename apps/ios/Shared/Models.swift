@@ -219,9 +219,24 @@ struct VoiceCapability: Codable, Sendable {
   var available: Bool
   var reason: String?
   var checkedAt: String
+  /// Absent for unlimited accounts.
+  var remaining: Int? = nil
+  var limit: Int? = nil
+  var resetsAt: String? = nil
   func isFresh(at now: Date = Date()) -> Bool {
     guard let date = Date.fromAPI(checkedAt) else { return false }
     return (0..<60).contains(now.timeIntervalSince(date))
+  }
+  /// "4 of 6 left today · resets 2 AM", in the device's own time.
+  func allowanceLine(timeZone: TimeZone = .current, locale: Locale = .current) -> String? {
+    guard let remaining, let limit else { return nil }
+    var line = remaining == 0 ? "None left today" : "\(remaining) of \(limit) left today"
+    if let reset = resetsAt.flatMap(Date.fromAPI) {
+      var style = Date.FormatStyle(date: .omitted, time: .shortened, locale: locale)
+      style.timeZone = timeZone
+      line += " · resets \(reset.formatted(style))"
+    }
+    return line
   }
 }
 struct Bootstrap: Codable, Sendable {
@@ -341,10 +356,12 @@ struct DraftWrite: Codable, Sendable {
   var answer: String
   var revision: Int
   var receipts: [DeliveryReceipt]?
+  /// Completion only: the style the interview finished in, so a switch after the last turn still shapes the ending.
+  var guidanceMode: GuidanceMode? = nil
 }
 struct Question: Codable, Sendable { var question: String }
 struct CodeInput: Codable, Sendable { var code: String }
-struct KeyInput: Codable, Sendable { var key: String; var model: String }
+struct KeyInput: Codable, Sendable { var key: String; var model: String? }
 struct DeviceResponse: Codable, Sendable {
   var id: String
   var token: String

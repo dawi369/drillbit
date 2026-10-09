@@ -27,6 +27,15 @@ import WidgetKit
   private var settingsSyncID: UUID?
   private var settingsSaveGeneration = 0
   var presented: Challenge?
+  /// The challenge whose preview chose talking; its interview opens straight into voice.
+  var talkOnOpen: String?
+  /// Interviews open out loud. Fixture runs open in text unless `--fixture-talk`, so the text-room tests stay deterministic.
+  var voiceFirst: Bool {
+    #if DEBUG
+    if fixture { return ProcessInfo.processInfo.arguments.contains("--fixture-talk") }
+    #endif
+    return true
+  }
   var firstUse = FirstUseProgress()
 
   func setFirstUse(_ value: FirstUseProgress) async throws {
@@ -234,7 +243,12 @@ import WidgetKit
         for (id, title, state) in [("library-completed", "Design notification delivery", "completed"), ("library-skipped", "Design a distributed scheduler", "skipped")] {
           let question = LibraryQuestion(id: id, title: title, prompt: "Design a durable service that handles worker failures and retries. Explain how you prevent duplicate side effects and preserve accepted work.", scenario: "Notification service", engineeringLevel: "senior", primaryConceptId: "queues", conceptIds: ["queues", "retry-safety"], eligible: false, eligibilityRevision: 0, lastActivity: "2026-09-10T12:00:00Z", attemptCount: state == "completed" ? 1 : 0)
           fixtureLibrary.append(question)
-          fixtureLibraryAttempts[id] = [Challenge(id: id + "-attempt", lifecycle: state, title: title, prompt: question.prompt, topic: "System design", createdAt: question.lastActivity, completedAt: state == "completed" ? question.lastActivity : nil, session: SessionDraft(answer: "My preserved original reasoning", revision: 1))]
+          var attempt = Challenge(id: id + "-attempt", lifecycle: state, title: title, prompt: question.prompt, topic: "System design", createdAt: question.lastActivity, completedAt: state == "completed" ? question.lastActivity : nil, session: SessionDraft(answer: "My preserved original reasoning", revision: 1))
+          // A completed attempt has feedback, like every real one.
+          if state == "completed" {
+            attempt.reflection = Reflection(summary: "Workers kept their jobs through a crash.", worked: ["Accepted work survives a worker crash"], improve: "Say what a retry does when the first delivery already went out.", takeaway: "Durability first, then deduplication.", strengths: ["Durability"], gaps: ["Duplicate delivery"])
+          }
+          fixtureLibraryAttempts[id] = [attempt]
         }
       }
       return
@@ -488,6 +502,13 @@ import WidgetKit
     } catch let e as APIError where e.status == 401 {
       if bootstrap == nil {
         error = nil
+      } else if Clerk.shared.session == nil {
+        // The session is gone (signed out elsewhere, revoked): go back to sign-in without clearing the
+        // local store, so drafts are still there under the same account once they sign in again.
+        presented = nil
+        conflict = nil
+        bootstrap = nil
+        error = "Your session ended. Sign in again to keep going. Your draft is saved on this device."
       } else {
         error = "Sign in again to continue. Your local draft is safe."
       }
@@ -661,6 +682,7 @@ import WidgetKit
       if let challenge = result.challenge { bootstrap?.challenge = challenge }
       if let job = result.job {
         busy = true
+        // Stays "preparing" until the refresh below has placed the question; otherwise the ticket blanks for one round trip.
         defer { busy = false; preparingDraft = nil }
         try? await api.questionStream(job: job.id) { snapshot in
           guard self.bootstrap?.account.id == account.id else { return }
@@ -668,8 +690,14 @@ import WidgetKit
         }
         try await waitForJob(job.id)
         guard bootstrap?.account.id == account.id else { return }
+        await refresh()
+        guard bootstrap?.account.id == account.id else { return }
+        if bootstrap?.challenge == nil, let fresh: Challenge = try? await api.send("challenges/" + (job.challengeId ?? job.id)) {
+          bootstrap?.challenge = fresh
+        }
+      } else {
+        await refresh()
       }
-      await refresh()
       guard bootstrap?.account.id == account.id else { return }
       if let bootstrap { try await disk.cache(key: "bootstrap:" + account.id, data: JSONEncoder().encode(bootstrap)) }
     } catch {
@@ -932,7 +960,8 @@ import WidgetKit
           }
           let write = DraftWrite(
             answer: draft.answer, revision: draft.revision,
-            receipts: draft.kind == "complete" ? receipts : nil)
+            receipts: draft.kind == "complete" ? receipts : nil,
+            guidanceMode: draft.kind == "complete" ? try await finishingMode(account: account, challengeID: draft.challengeID) : nil)
           if draft.kind == "complete" {
             let result: Challenge = try await api.send(
               "challenges/\(draft.challengeID)/complete", method: "POST", body: write,
@@ -969,6 +998,11 @@ import WidgetKit
       hasPendingWrites = true
       saveStatus = "Saved"
     }
+  }
+  /// The style the workspace had when Finish was pressed; the interview room caches it per attempt.
+  private func finishingMode(account: String, challengeID: String) async throws -> GuidanceMode? {
+    guard let data = try await disk.cached(key: "interview:" + account + ":" + challengeID + ":guidanceMode") else { return nil }
+    return try? JSONDecoder().decode(GuidanceMode.self, from: data)
   }
   func resolveConflict(keepLocal: Bool) async {
     guard let account = bootstrap?.account.id, let challenge = conflict else { return }
@@ -1202,6 +1236,8 @@ import WidgetKit
   private func seedFixture() {
     settings.onboardingComplete = true
     #if DEBUG
+    // Device-level choices from an earlier test run must not leak into this one.
+    for mark in CoachMark.allCases { UserDefaults.standard.removeObject(forKey: mark.storageKey) }
     if ProcessInfo.processInfo.arguments.contains("--fixture-onboarding") { settings.onboardingComplete = false }
     if ProcessInfo.processInfo.arguments.contains("--fixture-long-focus") { settings.focus = "Distributed backend systems, database performance, cache consistency, and safe cross-team migrations" }
     #endif
@@ -1256,8 +1292,10 @@ import WidgetKit
         result: InterviewResponse(outcome: "reply", text: "For example, give each logical operation a stable key and store its result in the same transaction as the state change."))])
     }
     #endif
+    let tomorrow = Calendar(identifier: .gregorian).startOfDay(for: .now.addingTimeInterval(86_400))
     bootstrap = Bootstrap(
-      capabilities: .init(voice: nil, developerTools: true), account: .init(id: "fixture", status: "active"), settings: settings, challenge: challenge,
+      capabilities: .init(voice: VoiceCapability(available: true, checkedAt: Date.now.ISO8601Format(), remaining: 5, limit: 6, resetsAt: tomorrow.ISO8601Format()), developerTools: true),
+      account: .init(id: "fixture", status: "active"), settings: settings, challenge: challenge,
       jobs: [], todayPlan: TodayPlan(state: ProcessInfo.processInfo.arguments.contains("--fixture-dashboard") ? "complete_today" : "first_session",
         completedTotal: ProcessInfo.processInfo.arguments.contains("--fixture-dashboard") ? 12 : 0,
         completedLastSevenDays: ProcessInfo.processInfo.arguments.contains("--fixture-dashboard") ? 4 : 0,

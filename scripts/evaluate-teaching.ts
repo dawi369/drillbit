@@ -1,11 +1,11 @@
 /** Synthetic inputs only. Product acceptance requires reading these responses. */
 import {mkdirSync,writeFileSync} from 'node:fs';
 import {z} from '../apps/api/node_modules/zod';
-import {messagesFor,interviewModelSchema,interviewReasoning,parseInterviewModelResult} from '../apps/api/src/ai';
+import {messagesFor,interviewModelSchema,interviewReasoning,parseInterviewModelResult,parseModelJSON} from '../apps/api/src/ai';
 import {interviewSchemaFor} from '../apps/api/src/interview';
 import {voiceDelegationMessages} from '../apps/api/src/prompts/voice-context';
 import {INTERVIEW_PROMPT_VERSION} from '../apps/api/src/prompts/interviewer';
-import {managedModel} from '../apps/api/src/domain';
+import {FAST_PROVIDERS,managedModel} from '../apps/api/src/domain';
 const MODEL_ID=managedModel('interview');
 const key=process.env.OPENROUTER_API_KEY;
 if(!key) throw new Error('OpenRouter key missing');
@@ -35,7 +35,7 @@ await Promise.all(['learn_together','coach_me','mock_interview'].map(async guida
     const context={question,interview,historicalSnapshot:{scope:'synthetic empty history',attempts:[]},action:{kind:'answer',text}};
     const messages=transport==='voice'?voiceDelegationMessages(question,context.historicalSnapshot,{...interview,turns:[...turns,{kind:'voice',voice:[{speaker:'user',text}]}]}):messagesFor('interview',context);
     const start=performance.now();
-    const response=await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},signal:AbortSignal.timeout(60000),body:JSON.stringify({model:MODEL_ID,provider:{sort:'latency',require_parameters:true},messages,reasoning:process.env.EVAL_REASONING ? {effort:process.env.EVAL_REASONING} : interviewReasoning(context),max_tokens:process.env.EVAL_REASONING ? 4096 : 2400,...({response_format:{type:'json_schema',json_schema:{name:'reply',strict:true,schema:z.toJSONSchema(interviewModelSchema(context,interviewSchemaFor('answer')))}}})})});
+    const response=await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},signal:AbortSignal.timeout(60000),body:JSON.stringify({model:MODEL_ID,provider:{order:FAST_PROVIDERS,require_parameters:true},messages,reasoning:process.env.EVAL_REASONING ? {effort:process.env.EVAL_REASONING} : interviewReasoning(context),max_tokens:process.env.EVAL_REASONING ? 4096 : 2400,...({response_format:{type:'json_schema',json_schema:{name:'reply',strict:true,schema:z.toJSONSchema(interviewModelSchema(context,interviewSchemaFor('answer')))}}})})});
     if(!response.ok)throw new Error(`Provider status ${response.status}`);
     const body=await response.json() as any;
     const raw=body.choices[0].message.content;

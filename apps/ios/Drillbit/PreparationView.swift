@@ -35,7 +35,7 @@ struct PreparationView: View {
           Button("Remove") { includeSource = false }
         }
       }
-      Section("Session style") {
+      Section {
         NavigationLink {
           GuidanceModePicker(selection: $guidanceMode)
         } label: {

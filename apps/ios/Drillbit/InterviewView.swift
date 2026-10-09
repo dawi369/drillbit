@@ -6,7 +6,6 @@ private enum InterviewSheet: String, Identifiable { case style, assistance; var 
 struct InterviewView: View {
   @State private var liveVoice: LiveVoice?
   @State private var showingVoiceRoom = false
-  @State private var voiceQuestionCollapsed = true
   @State private var checkingVoice = false
   @State private var voiceExplanation: String?
   @State private var voicePermissionNeedsSettings = false
@@ -48,6 +47,24 @@ struct InterviewView: View {
   @State private var openerTypes: Bool
   /// Fallback start for a round whose start time never reached this device.
   @State private var openedAt = Date()
+  @AppStorage(CoachMark.composer.storageKey) private var seenComposerTip = false
+  @AppStorage(CoachMark.tools.storageKey) private var seenToolsTip = false
+  /// One tip at a time: the composer before the first reply, then the tools once a follow-up has landed.
+  private var coach: CoachMark? {
+    guard CoachMark.enabled, sessionRestored, !showingVoiceRoom, sheet == nil, interview.finished == nil, showsDraft else { return nil }
+    if !seenComposerTip { return firstReply && interview.answer.isEmpty && (openerSettled || !openerTypes || challenge.opener == nil) ? .composer : nil }
+    if !seenToolsTip, interview.mode != .mockInterview, !firstReply { return .tools }
+    return nil
+  }
+  private func dismissCoach(_ mark: CoachMark) {
+    withAnimation(DrillbitMotion.fast) {
+      switch mark {
+      case .composer: seenComposerTip = true
+      case .tools: seenToolsTip = true
+      case .recall: break
+      }
+    }
+  }
   private var scenarioTitle: String { challenge.scenario?.split(whereSeparator: \.isWhitespace).prefix(2).joined(separator: " ") ?? "System design" }
   /// Guided's latest interviewer reply: it carries the current path step and the answers to tap.
   private var guidedTurn: InterviewTurn? {
@@ -89,7 +106,8 @@ struct InterviewView: View {
     ZStack {
       if let finished = interview.finished { ReflectionView(model: model, initial: finished).transition(.opacity) }
       else if showingVoiceRoom, let voice = liveVoice {
-        InterviewVoiceRoom(voice: voice, interview: interview, question: { questionDisclosure(collapsed: voiceQuestionCollapsed) { voiceQuestionCollapsed.toggle() } }, leave: leaveVoiceRoom)
+        InterviewVoiceRoom(voice: voice, interview: interview, allowance: model.bootstrap?.capabilities?.voice?.allowanceLine(),
+          question: { voiceQuestion }, leave: leaveVoiceRoom)
       } else { workspace }
     }
     .animation(reduceMotion ? nil : DrillbitMotion.page, value: interview.finished != nil)
@@ -112,6 +130,10 @@ struct InterviewView: View {
       await voice.restore()
       voice.prepareIfAllowed()
       sessionRestored = true
+      if model.talkOnOpen == challenge.id {
+        model.talkOnOpen = nil
+        await enterVoice(startNow: true)
+      }
     }
     .task(id: "\(interview.streamTurn?.jobId ?? ""):\(interview.streamEpoch):\(phase == .active)") {
       if phase == .active { await interview.watchResponse() }
@@ -173,6 +195,7 @@ struct InterviewView: View {
                     enabled: !interview.locked && interview.failedTurn == nil && interview.voice?.blocksText != true,
                     revealCaret: revealCaret)
                     .fixedSize(horizontal: false, vertical: true)
+                    .coachAnchor(.composer)
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { editorFrame = $0 }
                     .overlay(alignment: .topLeading) {
                       if interview.answer.isEmpty { Text(firstReply ? "A sentence is fine. Send when you’ve got a first take." : "Answer or ask a question…").foregroundStyle(.tertiary).padding(.top, 8).allowsHitTesting(false).accessibilityHidden(true) }
@@ -230,6 +253,9 @@ struct InterviewView: View {
         GuidedPathBar(steps: path, current: guidedTurn?.result?.step ?? 0)
       }
     }
+    .coachMark(coach, trailingToolbar: true, dismiss: dismissCoach)
+    // Typing answers the composer tip, whether or not it had appeared yet.
+    .onChange(of: interview.answer.isEmpty) { _, empty in if !empty, !seenComposerTip { dismissCoach(.composer) } }
     .navigationTitle(scenarioTitle).navigationBarTitleDisplayMode(.inline)
     .toolbarBackground(AppPalette.background, for: .navigationBar)
     .toolbarBackground(.visible, for: .navigationBar)
@@ -275,7 +301,7 @@ struct InterviewView: View {
               .disabled(requestingAssistance || interview.locked || interview.failedTurn != nil || liveVoice?.blocksText == true)
           }
           Button("Session style", systemImage: AppIcon.preferences.rawValue) { sheet = .style }.disabled(interview.locked || liveVoice?.blocksText == true)
-          Button("Finish interview", systemImage: AppIcon.checkmark.rawValue) { focused = false; confirmFinish = true }
+          Button("Finish interview", systemImage: AppIcon.checkmark.rawValue) { seenToolsTip = true; focused = false; confirmFinish = true }
             .disabled(!interview.canFinish)
           if !challenge.isWarmUp {
             Divider()
@@ -349,6 +375,17 @@ struct InterviewView: View {
       persistReading()
     }
   }
+  /// The room's question, whole: you read it, then talk.
+  private var voiceQuestion: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Text(challenge.title).font(.title2.weight(.semibold))
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityAddTraits(.isHeader)
+      QuestionBody(markup: challenge.displayPrompt)
+        .font(.body)
+    }
+    .accessibilityIdentifier("voiceQuestion")
+  }
   private func questionDisclosure(collapsed: Bool, toggle: @escaping () -> Void) -> some View {
     VStack(alignment: .leading, spacing: 4) {
         Button(action: toggle) {
@@ -369,7 +406,7 @@ struct InterviewView: View {
           identifier: "original" == activeID ? "interviewPrompt" : "earlierPrompt-original", markup: true)
     }.animation(disclosureMotion, value: collapsed)
   }
-  private func enterVoice() async {
+  private func enterVoice(startNow: Bool = false) async {
     guard !checkingVoice, let voice = liveVoice, !voice.blocksText else { return }
     checkingVoice = true
     voicePermissionNeedsSettings = false
@@ -388,7 +425,8 @@ struct InterviewView: View {
       }
       guard interview.currentAccount, phase == .active else { return }
       if let capability, !capability.available {
-        voiceExplanation = capability.reason ?? "Live voice is currently unavailable. You can continue in text."; return
+        let reason = capability.reason ?? "Live voice is currently unavailable. You can continue in text."
+        voiceExplanation = [reason, capability.allowanceLine().map { $0 + "." }].compactMap { $0 }.joined(separator: " "); return
       }
       if !model.fixture {
         let allowed = await AVAudioApplication.requestRecordPermission()
@@ -402,13 +440,14 @@ struct InterviewView: View {
       }
       // Older compatible servers may not advertise the field; Start remains authoritative.
       focused = false
-      voiceQuestionCollapsed = false
       showingVoiceRoom = true
       voice.dismiss()
+      if startNow { await voice.start() }
     } catch { voiceExplanation = "Voice isn’t reachable right now. Your reply is unchanged." }
   }
   private func requestAssistance(_ kind: String, title: String) {
     guard !requestingAssistance else { return }
+    seenToolsTip = true
     focused = false
     requestingAssistance = true
     assistanceTitle = title
@@ -612,38 +651,68 @@ struct InterviewView: View {
           Button(voice.blocksText ? "Try again" : "Dismiss") { Task { if voice.blocksText { await voice.retrySync() } else { voice.dismiss() } } }
         }
       }
-
-      HStack(spacing: 16) {
-      Button { Task { await enterVoice() } } label: {
-        Image(systemName: AppIcon.voice.rawValue).font(.system(size: 20, weight: .medium))
-          .frame(width: 24, height: 24)
-      }
-        .buttonStyle(DrillbitIconButtonStyle())
-        .disabled(checkingVoice || liveVoice == nil || interview.locked || interview.voice?.blocksText == true).accessibilityLabel("Live voice").accessibilityIdentifier("liveVoice")
-      if interview.mode != .mockInterview {
-        Button("Need a nudge?") { requestAssistance("hint", title: "Nudge") }
-          .font(.subheadline.weight(.medium))
-          .tint(AppPalette.secondary)
-          .frame(minHeight: 44)
-          .disabled(requestingAssistance || interview.locked || interview.failedTurn != nil || liveVoice?.blocksText == true)
-          .accessibilityIdentifier("inlineNudge")
-      }
-      Spacer(minLength: 0)
-        Button {
-          focused = false
-          followingLiveEnd = true
-          Task { await sendMessage() }
-        } label: {
-          Image(systemName: AppIcon.send.rawValue)
-            .font(.system(size: 20, weight: .semibold))
-            .frame(width: 24, height: 24)
-        }.buttonStyle(DrillbitIconButtonStyle(prominent: true))
-          .accessibilityLabel("Send")
-          .disabled(interview.voice?.blocksText == true || interview.locked || interview.failedTurn != nil || interview.answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-          .accessibilityIdentifier("shareAnswer")
+      // One row at regular sizes; at accessibility sizes the nudge takes its own line so no label wraps letter by letter.
+      ViewThatFits(in: .horizontal) {
+        HStack(spacing: 16) {
+          talkButton
+          nudgeButton
+          Spacer(minLength: 0)
+          sendButton
+        }
+        VStack(alignment: .leading, spacing: 8) {
+          HStack(spacing: 16) {
+            talkButton
+            Spacer(minLength: 0)
+            sendButton
+          }
+          nudgeButton
+        }
       }
     }.padding(16)
+      // The document scrolls under this bar; without a floor the draft's placeholder peeks through between the controls.
+      .background(AppPalette.background)
       .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { footerFrame = $0; if followingLiveEnd, sheet == nil, let lastCaret { revealCaret(lastCaret) } }
+  }
+  private var talkButton: some View {
+    let voiceDisabled = checkingVoice || liveVoice == nil || interview.locked || interview.voice?.blocksText == true
+    return Button { Task { await enterVoice() } } label: {
+      Label("Talk", systemImage: AppIcon.voice.rawValue)
+        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(AppPalette.primary)
+        .fixedSize()
+        .padding(.horizontal, 16).frame(minHeight: 48)
+        .background(AppPalette.elevated, in: Capsule())
+        .overlay { Capsule().stroke(AppPalette.hairline, lineWidth: 0.5) }
+        .contentShape(Capsule())
+    }
+      .buttonStyle(DrillbitPressStyle())
+      .opacity(voiceDisabled ? 0.42 : 1)
+      .disabled(voiceDisabled).accessibilityLabel("Talk it through").accessibilityHint("Switch to live voice. Your writing stays here.").accessibilityIdentifier("liveVoice")
+  }
+  @ViewBuilder private var nudgeButton: some View {
+    if interview.mode != .mockInterview {
+      Button("Need a nudge?") { requestAssistance("hint", title: "Nudge") }
+        .font(.subheadline.weight(.medium))
+        .tint(AppPalette.secondary)
+        .fixedSize()
+        .frame(minHeight: 44)
+        .disabled(requestingAssistance || interview.locked || interview.failedTurn != nil || liveVoice?.blocksText == true)
+        .accessibilityIdentifier("inlineNudge")
+    }
+  }
+  private var sendButton: some View {
+    Button {
+      focused = false
+      followingLiveEnd = true
+      Task { await sendMessage() }
+    } label: {
+      Image(systemName: AppIcon.send.rawValue)
+        .font(.system(size: 20, weight: .semibold))
+        .frame(width: 24, height: 24)
+    }.buttonStyle(DrillbitIconButtonStyle(prominent: true))
+      .accessibilityLabel("Send")
+      .disabled(interview.voice?.blocksText == true || interview.locked || interview.failedTurn != nil || interview.answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+      .accessibilityIdentifier("shareAnswer")
   }
   private func revealCaret(_ caret: CGRect) {
     lastCaret = caret

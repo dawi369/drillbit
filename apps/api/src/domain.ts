@@ -142,6 +142,8 @@ export const answerSchema = z.object({
   answer: z.string().max(24000),
   revision: z.number().int().nonnegative(),
   receipts: z.array(receiptSchema).max(100).optional(),
+  // The session style at Finish; a style switched after the last turn would otherwise never reach the ending.
+  guidanceMode: guidanceModeSchema.optional(),
 });
 export class Fault extends Error {
   constructor(

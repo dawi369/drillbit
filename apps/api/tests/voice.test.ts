@@ -28,6 +28,28 @@ it('voice capability is read-only, account-scoped and reflects the daily limit',
  expect((await e.DB.prepare("SELECT count FROM usage WHERE account_id=? AND day=? AND kind='voice_start'").bind(a,day).first<any>()).count).toBe(6);
 });
 
+it('voice capability reports the remaining starts and the next UTC reset', async()=>{
+ const {a,id}=await fixture();
+ const before=await voiceCapability(e,a);
+ expect(before).toMatchObject({available:true,remaining:6,limit:6,resetsAt:new Date(Date.UTC(new Date().getUTCFullYear(),new Date().getUTCMonth(),new Date().getUTCDate()+1)).toISOString()});
+ const mock=connection();
+ try { await startVoice(e,a,id,crypto.randomUUID(),{sdp:'offer',revision:2}); } finally { mock.mockRestore(); }
+ expect(await voiceCapability(e,a)).toMatchObject({available:true,remaining:5});
+ expect(await voiceCapability({...e,VOICE_UNLIMITED_ACCOUNTS:a},a)).not.toHaveProperty('remaining');
+});
+
+it('refunds a voice start when the provider never creates a session', async()=>{
+ const {a,id}=await fixture();
+ const day=new Date().toISOString().slice(0,10);
+ const failing=vi.spyOn(globalThis,'fetch').mockResolvedValue(new Response('busy',{status:503}));
+ try { await expect(startVoice(e,a,id,crypto.randomUUID(),{sdp:'offer',revision:2})).rejects.toMatchObject({code:'voice_provider'}); }
+ finally { failing.mockRestore(); }
+ expect((await e.DB.prepare("SELECT count FROM usage WHERE account_id=? AND day=? AND kind='voice_start'").bind(a,day).first<any>())?.count ?? 0).toBe(0);
+ await expect(startVoice(e,a,id,crypto.randomUUID(),{sdp:'offer',revision:99})).rejects.toMatchObject({status:404});
+ expect((await e.DB.prepare("SELECT count FROM usage WHERE account_id=? AND day=? AND kind='voice_start'").bind(a,day).first<any>())?.count ?? 0).toBe(0);
+ expect(await voiceCapability(e,a)).toMatchObject({remaining:6});
+});
+
 it('unlimited voice is an exact account override and still records usage', async()=>{
  const {a,id}=await fixture(), other=await fixture();
  const owner={...e,VOICE_UNLIMITED_ACCOUNTS: a};

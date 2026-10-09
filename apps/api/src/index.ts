@@ -493,6 +493,7 @@ app.post("/v1/challenges/:id/complete", async (c) => {
     await settingsFor(c.env, a),
     body.receipts ?? [],
     inline(c),
+    body.guidanceMode,
   );
   return c.json(await detail(c.env, a, id));
 });

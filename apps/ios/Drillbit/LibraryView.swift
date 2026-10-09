@@ -83,7 +83,6 @@ struct SessionDetailView: View {
     ScrollView {
       VStack(alignment: .leading, spacing: 24) {
         VStack(alignment: .leading, spacing: 8) {
-          SignalEyebrow(text: challenge.lifecycle == "completed" ? "Completed session" : "Session")
           Text(challenge.title).font(.title.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
             .accessibilityAddTraits(.isHeader)
           let date = challenge.completedAt.flatMap { Date.fromAPI($0) }?.formatted(date: .abbreviated, time: .shortened)
@@ -96,13 +95,13 @@ struct SessionDetailView: View {
         if let answer = challenge.session?.answer, !answer.isEmpty {
           Text("Your answer").font(.headline)
           Text(answer).textSelection(.enabled)
-          ShareLink("Copy or share answer", item: answer)
         }
-        AssistanceSummary(challenge: challenge)
         if let reflection = challenge.reflection {
           ReflectionContent(reflection: reflection)
+          AssistanceSummary(challenge: challenge)
           Button("Practise this next") { preparing = true }.buttonStyle(PracticeButtonStyle())
         } else if challenge.lifecycle == "completed" {
+          AssistanceSummary(challenge: challenge)
           Text("Feedback is pending. You can retry failed feedback from Home.").foregroundStyle(
             .secondary)
         }
@@ -134,7 +133,12 @@ struct SessionDetailView: View {
       .sheet(isPresented: $preparing, onDismiss: { if let started { model.presented = started; self.started = nil } }) {
         QuestionFlow(model: model, source: challenge, onStart: { started = $0 })
       }
-      .toolbar { Button("Delete", systemImage: AppIcon.delete.rawValue, role: .destructive) { deleting = true } }
+      .toolbar {
+        if let answer = challenge.session?.answer, !answer.isEmpty {
+          ShareLink(item: answer) { Label("Share answer", systemImage: "square.and.arrow.up") }
+        }
+        Button("Delete", systemImage: AppIcon.delete.rawValue, role: .destructive) { deleting = true }
+      }
       .confirmationDialog("Delete this session and its learning evidence?", isPresented: $deleting)
     {
       Button("Delete session", role: .destructive) {
@@ -210,10 +214,6 @@ struct LibraryView: View {
   private var identity: String { Self.cacheIdentity(search: search, tags: tags, level: level, days: days, skipped: skipped) }
   var body: some View {
     SignalList {
-      if !skipped {
-        SignalEyebrow(text: "Questions / evidence")
-          .listRowBackground(AppPalette.background)
-      }
       if !skipped { NavigationLink("Practice evidence") { PracticeEvidenceView(model: model) } }
       if tags.count == 1, let id = tags.first, let value = coverage.first(where: { $0.conceptId == id }) {
         Section {
@@ -357,7 +357,7 @@ struct LibraryQuestionView: View {
         ForEach(question.conceptIds, id: \.self) { id in
           NavigationLink(model.taxonomy.first { $0.id == id }?.label ?? id) { LibraryView(model: model, initialConcept: id) }
         }
-      } header: { Text("Concepts") } footer: { Text("Explore related questions in your library.") }
+      } header: { Text("Concepts") }
       Section {
         Button((detail?.attempts.contains { $0.lifecycle == "completed" } ?? false) ? "Try again" : "Practise now") { preview = true }
         Button("Practise this concept") { preparing = true }

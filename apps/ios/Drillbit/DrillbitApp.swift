@@ -43,7 +43,17 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
       }
     #endif
     do {
-      let configuration = ModelConfiguration(isStoredInMemoryOnly: fixture, cloudKitDatabase: .none)
+      var configuration = ModelConfiguration(isStoredInMemoryOnly: fixture, cloudKitDatabase: .none)
+      #if DEBUG
+        // Lets a UI test kill and relaunch against the same local drafts without touching real data.
+        if fixture && ProcessInfo.processInfo.arguments.contains("--fixture-persist") {
+          let url = FileManager.default.temporaryDirectory.appendingPathComponent("drillbit-fixture.store")
+          if ProcessInfo.processInfo.arguments.contains("--fixture-persist-reset") {
+            for suffix in ["", "-shm", "-wal"] { try? FileManager.default.removeItem(at: URL(fileURLWithPath: url.path + suffix)) }
+          }
+          configuration = ModelConfiguration(url: url, cloudKitDatabase: .none)
+        }
+      #endif
       let container = try ModelContainer(
         for: Schema(StoreV1.models), migrationPlan: StoreMigrations.self,
         configurations: configuration)

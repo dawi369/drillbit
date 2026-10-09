@@ -42,6 +42,7 @@
 		B81F6A3B13FB0CFA73CFCFED /* InterviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92066D96F6C016361FF268E4 /* InterviewView.swift */; };
 		BA66BF7CF5979DAA6AC4E9C5 /* PracticeEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 153D45AC2868C4FBAF088C71 /* PracticeEvidence.swift */; };
 		BC4FE8728310CCD03149A913 /* InterviewDocumentRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20B8BC792201909C6B627383 /* InterviewDocumentRows.swift */; };
+		C65663B45DE7E6FB2F28D848 /* AuditScreenshots.swift in Sources */ = {isa = PBXBuildFile; fileRef = C197A270F91EB4CC5F520C1D /* AuditScreenshots.swift */; };
 		CDF84DEA3D9A57613120F732 /* GrowingInterviewEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3805DAF1DC8F8A3A0256EBF7 /* GrowingInterviewEditor.swift */; };
 		CEEEB3987FECE2F2B2B61FF0 /* VoiceTranscript.swift in Sources */ = {isa = PBXBuildFile; fileRef = 658B4C2655924F8CC0AE95C3 /* VoiceTranscript.swift */; };
 		D090F4FDF85CBD331AA6CAB7 /* DrillbitWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 150BB0656D2594F45A3E045B /* DrillbitWidget.swift */; };
@@ -133,6 +134,7 @@
 		AD095763BDFB10A241582226 /* ReflectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReflectionView.swift; sourceTree = "<group>"; };
 		B8F2A363927CDF8EB6A14D5C /* InterviewVoiceRoom.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterviewVoiceRoom.swift; sourceTree = "<group>"; };
 		BA47F5B6A6BBF68259182059 /* FirstUse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirstUse.swift; sourceTree = "<group>"; };
+		C197A270F91EB4CC5F520C1D /* AuditScreenshots.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditScreenshots.swift; sourceTree = "<group>"; };
 		C8E06A264C65F45E7AD14AD1 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		C8F1C4DE69AF2358015E8EDD /* PracticeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeUITests.swift; sourceTree = "<group>"; };
 		CAA02422B05771C6B8DA4D2B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -254,6 +256,7 @@
 		E2B4BBCEE5B00E9CEC26D230 /* UITests */ = {
 			isa = PBXGroup;
 			children = (
+				C197A270F91EB4CC5F520C1D /* AuditScreenshots.swift */,
 				C8F1C4DE69AF2358015E8EDD /* PracticeUITests.swift */,
 			);
 			path = UITests;
@@ -407,6 +410,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C65663B45DE7E6FB2F28D848 /* AuditScreenshots.swift in Sources */,
 				095A54CECC96E78F3BEA8F50 /* PracticeUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -547,7 +551,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -686,7 +690,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;

@@ -25,7 +25,7 @@ afterAll(() => fetchMock.deactivate());
 const sse = (content: string) => (content.match(/[\s\S]{1,24}/g) ?? [])
   .map(part => `data: ${JSON.stringify({ choices: [{ delta: { content: part } }] })}\n\n`).join("") + "data: [DONE]\n\n";
 const streamHeaders = { headers: { "content-type": "text/event-stream" } };
-async function generatedPractice(account: string, warmUp: boolean, mode = "learn_together") {
+async function generatedPractice(account: string, warmUp: boolean, mode = "learn_together", finishAs?: string) {
   const settings = await settingsFor(bindings, account);
   const requests: any[] = [];
   const provider = (content: object, stream = false) => fetchMock.get("https://openrouter.ai")
@@ -41,15 +41,16 @@ async function generatedPractice(account: string, warmUp: boolean, mode = "learn
   const id = crypto.randomUUID();
   await createJob(bindings, account, id, "generate", null, { settings, guidanceMode: mode, primaryConceptId: "api-design", ...(warmUp ? { warmUp: true } : {}) });
   await runJob(bindings, id);
-  await complete(bindings, account, id, crypto.randomUUID(), "Use a stable request ID for each saved link.", 0, settings);
+  await complete(bindings, account, id, crypto.randomUUID(), "Use a stable request ID for each saved link.", 0, settings, [], undefined, finishAs);
+  const ending = finishAs ?? mode;
   const summarize = await bindings.DB.prepare("SELECT id FROM jobs WHERE challenge_id=? AND kind='summarize'").bind(id).first<{ id: string }>();
   provider({
     summary: "Clear keys.", worked: ["Stable IDs."], improve: "", takeaway: "Tie the key to the link.", strengths: [], gaps: [],
     nextExercise: "Explain a lost acknowledgement.",
     evidence: [{ conceptId: "api-design", observation: "Used stable IDs.", quote: "Use a stable request ID", signal: "needs_practice", assistance: "unknown",
       recall: { prompt: "A save times out and the client retries. What stops a second copy of the link?", answer: "The retry carries the same request ID, so the service returns the first save instead of storing another." } }],
-    ...(mode === "learn_together" ? { lesson: { learned: ["A stable ID lets a retry find the original save"], tryAlone: "Apply stable IDs to a payment retry." } } : {}),
-    ...(mode === "mock_interview" ? { debrief: { verdict: "borderline", reason: "Stable IDs are right; lookup speed was never addressed.", toPass: "Explain the index behind fast lookup.",
+    ...(ending === "learn_together" ? { lesson: { learned: ["A stable ID lets a retry find the original save"], tryAlone: "Apply stable IDs to a payment retry." } } : {}),
+    ...(ending === "mock_interview" ? { debrief: { verdict: "borderline", reason: "Stable IDs are right; lookup speed was never addressed.", toPass: "Explain the index behind fast lookup.",
       signals: ["requirements", "design", "trade_offs", "communication"].map(area => ({ area, rating: "mixed", note: "Partly covered." })) } } : {}),
   });
   await runJob(bindings, summarize!.id);
@@ -95,6 +96,16 @@ it("a mock interview ends with a timed debrief and a verdict, not the coaching s
   expect(reflection).toMatchObject({ guidanceMode: "mock_interview", debrief: { verdict: "borderline", toPass: "Explain the index behind fast lookup." } });
   expect(reflection.debrief.signals).toHaveLength(4);
   expect(reflection.lesson).toBeUndefined();
+});
+it("the style chosen at Finish decides the ending, even with no turn after the switch", async () => {
+  const account = (await accountFor(bindings, crypto.randomUUID())).id;
+  await bindings.DB.prepare("UPDATE accounts SET status='active' WHERE id=?").bind(account).run();
+  const { id, summarizeRequest } = await generatedPractice(account, false, "coach_me", "mock_interview");
+  fetchMock.assertNoPendingInterceptors();
+  expect(summarizeRequest.messages[0].content).toContain('<ending mode="mock_interview">');
+  const result = await detail(bindings, account, id);
+  expect(result.guidanceMode).toBe("mock_interview");
+  expect(result.reflection).toMatchObject({ guidanceMode: "mock_interview", debrief: { verdict: "borderline" } });
 });
 it("a round lasts the generator's minutes, falling back by level, and counts from the start", () => {
   const start = "2026-09-28T10:00:00.000Z";

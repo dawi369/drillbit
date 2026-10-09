@@ -32,15 +32,27 @@ async function consumeVoiceUsage(env: Env, account: string, kind: string, limit:
  // Explicit account exemptions retain accounting for every voice operation.
  await env.DB.prepare("INSERT INTO usage(account_id,day,kind,count) VALUES(?,?,?,1) ON CONFLICT(account_id,day,kind) DO UPDATE SET count=count+1").bind(account,timestamp().slice(0,10),kind).run();
 }
+// A start that never produced a provider session costs nothing, so it doesn't count.
+async function refundVoiceStart(env: Env, account: string, day: string) {
+ await env.DB.prepare("UPDATE usage SET count=count-1 WHERE account_id=? AND day=? AND kind='voice_start' AND count>0").bind(account, day).run();
+}
+const VOICE_DAILY_STARTS = 6;
+function nextUtcMidnight(now: string) {
+ const next = new Date(now.slice(0,10) + 'T00:00:00.000Z');
+ next.setUTCDate(next.getUTCDate() + 1);
+ return next.toISOString();
+}
 export async function voiceCapability(env: Env, account: string) {
  const checkedAt = timestamp();
  if (env.VOICE_ENABLED !== 'true' || !env.OPENAI_API_KEY)
   return { available: false, reason: 'Live voice is currently unavailable. You can continue in text.', checkedAt };
  if (unlimitedVoice(env, account)) return { available: true, checkedAt };
  const usage = await env.DB.prepare("SELECT count FROM usage WHERE account_id=? AND day=? AND kind='voice_start'").bind(account, checkedAt.slice(0,10)).first<{count:number}>();
- if ((usage?.count ?? 0) >= 6)
-  return { available: false, reason: 'Your daily voice limit is reached. It resets at midnight UTC. You can continue in text.', checkedAt };
- return { available: true, checkedAt };
+ const remaining = Math.max(0, VOICE_DAILY_STARTS - (usage?.count ?? 0));
+ const allowance = { remaining, limit: VOICE_DAILY_STARTS, resetsAt: nextUtcMidnight(checkedAt) };
+ if (remaining === 0)
+  return { available: false, reason: 'You’ve used today’s voice sessions. You can keep going in text.', checkedAt, ...allowance };
+ return { available: true, checkedAt, ...allowance };
 }
 export async function assertNoVoice(env:Env,account:string,id:string) {
  const s=await env.DB.prepare("SELECT id FROM voice_sessions WHERE account_id=? AND challenge_id=? AND status IN ('connecting','active') AND expires_at>?").bind(account,id,timestamp()).first();
@@ -54,17 +66,20 @@ export async function startVoice(env:Env,account:string,id:string,command:string
  const [context, profileSettings]=await Promise.all([interviewFor(env,account,id),settingsFor(env,account)]);
  context.guidanceMode = input.guidanceMode ?? context.guidanceMode;
  if(context.turns.some(t=>['pending','running','failed'].includes(t.status))) throw new Fault('interview_pending',409,'Finish the current response first.');
- await consumeVoiceUsage(env,account,'voice_start',6);
+ const day=timestamp().slice(0,10);
+ await consumeVoiceUsage(env,account,'voice_start',VOICE_DAILY_STARTS);
  const now=timestamp(),expires=new Date(Date.now()+15*60*1000).toISOString();
  // Reserve before paid startup. Lost handshakes cannot be blindly retried.
- await env.DB.batch([
+ const s=await env.DB.batch([
   env.DB.prepare("UPDATE voice_sessions SET status='uncertain' WHERE account_id=? AND expires_at<=? AND status IN ('connecting','active')").bind(account,now),
   env.DB.prepare("INSERT INTO jobs(id,account_id,challenge_id,kind,status,input,created_at,updated_at) SELECT ?,?,?,'voice','completed','{}',?,? WHERE EXISTS(SELECT 1 FROM sessions s JOIN challenges c ON c.id=s.challenge_id WHERE c.id=? AND c.account_id=? AND c.lifecycle='in_progress' AND s.revision=?) AND NOT EXISTS(SELECT 1 FROM voice_sessions WHERE account_id=? AND status IN ('connecting','active')) AND NOT EXISTS(SELECT 1 FROM jobs WHERE account_id=? AND kind='interview' AND status IN ('pending','running'))").bind(command,account,id,now,now,id,account,input.revision,account,account),
   env.DB.prepare("INSERT INTO interview_turns(id,challenge_id,ordinal,kind,prompt,text,job_id,created_at) SELECT ?,?,COALESCE((SELECT MAX(ordinal)+1 FROM interview_turns WHERE challenge_id=?),0),'voice',?,'',?,? WHERE EXISTS(SELECT 1 FROM jobs WHERE id=? AND kind='voice')").bind(command,id,id,context.prompt,command,now,command),
   env.DB.prepare("INSERT INTO voice_sessions(id,account_id,challenge_id,created_at,expires_at) SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM interview_turns WHERE id=? AND kind='voice')").bind(command,account,id,now,expires,command)
- ]).catch(()=>{throw new Fault('voice_conflict',409,'Another voice session or request already exists.');});
- const s=await sessionFor(env,account,id,command);
+ ]).catch(()=>{throw new Fault('voice_conflict',409,'Another voice session or request already exists.');})
+  .then(()=>sessionFor(env,account,id,command))
+  .catch(async error=>{await refundVoiceStart(env,account,day); throw error;});
  const practiceProfile=input.practiceProfile ?? profileSettings.practiceProfile ?? practiceProfileSchema.parse({});
+ let providerSession=false;
  try {
   await env.DB.prepare("UPDATE jobs SET input=? WHERE id=? AND account_id=?").bind(JSON.stringify({practiceProfile}),command,account).run();
   const history=spokenHistory(context.turns,12000);
@@ -72,12 +87,14 @@ export async function startVoice(env:Env,account:string,id:string,command:string
   if(!response.ok) throw new Fault('voice_provider',502,'Couldn’t connect voice. Try again later.');
   const result=await response.json() as any;
   if(typeof result.session?.id!=='string'||typeof result.transport?.sdp!=='string') throw new Fault('voice_provider',502,'Voice returned an invalid connection.');
+  providerSession=true;
   const activated=await env.DB.prepare("UPDATE voice_sessions SET provider_id=?,status='active' WHERE id=? AND status='connecting' AND EXISTS(SELECT 1 FROM challenges WHERE id=? AND account_id=? AND lifecycle='in_progress')").bind(result.session.id,s.id,id,account).run();
   if (activated.meta.changes) await env.DB.prepare("UPDATE challenges SET data=json_set(data,'$.guidanceMode',?) WHERE id=? AND account_id=?").bind(context.guidanceMode,id,account).run();
   if(!activated.meta.changes)throw new Fault('inactive',409,'The interview ended while voice was connecting.');
   return {id:command,sdp:result.transport.sdp,expiresAt:expires};
  } catch(error) {
   await env.DB.prepare("UPDATE voice_sessions SET status='uncertain' WHERE id=?").bind(command).run();
+  if(!providerSession) await refundVoiceStart(env,account,day);
   throw error;
  }
 }

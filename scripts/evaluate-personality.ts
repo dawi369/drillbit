@@ -1,9 +1,9 @@
 /** Synthetic conversations only. Live provider outputs require human review. */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { z } from '../apps/api/node_modules/zod';
-import { messagesFor, interviewModelSchema, parseInterviewModelResult, interviewReasoning } from '../apps/api/src/ai';
+import { messagesFor, interviewModelSchema, parseInterviewModelResult, interviewReasoning, parseModelJSON } from '../apps/api/src/ai';
 import { interviewSchemaFor } from '../apps/api/src/interview';
-import { managedModel } from '../apps/api/src/domain';
+import { FAST_PROVIDERS, managedModel } from '../apps/api/src/domain';
 const MODEL_ID = managedModel('interview');
 const key = process.env.OPENROUTER_API_KEY;
 if (!key) throw new Error('Provider key missing');
@@ -30,10 +30,10 @@ for (const version of [process.env.EVAL_PROMPT ?? 'interviewer-standard-v4']) {
   for (const text of sample.texts) {
    const context={promptVersion:version,question,historicalSnapshot:{attempts:[],assistance:'unknown'},interview:{style:'standard',prompt:turns.at(-1)?.result.text ?? question.prompt,turns},action:{kind:'answer',text}};
    const started=performance.now();
-   const response=await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:process.env.EVAL_MODEL ?? MODEL_ID,provider:{sort:'latency',require_parameters:true},reasoning:process.env.EVAL_REASONING ? {effort:process.env.EVAL_REASONING} : interviewReasoning(context),messages:messagesFor('interview',context),max_tokens:800,response_format:{type:'json_schema',json_schema:{name:'interview',strict:true,schema:z.toJSONSchema(interviewModelSchema(context, interviewSchemaFor('answer')))}}}),signal:AbortSignal.timeout(60000)});
+   const response=await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:process.env.EVAL_MODEL ?? MODEL_ID,provider:{order:FAST_PROVIDERS,require_parameters:true},reasoning:process.env.EVAL_REASONING ? {effort:process.env.EVAL_REASONING} : interviewReasoning(context),messages:messagesFor('interview',context),max_tokens:800,response_format:{type:'json_schema',json_schema:{name:'interview',strict:true,schema:z.toJSONSchema(interviewModelSchema(context, interviewSchemaFor('answer')))}}}),signal:AbortSignal.timeout(60000)});
    if(!response.ok) throw new Error(`Provider status ${response.status}`);
    const envelope=await response.json() as any;
-   const raw=JSON.parse(envelope.choices[0].message.content);
+   const raw=parseModelJSON(envelope.choices[0].message.content) as any;
    const result=parseInterviewModelResult(context, interviewSchemaFor('answer'), raw);
    const validation=interviewSchemaFor('answer').safeParse(result);
    const row={model:process.env.EVAL_MODEL ?? MODEL_ID,version,move:raw.move,case:sample.name,user:text,reply:result.text,valid:validation.success,reasoningTokens:envelope.usage?.completion_tokens_details?.reasoning_tokens,cost:envelope.usage?.cost,ms:Math.round(performance.now()-started)};

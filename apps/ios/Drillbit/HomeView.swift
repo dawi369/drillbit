@@ -10,6 +10,13 @@ struct HomeView: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.dynamicTypeSize) private var typeSize
   @State private var bitCheers = 0
+  @Namespace private var zoom
+  @AppStorage(CoachMark.recall.storageKey) private var seenRecallTip = false
+  private var recallCoach: CoachMark? {
+    guard CoachMark.enabled, !seenRecallTip, flow == nil, model.firstUse.stage == .complete, model.firstUse.firstRepID != nil,
+      (model.bootstrap?.todayPlan?.dueRecallCount ?? 0) > 0 else { return nil }
+    return .recall
+  }
 
   private enum Today {
     case preparing(QuestionDraft?)
@@ -74,6 +81,7 @@ struct HomeView: View {
       .frame(maxWidth: 640, alignment: .leading).frame(maxWidth: .infinity)
       .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 40)
     }
+    .coachMark(recallCoach) { _ in withAnimation(DrillbitMotion.fast) { seenRecallTip = true } }
     .drillbitTabClearance()
     .task(id: model.bootstrap?.account.id) { await model.ensureHomeQuestion() }
     .alert("Skip this question?", isPresented: Binding(get: { skipping != nil }, set: { if !$0 { skipping = nil } })) {
@@ -87,8 +95,8 @@ struct HomeView: View {
     .sheet(item: $flow, onDismiss: {
       if let started { model.presented = started; self.started = nil }
     }) { entry in
-      // A plain sheet: the zoom's snapshot of the ticket settled late with its own shadow.
       QuestionFlow(model: model, initial: entry.challenge, source: entry.source, recovery: entry.recovery, browseTopics: entry.browseTopics, area: entry.area, onStart: { started = $0 })
+        .navigationTransition(.zoom(sourceID: "today", in: zoom))
     }
     .task {
       while !Task.isCancelled {
@@ -272,7 +280,7 @@ struct HomeView: View {
       } stub: {
         VStack(alignment: .leading, spacing: 8) {
           if let line, !guided {
-            Text("Your line").font(.subheadline.weight(.medium)).foregroundStyle(AppPalette.secondary)
+            // The underline already marks it as the person's own words.
             YourLine(quote: line, font: .title3.weight(.medium))
           } else {
             Text(guided ? "Worked out together" : "One thing to carry forward").font(.subheadline.weight(.medium)).foregroundStyle(AppPalette.secondary)
@@ -319,6 +327,7 @@ struct HomeView: View {
     let introducing = model.firstUse.firstRepID != nil && !model.firstUse.recallIntroduced
     let count = plan.dueRecallCount
     return Button {
+      seenRecallTip = true
       if introducing { Task { await model.markRecallIntroduced() } }
       NotificationCenter.default.post(name: .init("OpenRecall"), object: nil)
     } label: {
@@ -342,6 +351,7 @@ struct HomeView: View {
     .accessibilityElement(children: .combine)
     .accessibilityLabel("Recall, \(plan.dueRecallCount) due")
     .accessibilityIdentifier("homeRecall")
+    .coachAnchor(.recall)
     .task { if model.recall.cards.isEmpty { await model.loadRecall() } }
   }
 
@@ -358,6 +368,11 @@ struct HomeView: View {
       Ticket(content: content, stub: stub).contentShape(Rectangle())
     }
     .buttonStyle(TicketPressStyle())
+    // The source carries the ticket's own shape and shadow, so the zoom's snapshot never settles with a different one.
+    .matchedTransitionSource(id: "today", in: zoom) { source in
+      source.background(AppPalette.ticket).clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: AppPalette.ticketShadow, radius: 14, y: 12)
+    }
     .accessibilityIdentifier(identifier ?? "todayTicket")
     // The printed pill is decorative for VoiceOver, but Voice Control users say what they see.
     .accessibilityInputLabels([Text(spoken), Text("Today’s question")])

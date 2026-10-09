@@ -83,7 +83,7 @@ Run `bun scripts/check-practice-model.ts` and `bun scripts/check-practice-model.
 
 ## Contextual companion
 
-[Companion specification](companion-vision.md) defines the implemented native bottom companion and mode boundaries. `InterventionPolicy` is pure; an observable coordinator owns activity, timing and presentation freshness. Views forward events; `PracticeCompanion` integrates persisted commands, account-scoped delivery receipts and HTTP. No voice transport is present.
+`InterventionPolicy` is pure; an observable coordinator owns activity, timing and presentation freshness. Views forward events; `PracticeCompanion` integrates persisted commands, account-scoped delivery receipts and HTTP. No voice transport is present.
 
 Migration 0005 adds companion context, normalized interaction cycles, captured automatic requests and delivery receipts. Context mutations use revision checks and idempotency keys. D1 enforces shared automatic budgets, cooldown and duplicate-cycle rejection; `COMPANION_AUTO_ENABLED` controls rollout independently of manual help. Completion freezes pending delivery evidence atomically with the final draft. Generated, shown, uncertain and adopted help are distinct; unknown exposure is never classified as independent work.
 
@@ -268,17 +268,17 @@ Interview disclosure height and surrounding document placement inherit a SwiftUI
 
 The V3 rollout pinned `interviewer-standard-v3`; V2 remains resolvable for queued jobs. XML policy/reference material is separated from natural conversation messages and the final utterance, so the problem statement is no longer bundled into every conversational request. A follow_up outcome represents the next turn, including social replies; no public response schema changes. The model named in that rollout is historical; the current fixed model is specified below.
 
-Finalized voice-answer admission normalizes edge whitespace and rejects inactive/hidden or finished workspaces, retaining existing durable command/replay and draft guards. Voice stays disabled. See `docs/context-engineering.md` for researched personality decisions and partial live acceptance, and `docs/voice-foundations.md` for remaining audio-specific requirements.
+Finalized voice-answer admission normalizes edge whitespace and rejects inactive/hidden or finished workspaces, retaining existing durable command/replay and draft guards. Voice stays disabled. See `docs/context-engineering.md` for researched personality decisions and partial live acceptance.
 
 ## V4 conversation routing and response ownership — 11 September 2026
 
 New interview jobs pin V4. A narrow whole-message social recognizer changes inference context only; it does not alter persistence, replace replies or drop historical data. Main context uses escaped XML reference data explicitly marked untrusted, followed by native conversation roles. V4 model output is `{move,text}`; the private move is validated then discarded. The server determines public follow_up/reply from the accepted action. Models cannot choose wrap_up or change lifecycle. Old V2/V3 editions retain their schema/assembly paths. Public API, Swift DTOs, D1 schema and streaming text protocol are unchanged.
 
-The V4 acceptance samples tested low reasoning on substantive turns; current interview calls disable reasoning for latency. There is one provider call per turn. Historical cost/latency and reviewed sample acceptance are in `docs/personality-acceptance.md`.
+The V4 acceptance samples tested low reasoning on substantive turns; current interview calls disable reasoning for latency. There is one provider call per turn.
 
 ## Text-practice completeness — 11 September 2026
 
-The current product is Home / Library with the Interview room. This section and the [completeness ledger](product-completeness.md) supersede older Today/Memory and model-name descriptions above. Managed calls that wait on the first word (interview turns, question writing, voice reasoning) use `deepseek/deepseek-v4.1-flash` pinned to the Together then Fireworks providers; feedback, Recall cards and the remaining managed calls use `openai/gpt-6-luna` with latency-sorted structured-output providers. A strict-JSON reply that never closes its object and pads whitespace is cut off early and accepted only if it then passes its schema. Interactive interview and question-writing jobs run inline in the request rather than waiting for a Workflow to start; the reconciler hands an interrupted inline job back to the Workflow after two minutes. BYOK accounts instead use the OpenRouter model ID saved with their key (`credentials.model`, migration 0012). `PUT /v1/credential` validates the key and the model together with one strict structured-output call, and `ai_runs` records the model that ran. Keys saved before the model field keep Luna. Interview turns disable reasoning; reflection retains low reasoning. Previously saved Gemini 3.1 and 2.5 model values remain accepted and normalize to Luna without a migration or model picker. Live audio uses its separate GPT-Live path and is not changed by this text-model switch.
+The current product is Home / Library with the Interview room. This section supersedes older Today/Memory and model-name descriptions above. Managed calls that wait on the first word (interview turns, question writing, voice reasoning) use `deepseek/deepseek-v4.1-flash` pinned to the Together then Fireworks providers; feedback, Recall cards and the remaining managed calls use `openai/gpt-6-luna` with latency-sorted structured-output providers. A strict-JSON reply that never closes its object and pads whitespace is cut off early and accepted only if it then passes its schema. Interactive interview and question-writing jobs run inline in the request rather than waiting for a Workflow to start; the reconciler hands an interrupted inline job back to the Workflow after two minutes. BYOK accounts instead use the OpenRouter model ID saved with their key (`credentials.model`, migration 0012). `PUT /v1/credential` validates the key and the model together with one strict structured-output call, and `ai_runs` records the model that ran. Keys saved before the model field keep Luna. Interview turns disable reasoning; reflection retains low reasoning. Previously saved Gemini 3.1 and 2.5 model values remain accepted and normalize to Luna without a migration or model picker. Live audio uses its separate GPT-Live path and is not changed by this text-model switch.
 
 Reflection output `feedback-v2` adds required model-side evidence and nextExercise while public stored fields remain optional for old clients/records. Evidence is accepted only when its quote occurs in submitted candidate text and its concept is on the question. Quote validation is not semantic proof; observations remain model feedback. The server does not certify independence from missing delivery history. New reflections may have an empty improvement when the stated requirements are met. No historical sessions are rewritten. The last 100 completed-session observations travel in the existing cached memory response, with source IDs and dates.
 
@@ -306,7 +306,7 @@ Explicit help lives once in the workspace menu as Need a nudge? and Show an exam
 
 ## Live voice integration — 12 September 2026
 
-The native interview now has a gated WebRTC voice mode; see [voice foundations and acceptance boundaries](voice-foundations.md). Migration 0009 adds account-scoped voice sessions, immutable transcript fragments and idempotent delegation records. A voice session reserves an ordinary ordered interview block backed by a completed `voice` job; it never passes speech through `requestInterview` and therefore cannot generate duplicate text replies. Public interview turns add optional `voice` fragments and the `voice` kind; existing text DTOs remain valid. Completion snapshots include fragments, and feedback checks user quotes against those fragments. Versioned native and backend paths must be rolled out together before enabling voice for clients that understand the new turn kind.
+The native interview now has a gated WebRTC voice mode. Migration 0009 adds account-scoped voice sessions, immutable transcript fragments and idempotent delegation records. A voice session reserves an ordinary ordered interview block backed by a completed `voice` job; it never passes speech through `requestInterview` and therefore cannot generate duplicate text replies. Public interview turns add optional `voice` fragments and the `voice` kind; existing text DTOs remain valid. Completion snapshots include fragments, and feedback checks user quotes against those fragments. Versioned native and backend paths must be rolled out together before enabling voice for clients that understand the new turn kind.
 
 Local voice outboxes are included in account pending-write checks. D1 owns transcript and lifecycle state; provider event IDs identify fragments, while app command UUIDs identify sessions. Ending voice leaves the attempt and written draft in place. `VOICE_ENABLED=false` retains text practice while live provider and device acceptance remain open.
 
@@ -320,7 +320,7 @@ Back is the single voice exit and returns to writing after stopping local audio 
 
 ### Text-first interview refinement
 
-See [interview workspace](interview-workspace.md) for the current screen/control decisions, replacing the voice selector described above. Voice shows a canonical question reference plus latest exchange, with History/Live over the shared transcript, Back to writing and Start/Mute. Quick help remains in the text menu and retains its existing explicit domain request kinds. Writing has one composer and one Send action. A short, single-line message ending in `?` is a clarification that keeps the current prompt; other messages are answers. Send never means Finish.
+The current screen/control decisions replace the voice selector described above. Voice shows a canonical question reference plus latest exchange, with History/Live over the shared transcript, Back to writing and Start/Mute. Quick help remains in the text menu and retains its existing explicit domain request kinds. Writing has one composer and one Send action. A short, single-line message ending in `?` is a clarification that keeps the current prompt; other messages are answers. Send never means Finish.
 
 ### Progressive interview parameters — 26 September 2026
 
@@ -377,11 +377,11 @@ Text and delegated voice interview calls disable hidden reasoning and cap the sh
 
 A delegation has a 12-second backend inference deadline and a 15-second native deadline from receipt of the delegation event, including transcript synchronization. Exactly one commentary result/fallback is admitted locally; late results, ended sessions and switched accounts cannot present another result. These deadlines are not a guarantee about speech-to-answer latency. Provider claims are duplicate-safe in D1; quota/provider failures leave failed records, not stranded running records. No automatic paid repair/retry. Logs contain timings, mode and input size only. Interrupted/unheard speech remains conservatively uncertain.
 
-See [teaching modes](teaching-modes.md) for live model findings and remaining correctness limits. Physical GPT-Live delivery and interruption behavior need a fresh phone pass; simulator fixtures do not verify audio.
+Physical GPT-Live delivery and interruption behavior need a fresh phone pass; simulator fixtures do not verify audio.
 
 ### Session-style wording — 13 September 2026
 
-The native selector is now **Session style**: Guided, Practice (default), Mock interview. Display descriptions explain the experience; the persisted `learn_together`, `coach_me`, `mock_interview` identifiers and teaching policies are unchanged. No backend rollout is needed for this copy change. A richer Home is proposed in [Home direction](home-direction.md); that document does not describe shipped layout changes.
+The native selector is now **Session style**: Guided, Practice (default), Mock interview. Display descriptions explain the experience; the persisted `learn_together`, `coach_me`, `mock_interview` identifiers and teaching policies are unchanged. No backend rollout is needed for this copy change.
 
 ### Home practice hub (13 September 2026)
 
@@ -465,9 +465,9 @@ Keyboard: as in chat composers, tapping anywhere outside a text input puts the k
 
 ## Bit, the mascot — 2 October 2026
 
-Drillbit has a mascot: **Bit**, the drill bit itself with two dot eyes. This supersedes the product vision's “no avatar” rule and replaces `SignalPresence` on Welcome, sign-in and the setup introduction, and the arriving drill mark on the completion heading. The design source is [docs/design/mascot-studies-v3.html](design/mascot-studies-v3.html); v2 is the frozen approved direction.
+Drillbit has a mascot: **Bit**, the drill bit itself with two dot eyes. This supersedes the product vision's “no avatar” rule and replaces `SignalPresence` on Welcome, sign-in and the setup introduction, and the arriving drill mark on the completion heading. The design studies that produced Bit are in git history (`docs/design/mascot-studies-v3.html`); the shipped source is `BitRig`/`BitRenderer`/`BitView`.
 
-Where Bit appears: the app icon, the launch screen and restoring surface, Welcome (one hop on arrival), sign-in (listens while the invite field is focused), the setup questions (Bit asks each one), the question preview (only while a question is being written; it fades out when the question lands), completion feedback (one small hop) and Home. Placement is minimal (3 October 2026): Bit is small wherever it isn't the screen's subject, and it shows up for a reason (arriving, waiting, finishing) rather than as decoration. Bit is the loading cue wherever the old drill spinner was: Home's header drills while the ticket says so in text, and the preview's Start button reads “Opening…” on its own, keeping at most one animated Bit per screen. On Home, Bit sits beside the weekday title at a small size and mirrors the ticket: `drilling` while today’s question is prepared, one hop when it lands, `content` once today’s rep is done, `concerned` when preparation failed, `idle` otherwise. At accessibility text sizes Home and the preview drop Bit so text keeps the full width. Bit stays out of the answer workspace, the companion and the assistance sheet, so writing remains a quiet room. The voice room keeps the measured-audio orb, which represents the interviewer; Bit does not stand in for the interviewer. The widget and notifications are not changed yet.
+Where Bit appears: the app icon, the launch screen and restoring surface, Welcome (as the speaker of the playable example, reacting to it), the setup questions (Bit asks each one), the question preview (only while a question is being written; it fades out when the question lands), completion feedback (one small hop) and Home. Sign-in has no Bit. Placement is minimal (3 October 2026): Bit is small wherever it isn't the screen's subject, and it shows up for a reason (arriving, waiting, finishing) rather than as decoration. Bit is the loading cue wherever the old drill spinner was: Home's header drills while the ticket says so in text, and the preview's Start button reads “Opening…” on its own, keeping at most one animated Bit per screen. On Home, Bit sits beside the weekday title at a small size and mirrors the ticket: `drilling` while today’s question is prepared, one hop when it lands, `content` once today’s rep is done, `concerned` when preparation failed, `idle` otherwise. At accessibility text sizes Home and the preview drop Bit so text keeps the full width. Bit stays out of the answer workspace, the companion and the assistance sheet, so writing remains a quiet room. The voice room keeps the measured-audio orb, which represents the interviewer; Bit does not stand in for the interviewer. The widget and notifications are not changed yet.
 
 Home's ticket opens the question preview as a plain sheet. The zoom transition was removed on 3 October 2026: its snapshot of the ticket settled about a second after dismissal with the transition's own shadow, then snapped back to the ticket's printed shadow.
 
@@ -483,7 +483,7 @@ Evolutions are a concept, not a decision: Bit might gain finishes or forms as th
 
 ## First run and free reps — 2 October 2026
 
-Implements [product vision §16](product-vision.md#16-first-run-and-the-practice-gate--2-october-2026) and supersedes the warm-up, guide, tab tour and first-session sheet in “Activation and guided curriculum” and the four-page walkthrough in “Motion, feel and onboarding polish”.
+Implements [product vision: first run and the practice gate](product-vision.md#first-run-and-the-practice-gate--2-october-2026) and supersedes the warm-up, guide, tab tour and first-session sheet in “Activation and guided curriculum” and the four-page walkthrough in “Motion, feel and onboarding polish”.
 
 First run: Welcome is one screen (promise, sample exchange, a static amber glow behind Bit, Get started). Sign-in and the invite are unchanged. Setup asks two questions, each in Bit's bubble, which is the screen's heading: goal (an interview reveals an optional date and arithmetic from it) and familiarity. Role, focus, daily minutes and the reminder keep their defaults. Show me a question saves the plan, sets first-use `firstRep` and raises the preview over setup. The first question is a counted Guided generation with no Close and one swap, which replaces the ready question in place. `onboardingComplete` still flips only when that rep is finished or skipped, so setup stays behind the interview and Home appears under the feedback. Finishing records `firstRepID`; that feedback offers the daily reminder once, and Home's Recall row introduces the first cards once. Legacy first-use stages decode to `complete`, the setup draft key is `onboarding-v2:`, and the server keeps the `warmUp` flag and `COUNTED` guard so existing warm-ups stay uncounted.
 
@@ -492,3 +492,62 @@ Opener: generation now requires `opener`, the interviewer's first line, written 
 Interview and feedback: the blocking guide is gone. The reply placeholder explains itself on the first reply and Guided and Practice show an inline Need a nudge?. Every reflection leads with one strength and one gap, quoted from evidence when there is one, before Guided's recap or Mock's debrief. The question preview shows Bit drilling while a question is written, hopping when it lands.
 
 Free reps: `PRACTICE_GATE=true` turns them on; it stays off during the invite beta. `PRACTICE_UNLIMITED_ACCOUNTS` lists unlimited accounts until Superwall supplies entitlements. A rep is spent when its question is prepared: the challenge and its pending generation job carry `freeRepAt`, and a rep is available when no `freeRepAt` falls in the last seven days. The generation insert checks this atomically, so racing preparations spend one rep. The one swap reuses the original `freeRepAt` and marks `swapped`. Failed or cancelled preparations never count, and their retry is a fresh rep. Library starts and moment retries check before inserting; the one-active-challenge constraint bounds that race. Free accounts get no automatic daily question. Free reps cap interviewer turns at `FREE_REP_FOLLOW_UPS` (8) and nudges plus examples at `FREE_REP_NUDGES` (2), returning `free_rep_limit`. A spent rep returns 402 `practice_gate`. Bootstrap's `practice` gives `freeReps`, `available` and `nextFreeRepAt`; the client's `mayStartRep` hook (where Superwall's `practice_rep` placement will go) hides swaps and rep-starting actions, and Home says when the rep comes back. Voice keeps its own limit of 6 `voice_start` per account per UTC day.
+
+## Taste pass: playable Welcome, coachmarks, voice room — 3 October 2026
+
+Implements [product vision: taste, tips and the voice room](product-vision.md#taste-tips-and-the-voice-room--3-october-2026) and amends the section above.
+
+**Welcome:** the screen holds the promise and `RetryExample`, a scripted, local example. A push times out; Retry it delivers it twice, Check first can't tell, and both end with Retry with the same request ID. Bit is the bubble's speaker and reacts to the push (`idle`, `thinking`, `concerned`, then `content` with a hop). The steps carry a warning and a success haptic, and Again replays the example. Sign-in has no Bit.
+
+**Setup:** an interview date at least two days out shows one large, honest numeral. Today and tomorrow read as sentences. The level page states what the level changes (`SetupView.levelPromise`).
+
+**Preview:** a segmented Write it / Talk it through picker (`@AppStorage("answerMode")`) is shown unless voice is unavailable. Start talking sets `AppModel.talkOnOpen` to the opened challenge's id. `InterviewView` consumes the id after restoring voice, then enters the room and starts the session; microphone permission is still requested at that point.
+
+**Coachmarks:**
+- **Mechanism:** `CoachMark` (`composer`, `tools`, `recall`) with `coachAnchor` and `coachMark` modifiers. The overlay is non-modal and only the callout takes touches.
+- **Look and motion:** the callout is the restored `CoachCallout`, without progress dots. It appears 320 ms after its moment and scales 0.96 → 1 from its pointer with no bounce. On arrival it is announced to VoiceOver.
+- **Toolbar tip:** toolbar targets can't be measured, so the tools tip points at the trailing toolbar button.
+- **Seen state:** device-level `@AppStorage("coach.*")`.
+- **Fixtures:** UI fixtures disable tips unless launched with `--fixture-coach`, and they reset tip and answer-mode state at launch.
+
+**Voice room:**
+- **Layout:** `InterviewVoiceRoom` is one stage: the collapsed question, a 168 pt orb (dropped at accessibility sizes), `VoiceTurnLabel` and the interviewer's latest line as a caption (`lineLimit(4, reservesSpace: true)`).
+- **Turn label:** samples `VoiceLevels` five times a second with a 0.6 s hold. VoiceOver gets only steady states.
+- **New state on `LiveVoice`:**
+  - `startedAt` is set on `session.started`. It drives the clock, which counts down from `sessionLimit` (10 minutes) in the last two minutes, with a warning haptic and an announcement.
+  - `thinking` is true only while a delegation is unresolved.
+- **Dock by state:**
+  - **Idle:** cap and allowance, Start talking, Back to writing.
+  - **Connecting:** Cancel.
+  - **Live:** Transcript, Mute and End (`voiceEnd`).
+  - **Ending:** saving.
+  - **Unavailable:** Try again and Back to writing.
+- **End:** has the same audio semantics as the old Back. It stops local audio, finalizes in the background and returns to writing.
+- **Writing footer:** shows a labelled Talk capsule.
+
+**Voice allowance:**
+- **Bootstrap:** `capabilities.voice` adds optional `remaining`, `limit` and `resetsAt` (the next UTC midnight), omitted for unlimited accounts. The OpenAPI document and the `voice-capabilities` fixture are updated.
+- **Display:** `VoiceCapability.allowanceLine()` formats “5 of 6 left today · resets 2 AM” in the device's time zone.
+- **Refunds:** `startVoice` refunds the `voice_start` usage when no provider session id came back. That covers a reservation conflict, a reservation that didn't insert, a provider error or timeout, and an invalid provider response.
+
+## Finish pass — 9 October 2026
+
+Fixes from the two-week walkthrough in [finish-report.md](finish-report.md); findings are numbered there.
+
+- **Completion carries the session style.** `POST /v1/challenges/{id}/complete` accepts an optional `guidanceMode`. The lifecycle transaction writes it into the challenge only for the winning command, before the `completion_context` freeze, so a style switched after the last turn still decides the ending (Mock debrief, Guided recap). The client's outbox reads the per-attempt cached style when it drains a completion; `InterviewController.finish` stamps the same mode on the local copy. Older clients omit the field and keep the generated mode (F-005).
+- **Expired session.** A 401 while Clerk has no session returns to Welcome without clearing the local store; the draft is still there under the same account after signing in again. A 401 with a live Clerk session keeps the existing alert.
+- **BYOK.** The model ID is optional on the client as it always was on the server; Remove key only shows with a saved key and switches `aiMode` back to managed; a footer warns when BYOK is selected with no key. Replacing or removing a key cancels pending BYOK jobs only (tested in D1).
+- **Mock openers.** Generation passes `mockOpener` so the layout instruction swaps the key-facts structure for a spoken one-paragraph opener; the question evaluator shows mock prompts without `• ` facts.
+- **Interview footer.** `ViewThatFits`: one row at regular sizes, the inline nudge on its own line at accessibility sizes. The editor's empty minimum is three lines at accessibility categories, six otherwise. The footer paints the page background so the scrolling draft never shows through.
+- **Fixtures.** `--fixture-persist` keeps the fixture store in a temporary file across relaunches (`--fixture-persist-reset` clears it) so UI tests can kill and relaunch; Debug only. `scripts/audit-shots.sh` runs `AuditScreenshots` and exports PNGs by attachment name.
+
+Correction to “Model and prompt policy” above: managed requests use `deepseek/deepseek-v4.1-flash` for interview turns, question writing and voice reasoning and `openai/gpt-6-luna` for feedback and Recall (`managedModel` in `domain.ts`); BYOK uses the model saved with the key, defaulting to `openai/gpt-6-luna`. The evaluators pin the same provider order production uses.
+
+### Round 2: design pass — 9 October 2026
+
+- **Voice first, no switch.** The preview has one Start. A fresh start opens the interview in the voice room; Resume returns to where the person was. The Write it / Talk it through picker and `answerMode` are gone. `AppModel.voiceFirst` is true for real installs; fixture runs open in text unless launched with `--fixture-talk`, so the text-room UI tests stay deterministic.
+- **Ticket → preview zoom is back.** The `matchedTransitionSource` carries the ticket's own fill, 12 pt corner radius and printed shadow, so the zoom's snapshot never settles with a different shadow than the ticket (the 3 October glitch). `testWalkN_TicketZoom` captures the return frames.
+- **Voice room.** One stage: the whole question (title and body, readable on open), then a small Bit, a state line with a coloured dot (amber live, red muted, grey otherwise) and the interviewer's latest line in a fixed four-line box. The dock holds only voice actions: Start talking with the cap and allowance under it; Cancel while connecting; Transcript, Mute and End while live; Try again when unavailable. The keyboard is a toolbar button (`voiceBack`, "Write") in every state. Connecting is shown by Bit and the state line, not a spinner.
+- **The particle orb is gone.** `SignalPresence`, its dynamics, particle field and renderer were removed. Bit is the interviewer's presence in the room, driven by measured audio through the same `SpeakerGauge` as the state line: `talking` on interviewer output (with `VoiceLevels.output` moving the mouth), `listening` while the person speaks, `thinking` while a delegation is unresolved or the session connects, `idle` otherwise. This supersedes "Bit stays out of the voice room; the orb represents the interviewer" above. `VoiceLevels` stays as the unobserved per-frame level store.
+- **Less on screen.** Library drops the "Questions / evidence" eyebrow; the preview drops "The scenario"; Home's done ticket drops the "Your line" label (the underline already says it); Reflection and the completed-session page move the help footnote under the feedback and offer one "Retry a moment" instead of three; the session's share action moves to the toolbar; the Library question page loses its "Explore related questions" footer.
+- **Home's daily question** keeps the preparing ticket until the refresh that carries the finished question has landed, instead of blanking for one round trip (F-034).

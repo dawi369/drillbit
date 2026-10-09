@@ -203,7 +203,7 @@ export const wire = {
       automaticCompanion: z.boolean().optional(),
       managedAI: z.boolean(),
       voiceInterview: z.boolean(),
-      voice: z.object({ available: z.boolean(), reason: z.string().optional(), checkedAt: z.string() }).optional(),
+      voice: z.object({ available: z.boolean(), reason: z.string().optional(), checkedAt: z.string(), remaining: z.number().int().optional(), limit: z.number().int().optional(), resetsAt: z.string().optional() }).optional(),
       developerTools: z.boolean().optional(),
     }),
   }),

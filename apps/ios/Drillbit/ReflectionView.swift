@@ -120,10 +120,10 @@ struct ReflectionView: View {
     ScrollView {
       VStack(alignment: .leading, spacing: 24) {
         CompletionHeading(warmUp: warmUp, mode: mode)
-        AssistanceSummary(challenge: current ?? initial)
         if let reflection = (current ?? initial).reflection {
           Group {
           ReflectionContent(reflection: reflection, showsEnding: true)
+          AssistanceSummary(challenge: current ?? initial)
           // Branch retries and Recall would make an uncounted legacy warm-up count.
           if warmUp {
             Text("That’s the whole loop. This one didn’t count.")
@@ -137,11 +137,11 @@ struct ReflectionView: View {
             Text(AppModel.freeRepLine(next)).font(.subheadline).foregroundStyle(AppPalette.secondary)
               .accessibilityIdentifier("freeRepNotice")
           }
-          if model.mayStartRep(), let turns = (current ?? initial).interview?.turns.filter({ $0.kind == "answer" }), !turns.isEmpty {
+          if model.mayStartRep(), let turn = (current ?? initial).interview?.turns.last(where: { $0.kind == "answer" }) {
+            // One branch point is an offer; a list of them is homework.
             VStack(alignment: .leading, spacing: 12) {
-              SignalEyebrow(text: "Other moments")
-              ForEach(turns.suffix(3)) { turn in
-                Button {
+              SignalEyebrow(text: "Retry a moment")
+              Button {
                   Task {
                     retryingTurn = turn.id; retryFailure = nil
                     defer { retryingTurn = nil }
@@ -161,7 +161,6 @@ struct ReflectionView: View {
                   .frame(minHeight: 56)
                   .contentShape(Rectangle())
                 }.buttonStyle(DrillbitRowButtonStyle()).disabled(retryingTurn != nil)
-              }
             }
           }
           }

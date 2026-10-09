@@ -54,11 +54,11 @@ struct QuestionFlow: View {
   }
   /// Bit shows up only while the question is being written, then gets out of the way.
   private var writing: Bool { question == nil && failure == nil }
-  /// Eyebrow and note are fixed copy but still written out, so the page reads as one voice.
+  /// The note is fixed copy but still written out, so the page reads as one voice.
   private var previewSegments: [StreamSegment] {
     var segments = [
-      StreamSegment(style: .eyebrow, text: AttributedString("The scenario".uppercased()), fixed: true),
-      StreamSegment(style: .title, text: AttributedString(QuestionMarkup.plain(question?.title ?? draft?.title ?? "")), placeholder: true),
+      // The empty title keeps a caret while a question is on its way; after a failure there is nothing to wait for.
+      StreamSegment(style: .title, text: AttributedString(QuestionMarkup.plain(question?.title ?? draft?.title ?? "")), placeholder: failure == nil),
     ]
     if let previewNote { segments.append(StreamSegment(style: .note, text: AttributedString(previewNote), fixed: true)) }
     let blocks = QuestionMarkup.blocks(question?.displayPrompt ?? draft?.prompt ?? "", formatted: model.settings.formatsQuestions)
@@ -137,14 +137,19 @@ struct QuestionFlow: View {
               BitView(mood: .drilling).frame(height: 56).transition(.opacity)
             }
             if let question, revealed {
-              let title = question.lifecycle == "in_progress" ? "Resume" : "Start interview"
+              let resuming = question.lifecycle == "in_progress"
+              let title = resuming ? "Resume" : "Start"
               Button {
                 guard !starting else { return }
                 starting = true
                 Task {
                   do {
                     let opened = try await model.openForPreview(question)
-                    if visible, scenePhase == .active, account == model.bootstrap?.account.id { onStart(opened); dismiss() }
+                    if visible, scenePhase == .active, account == model.bootstrap?.account.id {
+                      // A fresh start opens the interview out loud; the room always has the keyboard one tap away.
+                      model.talkOnOpen = !resuming && model.voiceFirst ? opened.id : nil
+                      onStart(opened); dismiss()
+                    }
                   } catch { failure = error.localizedDescription }
                   starting = false
                 }
@@ -155,12 +160,12 @@ struct QuestionFlow: View {
                 .allowsHitTesting(!starting)
                 .accessibilityLabel(starting ? "Opening" : title)
                 .accessibilityIdentifier("previewStart")
-                .transition(arrival(0))
+                .transition(arrival(1))
             }
             if let question, revealed, question.lifecycle == "ready" && (firstRep ? rerolls < 1 : model.mayStartRep(swapping: question)) {
               Button("Choose another question") { chooseAnother(question) }
                 .disabled(starting)
-                .transition(arrival(1))
+                .transition(arrival(2))
             }
           }.padding(16).background(AppPalette.background)
             .animation(reduceMotion ? nil : DrillbitMotion.fast, value: writing)

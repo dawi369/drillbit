@@ -333,6 +333,8 @@ import UIKit
     do {
       try await flush()
       challenge.interview = state
+      // The ending follows the style on screen, even if no turn was sent after a switch.
+      challenge.guidanceMode = mode
       finished = try await model.finish(challenge, answer: answer)
     } catch { failure = error.localizedDescription }
   }

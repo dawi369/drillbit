@@ -104,6 +104,15 @@ struct InterviewTests {
     #expect(VoiceTranscript.rows(fragments).count == 3)
   }
 
+  @Test func voiceAllowanceReadsInLocalTimeAndStaysQuietWhenUnlimited() throws {
+    let decoded = try JSONDecoder().decode(VoiceCapability.self, from: Data(#"{"available":true,"checkedAt":"2026-09-12T10:00:00.000Z","remaining":5,"limit":6,"resetsAt":"2026-09-13T00:00:00.000Z"}"#.utf8))
+    let locale = Locale(identifier: "en_US")
+    #expect(decoded.allowanceLine(timeZone: TimeZone(identifier: "Europe/Oslo")!, locale: locale) == "5 of 6 left today · resets 2:00\u{202F}AM")
+    var spent = decoded; spent.remaining = 0
+    #expect(spent.allowanceLine(timeZone: TimeZone(identifier: "America/New_York")!, locale: locale) == "None left today · resets 8:00\u{202F}PM")
+    #expect(VoiceCapability(available: true, checkedAt: "2026-09-12T10:00:00.000Z").allowanceLine() == nil)
+  }
+
   @Test func voiceFragmentsPreserveSpacesOverlapAndStableRows() {
     let first = VoiceFragment(id:"one",sequence:0,speaker:"user",text:"Use a",startMs:0,endMs:500)
     let overlapping = VoiceFragment(id:"two",sequence:1,speaker:"assistant",text:"Mm-hm.",startMs:300,endMs:600)
@@ -290,7 +299,7 @@ struct InterviewTests {
     let date = { (days: Int) in calendar.date(byAdding: .day, value: days, to: now)! }
     #expect(SetupView.countdown(to: date(0), now: now, calendar: calendar) == "That’s today. One quick rep to warm up.")
     #expect(SetupView.countdown(to: date(1), now: now, calendar: calendar) == "That’s tomorrow. One good rep tonight.")
-    #expect(SetupView.countdown(to: date(12), now: now, calendar: calendar) == "12 days out. A rep a day gets you 12 shots.")
+    #expect(SetupView.countdown(to: date(12), now: now, calendar: calendar) == "12 days until your interview. Let’s find one thing to sharpen today.")
   }
 
   @Test func firstUseProgressRestoresPerAccountAndResetClearsIt() async throws {

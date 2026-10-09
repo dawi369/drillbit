@@ -18,9 +18,14 @@ private struct VoiceOutbox: Codable {
 
 @MainActor @Observable final class LiveVoice {
   enum Phase: Equatable { case idle, connecting, active, ending, unavailable }
+  static let sessionLimit: TimeInterval = 10 * 60
   var phase: Phase = .idle
   var muted = false
   var message: String?
+  /// When the provider confirmed the session; drives the room's clock.
+  var startedAt: Date?
+  /// True only while a delegated reasoning request is actually in flight.
+  var thinking = false
   var isOpen: Bool { phase != .idle }
   var blocksText: Bool { [.connecting,.active,.ending].contains(phase) || outbox != nil }
   let levels = VoiceLevels()
@@ -71,7 +76,7 @@ private struct VoiceOutbox: Codable {
   func start() async {
     guard !blocksText, !interview.locked, interview.currentAccount, interview.acceptsVoiceInput else { return }
     let epoch = UUID(); generation = epoch
-    phase = .connecting; message = nil; muted = false; seen = []; delegations = []; guidanceDeliveries = [:]; acknowledged = []
+    phase = .connecting; message = nil; muted = false; startedAt = nil; thinking = false; seen = []; delegations = []; guidanceDeliveries = [:]; acknowledged = []
     do {
       #if DEBUG
       if interview.model.fixture, ProcessInfo.processInfo.arguments.contains("--fixture-voice-connecting") {
@@ -96,6 +101,7 @@ private struct VoiceOutbox: Codable {
       guard generation == epoch, interview.currentAccount, interview.acceptsVoiceInput else { return }
       if interview.model.fixture {
         phase = .active
+        startedAt = .now
         present([],id:id)
         #if DEBUG
         startFixtureMeter(epoch: epoch)
@@ -147,7 +153,7 @@ private struct VoiceOutbox: Codable {
       }
       present([],id:id)
       deadline = Task { [weak self] in
-        try? await Task.sleep(for:.seconds(10*60))
+        try? await Task.sleep(for:.seconds(Self.sessionLimit))
         guard !Task.isCancelled else { return }
         await self?.end()
       }
@@ -230,7 +236,7 @@ private struct VoiceOutbox: Codable {
   }
   private func receive(_ data: Data) async {
     guard let event = try? JSONSerialization.jsonObject(with:data) as? [String:Any],let type=event["type"] as? String else { return }
-    if type == "session.started" { if phase == .connecting { phase = .active }; return }
+    if type == "session.started" { if phase == .connecting { phase = .active; startedAt = .now }; return }
     if type == "session.closed" { if let usage=event["usage"] as? [String:Any] { outbox?.usageSeconds = usage["seconds"] as? Double }; await finalize(confirmed:true); return }
     if type == "error" { interrupt("Voice encountered a connection error. Your writing is safe."); return }
     if type == "session.usage.updated",let usage=event["usage"] as? [String:Any] { outbox?.usageSeconds = usage["seconds"] as? Double; return }
@@ -252,6 +258,7 @@ private struct VoiceOutbox: Codable {
       // network task may finish later, but cannot speak after this fallback.
       let deadline = ContinuousClock.now.advanced(by: .seconds(15))
       guidanceDeliveries[id] = VoiceGuidanceDelivery(deadline: deadline)
+      thinking = true
       let timeout = Task {
         do { try await Task.sleep(until: deadline, clock: .continuous) } catch { return }
         deliverGuidance("The response didn't arrive. Say briefly that guidance is unavailable right now; offer to continue in text. Don't ask them to keep waiting.", id: id, epoch: epoch)
@@ -285,6 +292,7 @@ private struct VoiceOutbox: Codable {
     guard generation == epoch, phase == .active, interview.currentAccount,
           guidanceDeliveries[id]?.resolved == false else { return }
     guard let outcome = guidanceDeliveries[id]?.resolve(at: .now) else { return }
+    thinking = guidanceDeliveries.values.contains { !$0.resolved }
     let content = outcome == .response ? text : "The response didn't arrive in time. Briefly acknowledge guidance is unavailable and offer to continue in text. Don't promise more waiting."
     transport?.send(["type":"session.commentary.append", "event_id":UUID().uuidString, "delegation_id":id, "content":content])
   }

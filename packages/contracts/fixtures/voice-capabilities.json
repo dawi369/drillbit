@@ -1,6 +1,7 @@
 {
-  "available": { "available": true, "checkedAt": "2026-09-12T10:00:00.000Z" },
+  "available": { "available": true, "checkedAt": "2026-09-12T10:00:00.000Z", "remaining": 5, "limit": 6, "resetsAt": "2026-09-13T00:00:00.000Z" },
+  "unlimited": { "available": true, "checkedAt": "2026-09-12T10:00:00.000Z" },
   "unavailable": { "available": false, "reason": "Live voice is currently unavailable. You can continue in text.", "checkedAt": "2026-09-12T10:00:00.000Z" },
-  "limitReached": { "available": false, "reason": "Your daily voice limit is reached. It resets at midnight UTC. You can continue in text.", "checkedAt": "2026-09-12T10:00:00.000Z" },
+  "limitReached": { "available": false, "reason": "You’ve used today’s voice sessions. You can keep going in text.", "checkedAt": "2026-09-12T10:00:00.000Z", "remaining": 0, "limit": 6, "resetsAt": "2026-09-13T00:00:00.000Z" },
   "legacyCapabilities": { "managedAI": true, "voiceInterview": false }
 }

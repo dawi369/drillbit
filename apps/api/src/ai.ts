@@ -52,7 +52,7 @@ export function messagesFor(kind: string, context: unknown): ModelMessage[] {
   }
   const messages = baseMessagesFor(kind, reference);
   messages[0].content += personalizationInstructions(value.practiceProfile ?? value.settings?.practiceProfile, kind === "generate" ? "question" : kind === "summarize" ? "reflection" : "conversation");
-  if (kind === "generate") messages[0].content += questionFormattingInstructions((value.settings as { questionFormatting?: boolean } | undefined)?.questionFormatting !== false);
+  if (kind === "generate") messages[0].content += questionFormattingInstructions((value.settings as { questionFormatting?: boolean } | undefined)?.questionFormatting !== false, (context as { mockOpener?: boolean }).mockOpener === true);
   return messages;
 }
 function baseMessagesFor(kind: string, context: unknown): ModelMessage[] {

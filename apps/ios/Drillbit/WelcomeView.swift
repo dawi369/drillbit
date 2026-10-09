@@ -14,7 +14,8 @@ struct WelcomeView: View {
     NavigationStack {
       Group {
         let forced = ProcessInfo.processInfo.arguments.contains("--fixture-walkthrough") && !leftWalkthrough
-        if !forced && (walkthroughVersion >= 1 || model.fixture) { authentication.transition(.opacity) } else { walkthrough.transition(.opacity) }
+        // Version 2 is the playable example; people who saw the old walkthrough get it once.
+        if !forced && (walkthroughVersion >= 2 || model.fixture) { authentication.transition(.opacity) } else { walkthrough.transition(.opacity) }
       }
       .animation(DrillbitMotion.page, value: walkthroughVersion)
       .background(AppPalette.background)
@@ -25,8 +26,21 @@ struct WelcomeView: View {
   private var walkthrough: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 32) {
-        practiceProof
-        feedbackProof.signalEntrance(3)
+        VStack(alignment: .leading, spacing: 20) {
+          DrillbitLogo(compact: true).signalEntrance(0)
+          VStack(alignment: .leading, spacing: 12) {
+            SignalEyebrow(text: "System design mock rounds")
+            Text("Grills you like\nthe real one.\nWants you to pass.")
+              .font(.largeTitle.weight(.semibold)).tracking(-0.8)
+              .fixedSize(horizontal: false, vertical: true)
+              .accessibilityAddTraits(.isHeader)
+            Text("Talk it through or type it out. Get honest notes on what to fix.")
+              .font(.subheadline).foregroundStyle(AppPalette.secondary)
+              .fixedSize(horizontal: false, vertical: true)
+          }
+          .signalEntrance(1)
+        }
+        RetryExample().signalEntrance(2)
       }
       .frame(maxWidth: 560, alignment: .topLeading)
       .padding(24)
@@ -36,66 +50,13 @@ struct WelcomeView: View {
     .safeAreaInset(edge: .bottom, spacing: 0) {
       VStack(spacing: 0) {
         AppPalette.hairline.frame(height: 1)
-        Button("Get started") { walkthroughVersion = 1; withAnimation(DrillbitMotion.page) { leftWalkthrough = true } }
+        Button("Get started") { walkthroughVersion = 2; withAnimation(DrillbitMotion.page) { leftWalkthrough = true } }
           .buttonStyle(PracticeButtonStyle())
           .frame(maxWidth: 560).padding(.horizontal, 24).padding(.top, 12).padding(.bottom, 8)
           .frame(maxWidth: .infinity)
       }
       .background(AppPalette.background)
     }
-  }
-
-  private var practiceProof: some View {
-    VStack(alignment: .leading, spacing: 20) {
-      DrillbitLogo(compact: true).signalEntrance(0)
-      BitView(greets: true)
-        .frame(height: 180)
-        .frame(maxWidth: .infinity)
-        // The app icon's glow: one static gradient, never animated. Sized past Bit's frame so it fades out instead of ending in an edge.
-        .background {
-          RadialGradient(colors: [AppPalette.accent.opacity(0.22), AppPalette.accent.opacity(0)], center: .center, startRadius: 8, endRadius: 150)
-            .frame(width: 300, height: 300)
-            .accessibilityHidden(true)
-        }
-        .signalEntrance(1)
-      VStack(alignment: .leading, spacing: 20) {
-        SignalEyebrow(text: "System design mock rounds")
-        Text("Grills you like\nthe real one.\nWants you to pass.")
-          .font(.largeTitle.weight(.semibold)).tracking(-0.8)
-          .fixedSize(horizontal: false, vertical: true)
-          .accessibilityAddTraits(.isHeader)
-        Text("One question, a few minutes, honest notes on what to fix.")
-          .font(.subheadline).foregroundStyle(AppPalette.secondary)
-      }
-      .signalEntrance(2)
-    }
-  }
-
-  private var feedbackProof: some View {
-    VStack(alignment: .leading, spacing: 16) {
-      SignalEyebrow(text: "It pokes holes. You patch them.")
-      VStack(alignment: .leading, spacing: 12) {
-        turn("You", "If the push fails, I’d just retry it.")
-        Divider()
-        turn("Interviewer", "Okay. What if the first one actually went through?")
-      }
-      VStack(alignment: .leading, spacing: 8) {
-        SignalRule().padding(.bottom, 12)
-        SignalEyebrow(text: "What you missed")
-        Text("Give each push an idempotency key.")
-          .font(.title3.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
-        Text("Then a retry after a timeout can’t notify someone twice.")
-          .foregroundStyle(AppPalette.secondary).fixedSize(horizontal: false, vertical: true)
-      }
-    }
-  }
-
-  private func turn(_ speaker: String, _ text: String) -> some View {
-    VStack(alignment: .leading, spacing: 4) {
-      InterviewRowLabel(text: speaker)
-      Text(text).fixedSize(horizontal: false, vertical: true)
-    }
-    .accessibilityElement(children: .combine)
   }
 
   private var authentication: some View {
@@ -105,12 +66,10 @@ struct WelcomeView: View {
       ScrollView {
         VStack(spacing: 16) {
           DrillbitLogo()
-          // Gives the form room above the keyboard while typing; Bit listens while you type.
-          BitView(mood: inviteFocused ? .listening : .idle).frame(height: inviteFocused ? 96 : 140)
           VStack(spacing: 8) {
             Text(inviting ? "One last step." : "Ready when you are.")
               .font(.title2.weight(.semibold))
-            Text(inviting ? "Enter your invite code to begin." : "Sign in to save your practice and feedback.")
+            Text(inviting ? "Enter your invite code to begin." : "Sign in to keep your reps and feedback.")
               .font(.subheadline).foregroundStyle(AppPalette.secondary)
           }
           .multilineTextAlignment(.center)
@@ -171,5 +130,151 @@ struct WelcomeView: View {
   private func authenticate(_ operation: @escaping @MainActor () async -> Void) {
     guard !signingIn else { return }; signingIn = true
     Task { defer { signingIn = false }; await operation() }
+  }
+}
+
+/// Welcome's playable example: a timed-out push, a retry that sends it twice, then the fix.
+/// Scripted and local; no model call, no score. Bit reacts to what happened to the push, not to the person.
+struct RetryExample: View {
+  enum Step: Equatable { case asking, checked, doubled, fixed }
+  @State private var step = Step.asking
+  @State private var cheers = 0
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+  private struct Receipt: Identifiable, Equatable {
+    var id: String
+    var request: String
+    var status: String
+    var symbol: String
+    var tone: Tone
+    enum Tone { case waiting, delivered, duplicate, skipped }
+  }
+  private var line: String {
+    switch step {
+    case .asking: "Your push to their phone timed out. Now what?"
+    case .checked: "Smart. But the server never answered, so you can’t tell if it went out."
+    case .doubled: "Oops. It went out the first time. Their phone buzzed twice."
+    case .fixed: "Same request, same result. That’s an idempotency key."
+    }
+  }
+  private var mood: BitMood {
+    switch step {
+    case .asking: .idle
+    case .checked: .thinking
+    case .doubled: .concerned
+    case .fixed: .content
+    }
+  }
+  private var receipts: [Receipt] {
+    switch step {
+    case .asking: [Receipt(id: "first", request: "7f3a", status: "Timed out", symbol: "clock", tone: .waiting)]
+    case .checked: [Receipt(id: "first", request: "7f3a", status: "No answer", symbol: "questionmark.circle", tone: .waiting)]
+    case .doubled: [
+      Receipt(id: "first", request: "7f3a", status: "Delivered", symbol: "checkmark.circle.fill", tone: .delivered),
+      Receipt(id: "second", request: "b21c", status: "Delivered again", symbol: "exclamationmark.circle.fill", tone: .duplicate)]
+    case .fixed: [
+      Receipt(id: "first", request: "7f3a", status: "Delivered", symbol: "checkmark.circle.fill", tone: .delivered),
+      Receipt(id: "second", request: "7f3a", status: "Duplicate skipped", symbol: "arrow.uturn.backward.circle", tone: .skipped)]
+    }
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      SignalEyebrow(text: "Try one · 20 seconds")
+      BitAsks(question: line, cheers: cheers, mood: mood, font: .headline, isHeader: false)
+        .animation(reduceMotion ? nil : DrillbitMotion.fast, value: line)
+        .accessibilityIdentifier("exampleLine")
+      VStack(spacing: 8) {
+        ForEach(receipts) { receipt in
+          receiptRow(receipt)
+            .transition(reduceMotion ? .opacity : .asymmetric(
+              insertion: .opacity.combined(with: .offset(y: -8)).combined(with: .scale(scale: 0.96, anchor: .top)),
+              removal: .opacity))
+        }
+      }
+      actions
+    }
+    .sensoryFeedback(trigger: step) { _, new in
+      switch new {
+      case .doubled: .warning
+      case .fixed: .success
+      default: nil
+      }
+    }
+  }
+
+  @ViewBuilder private var actions: some View {
+    switch step {
+    case .asking:
+      HStack(spacing: 12) {
+        choice("Retry it", primary: true) { go(.doubled) }
+          .accessibilityIdentifier("exampleRetry")
+        choice("Check first", primary: false) { go(.checked) }
+          .accessibilityIdentifier("exampleCheck")
+      }
+    case .checked, .doubled:
+      choice("Retry with the same request ID", primary: true) { go(.fixed) }
+        .accessibilityIdentifier("exampleFix")
+    case .fixed:
+      HStack(alignment: .firstTextBaseline, spacing: 12) {
+        Text("That’s the kind of hole Drillbit pokes. Then it tells you how to patch it.")
+          .font(.subheadline).foregroundStyle(AppPalette.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+        Spacer(minLength: 0)
+        Button("Again") { go(.asking) }
+          .font(.subheadline.weight(.semibold))
+          .frame(minHeight: 44)
+          .accessibilityLabel("Play the example again")
+      }
+    }
+  }
+
+  private func go(_ next: Step) {
+    withAnimation(reduceMotion ? nil : .spring(duration: 0.3, bounce: 0)) { step = next }
+    if next == .fixed { cheers += 1 }
+  }
+
+  private func choice(_ title: String, primary: Bool, action: @escaping () -> Void) -> some View {
+    Button(action: action) {
+      Text(title)
+        .font(.subheadline.weight(.semibold))
+        .multilineTextAlignment(.center)
+        .foregroundStyle(primary ? AppPalette.actionInk : AppPalette.primary)
+        .padding(.horizontal, 16).frame(maxWidth: .infinity, minHeight: 44)
+        .background(primary ? AppPalette.action : AppPalette.elevated, in: Capsule())
+        .contentShape(Capsule())
+    }
+    .buttonStyle(DrillbitPressStyle())
+  }
+
+  private func receiptRow(_ receipt: Receipt) -> some View {
+    let tint: Color = switch receipt.tone {
+    case .waiting, .skipped: AppPalette.secondary
+    case .delivered: AppPalette.success
+    case .duplicate: AppPalette.destructive
+    }
+    return HStack(spacing: 12) {
+      Image(systemName: receipt.symbol)
+        .font(.body.weight(.semibold)).foregroundStyle(tint)
+        .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace))
+        .frame(width: 24)
+        .accessibilityHidden(true)
+      VStack(alignment: .leading, spacing: 2) {
+        Text("Push notification").font(.subheadline.weight(.semibold))
+        Text("request \(receipt.request)").font(.caption.monospaced()).foregroundStyle(AppPalette.secondary)
+          .contentTransition(.numericText())
+      }
+      Spacer(minLength: 8)
+      Text(receipt.status)
+        .font(.subheadline.weight(.medium)).foregroundStyle(tint)
+        .multilineTextAlignment(.trailing)
+        .contentTransition(.opacity)
+    }
+    .padding(.horizontal, 16).padding(.vertical, 12)
+    .background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 12))
+    .overlay { RoundedRectangle(cornerRadius: 12).stroke(receipt.tone == .duplicate ? AppPalette.destructive.opacity(0.5) : AppPalette.hairline.opacity(0.6), lineWidth: 1) }
+    .opacity(receipt.tone == .skipped ? 0.7 : 1)
+    .accessibilityElement(children: .combine)
+    .accessibilityIdentifier("exampleReceipt-" + receipt.id)
   }
 }

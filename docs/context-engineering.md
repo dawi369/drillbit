@@ -1,6 +1,6 @@
 # Interviewer context engineering
 
-The current client uses **Learn together / Coach me (default) / Mock interview**. Text and delegated voice reasoning share one XML conversation pipeline. Text calls now use GPT-6 Luna with reasoning disabled for interview turns; the dated Gemini evaluations below remain historical and do not establish Luna's product quality. See [teaching modes and evaluation](teaching-modes.md).
+The current client uses **Learn together / Coach me (default) / Mock interview**. Text and delegated voice reasoning share one XML conversation pipeline. Text calls now use GPT-6 Luna with reasoning disabled for interview turns; the dated Gemini evaluations below remain historical and do not establish Luna's product quality.
 
 ## Voice source and interpretation
 
@@ -49,4 +49,4 @@ Known failures: an occasional joke still gets a technical pivot; routine praise 
 
 ## Historical edition: V4
 
-The V3 partial acceptance above is historical. V4 separates pure social context, uses a model-internal conversational move plus text, and assigns the existing public outcome server-side. Full context returns on substantive messages. Escaped reference XML is marked untrusted inside the system message, while actual turns use native conversation roles. The V4 candidate reviews used low reasoning; current GPT-6 Luna interview calls disable it. See [V4 personality acceptance](personality-acceptance.md) for the historical timing and quality limits. No new user-facing mode or model picker is added.
+The V3 partial acceptance above is historical. V4 separates pure social context, uses a model-internal conversational move plus text, and assigns the existing public outcome server-side. Full context returns on substantive messages. Escaped reference XML is marked untrusted inside the system message, while actual turns use native conversation roles. The V4 candidate reviews used low reasoning; current GPT-6 Luna interview calls disable it. No new user-facing mode or model picker is added.

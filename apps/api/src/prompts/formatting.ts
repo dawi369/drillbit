@@ -11,12 +11,19 @@ const examples = [
 ];
 
 // Plain-text layout, so it applies with formatting on or off; the app renders paragraphs, "• " lines (the Key facts block) and the closing ask.
-const structure = `
+const defaultStructure = `
 <question_structure>
-Lay the prompt out for quick reading. Open with one or two sentences of scenario. Then, when the decision turns on them, two to four key facts, each on its own line starting with "• ": the users, scale, limits or existing pieces the answer depends on. One fact per line, under 80 characters, stated plainly with the number where it matters. A key fact is never a hint or the scenario restated, and constraints never repeat a key fact. End with the ask on its own line: one sentence naming the decision. Separate these parts with a blank line. No headings. A Mock interview opener is the exception: one short paragraph, no bullets. Other exploratory prompts keep key facts to fixed context (who uses it, what already exists) and leave numbers and limits for the candidate to ask about.
+Lay the prompt out for quick reading. Open with one or two sentences of scenario. Then, when the decision turns on them, two to four key facts, each on its own line starting with "• ": the users, scale, limits or existing pieces the answer depends on. One fact per line, under 80 characters, stated plainly with the number where it matters. A key fact is never a hint or the scenario restated, and constraints never repeat a key fact. End with the ask on its own line: one sentence naming the decision. Separate these parts with a blank line. No headings. Exploratory prompts keep key facts to fixed context (who uses it, what already exists) and leave numbers and limits for the candidate to ask about.
 </question_structure>`;
 
-export function questionFormattingInstructions(enabled: boolean): string {
+// A Mock interview opens the way a real interviewer speaks: no key facts, the candidate scopes it by asking.
+const mockStructure = `
+<question_structure>
+This prompt is a Mock interview opener. Write it the way an interviewer says it out loud: one short paragraph of scenario (one to three sentences), a blank line, then the ask on its own line as one question. No "• " lines, no lists of facts, numbers, limits or requirements; the candidate scopes the problem by asking. No headings.
+</question_structure>`;
+
+export function questionFormattingInstructions(enabled: boolean, mock = false): string {
+  const structure = mock ? mockStructure : defaultStructure;
   if (!enabled) return `${structure}\n<question_formatting>Write title, prompt and constraints as plain text. Never use markup tags, Markdown, backticks or code fences.</question_formatting>`;
   return `${structure}
 <question_formatting>

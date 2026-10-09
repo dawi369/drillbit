@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-motion="full">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drillbit · prototype</title>
+<link rel="stylesheet" href="draft-r1.css">
+</head>
+<body>
+<main class="page">
+  <h1>Drillbit, redrawn</h1>
+  <p class="lede">One page, clickable phones. Every screen names the Swift view it replaces and is tagged by what it needs: <span class="tag view">view</span> SwiftUI only · <span class="tag content">content</span> authoring · <span class="tag api">API</span> contract change (OpenAPI + fixtures + DTOs) · <span class="tag model">model</span> prompt or schema change. Flows ride the real turn model: a draft autosaves, Send is a durable <code>answer</code>, the interviewer replies with a <code>follow_up</code>; a single line ending in “?” is a clarification. Grounding: <a href="app-audit/notes.md">teardown</a>, <a href="app-audit/steal-list.md">steal list</a>, <a href="app-audit/cheap-cut.md">cheap cut</a>.</p>
+  <div class="controls">
+    <div class="seg" id="theme" role="group" aria-label="Theme"><button data-v="light" aria-pressed="true">Light</button><button data-v="dark" aria-pressed="false">Dark</button></div>
+    <div class="seg" id="motion" role="group" aria-label="Motion"><button data-v="full" aria-pressed="true">Motion</button><button data-v="reduce" aria-pressed="false">Reduced</button></div>
+    <span class="hint">Type: Libron for anything you read; SF for controls and labels; SF Mono only inside diagrams.</span>
+  </div>
+  <ul class="toc"><li><a href="#r1">Round 1 · First run → first rep</a></li><li><a href="#decisions">Decisions</a></li></ul>
+
+  <section class="round" id="r1">
+    <h2>Round 1 · First run → first rep</h2>
+    <p class="sub">Welcome → sign in → one setup screen → first question → the room (Requirements with a tiny step, Design on the lane canvas, pushback that points at a node) → feedback → Home with the gate. Click through; each phone also works on its own.</p>
+    <div class="board">
+      <div class="frame" id="f-welcome"><div class="phone" data-phone="welcome"></div><p class="cap"><b>Welcome</b> The positioning is the heading. The playable example is now a two-node diagram: the request travels, dies, buzzes twice, or gets skipped by its id. Bit appears once, when the fix lands. <span class="rep">replaces WelcomeView + RetryExample</span><span class="tag view">view</span></p></div>
+      <div class="frame" id="f-signin"><div class="phone" data-phone="signin"></div><p class="cap"><b>Sign in</b> Unchanged in substance. <span class="rep">WelcomeView.authentication</span><span class="tag view">view</span></p></div>
+      <div class="frame" id="f-setup"><div class="phone" data-phone="setup"></div><p class="cap"><b>Setup, one screen</b> Two questions about the interview, not the learner. Level shows what it changes. Pick a date option to enable the button. <span class="rep">replaces SetupView (2 pages)</span><span class="tag view">view</span></p></div>
+      <div class="frame" id="f-first"><div class="phone" data-phone="first"></div><p class="cap"><b>First question</b> Title writes itself in; prompt and numbered constraints; the five steps are shown before Start. No Write it / Talk it through. One swap. <span class="rep">replaces QuestionFlow preview</span><span class="tag view">view</span> <span class="tag model">model</span> fixed path in generation</p></div>
+      <div class="frame" id="f-room"><div class="phone" data-phone="room"></div><p class="cap"><b>Room · Requirements</b> The composer takes the step’s shape (three numbered lines). Send → follow-up → a <i>move</i>: pick the odd one out, checked on-device, one line of why, then the interviewer moves on. <span class="rep">replaces InterviewView composer + GuidedChoices</span><span class="tag model">model</span> moves generated with the question <span class="tag api">API</span> declare <code>path</code>, <code>moves</code>, <code>step</code></p></div>
+      <div class="frame" id="f-room3"><div class="phone" data-clone="room:s3"></div><p class="cap"><b>Room · Design</b> Three lanes, tap a part to place it, tap two to connect, long-press-ish tools when selected. Seeded here so you can poke it; the live flow starts empty. Send sends the graph as JSON with the sentence. <span class="rep">new: LaneCanvas inside InterviewView</span><span class="tag api">API</span> <code>answer.diagram</code> <span class="tag model">model</span> interviewer reads the graph</p></div>
+      <div class="frame" id="f-room3s"><div class="phone" data-clone="room:s3sent"></div><p class="cap"><b>Room · pushback</b> The request pulses along the lease edge while the interviewer thinks; the reply names two nodes and the canvas dims the one in question. <span class="tag model">model</span> reply references node ids</p></div>
+      <div class="frame" id="f-feedback"><div class="phone" data-phone="feedback" data-state="main"></div><p class="cap"><b>Feedback</b> One strength, one gap, both quoted. Then the five steps with a quote each; no ratings. The reminder is one inline question. <span class="rep">replaces ReflectionView</span><span class="tag model">model</span> reflection schema gains <code>steps[]</code></p></div>
+      <div class="frame" id="f-home"><div class="phone" data-phone="home"></div><p class="cap"><b>Home, gated</b> What you carry from today, what’s next and why, when the free rep returns, and a real CTA. <span class="rep">replaces HomeView ticket</span><span class="tag view">view</span> (paywall placement is still yours)</p></div>
+    </div>
+    <div class="notes">
+      <div class="note"><h3>What changed from the app</h3><ul><li><b>No eyebrow caps.</b> Hierarchy comes from Libron sizes and spacing.</li><li><b>No cards.</b> Only the canvas and the composer are inset surfaces.</li><li><b>One accent</b>, used for the current step, the request dot and “what to fix”. Primary buttons are ink.</li><li><b>Bit</b> twice: when the Welcome fix lands, and on feedback.</li></ul></div>
+      <div class="note"><h3>Turn model</h3><ul><li>Requirements lines → one <code>answer</code> with the lines joined.</li><li>A move is a local check; the pick is then sent as an <code>answer</code> so the interviewer reacts to it. Needs <code>moves[]</code> on the generated question and <code>step</code> in every reply.</li><li>The canvas serialises to <code>{nodes, edges}</code> and rides the same <code>answer</code> command (additive field).</li></ul></div>
+      <div class="note"><h3>Open questions this round</h3><ul><li>Setup: is one screen too dense at larger text sizes? (Chips wrap.)</li><li>Design step: do you want the sentence field at all, or diagram-only?</li><li>Feedback: five-step review replaces the Mock Strong/Mixed/Weak card. Is “thin / missed” honest enough?</li><li>Title face: Libron Bold is used for titles too. A second display face is possible; say if you want to see one.</li></ul></div>
+    </div>
+  </section>
+
+  <section class="decisions" id="decisions">
+    <h2>Decisions</h2>
+    <ul>
+      <li><b>4 Oct:</b> lanes + slots canvas (option A) chosen by the user; Libron for the prototype, creative liberty on a complementary face; tiny steps live inside the interview; fixed five-step path (Requirements · Entities · API · Design · Deep dive, after Hello Interview’s published framework) for every mode; voice shows the canvas read-only until a finalized-turn boundary exists; Bit on Welcome and feedback only; Recall + Library fold into one Map tab; the gate stays after the first feedback and gains a CTA.</li>
+      <li><b>4 Oct (mine):</b> Setup collapsed to one screen. Setup asks “when” and “level” only; goal and daily minutes default. Primary buttons are ink, not amber, so the accent can mean “here” on the step bar.</li>
+    </ul>
+  </section>
+</main>
+<script src="draft-r1.js"></script>
+</body>
+</html>

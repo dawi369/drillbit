@@ -67,7 +67,7 @@ Test restoring exports into a separate local database, never over the running se
 
 ## Release gate
 
-A signed TestFlight release requires real Apple sign-in, both AI modes, cold widget launches, interrupted networking, offline completion/reconnect and account deletion on a real iPhone. The local fixture screen check is explicitly not a provider/account acceptance test. Record remaining issues in `docs/acceptance.md` rather than describing unverified paths as complete.
+A signed TestFlight release requires real Apple sign-in, both AI modes, cold widget launches, interrupted networking, offline completion/reconnect and account deletion on a real iPhone. The local fixture screen check is explicitly not a provider/account acceptance test. Record remaining issues here rather than describing unverified paths as complete.
 
 ## Configured development identity
 
@@ -95,6 +95,8 @@ Help request recovery uses the same stored job ID; do not create automatic repla
 ## Simulator test helper and source backup
 
 Xcode UI tests install `DrillbitUITests-Runner` (`dawi.DrillbitUITests.xctrunner`) alongside the main app. It is a test harness, not an alternate Drillbit build. After tests finish, it can be uninstalled with `xcrun simctl uninstall <simulator-id> dawi.DrillbitUITests.xctrunner`; future UI tests recreate it. Do not uninstall `dawi.drillbit` to clean up the runner, because that would remove the app's local data.
+
+Screenshot set: `sh scripts/audit-shots.sh <dir> [testName ...]` runs the `AuditScreenshots` UI tests on the one booted simulator (all, or the named tests) and exports every attached screenshot as `<name>.png`. Fixture flags used by those tests: `--fixture-coach` turns the first-run tips on, `--fixture-talk` opens a fresh interview in the voice room as real installs do, `--fixture-persist` keeps the fixture store in a temp file across kill-and-relaunch and `--fixture-persist-reset` clears it first. Reduce Motion for a run: `xcrun simctl spawn <udid> defaults write com.apple.Accessibility ReduceMotionEnabled -bool true` before launching, and `-bool false` after.
 
 `/Users/dawi/dev/drillbit-before-native-20260908-212600` is a 2.5 MB recovery bundle (`source.tar.gz`, `working-tree.patch`, `HEAD`), not a second active checkout. It was preserved during the native rebuild.
 
@@ -132,7 +134,7 @@ Assistant MK1 (`6801853827`, `com.dawi369.assistantmk1`) was removed from active
 
 On 9 September 2026 the compatible settings backend deployed successfully as `1d798d23-25d4-457d-a36e-a68b2e6a9ecf`. Health returned 200 and unauthenticated bootstrap 401. No D1 migration is needed: level fields are additive in existing JSON records, with legacy normalization on read/job execution.
 
-Signed Release version `2.0.0` build `2` archived to `/tmp/drillbit-testflight/Drillbit-build2.xcarchive` and uploaded successfully using the existing internal-only export options. Live App Store Connect verification: processing **Complete**, build **Testing / Internal**, assigned to **Owner Testing** with one invitation. Build ID: `0936344e-6e1c-4826-a725-036c153038e4`. The build retains iOS 26 minimum and development services. See the settings section of [acceptance](acceptance.md) for verification and remaining device/prompt limits.
+Signed Release version `2.0.0` build `2` archived to `/tmp/drillbit-testflight/Drillbit-build2.xcarchive` and uploaded successfully using the existing internal-only export options. Live App Store Connect verification: processing **Complete**, build **Testing / Internal**, assigned to **Owner Testing** with one invitation. Build ID: `0936344e-6e1c-4826-a725-036c153038e4`. The build retains iOS 26 minimum and development services.
 
 ## Interview development rollout — 9 September 2026
 
@@ -169,7 +171,7 @@ User-authorized physical-device testing release: version `2.0.0` build `3`, bund
 
 ## Text-practice completeness development rollout — 11 September 2026
 
-Worker version `5a917562-5b56-4de6-a77b-5ac2eb9f0826` deployed successfully; health returned `ok`. Additive evidence and account-export contracts, selection version 2 and reflection prompt `feedback-v2` require no database migration. Existing clients and historical reflections remain supported. Current simulator build installed on iPhone 17 Pro; no TestFlight upload. Details and remaining physical checks: [completeness ledger](product-completeness.md).
+Worker version `5a917562-5b56-4de6-a77b-5ac2eb9f0826` deployed successfully; health returned `ok`. Additive evidence and account-export contracts, selection version 2 and reflection prompt `feedback-v2` require no database migration. Existing clients and historical reflections remain supported. Current simulator build installed on iPhone 17 Pro; no TestFlight upload.
 
 Feedback runs use low reasoning; social/interview transport policy remains V4. `ai_runs.prompt_version` now records the actual edition rather than the old hardcoded practice version. Invalid structured responses still record available usage. To roll back, deploy the prior compatible Worker; retain saved reflection JSON and library records. An older Worker will not serve account export, so coordinate that rollback with native testing. Metrics are content-free Worker logs and local MetricKit counts, not a new third-party telemetry integration.
 
@@ -205,7 +207,7 @@ Development Worker `44fbebe3-d50c-4ae2-a230-78d89493b867` introduces additive gu
 
 Simulator build only: the owner’s existing phone build receives Coach me behavior by default from the new backend; selecting the three modes and the native 15-second delivery gate require the updated native build. No TestFlight upload was performed. The independent 12-second backend inference deadline also protects older clients. Full voice speech-to-answer timing is not bounded by those delegation deadlines.
 
-Run `bun scripts/evaluate-teaching.ts` from the repo root with the existing OpenRouter environment key for synthetic text/voice-reasoning evaluation. Output is ignored under `.local/`. `EVAL_CASE` filters scenarios and `EVAL_REASONING` is experiment-only. Do not mistake these direct provider calls for real-phone GPT-Live acceptance; see [teaching modes](teaching-modes.md).
+Run `bun scripts/evaluate-teaching.ts` from the repo root with the existing OpenRouter environment key for synthetic text/voice-reasoning evaluation. Output is ignored under `.local/`. `EVAL_CASE` filters scenarios and `EVAL_REASONING` is experiment-only. Do not mistake these direct provider calls for real-phone GPT-Live acceptance.
 
 ### Local Xcode 27 transition — 13 September 2026
 

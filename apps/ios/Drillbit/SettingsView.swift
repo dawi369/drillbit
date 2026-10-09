@@ -67,7 +67,7 @@ struct SettingsView: View {
         }.accessibilityIdentifier("questionFormatting")
       }
       Section { NavigationLink("LLM provider") { AIAccessView(model: model) } }
-      Section("Appearance") {
+      Section {
         Picker("Appearance", selection: $appearance) {
           Text("System").tag("system")
           Text("Light").tag("light")
@@ -97,7 +97,7 @@ struct SettingsView: View {
           }
         }
         Button("Delete account", role: .destructive) { deleting = true }
-          .alert("Delete Account?", isPresented: $deleting) {
+          .alert("Delete your account?", isPresented: $deleting) {
             Button("Delete", role: .destructive) {
               Task {
                 await model.perform {
@@ -110,7 +110,7 @@ struct SettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
           } message: {
-            Text("This permanently deletes your account, practice, feedback, Recall and saved key. You can't undo this.")
+            Text("This permanently deletes your account, practice, feedback, Recall and saved key. There’s no undo.")
           }
       }
       if model.bootstrap?.capabilities?.developerTools == true {
@@ -162,7 +162,7 @@ private struct DeveloperSettingsSection: View {
 }
 struct LearningPlanSettingsView: View {
   @Bindable var model: AppModel
-  private let objectives = [("interview","An upcoming interview"),("learn","Strengthen up my skills"),("stay_sharp","Keep my skills fresh")]
+  private let objectives = [("interview","An interview’s coming up"),("learn","I want to get sharper"),("stay_sharp","Just keeping fresh")]
   private let roles = [("general","A mix of things"),("backend","Backend services"),("frontend","Web frontends"),("full_stack","Full-stack products"),("platform","Platforms and infrastructure"),("data","Data systems"),("mobile","Mobile apps")]
   private let areas = PracticeAreaGroup.all.map { ($0.id, $0.title) }
   private var plan: Binding<LearningPlan> { Binding(get: { model.settings.learningPlan ?? LearningPlan() }, set: { model.settings.learningPlan = $0 }) }
@@ -208,6 +208,7 @@ struct AIAccessView: View {
   @State private var modelID = ""
   @State private var saved: Bootstrap.Credential?
   @State private var validating = false
+  private var credential: Bootstrap.Credential? { saved ?? model.bootstrap?.credential }
   var body: some View {
     SignalList {
       Section {
@@ -217,28 +218,31 @@ struct AIAccessView: View {
         }
       }
       Section {
-        if let credential = saved ?? model.bootstrap?.credential {
+        if let credential {
           Label("Key ending in \(credential.suffix)", systemImage: AppIcon.completed.rawValue).foregroundStyle(
             AppPalette.success)
           if let name = credential.model {
             LabeledContent("Model", value: name)
           }
         }
-        SecureField("OpenRouter key", text: $key).textInputAutocapitalization(.never)
+        SecureField(credential == nil ? "OpenRouter key" : "Replace with a new key", text: $key).textInputAutocapitalization(.never)
           .autocorrectionDisabled()
-        TextField("Model ID", text: $modelID, prompt: Text("Model ID, e.g. openai/gpt-6-luna"))
+          .accessibilityIdentifier("openRouterKey")
+        // The server falls back to its default model when none is given.
+        TextField("Model ID", text: $modelID, prompt: Text("Model ID (optional, e.g. openai/gpt-6-luna)"))
           .textInputAutocapitalization(.never)
           .autocorrectionDisabled()
           .keyboardType(.asciiCapable)
           .accessibilityIdentifier("openRouterModel")
-        Button("Validate and save") {
+        Button(validating ? "Checking key…" : "Validate and save") {
           Task {
             validating = true
             defer { validating = false }
             await model.perform {
+              let trimmedModel = modelID.trimmingCharacters(in: .whitespaces)
               let result: Bootstrap.Credential = try await model.api.send(
                 "credential", method: "PUT",
-                body: KeyInput(key: key, model: modelID.trimmingCharacters(in: .whitespaces)))
+                body: KeyInput(key: key, model: trimmedModel.isEmpty ? nil : trimmedModel))
               saved = result
               model.bootstrap?.credential = result
               key = ""
@@ -247,23 +251,32 @@ struct AIAccessView: View {
               try await model.updateSettings()
             }
           }
-        }.disabled(key.isEmpty || modelID.trimmingCharacters(in: .whitespaces).isEmpty || validating)
-        Button("Remove key", role: .destructive) {
-          Task {
-            await model.perform {
-              let _: EmptyResponse = try await model.api.send("credential", method: "DELETE")
-              saved = nil
-              model.bootstrap?.credential = nil
-              await model.refresh()
+        }.disabled(key.isEmpty || validating)
+          .accessibilityIdentifier("validateKey")
+        if credential != nil {
+          Button("Remove key", role: .destructive) {
+            Task {
+              await model.perform {
+                let _: EmptyResponse = try await model.api.send("credential", method: "DELETE")
+                saved = nil
+                model.bootstrap?.credential = nil
+                if model.settings.aiMode == "byok" { model.settings.aiMode = "managed"; try await model.updateSettings() }
+                await model.refresh()
+              }
             }
           }
+          .accessibilityIdentifier("removeKey")
         }
       } header: {
         Text("OpenRouter")
+      } footer: {
+        if model.settings.aiMode == "byok" && credential == nil {
+          Text("Your key is set to be used, but none is saved yet. Add one, or switch back to Included AI.")
+        }
       }
       Section {
         Text(
-          "Your key is encrypted on Drillbit's servers so daily preparation can work while the app is closed. A rejected key never falls back to included AI."
+          "Your key is encrypted on Drillbit's servers so daily preparation can work while the app is closed. A rejected key never falls back to included AI. Removing it switches you back to Included AI."
         ).font(.footnote).foregroundStyle(.secondary)
       }
     }.navigationTitle("LLM provider")

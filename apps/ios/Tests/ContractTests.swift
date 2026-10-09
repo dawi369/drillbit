@@ -126,6 +126,12 @@ struct ContractTests {
     #expect(challenge.session?.revision == 2)
     #expect(challenge.session?.updatedAt != nil)
   }
+  @Test func completionWriteCarriesTheFinishingStyleOnlyWhenKnown() throws {
+    let plain = try JSONSerialization.jsonObject(with: JSONEncoder().encode(DraftWrite(answer: "a", revision: 1))) as? [String: Any]
+    #expect(plain?["guidanceMode"] == nil)
+    let finished = try JSONSerialization.jsonObject(with: JSONEncoder().encode(DraftWrite(answer: "a", revision: 1, guidanceMode: .mockInterview))) as? [String: Any]
+    #expect(finished?["guidanceMode"] as? String == "mock_interview")
+  }
   @Test func localOutboxPreservesNewerEditDuringAcknowledgement() async throws {
     let container = try ModelContainer(
       for: Schema(StoreV1.models), configurations: ModelConfiguration(isStoredInMemoryOnly: true))
