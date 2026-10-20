@@ -4,7 +4,7 @@ import {
     type WorkflowStep,
 } from "cloudflare:workers";
 import { z } from "zod";
-import { partialJSONString, streamedInterview, streamedStructured, structured } from "./ai";
+import { partialJSONString, partialJSONStrings, streamedInterview, streamedStructured, structured } from "./ai";
 import { interventionFor } from "./companion-contract";
 import {
     exampleSchema,
@@ -26,7 +26,7 @@ import { interviewSchemaFor } from "./interview";
 import { groundReflection } from "./learning";
 import { selectConcept } from "./library";
 import type { Env } from "./platform";
-import { plainQuestion } from "./prompts/formatting";
+import { normalizeQuestionMarkup, plainQuestion } from "./prompts/formatting";
 import { guidanceMode } from "./prompts/teaching";
 import { activeChallenge, COUNTED, detail, dispatch, type Job } from "./store";
 import { concepts } from "./taxonomy";
@@ -109,17 +109,21 @@ export async function runJob(env: Env, id: string) {
       generationContext,
       generationOutputSchema,
       // The preview shows the question as it is written; the row is keyed by job like interview text.
-      raw => {
+      (raw, textDone) => {
         const title = partialJSONString(raw, "title");
         if (!title) return null;
+        // The preview reads exactly as the ticket will, constraints included, so nothing new lands at the end.
+        const prompt = normalizeQuestionMarkup(withConstraints(partialJSONString(raw, "prompt"), partialJSONStrings(raw, "constraints")));
         return env.DB.prepare("INSERT INTO interview_streams(job_id,text) SELECT ?,? WHERE EXISTS(SELECT 1 FROM jobs WHERE id=? AND status='running') ON CONFLICT(job_id) DO UPDATE SET text=excluded.text")
-          .bind(id, JSON.stringify({ title, prompt: partialJSONString(raw, "prompt") }), id).run();
+          .bind(id, JSON.stringify({ title, prompt, ...(textDone ? { textDone: true } : {}) }), id).run();
       },
     );
     const generated = data as import("zod").z.infer<
       typeof questionGenerationSchema
     >;
     if (!restored) {
+      generated.prompt = normalizeQuestionMarkup(generated.prompt);
+      generated.constraints = generated.constraints.map(normalizeQuestionMarkup);
       if(generated.primaryConceptId!==selection.primaryConceptId)throw new Error("question_concept_mismatch");
 
     }
@@ -139,11 +143,7 @@ export async function runJob(env: Env, id: string) {
       selectionReason: restored ? "A question you added back to your pool." : selection.reason,
       selectionSnapshot: { ...selection, requestedLevel: input.settings.engineeringLevel, learningPlanVersion: input.settings.learningPlan?.version, instruction: input.instruction??"", recent: recent.results.slice(0,10).map(r=>{const q=JSON.parse(r.data as string);return {title:q.title,primaryConceptId:q.primaryConceptId,scenario:q.scenario};}) },
       evaluationCriteria: [generated.prompt, ...generated.constraints],
-      prompt: !restored && generated.constraints.length
-        ? generated.prompt +
-          "\n\nConstraints\n" +
-          generated.constraints.map((value) => "• " + value).join("\n")
-        : generated.prompt,
+      prompt: restored ? generated.prompt : withConstraints(generated.prompt, generated.constraints),
     };
     if(!restored && await env.DB.prepare("SELECT id FROM questions WHERE account_id=? AND json_extract(data,'$.prompt')=? LIMIT 1").bind(job.account_id,(data as {prompt:string}).prompt).first())throw new Error("duplicate_question");
     const lifecycle =
@@ -378,4 +378,10 @@ export async function reconcile(env: Env) {
   )
     .bind(new Date(Date.now() - 120000).toISOString())
     .run();
+}
+
+/** The ticket's text: the prompt, then its constraints as a bulleted list. */
+export function withConstraints(prompt: string, constraints: string[]): string {
+  if (!constraints.length) return prompt;
+  return prompt + "\n\nConstraints\n" + constraints.map(value => "• " + value).join("\n");
 }

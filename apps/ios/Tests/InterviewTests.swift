@@ -104,13 +104,27 @@ struct InterviewTests {
     #expect(VoiceTranscript.rows(fragments).count == 3)
   }
 
-  @Test func voiceAllowanceReadsInLocalTimeAndStaysQuietWhenUnlimited() throws {
-    let decoded = try JSONDecoder().decode(VoiceCapability.self, from: Data(#"{"available":true,"checkedAt":"2026-09-12T10:00:00.000Z","remaining":5,"limit":6,"resetsAt":"2026-09-13T00:00:00.000Z"}"#.utf8))
+  @Test func voiceAllowanceSpeaksForFreeAndStaysQuietOnPro() throws {
+    let intro = try JSONDecoder().decode(VoiceCapability.self, from: Data(#"{"available":true,"plan":"free","checkedAt":"2026-09-12T10:00:00.000Z","sessionSeconds":180,"remaining":3,"limit":3,"kind":"intro"}"#.utf8))
     let locale = Locale(identifier: "en_US")
-    #expect(decoded.allowanceLine(timeZone: TimeZone(identifier: "Europe/Oslo")!, locale: locale) == "5 of 6 left today · resets 2:00\u{202F}AM")
-    var spent = decoded; spent.remaining = 0
-    #expect(spent.allowanceLine(timeZone: TimeZone(identifier: "America/New_York")!, locale: locale) == "None left today · resets 8:00\u{202F}PM")
-    #expect(VoiceCapability(available: true, checkedAt: "2026-09-12T10:00:00.000Z").allowanceLine() == nil)
+    #expect(intro.allowanceLine(locale: locale) == "3 free voice sessions to start.")
+    var two = intro; two.remaining = 2
+    #expect(two.allowanceLine(locale: locale) == "2 of 3 free voice sessions left.")
+    var last = intro; last.remaining = 1
+    #expect(last.allowanceLine(locale: locale) == "Last free voice session. After this, one a week.")
+    let taste = VoiceCapability(available: true, plan: "free", checkedAt: "2026-09-12T10:00:00.000Z", sessionSeconds: 180, remaining: 1, limit: 1, kind: "taste")
+    #expect(taste.allowanceLine(locale: locale) == "Your free voice session this week is ready.")
+    let now = Date.fromAPI("2026-09-12T10:00:00.000Z")!
+    var waiting = taste; waiting.available = false; waiting.remaining = 0; waiting.resetsAt = "2026-09-17T09:00:00.000Z"
+    #expect(waiting.allowanceLine(timeZone: TimeZone(identifier: "Europe/Oslo")!, locale: locale, now: now) == "Your free voice session comes back Thursday. Pro has it any time.")
+    waiting.resetsAt = "2026-09-12T23:30:00.000Z"
+    #expect(waiting.allowanceLine(timeZone: TimeZone(identifier: "Europe/Oslo")!, locale: locale, now: now) == "Your free voice session comes back tomorrow. Pro has it any time.")
+    #expect(waiting.allowanceLine(timeZone: TimeZone(identifier: "America/New_York")!, locale: locale, now: now) == "Your free voice session comes back later today. Pro has it any time.")
+    // Pro carries no counters, so nothing is said.
+    #expect(VoiceCapability(available: true, plan: "pro", checkedAt: "2026-09-12T10:00:00.000Z", sessionSeconds: 1200).allowanceLine() == nil)
+    // Older servers without the plan fields still decode.
+    let legacy = try JSONDecoder().decode(VoiceCapability.self, from: Data(#"{"available":true,"checkedAt":"2026-09-12T10:00:00.000Z"}"#.utf8))
+    #expect(legacy.sessionSeconds == nil && legacy.allowanceLine() == nil)
   }
 
   @Test func voiceFragmentsPreserveSpacesOverlapAndStableRows() {
@@ -233,6 +247,18 @@ struct InterviewTests {
 }
 
 #if !canImport(DrillbitCore)
+struct PlanCopyTests {
+  @MainActor @Test func freeRepLineNamesTheLocalResetTime() {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(identifier: "Europe/Oslo")!
+    // UTC midnight is 01:00 or 02:00 in Oslo, so the next reset always reads as tomorrow there.
+    let reset = Date.fromAPI(AppModel.fixtureReset)!
+    let line = AppModel.freeRepLine(reset, calendar: calendar, locale: Locale(identifier: "en_US"))
+    // Near local midnight the next UTC reset can still fall on today's date.
+    #expect(line.hasPrefix("That’s today’s free reps. More land tomorrow at ") || line.hasPrefix("That’s today’s free reps. More land later today, at "), Comment(rawValue: line))
+    #expect(line.hasSuffix("AM."), Comment(rawValue: line))
+  }
+}
 @MainActor struct InterviewSubmissionTests {
   @Test func vanishedClerkSessionReadsAsSignedOutNotAnError() async throws {
     let gone = try JSONDecoder().decode(ClerkAPIError.self, from: Data(#"{"code":"resource_not_found","message":"No session with id sess_1 found"}"#.utf8))
@@ -289,8 +315,8 @@ struct InterviewTests {
     let monday = try #require(Calendar.current.date(byAdding: .day, value: 5, to: .now))
     model.bootstrap?.practice = PracticeAccess(freeReps: true, available: false, nextFreeRepAt: monday.ISO8601Format())
     #expect(model.nextFreeRep != nil)
-    #expect(AppModel.freeRepLine(monday) == "Your free rep comes back \(monday.formatted(.dateTime.weekday(.wide))).")
-    #expect(AppModel.freeRepLine(.now) == "Your free rep comes back later today.")
+    #expect(AppModel.freeRepLine(monday) == "That’s today’s free reps. More land \(monday.formatted(.dateTime.weekday(.wide))).")
+    #expect(AppModel.freeRepLine(.now).hasPrefix("That’s today’s free reps. More land later today, at "))
   }
 
   @Test func setupCountdownIsArithmeticFromTheChosenDate() throws {
@@ -564,8 +590,10 @@ struct QuestionMarkupTests {
     #expect(open.runs.contains { $0.inlinePresentationIntent == .stronglyEmphasized })
     #expect(QuestionMarkup.blocks("Payload:<pre>{\n  \"id\"") .last == .code("{\n  \"id\""))
   }
-  @Test func leavesUnknownTagsLiteralAndStripsWhenFormattingIsOff() {
-    #expect(QuestionMarkup.plain("if a < b and <script>") == "if a < b and <script>")
+  @Test func dropsUnknownTagsKeepsBareAnglesAndStripsWhenFormattingIsOff() {
+    // A tag the app doesn't know is skipped, its text kept; a bare "<" with a space after it is just text.
+    #expect(QuestionMarkup.plain("if a < b and <script>") == "if a < b and ")
+    #expect(QuestionMarkup.plain("Key facts:\n<practice>{\"productId\":\"204\"}</practice>") == "Key facts:\n{\"productId\":\"204\"}")
     let plain = QuestionMarkup.blocks("Use <b>one</b> key", formatted: false)
     #expect(plain == [.text(AttributedString("Use one key"))])
   }

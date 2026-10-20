@@ -1,3 +1,4 @@
+import AVFAudio
 import ClerkKit
 import Network
 import OSLog
@@ -29,12 +30,36 @@ import WidgetKit
   var presented: Challenge?
   /// The challenge whose preview chose talking; its interview opens straight into voice.
   var talkOnOpen: String?
-  /// Interviews open out loud. Fixture runs open in text unless `--fixture-talk`, so the text-room tests stay deterministic.
+  /// ICE gathered while the question is still being written, so Start skips most of “Connecting”. Never a billed session.
+  var voiceWarmup: (link: NativeVoiceTransport, offer: Task<String, Error>, date: Date)?
+  /// How setup said they want to practise: `voice`, `text` or `mix`. Device-local; Settings can change it.
+  var practiceMode: String {
+    get { UserDefaults.standard.string(forKey: "practiceMode") ?? "voice" }
+    set { UserDefaults.standard.set(newValue, forKey: "practiceMode") }
+  }
+  /// Interviews open out loud unless they asked to type. Fixture runs open in text unless `--fixture-talk`, so the text-room tests stay deterministic.
+  func warmVoice() async {
+    guard !fixture, voiceFirst, voiceWarmup == nil, AVAudioApplication.shared.recordPermission == .granted else { return }
+    let account = bootstrap?.account.id
+    if bootstrap?.capabilities?.voice?.isFresh() != true, let refreshed: Bootstrap = try? await api.send("bootstrap") {
+      guard account == bootstrap?.account.id else { return }
+      bootstrap?.capabilities = refreshed.capabilities
+    }
+    guard bootstrap?.capabilities?.voice?.available == true, voiceWarmup == nil else { return }
+    let link = NativeVoiceTransport()
+    voiceWarmup = (link, Task { try await link.offer() }, Date())
+  }
+  func takeVoiceWarmup() -> (link: NativeVoiceTransport, offer: Task<String, Error>, date: Date)? {
+    defer { voiceWarmup = nil }
+    guard let warm = voiceWarmup else { return nil }
+    if Date().timeIntervalSince(warm.date) > 60 { warm.offer.cancel(); warm.link.close(); return nil }
+    return warm
+  }
   var voiceFirst: Bool {
     #if DEBUG
     if fixture { return ProcessInfo.processInfo.arguments.contains("--fixture-talk") }
     #endif
-    return true
+    return practiceMode != "text"
   }
   var firstUse = FirstUseProgress()
 
@@ -59,7 +84,10 @@ import WidgetKit
     progress.recallIntroduced = true
     try? await setFirstUse(progress)
   }
-  /// Every action that starts a rep asks here first; Superwall's `practice_rep` placement will sit behind it.
+  /// Shown once when a receipt belongs to another account.
+  var entitlementNotice: String?
+  var isPro: Bool { bootstrap?.account.plan == "pro" || bootstrap?.practice?.freeReps == false }
+  /// Every action that starts a rep asks here first; the `practice_rep` placement sits behind a refusal.
   func mayStartRep(swapping current: Challenge? = nil) -> Bool {
     guard let practice = bootstrap?.practice, practice.freeReps else { return true }
     if let current, current.freeRepAt != nil, current.swapped != true { return true }
@@ -70,11 +98,19 @@ import WidgetKit
     guard let practice = bootstrap?.practice, practice.freeReps, !practice.available else { return nil }
     return practice.nextFreeRepAt.flatMap(Date.fromAPI)
   }
-  static func freeRepLine(_ date: Date, calendar: Calendar = .current) -> String {
-    if calendar.isDateInToday(date) { return "Your free rep comes back later today." }
-    if calendar.isDateInTomorrow(date) { return "Your free rep comes back tomorrow." }
-    return "Your free rep comes back \(date.formatted(.dateTime.weekday(.wide)))."
+  /// "That’s today’s free reps. More land at 2:00 AM." The reset is UTC midnight, shown in local time.
+  static func freeRepLine(_ date: Date, calendar: Calendar = .current, locale: Locale = .current) -> String {
+    var style = Date.FormatStyle(date: .omitted, time: .shortened, locale: locale)
+    style.timeZone = calendar.timeZone
+    let when = calendar.isDateInToday(date) ? "later today, at \(date.formatted(style))" : calendar.isDateInTomorrow(date) ? "tomorrow at \(date.formatted(style))" : date.formatted(.dateTime.weekday(.wide).locale(locale))
+    return "That’s today’s free reps. More land \(when)."
   }
+  /// "2 of 3 free reps left today", or nil on Pro.
+  var repsLeftLine: String? {
+    guard let practice = bootstrap?.practice, practice.freeReps, let remaining = practice.remaining, let limit = practice.limit, remaining > 0 else { return nil }
+    return "\(remaining) of \(limit) free reps left today"
+  }
+  static var fixtureReset: String { var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(identifier: "UTC")!; return c.startOfDay(for: Date().addingTimeInterval(86_400)).ISO8601Format() }
   var error: String?
   var completionNoticeAccount: String?
   var busy = false
@@ -383,6 +419,9 @@ import WidgetKit
         try? await Task.sleep(for: .seconds(8))
       }
       if ProcessInfo.processInfo.arguments.contains("--fixture-signed-out") {
+        // A signed-out launch is a first run for the tests: forget any earlier draft or stage.
+        UserDefaults.standard.removeObject(forKey: SetupView.draftKey)
+        UserDefaults.standard.removeObject(forKey: "firstRun.stage")
         launching = false
         return
       }
@@ -466,6 +505,7 @@ import WidgetKit
       await restoreHomeCache(account: result.account.id)
       guard Clerk.shared.user?.id == subject else { return }
       bootstrap = result
+      PlanCoordinator.shared.identify(account: result.account.id)
       let queuedSkips = try await disk.pendingSkips(account: result.account.id)
       if let id = result.challenge?.id, locallySkipped[result.account.id]?.contains(id) == true || queuedSkips.contains(id) { bootstrap?.challenge = nil }
       if let pendingSettings { settings = pendingSettings.value }
@@ -629,6 +669,7 @@ import WidgetKit
     memoryRequestVersion += 1; cacheGeneration += 1; libraryVersion += 1
     settings = PracticeSettings()
     firstUse = FirstUseProgress()
+    UserDefaults.standard.removeObject(forKey: SetupView.draftKey)
     bootstrap?.settings = settings
     bootstrap?.challenge = nil; bootstrap?.todayPlan = nil
     bootstrap?.jobs = []
@@ -647,6 +688,38 @@ import WidgetKit
       }
     }
   }
+  /// The nuclear option: server practice wiped, local store cleared, walkthrough and coach tips forgotten, signed out.
+  func resetDeveloperEverything(reinvite: Bool) async throws {
+    try await resetDeveloperPractice()
+    if reinvite, !fixture { let _: EmptyResponse = try await api.send("developer/reinvite", method: "POST") }
+    Self.forgetDeviceOnboarding()
+    try await signOut(discard: true)
+  }
+  /// Device-side first-run memory: walkthrough, coach tips, practice mode, dismissed notices.
+  static func forgetDeviceOnboarding() {
+    let defaults = UserDefaults.standard
+    defaults.removeObject(forKey: "walkthroughVersion")
+    defaults.removeObject(forKey: "practiceMode")
+    defaults.removeObject(forKey: "firstRun.stage")
+    defaults.removeObject(forKey: SetupView.draftKey)
+    for mark in CoachMark.allCases { defaults.removeObject(forKey: mark.storageKey) }
+    defaults.removeObject(forKey: CoachMark.homeReadyKey)
+  }
+  /// Developer preview of the free plan without touching the server; a refresh puts the real plan back.
+  func previewPlan(_ preview: PlanPreview) {
+    switch preview {
+    case .live: Task { await refresh() }
+    case .freeReps:
+      bootstrap?.account.plan = "free"
+      bootstrap?.practice = PracticeAccess(plan: "free", freeReps: true, available: true, remaining: 2, limit: 3, resetsAt: Self.fixtureReset)
+      bootstrap?.capabilities?.voice = VoiceCapability(available: true, plan: "free", checkedAt: Date().ISO8601Format(), sessionSeconds: 180, remaining: 3, limit: 3, kind: "intro")
+    case .freeSpent:
+      bootstrap?.account.plan = "free"
+      bootstrap?.practice = PracticeAccess(plan: "free", freeReps: true, available: false, nextFreeRepAt: Self.fixtureReset, remaining: 0, limit: 3, resetsAt: Self.fixtureReset)
+      bootstrap?.capabilities?.voice = VoiceCapability(available: false, plan: "free", reason: "Your next free voice session comes back Thursday. Pro has it any time.", checkedAt: Date().ISO8601Format(), sessionSeconds: 180, remaining: 0, limit: 1, resetsAt: Date().addingTimeInterval(4 * 86_400).ISO8601Format(), kind: "taste")
+    }
+  }
+  enum PlanPreview: String, CaseIterable, Identifiable { case live, freeReps, freeSpent; var id: String { rawValue } }
   private var checkingDailyQuestion = false
   private var automaticPreparationAccounts: Set<String> = []
   func ensureHomeQuestion() async {
@@ -684,20 +757,32 @@ import WidgetKit
         busy = true
         // Stays "preparing" until the refresh below has placed the question; otherwise the ticket blanks for one round trip.
         defer { busy = false; preparingDraft = nil }
+        var streamed = false, delivered: Challenge?
         try? await api.questionStream(job: job.id) { snapshot in
           guard self.bootstrap?.account.id == account.id else { return }
-          self.preparingDraft = QuestionDraft(title: snapshot.title, prompt: snapshot.prompt)
+          self.preparingDraft = QuestionDraft(title: snapshot.title, prompt: snapshot.prompt, textDone: snapshot.textDone == true)
+          streamed = snapshot.status == "completed"
+          delivered = snapshot.challenge
         }
-        try await waitForJob(job.id)
+        // The stream's last frame already said the job is done; polling again only adds the pause the ticket shows as a freeze.
+        if !streamed { try await waitForJob(job.id) }
         guard bootstrap?.account.id == account.id else { return }
-        await refresh()
+        // The stream's last frame brought the question; a fetch is only the fallback.
+        let fresh: Challenge
+        if let delivered { fresh = delivered } else { fresh = try await api.send("challenges/" + (job.challengeId ?? job.id)) }
         guard bootstrap?.account.id == account.id else { return }
-        if bootstrap?.challenge == nil, let fresh: Challenge = try? await api.send("challenges/" + (job.challengeId ?? job.id)) {
-          bootstrap?.challenge = fresh
+        bootstrap?.challenge = fresh
+        bootstrap?.jobs.removeAll { $0.id == job.id }
+        if let bootstrap { try? await disk.cache(key: "bootstrap:" + account.id, data: JSONEncoder().encode(bootstrap)) }
+        Task {
+          guard bootstrap?.account.id == account.id else { return }
+          await refresh()
+          guard bootstrap?.account.id == account.id, let bootstrap else { return }
+          try? await disk.cache(key: "bootstrap:" + account.id, data: JSONEncoder().encode(bootstrap))
         }
-      } else {
-        await refresh()
+        return
       }
+      await refresh()
       guard bootstrap?.account.id == account.id else { return }
       if let bootstrap { try await disk.cache(key: "bootstrap:" + account.id, data: JSONEncoder().encode(bootstrap)) }
     } catch {
@@ -778,13 +863,33 @@ import WidgetKit
         prompt: "Design a reliable job queue. Explain retries, ordering, and how failures are handled.",
         topic: preparation?.focus ?? settings.focus, session: SessionDraft(answer: "", revision: 0))
       do {
-        // Arrives word by word at roughly a model's pace so the preview streams like it does live.
         var written = draft
-        for (field, text) in [(\QuestionDraft.title, challenge.title), (\QuestionDraft.prompt, challenge.prompt)] {
-          for word in text.split(separator: " ", omittingEmptySubsequences: false) {
-            written[keyPath: field] += (written[keyPath: field].isEmpty ? "" : " ") + word
+        #if DEBUG
+        let bursty = ProcessInfo.processInfo.arguments.contains("--fixture-bursty-stream")
+        #else
+        let bursty = false
+        #endif
+        if bursty {
+          // The live shape: the provider hands over big chunks with quiet gaps, the text ends before the job does.
+          let full = challenge.title + "\u{1}" + challenge.prompt
+          var sent = 0
+          for (index, chunk) in [37, 92, 140, 61, 210, 180].enumerated() where sent < full.count {
+            try await Task.sleep(for: .milliseconds([600, 350, 1200, 300, 900, 450][index]))
+            sent = min(full.count, sent + chunk)
+            let parts = String(full.prefix(sent)).split(separator: "\u{1}", maxSplits: 1, omittingEmptySubsequences: false)
+            written.title = String(parts[0]); written.prompt = parts.count > 1 ? String(parts[1]) : ""
             publish(written)
-            try await Task.sleep(for: .milliseconds(45))
+          }
+          written.textDone = true; publish(written)
+          try await Task.sleep(for: .milliseconds(500))
+        } else {
+          // Arrives word by word at roughly a model's pace so the preview streams like it does live.
+          for (field, text) in [(\QuestionDraft.title, challenge.title), (\QuestionDraft.prompt, challenge.prompt)] {
+            for word in text.split(separator: " ", omittingEmptySubsequences: false) {
+              written[keyPath: field] += (written[keyPath: field].isEmpty ? "" : " ") + word
+              publish(written)
+              try await Task.sleep(for: .milliseconds(45))
+            }
           }
         }
         guard bootstrap?.account.id == account else { throw CancellationError() }
@@ -805,6 +910,7 @@ import WidgetKit
       throw failure
     }
     let challenge: Challenge
+    var streamed = false, delivered: Challenge?
     if let existing = result.challenge { challenge = existing }
     else if let id = result.id {
       do {
@@ -814,12 +920,15 @@ import WidgetKit
           var written = draft
           written.title = snapshot.title
           written.prompt = snapshot.prompt
+          written.textDone = snapshot.textDone == true
           publish(written)
+          streamed = snapshot.status == "completed"
+          delivered = snapshot.challenge
         }
       }
-      try await waitForJob(id)
+      if !streamed { try await waitForJob(id) }
       guard bootstrap?.account.id == account else { throw CancellationError() }
-      challenge = try await api.send("challenges/" + id)
+      if let delivered { challenge = delivered } else { challenge = try await api.send("challenges/" + id) }
     } else { throw APIError(code: "missing_question", message: "The question is not available yet. Check Home shortly.", status: 0) }
     guard bootstrap?.account.id == account else { throw CancellationError() }
     bootstrap?.challenge = challenge
@@ -1061,6 +1170,7 @@ import WidgetKit
       var done = FirstUseProgress()
       if !challenge.isWarmUp { done.firstRepID = challenge.id }
       try? await setFirstUse(done)
+      UserDefaults.standard.set(true, forKey: CoachMark.homeReadyKey)
     }
     await completeOnboarding()
     return completed
@@ -1078,7 +1188,10 @@ import WidgetKit
       if !fixture { try await disk.queueSkip(account: account, id: id, answer: answer) }
       guard bootstrap?.account.id == account else { return }
       // Skipping the first rep still ends onboarding; Home takes over.
-      if firstUse.stage == .firstRep { try? await setFirstUse(FirstUseProgress()) }
+      if firstUse.stage == .firstRep {
+        try? await setFirstUse(FirstUseProgress())
+        UserDefaults.standard.set(true, forKey: CoachMark.homeReadyKey)
+      }
       await completeOnboarding()
       locallySkipped[account, default: []].insert(id)
       if bootstrap?.challenge?.id == id { bootstrap?.challenge = nil }
@@ -1218,6 +1331,7 @@ import WidgetKit
       try SharedStore.setSecret(nil, key: key)
     }
     try SharedStore.save(WidgetSnapshot(challenge: nil, updatedAt: ""))
+    PlanCoordinator.shared.identify(account: nil)
     WidgetCenter.shared.reloadAllTimelines()
     UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
     libraryWarmTask?.cancel(); libraryWarmTask = nil; libraryWarmAccount = nil
@@ -1238,7 +1352,13 @@ import WidgetKit
     #if DEBUG
     // Device-level choices from an earlier test run must not leak into this one.
     for mark in CoachMark.allCases { UserDefaults.standard.removeObject(forKey: mark.storageKey) }
-    if ProcessInfo.processInfo.arguments.contains("--fixture-onboarding") { settings.onboardingComplete = false }
+    UserDefaults.standard.removeObject(forKey: CoachMark.homeReadyKey)
+    if ProcessInfo.processInfo.arguments.contains("--fixture-onboarding") {
+      settings.onboardingComplete = false
+      // A fresh first run: forget any draft or stage left behind by an earlier launch.
+      UserDefaults.standard.removeObject(forKey: SetupView.draftKey)
+      UserDefaults.standard.removeObject(forKey: "firstRun.stage")
+    }
     if ProcessInfo.processInfo.arguments.contains("--fixture-long-focus") { settings.focus = "Distributed backend systems, database performance, cache consistency, and safe cross-team migrations" }
     #endif
     var challenge = Challenge(
@@ -1294,7 +1414,7 @@ import WidgetKit
     #endif
     let tomorrow = Calendar(identifier: .gregorian).startOfDay(for: .now.addingTimeInterval(86_400))
     bootstrap = Bootstrap(
-      capabilities: .init(voice: VoiceCapability(available: true, checkedAt: Date.now.ISO8601Format(), remaining: 5, limit: 6, resetsAt: tomorrow.ISO8601Format()), developerTools: true),
+      capabilities: .init(voice: VoiceCapability(available: true, plan: "free", checkedAt: Date.now.ISO8601Format(), sessionSeconds: 180, remaining: 2, limit: 3, resetsAt: tomorrow.ISO8601Format(), kind: "intro"), developerTools: true),
       account: .init(id: "fixture", status: "active"), settings: settings, challenge: challenge,
       jobs: [], todayPlan: TodayPlan(state: ProcessInfo.processInfo.arguments.contains("--fixture-dashboard") ? "complete_today" : "first_session",
         completedTotal: ProcessInfo.processInfo.arguments.contains("--fixture-dashboard") ? 12 : 0,
@@ -1304,9 +1424,15 @@ import WidgetKit
         nextTicket: ProcessInfo.processInfo.arguments.contains("--fixture-dashboard") ? 13 : 1))
     #if DEBUG
     if ProcessInfo.processInfo.arguments.contains("--fixture-dashboard") { bootstrap?.challenge = nil }
-    if ProcessInfo.processInfo.arguments.contains("--fixture-free-reps") { bootstrap?.practice = PracticeAccess(freeReps: true, available: true) }
+    if ProcessInfo.processInfo.arguments.contains("--fixture-free-reps") {
+      bootstrap?.account.plan = "free"
+      bootstrap?.practice = PracticeAccess(plan: "free", freeReps: true, available: true, remaining: 2, limit: 3, resetsAt: Self.fixtureReset)
+      bootstrap?.capabilities?.voice = VoiceCapability(available: true, plan: "free", checkedAt: Date().ISO8601Format(), sessionSeconds: 180, remaining: 3, limit: 3, kind: "intro")
+    }
     if ProcessInfo.processInfo.arguments.contains("--fixture-gate") {
-      bootstrap?.practice = PracticeAccess(freeReps: true, available: false, nextFreeRepAt: Date().addingTimeInterval(3 * 86_400).ISO8601Format())
+      bootstrap?.account.plan = "free"
+      bootstrap?.practice = PracticeAccess(plan: "free", freeReps: true, available: false, nextFreeRepAt: Self.fixtureReset, remaining: 0, limit: 3, resetsAt: Self.fixtureReset)
+      bootstrap?.capabilities?.voice = VoiceCapability(available: false, plan: "free", reason: "Your next free voice session comes back Thursday. Pro has it any time.", checkedAt: Date().ISO8601Format(), sessionSeconds: 180, remaining: 0, limit: 1, resetsAt: Date().addingTimeInterval(4 * 86_400).ISO8601Format(), kind: "taste")
     }
     #endif
   }

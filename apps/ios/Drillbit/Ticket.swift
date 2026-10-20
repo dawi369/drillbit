@@ -64,6 +64,8 @@ struct Perforation: View {
 
 /// Today's question as an object: a body for the question and a stub below the perforation for what you do with it.
 struct Ticket<Content: View, Stub: View>: View {
+  /// Off while a zoomed sheet owns the ticket; Home fades it back in so the shadow never snaps on after the return.
+  var shadowed = true
   @ViewBuilder var content: () -> Content
   @ViewBuilder var stub: () -> Stub
 
@@ -87,8 +89,8 @@ struct Ticket<Content: View, Stub: View>: View {
         .overlay(alignment: .top) { Perforation() }
     }
     .compositingGroup()
-    .shadow(color: AppPalette.ticketContact, radius: 1, y: 1)
-    .shadow(color: AppPalette.ticketShadow, radius: 14, y: 12)
+    .shadow(color: AppPalette.ticketContact.opacity(shadowed ? 1 : 0), radius: 1, y: 1)
+    .shadow(color: AppPalette.ticketShadow.opacity(shadowed ? 1 : 0), radius: 14, y: 12)
   }
 }
 

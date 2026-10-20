@@ -1,55 +1,53 @@
 import SwiftUI
 
 /// Presentation only: the interview shell owns the connection and pending receipts.
-/// One quiet stage: the question, the interviewer's orb, who's talking and their last line.
+/// One quiet stage: the question, the interviewer's orb and their last line.
 struct InterviewVoiceRoom<Question: View>: View {
   let voice: LiveVoice
   let interview: InterviewController
-  /// "5 of 6 left today · resets 2 AM", when the account has a daily allowance.
+  /// "2 of 3 free voice sessions left.", when the account is on the free plan.
   var allowance: String? = nil
+  /// True while the shell is about to start voice itself; the room reads as connecting until it does.
+  var opening = false
   @ViewBuilder var question: () -> Question
+  /// Ends voice and returns to the written interview.
   var leave: () -> Void
-  @State private var showingTranscript = false
+  /// Ends voice and lands in the editor with the keyboard up.
+  var text: () -> Void
+  /// First-run tip over Start; `Show me` on it performs the keyboard tap.
+  var coach: CoachMark? = nil
+  /// Voice-first: the tip's Show me performs the keyboard tap. Text-first: they came from the keyboard, so it just closes.
+  var coachReturnsToText = true
+  var dismissCoach: (CoachMark) -> Void = { _ in }
   @State private var warned = false
+  /// The mute hint shows for the first muted stretch only; after they've unmuted once it stays quiet.
+  @State private var unmutedOnce = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.dynamicTypeSize) private var typeSize
+  private var phase: LiveVoice.Phase { opening && voice.phase == .idle ? .connecting : voice.phase }
 
   var body: some View {
-    ZStack {
-      if showingTranscript {
-        InterviewConversation(state: interview.displayState, latestOnly: false) { question() }
-          .transition(.opacity)
-      } else {
-        stage.transition(.opacity)
+    stage
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .background(AppPalette.background)
+      .safeAreaInset(edge: .bottom, spacing: 0) { dock }
+      .coachMark(coach, action: coachReturnsToText ? nil : "Got it") { mark in dismissCoach(mark); if mark == .voice, coachReturnsToText { text() } }
+      .navigationTitle("Talk it through")
+      .navigationBarTitleDisplayMode(.inline)
+      .navigationBarBackButtonHidden()
+      .toolbar { ToolbarItem(placement: .principal) { VoiceRoomClock(voice: voice, warned: $warned) } }
+      .sensoryFeedback(.impact(weight: .medium), trigger: voice.phase == .active) { _, live in live }
+      .sensoryFeedback(.warning, trigger: warned) { _, now in now }
+      .onChange(of: voice.phase) { _, phase in
+        switch phase {
+        case .connecting: warned = false
+        case .active: AccessibilityNotification.Announcement("Connected. Unmute when you’re ready to talk.").post()
+        case .ending: AccessibilityNotification.Announcement("Voice ended.").post()
+        default: break
+        }
       }
-    }
-    .animation(reduceMotion ? nil : DrillbitMotion.page, value: showingTranscript)
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .background(AppPalette.background)
-    .safeAreaInset(edge: .bottom, spacing: 0) { dock }
-    .navigationTitle("Talk it through")
-    .navigationBarTitleDisplayMode(.inline)
-    .navigationBarBackButtonHidden()
-    .toolbar {
-      ToolbarItem(placement: .principal) { VoiceRoomClock(voice: voice, warned: $warned) }
-      // The keyboard is always one tap away; it never competes with the voice controls in the dock.
-      ToolbarItem(placement: .topBarTrailing) {
-        Button("Write", systemImage: "keyboard", action: leave)
-          .accessibilityHint(voice.phase == .active ? "Ends voice and returns to writing. The interview stays open." : "Returns to writing")
-          .accessibilityIdentifier("voiceBack")
-      }
-    }
-    .sensoryFeedback(.impact(weight: .medium), trigger: voice.phase == .active) { _, live in live }
-    .sensoryFeedback(.warning, trigger: warned) { _, now in now }
-    .onChange(of: voice.phase) { _, phase in
-      switch phase {
-      case .connecting: warned = false
-      case .active: AccessibilityNotification.Announcement("Connected. Go ahead and talk.").post()
-      case .ending: AccessibilityNotification.Announcement("Voice ended.").post()
-      default: break
-      }
-    }
-    .onChange(of: warned) { _, now in if now { AccessibilityNotification.Announcement("Two minutes left in this voice session.").post() } }
+      .onChange(of: warned) { _, now in if now { AccessibilityNotification.Announcement("Two minutes left in this voice session.").post() } }
+      .onChange(of: voice.muted) { _, muted in if !muted { unmutedOnce = true } }
   }
 
   // MARK: Stage
@@ -63,11 +61,10 @@ struct InterviewVoiceRoom<Question: View>: View {
             .frame(maxWidth: 560, alignment: .leading)
             .padding(.horizontal, 24).padding(.top, 8)
           Spacer(minLength: 32)
-          VStack(spacing: 12) {
+          VStack(spacing: 16) {
             if !typeSize.isAccessibilitySize {
-              VoiceBit(voice: voice).frame(height: 72)
+              VoiceBit(voice: voice, phase: phase).frame(height: 72)
             }
-            VoiceTurnLabel(voice: voice)
             caption
               .frame(maxWidth: 520)
               .padding(.horizontal, 32)
@@ -82,7 +79,7 @@ struct InterviewVoiceRoom<Question: View>: View {
 
   /// The interviewer's latest line, in a fixed four-line box so the stage never jumps while they talk.
   @ViewBuilder private var caption: some View {
-    if let line = latestInterviewerLine, voice.phase != .idle {
+    if let line = latestInterviewerLine, phase == .active || phase == .ending {
       Text(line)
         .font(.title3.weight(.medium))
         .multilineTextAlignment(.center)
@@ -94,16 +91,24 @@ struct InterviewVoiceRoom<Question: View>: View {
         .accessibilityLabel("Interviewer said: \(line)")
         .accessibilityIdentifier("voiceCaption")
     } else {
-      Text(voice.phase == .idle ? "Say it out loud, like the real one.\nThe interviewer talks back." : " ")
+      // Nothing to read until the interviewer says something; the mic carries the state.
+      Text(" ")
         .font(.title3)
-        .multilineTextAlignment(.center)
         .lineLimit(4, reservesSpace: true)
-        .foregroundStyle(AppPalette.secondary)
+        .accessibilityHidden(true)
     }
   }
   private var latestInterviewerLine: String? {
     guard let turn = interview.displayState.turns.last(where: { $0.kind == "voice" }) else { return nil }
     return VoiceTranscript.rows(turn.voice ?? []).last { $0.speaker == "assistant" && !$0.text.isEmpty }?.text
+  }
+
+  private var micState: MicControl.State {
+    switch phase {
+    case .idle: .start
+    case .connecting: .connecting
+    default: voice.muted ? .muted : .live
+    }
   }
 
   // MARK: Dock
@@ -114,64 +119,99 @@ struct InterviewVoiceRoom<Question: View>: View {
         Text(message).font(.footnote).foregroundStyle(AppPalette.secondary)
           .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
       }
-      switch voice.phase {
-      case .idle:
-        Button { Task { await voice.start() } } label: {
-          Label("Start talking", systemImage: AppIcon.microphone.rawValue)
+      switch phase {
+      case .idle, .connecting, .active:
+        // The microphone sits dead centre in every state; the way out hangs off to the right like a phone call's hang-up.
+        MicControl(state: micState) {
+          switch phase {
+          case .idle: Task { await voice.start() }
+          case .active: voice.toggleMute()
+          default: break
+          }
         }
-        .buttonStyle(PracticeButtonStyle())
-        .accessibilityIdentifier("voiceStart")
-        // The cap and today's allowance sit under the button, where the decision is made.
-        Text(["Up to \(Int(LiveVoice.sessionLimit / 60)) min", allowance].compactMap { $0 }.joined(separator: " · "))
-          .font(.footnote).foregroundStyle(AppPalette.secondary)
-          .multilineTextAlignment(.center)
-          .accessibilityIdentifier("voiceAllowance")
-      case .connecting:
-        // The stage already says it's connecting; the dock only offers the way out.
-        Button("Cancel", action: leave)
-          .buttonStyle(PracticeButtonStyle(secondary: true))
-          .accessibilityHint("Stops connecting and returns to writing")
-          .accessibilityIdentifier("voiceCancel")
-      case .active:
-        HStack(alignment: .top, spacing: 0) {
-          RoomControl(title: showingTranscript ? "Live" : "Transcript", symbol: showingTranscript ? AppIcon.voice.rawValue : AppIcon.transcript.rawValue, size: 56,
-            fill: AppPalette.elevated, ink: AppPalette.primary, identifier: "voiceHistory") { showingTranscript.toggle() }
-          RoomControl(title: voice.muted ? "Unmute" : "Mute", symbol: voice.muted ? AppIcon.microphoneMuted.rawValue : AppIcon.microphone.rawValue, size: 72,
-            fill: voice.muted ? AppPalette.elevated : AppPalette.action, ink: voice.muted ? AppPalette.destructive : AppPalette.actionInk,
-            identifier: "voiceMute", spoken: voice.muted ? "Unmute microphone" : "Mute microphone") { voice.toggleMute() }
-            .accessibilityValue(voice.muted ? "Muted" : "Microphone on")
-            .sensoryFeedback(.selection, trigger: voice.muted)
-          RoomControl(title: "End", symbol: AppIcon.end.rawValue, size: 56,
-            fill: AppPalette.destructive.opacity(0.16), ink: AppPalette.destructive, identifier: "voiceEnd", spoken: "End voice", action: leave)
-            .accessibilityHint("Stops talking and returns to writing. The interview stays open.")
+        .frame(maxWidth: .infinity)
+        .overlay(alignment: .trailing) {
+          Group {
+            switch phase {
+            case .idle:
+              RoomControl(title: "Type", symbol: "keyboard", fill: AppPalette.elevated, ink: AppPalette.primary,
+                identifier: "voiceBack", spoken: "Type instead", action: text)
+                .accessibilityHint("Returns to writing")
+                .coachAnchor(.voice)
+            case .connecting:
+              // The first rep has no way out of its own opening; the line either comes up or fails to Try again.
+              if interview.model.firstUse.stage != .firstRep {
+                RoomControl(title: "Cancel", symbol: "xmark", fill: AppPalette.elevated, ink: AppPalette.primary,
+                  identifier: "voiceCancel", action: leave)
+                  .accessibilityHint("Stops connecting and returns to writing")
+              }
+            default:
+              RoomControl(title: "End", symbol: AppIcon.end.rawValue, fill: AppPalette.destructive.opacity(0.16), ink: AppPalette.destructive,
+                identifier: "voiceEnd", spoken: "End voice", action: leave)
+                .accessibilityHint("Stops talking and returns to writing. The interview stays open.")
+                // Live, the tip points at End: that's the keyboard route once talking.
+                .coachAnchor(.voice)
+            }
+          }
+          .frame(width: 88)
+          .padding(.trailing, 16)
         }
-        .frame(maxWidth: 360)
+        // The free allowance sits under the button, where the decision is made.
+        if let allowance {
+          Text(allowance)
+            .font(.footnote).foregroundStyle(AppPalette.secondary)
+            .multilineTextAlignment(.center)
+            .accessibilityIdentifier("voiceAllowance")
+        }
         #if DEBUG
-        if interview.model.fixture, ProcessInfo.processInfo.arguments.contains("--fixture-voice") {
+        if phase == .active, interview.model.fixture, ProcessInfo.processInfo.arguments.contains("--fixture-voice") {
           Button("Simulate speech") { Task { await voice.fixtureSpeech() } }.font(.footnote).accessibilityIdentifier("voiceFixtureSpeech")
         }
         #endif
       case .ending:
         LoadingStatus("Saving the conversation…", centered: true)
       case .unavailable:
-        Button {
-          Task { if voice.blocksText { await voice.retrySync() } else { await voice.start() } }
-        } label: { Label("Try again", systemImage: AppIcon.retry.rawValue) }
-          .buttonStyle(PracticeButtonStyle())
-          .accessibilityIdentifier("voiceRetry")
+        HStack(spacing: 12) {
+          Button {
+            Task { if voice.blocksText { await voice.retrySync() } else { await voice.start() } }
+          } label: { Label("Try again", systemImage: AppIcon.retry.rawValue) }
+            .buttonStyle(PracticeButtonStyle())
+            .accessibilityIdentifier("voiceRetry")
+          KeyboardControl(action: text)
+        }
       }
     }
     .frame(maxWidth: 560)
-    .padding(.horizontal, 24).padding(.top, 12).padding(.bottom, 8)
+    .padding(.horizontal, 24).padding(.top, 16)
     .frame(maxWidth: .infinity)
-    .background(AppPalette.background)
-    .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: voice.phase)
+    .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: phase)
+  }
+}
+
+/// The way back to typing, beside the primary action: a small round key, never competing with it.
+private struct KeyboardControl: View {
+  let action: () -> Void
+  var body: some View {
+    Button(action: action) {
+      Image(systemName: "keyboard")
+        .font(.system(size: 18, weight: .semibold))
+        .foregroundStyle(AppPalette.primary)
+        .frame(width: 48, height: 48)
+        .background(AppPalette.elevated, in: Circle())
+        .overlay { Circle().strokeBorder(AppPalette.hairline, lineWidth: 0.5) }
+        .contentShape(Circle())
+    }
+    .buttonStyle(DrillbitPressStyle())
+    .accessibilityLabel("Type instead")
+    .accessibilityHint("Returns to writing")
+    .accessibilityIdentifier("voiceBack")
   }
 }
 
 /// Bit as the interviewer's presence in the room: talking from measured output, listening while you speak, thinking while a reply is on its way.
 private struct VoiceBit: View {
   let voice: LiveVoice
+  let phase: LiveVoice.Phase
   @State private var gauge = SpeakerGauge()
   var body: some View {
     TimelineView(.periodic(from: .now, by: 0.2)) { context in
@@ -179,62 +219,16 @@ private struct VoiceBit: View {
     }
   }
   private func mood(at date: Date) -> BitMood {
-    switch voice.phase {
+    switch phase {
     case .idle, .ending, .unavailable: return .idle
     case .connecting: return .thinking
     case .active:
-      if voice.muted { return .idle }
       if voice.thinking { return .thinking }
       switch gauge.speaker(input: voice.levels.input, output: voice.levels.output, at: date) {
       case .interviewer: return .talking
       case .you: return .listening
       case nil: return .idle
       }
-    }
-  }
-}
-
-/// Who has the floor, read from measured audio a few times a second. A short hold keeps it from flickering between words.
-private struct VoiceTurnLabel: View {
-  let voice: LiveVoice
-  @State private var gauge = SpeakerGauge()
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  var body: some View {
-    TimelineView(.periodic(from: .now, by: 0.2)) { context in
-      let text = label(at: context.date)
-      let muted = voice.muted && voice.phase == .active
-      HStack(spacing: 8) {
-        // One small dot carries the state's colour; the words carry its meaning.
-        Circle().fill(muted ? AppPalette.destructive : voice.phase == .active ? AppPalette.action : AppPalette.secondary)
-          .frame(width: 6, height: 6)
-          .opacity(voice.phase == .connecting && !reduceMotion ? 0.4 + 0.6 * (0.5 + 0.5 * sin(context.date.timeIntervalSinceReferenceDate * 4)) : 1)
-        Text(text)
-          .font(.subheadline.weight(.medium))
-          .foregroundStyle(muted ? AppPalette.destructive : AppPalette.secondary)
-          .contentTransition(.opacity)
-      }
-      .animation(DrillbitMotion.fast, value: text)
-    }
-    // Speaker changes stay visual; VoiceOver hears only steady states.
-    .accessibilityElement(children: .ignore)
-    .accessibilityLabel(steady)
-    .accessibilityIdentifier("voiceState")
-  }
-  private var steady: String {
-    switch voice.phase {
-    case .idle: "Ready when you are"
-    case .connecting: "Connecting"
-    case .active: voice.muted ? "Mic off. They can’t hear you." : voice.thinking ? "Working through your answer" : "Voice connected"
-    case .ending: "Saving the conversation"
-    case .unavailable: "Voice is off"
-    }
-  }
-  private func label(at date: Date) -> String {
-    guard voice.phase == .active, !voice.muted, !voice.thinking else { return steady }
-    switch gauge.speaker(input: voice.levels.input, output: voice.levels.output, at: date) {
-    case .interviewer: return "Interviewer’s talking"
-    case .you: return "You’re talking"
-    case nil: return "Listening"
     }
   }
 }
@@ -262,7 +256,7 @@ private struct VoiceRoomClock: View {
       if voice.phase == .active, let started = voice.startedAt {
         TimelineView(.periodic(from: started, by: 1)) { context in
           let elapsed = max(0, context.date.timeIntervalSince(started))
-          let left = max(0, LiveVoice.sessionLimit - elapsed)
+          let left = max(0, voice.sessionLimit - elapsed)
           let closing = left <= 120
           Text(closing ? "\(Self.clock(left)) left" : Self.clock(elapsed))
             .font(.caption.monospacedDigit())
@@ -279,32 +273,105 @@ private struct VoiceRoomClock: View {
   }
 }
 
+/// The microphone: one big circle in the middle of the dock. Filled and glowing while they can hear you, quiet while muted.
+private struct MicControl: View {
+  enum State: Equatable { case start, connecting, muted, live }
+  let state: State
+  let action: () -> Void
+  @State private var pulse = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  private let size: CGFloat = 80
+  private var filled: Bool { state == .start || state == .live }
+  private var label: String {
+    switch state {
+    case .start: "Start talking"
+    case .connecting: "Connecting…"
+    case .muted: "Unmute"
+    case .live: "Mute"
+    }
+  }
+  private var symbol: String {
+    switch state {
+    case .muted: AppIcon.microphoneMuted.rawValue
+    default: AppIcon.microphone.rawValue
+    }
+  }
+  var body: some View {
+    Button(action: action) {
+      VStack(spacing: 10) {
+        ZStack {
+          if state == .connecting {
+            // One quiet ring breathing out from the mic while the line comes up.
+            Circle().strokeBorder(AppPalette.action.opacity(0.6), lineWidth: 2)
+              .scaleEffect(pulse ? 1.45 : 1)
+              .opacity(pulse ? 0 : 0.9)
+          }
+          Circle()
+            .fill(filled ? AppPalette.action : AppPalette.elevated)
+            .overlay { Circle().strokeBorder(filled ? AppPalette.action.opacity(0.5) : AppPalette.hairline, lineWidth: 1) }
+            .shadow(color: AppPalette.action.opacity(filled ? 0.35 : 0), radius: 18, y: 4)
+          Image(systemName: symbol)
+            .font(.system(size: 30, weight: .semibold))
+            .foregroundStyle(filled ? AppPalette.actionInk : state == .connecting ? AppPalette.secondary : AppPalette.primary)
+            .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace))
+        }
+        .frame(width: size, height: size)
+        .contentShape(Circle())
+        Text(label).font(.caption).foregroundStyle(AppPalette.secondary)
+          .contentTransition(.identity).transaction { $0.animation = nil }
+      }
+      .frame(maxWidth: .infinity)
+      .contentShape(Rectangle())
+      .animation(reduceMotion ? nil : DrillbitMotion.selection, value: state)
+    }
+    .buttonStyle(DrillbitPressStyle(scale: 0.94))
+    .disabled(state == .connecting)
+    .accessibilityLabel(spoken)
+    .accessibilityValue(state == .muted ? "Muted" : state == .live ? "Microphone on" : "")
+    .accessibilityIdentifier(state == .start ? "voiceStart" : state == .connecting ? "voiceConnecting" : "voiceMute")
+    .sensoryFeedback(.selection, trigger: state == .muted)
+    .task(id: state == .connecting) {
+      pulse = false
+      guard state == .connecting, !reduceMotion else { return }
+      withAnimation(.easeOut(duration: 1.3).repeatForever(autoreverses: false)) { pulse = true }
+    }
+  }
+  private var spoken: String {
+    switch state {
+    case .start: "Start talking"
+    case .connecting: "Connecting to voice"
+    case .muted: "Unmute microphone"
+    case .live: "Mute microphone"
+    }
+  }
+}
+
 /// A round transport control with its name underneath, like the phone app's call buttons.
 private struct RoomControl: View {
   let title: String
   let symbol: String
-  let size: CGFloat
   let fill: Color
   let ink: Color
   let identifier: String
   var spoken: String? = nil
   let action: () -> Void
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  private let size: CGFloat = 56
   var body: some View {
     Button(action: action) {
-      VStack(spacing: 8) {
+      VStack(spacing: 10) {
         Image(systemName: symbol)
-          .font(.system(size: size * 0.36, weight: .semibold))
-          .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace))
+          .font(.system(size: 20, weight: .semibold))
           .foregroundStyle(ink)
           .frame(width: size, height: size)
           .background(fill, in: Circle())
           .contentShape(Circle())
         Text(title).font(.caption).foregroundStyle(AppPalette.secondary)
-          .contentTransition(.identity).transaction { $0.animation = nil }
       }
       .frame(maxWidth: .infinity)
-      .animation(DrillbitMotion.selection, value: symbol)
+      // Centres the smaller circle on the microphone's midline.
+      .padding(.top, 12)
+      // The gap between circle and caption is part of the button, not a hole in it.
+      .contentShape(Rectangle())
     }
     .buttonStyle(DrillbitPressStyle())
     .accessibilityLabel(spoken ?? title)

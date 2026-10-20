@@ -26,6 +26,8 @@ struct QuestionFlow: View {
   @State private var draft: QuestionDraft?
   /// Actions arrive only once the whole question has been written out.
   @State private var revealed = false
+  /// The streamed text has written itself out; the question may still be on its way.
+  @State private var textSettled = false
   @State private var instantReveal = false
   @State private var clock = RevealClock()
   /// While the old question streams out, the new one is written into `held` instead of the page.
@@ -117,11 +119,11 @@ struct QuestionFlow: View {
         ScrollView {
           VStack(alignment: .leading, spacing: 16) {
             StreamingDocument(
-              clock: clock, segments: previewSegments, finished: question != nil || failure != nil,
+              clock: clock, segments: previewSegments, finished: question != nil || failure != nil || draft?.textDone == true,
               paused: (revealed || failure != nil) && !rewinding, instant: instantReveal,
               settled: {
                 if rewinding { rewinding = false; afterRewind?(); afterRewind = nil }
-                else if question != nil { withAnimation(DrillbitMotion.entrance) { revealed = true } }
+                else { textSettled = true; if question != nil { withAnimation(DrillbitMotion.entrance) { revealed = true } } }
               })
             if let failure {
               Text(failure).foregroundStyle(.secondary).transition(.opacity)
@@ -187,6 +189,8 @@ struct QuestionFlow: View {
       if let initial { question = initial; showingPreview = true; instantReveal = true; revealed = true }
       else if firstRep { prepare(nil) }
     }
+    // The question object may land after its text has already settled on the page.
+    .onChange(of: question?.id) { _, id in if id != nil, textSettled, !revealed, !rewinding { withAnimation(DrillbitMotion.entrance) { revealed = true } } }
     .onDisappear { visible = false }
     .onChange(of: scenePhase) { _, phase in if phase == .background { visible = false; dismiss() } }
     .onChange(of: model.bootstrap?.account.id) { _, value in if value != account { dismiss() } }
@@ -198,6 +202,7 @@ struct QuestionFlow: View {
     draft = nil
     failure = nil
     revealed = false
+    textSettled = false
     instantReveal = false
     // Waits out the sheet's own arrival before the first letter appears.
     clock.reset(after: 0.35)
@@ -222,9 +227,11 @@ struct QuestionFlow: View {
       question = heldQuestion
       holding = false
       instantReveal = false
+      textSettled = false
       clock.reset(after: 0.12)
     }
     generate(nil)
+    Task { await model.warmVoice() }
   }
   private func generate(_ input: PreparationInput?) {
     let capturedAccount = model.bootstrap?.account.id

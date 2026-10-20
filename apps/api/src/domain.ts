@@ -78,13 +78,14 @@ export const questionSpecificationSchema = challengeSchema.extend({
   evaluationCriteria: z.array(z.string().min(1).max(3000)).min(1).max(6),
   ambiguityPolicy: z.string().min(1).max(300),
 });
-export const questionGenerationSchema = questionSpecificationSchema.omit({
-  evaluationCriteria: true,
-}).extend({scenario:questionMetadata.shape.scenario,primaryConceptId:conceptId,tagEvidence:questionMetadata.shape.tagEvidence}).superRefine((value,ctx)=> {
+export const refineQuestionGeneration = (value: { tagEvidence: { conceptId: string; requirementIndex: number }[]; primaryConceptId: string; constraints: string[] }, ctx: z.RefinementCtx) => {
  const ids=value.tagEvidence.map(e=>e.conceptId);
  if(new Set(ids).size!==ids.length||!ids.includes(value.primaryConceptId))ctx.addIssue({code:"custom",message:"Include the primary concept exactly once and at most two distinct secondary concepts"});
  if(value.tagEvidence.some(e=>e.requirementIndex>value.constraints.length))ctx.addIssue({code:"custom",message:"Tag reference does not exist"});
-});
+};
+export const questionGenerationSchema = questionSpecificationSchema.omit({
+  evaluationCriteria: true,
+}).extend({scenario:questionMetadata.shape.scenario,primaryConceptId:conceptId,tagEvidence:questionMetadata.shape.tagEvidence}).superRefine(refineQuestionGeneration);
 export const recallPromptSchema = z.object({
   prompt: z.string().min(1).max(160),
   answer: z.string().min(1).max(320),

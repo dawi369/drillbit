@@ -271,26 +271,31 @@ export async function streamedStructured<T>(
   kind: string,
   context: unknown,
   schema: z.ZodType<T>,
-  publish: (raw: string) => Promise<unknown> | null,
+  publish: (raw: string, textDone?: boolean) => Promise<unknown> | null,
 ): Promise<T> {
   const response = await provider(env, account, settings, messagesFor(kind, context), { kind, schema, stream: true });
   if (!response.body) throw new Error("missing_stream");
   let raw = "", published = "", publishing: Promise<unknown> | undefined;
+  // One write in flight at a time, and whatever arrived meanwhile goes out as soon as it lands:
+  // a provider that streams in big chunks must never leave the preview a chunk behind until the next one.
+  const flush = () => {
+    if (publishing || published === raw) return;
+    const write = publish(raw);
+    if (!write) return;
+    published = raw;
+    publishing = Promise.all([write, new Promise(r => setTimeout(r, 120))])
+      .catch(() => {})
+      .finally(() => { publishing = undefined; flush(); });
+  };
   for await (const delta of textDeltas(response.body, usage => recordUsage(env, account, settings, kind, usage))) {
     raw += delta;
     if (raw.length > 50000) throw new Error("oversized_stream");
     if (runaway(raw)) break;
-    if (!publishing) {
-      const write = publish(raw);
-      if (!write) continue;
-      published = raw;
-      publishing = Promise.all([write, new Promise(r => setTimeout(r, 120))])
-        .catch(() => {})
-        .finally(() => { publishing = undefined; });
-    }
+    flush();
   }
-  await publishing;
-  if (published !== raw) await publish(raw)?.catch(() => {});
+  while (publishing) await publishing;
+  // The model has stopped writing: the preview can settle now, while the job finishes its bookkeeping.
+  await publish(raw, true)?.catch(() => {});
   try {
     return schema.parse(parseModelJSON(raw));
   } catch {
@@ -409,6 +414,32 @@ export function partialJSONString(raw: string, key: string): string {
     end = i + 1;
   }
   try { const text: string = JSON.parse('"' + raw.slice(start, end) + '"'); return /[\uD800-\uDBFF]$/.test(text) ? text.slice(0, -1) : text; } catch { return ""; }
+}
+/** The strings of a JSON array as far as `raw` has been written, the last one possibly cut short. */
+export function partialJSONStrings(raw: string, key: string): string[] {
+  const match = new RegExp(`"${key}"\\s*:\\s*\\[`).exec(raw);
+  if (!match) return [];
+  const items: string[] = [];
+  let i = match.index + match[0].length;
+  while (i < raw.length) {
+    while (i < raw.length && /[\s,]/.test(raw[i])) i++;
+    if (i >= raw.length || raw[i] !== '"') break;
+    const start = i + 1;
+    let end = start, closed = false;
+    for (let j = start; j < raw.length; j++) {
+      if (raw[j] === '"') { end = j; closed = true; break; }
+      if (raw[j] === "\\") {
+        const count = raw[j + 1] === "u" ? 6 : 2;
+        if (j + count > raw.length) { end = j; break; }
+        j += count - 1;
+      }
+      end = j + 1;
+    }
+    try { items.push(JSON.parse('"' + raw.slice(start, end) + '"')); } catch { break; }
+    if (!closed) break;
+    i = end + 1;
+  }
+  return items.filter(Boolean);
 }
 /** Strict-schema output whose object a provider left unclosed; the schema still decides what is accepted. */
 export function parseModelJSON(raw: string): unknown {

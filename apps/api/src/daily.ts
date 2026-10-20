@@ -25,7 +25,7 @@ export async function dailyQuestion(env: Env, account: string, now = new Date(),
  const pending = await env.DB.prepare("SELECT * FROM jobs WHERE account_id=? AND kind='generate' AND status IN ('pending','running') LIMIT 1").bind(account).first();
  if (pending) return {day,job:pending};
  // Free reps are spent on purpose, never on a question nobody opens.
- if (!claimed || onFreeReps(env,account)) return {day};
+ if (!claimed || await onFreeReps(env,account)) return {day};
  // A failed check/generation consumes today's automatic opportunity; Retry is explicit.
  await consumeUsage(env,account,'generate',10);
  const followUp = queued ? await followUpContext(env,account,queued.source_challenge_id).catch(() => undefined) : undefined;

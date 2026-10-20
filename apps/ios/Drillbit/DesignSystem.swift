@@ -554,7 +554,9 @@ extension View {
   }
   /// `report` fires once, when the page is fully written or fully streamed out.
   func tick(_ now: Date, target: Double, instant: Bool, finished: Bool, report: () -> Void) -> Double {
-    let elapsed = last.map { min(max(now.timeIntervalSince($0), 0), 1.0 / 20) } ?? 0
+    // Real time between frames, capped only against a long suspension: a dropped frame or a busy main thread must
+    // not slow the writing down and then force it to sprint.
+    let elapsed = last.map { min(max(now.timeIntervalSince($0), 0), 0.5) } ?? 0
     last = now
     if let rewindRate {
       cursor = instant ? 0 : max(0, cursor - rewindRate * elapsed)
@@ -563,8 +565,11 @@ extension View {
     }
     if instant { cursor = target }
     else if now >= start, cursor < target {
-      // A steady hand that speeds up with the backlog, so a burst never trails by much more than a second.
-      cursor = min(target, cursor + max(48, (target - cursor) / 0.9) * elapsed)
+      // A steady hand while the stream is open: the pace rises with the backlog but stays within what reads as typing.
+      // Once the text is finished, whatever is left is written out within half a second rather than left to crawl.
+      let backlog = target - cursor
+      let rate = finished ? max(110, backlog / 0.5) : min(max(40, backlog / 1.8), 110)
+      cursor = min(target, cursor + rate * elapsed)
     }
     if finished, cursor >= target, !reported { reported = true; report() }
     return cursor
@@ -577,14 +582,24 @@ struct RevealRenderer: TextRenderer {
   var caret: Double
   var caretColor: Color
   var motion: Bool
+  /// The full text's length, when the layout may be truncated (a line limit): once every glyph the layout has is
+  /// written, the caret stops rather than blinking at the cut while invisible text goes on streaming.
+  var total: Double? = nil
+  /// Glyph indices where a new sentence starts. Each sentence then owns `edge` extra cursor units, so `shown`
+  /// can rest with the sentence fully inked and the next one fades in from nothing instead of mid-edge.
+  var breaks: [Int] = []
   static let edge = 8.0
+
+  private func offset(_ index: Double) -> Double {
+    Double(breaks.count { Double($0) <= index }) * Self.edge
+  }
 
   func draw(layout: Text.Layout, in context: inout GraphicsContext) {
     var index = 0.0
     var tail: CGRect?
     lines: for line in layout {
       let count = Double(line.reduce(0) { $0 + $1.count })
-      if index + count + Self.edge <= shown {
+      if count > 0, shown >= index + count - 1 + offset(index + count - 1) + Self.edge {
         context.draw(line)
         index += count
         tail = line.typographicBounds.rect
@@ -592,7 +607,7 @@ struct RevealRenderer: TextRenderer {
       }
       for run in line {
         for glyph in run {
-          let progress = (shown - index) / Self.edge
+          let progress = (shown - index - offset(index)) / Self.edge
           guard progress > 0 else { break lines }
           index += 1
           tail = glyph.typographicBounds.rect
@@ -609,6 +624,7 @@ struct RevealRenderer: TextRenderer {
       }
     }
     guard caret > 0, let first = layout.first?.typographicBounds.rect else { return }
+    if let total, index + Self.edge < total, shown >= index + Self.edge { return }
     let bounds = tail ?? CGRect(x: first.minX, y: first.minY, width: 0, height: first.height)
     var caretContext = context
     caretContext.opacity = caret

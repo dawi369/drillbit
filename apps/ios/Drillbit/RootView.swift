@@ -6,23 +6,98 @@ struct RootView: View {
   @State private var settingsOpen = false
   @State private var selectedTab = ProcessInfo.processInfo.arguments.contains("--fixture-recall") ? "recall" : "home"
   @AppStorage("appearance") private var appearance = "dark"
+  @AppStorage(CoachMark.tour.storageKey) private var seenTour = false
+  @AppStorage(CoachMark.recallPage.storageKey) private var seenRecallPage = false
+  @AppStorage(CoachMark.libraryPage.storageKey) private var seenLibraryPage = false
+  @AppStorage(CoachMark.homeReadyKey) private var homeReady = false
+  /// After the first rep, a short tour: Home offers it, Show me walks Recall then Library, Back home ends it.
+  private func pageCoach(_ tab: String) -> CoachMark? {
+    guard tourRunning, selectedTab == tab else { return nil }
+    switch tab {
+    case "home": return seenTour ? nil : .tour
+    case "recall": return seenRecallPage ? nil : .recallPage
+    case "library": return seenLibraryPage ? nil : .libraryPage
+    default: return nil
+    }
+  }
+  /// From the first rep's end until the Library tip is dismissed, the tour owns the screen, tab bar included.
+  private var tourRunning: Bool { CoachMark.enabled && homeReady && !settingsOpen && model.presented == nil && !seenLibraryPage }
+  private func advanceTour(_ mark: CoachMark) {
+    withAnimation(DrillbitMotion.page) {
+      switch mark {
+      case .tour: seenTour = true; selectedTab = "recall"
+      case .recallPage: seenTour = true; seenRecallPage = true; selectedTab = "library"
+      default: seenTour = true; seenRecallPage = true; seenLibraryPage = true; selectedTab = "home"
+      }
+    }
+  }
   @Environment(\.scenePhase) private var scenePhase
   @Environment(\.colorScheme) private var systemColorScheme
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  private enum Stage { case restoring, welcome, setup, app }
+  /// Device-local progress through the first run: nothing needs an account until the first question.
+  @AppStorage("firstRun.stage") private var firstRunStage = FirstRunStage.welcome.rawValue
+  @State private var pendingDraft: LearningPlanCoordinator.Draft?
+  @State private var showingQuestion = false
+  @State private var startedFirstRep: Challenge?
+  @State private var applyingDraft = false
+  enum FirstRunStage: String { case welcome, setup, signIn, done }
+  private enum Stage { case restoring, welcome, setup, signIn, app }
+  private var signedIn: Bool { model.bootstrap?.account.status == "active" }
   private var stage: Stage {
     if model.restoringSession || model.launchError != nil { return .restoring }
-    guard model.bootstrap?.account.status == "active" else { return .welcome }
-    return model.settings.onboardingComplete ? .app : .setup
+    if signedIn && model.settings.onboardingComplete { return .app }
+    // Fixtures that start at onboarding skip Welcome; everything else follows the device's stage.
+    let fixtureSetup = model.fixture && ProcessInfo.processInfo.arguments.contains("--fixture-onboarding")
+    switch FirstRunStage(rawValue: firstRunStage) ?? .welcome {
+    case .welcome: return fixtureSetup ? .setup : signedIn ? .setup : .welcome
+    case .setup: return .setup
+    case .signIn, .done: return signedIn ? .setup : .signIn
+    }
+  }
+  /// Signing out mid-flow (or a full reset) starts the first run over.
+  private func resetFirstRunIfSignedOut() { if !signedIn, FirstRunStage(rawValue: firstRunStage) == .done { firstRunStage = FirstRunStage.welcome.rawValue } }
+  private func finishSetup(_ draft: LearningPlanCoordinator.Draft) {
+    pendingDraft = draft
+    if signedIn { Task { await openFirstQuestionIfPending() } }
+    else { withAnimation(DrillbitMotion.page) { firstRunStage = FirstRunStage.signIn.rawValue } }
+  }
+  private func openFirstQuestionIfPending() async {
+    guard !applyingDraft, signedIn, !model.settings.onboardingComplete else { return }
+    let draft = pendingDraft ?? UserDefaults.standard.data(forKey: SetupView.draftKey).flatMap { try? JSONDecoder().decode(LearningPlanCoordinator.Draft.self, from: $0) }
+    guard let draft, draft.page >= SetupView.pageCount - 1 else { return }
+    applyingDraft = true
+    defer { applyingDraft = false }
+    await model.perform { try await SetupView.apply(draft, to: model) }
+    guard model.error == nil else { return }
+    pendingDraft = nil
+    firstRunStage = FirstRunStage.done.rawValue
+    showingQuestion = true
   }
   var body: some View {
     Group {
       if model.restoringSession || model.launchError != nil {
         LaunchSurface(message: model.launchError) { Task { await model.launch() } }
           .transition(.opacity)
+      } else if stage == .welcome {
+        WelcomeView(model: model) { withAnimation(DrillbitMotion.page) { firstRunStage = FirstRunStage.setup.rawValue } }
+          .transition(.opacity)
+      } else if stage == .setup {
+        NavigationStack { SetupView(model: model, onFinish: finishSetup) }
+          .transition(.opacity)
+          // The first question rises over setup and the interview replaces it; Home appears once the rep is done.
+          .sheet(isPresented: $showingQuestion, onDismiss: {
+            guard let started = startedFirstRep else { return }
+            startedFirstRep = nil
+            model.presented = started
+          }) {
+            QuestionFlow(model: model, initial: model.bootstrap?.challenge.flatMap { $0.lifecycle == "in_progress" ? $0 : nil }) { startedFirstRep = $0 }
+          }
+      } else if stage == .signIn {
+        NavigationStack { SignInView(model: model) }
+          .transition(.opacity)
       } else if let account = model.bootstrap?.account, account.status == "active" {
         if !model.settings.onboardingComplete {
-          NavigationStack { SetupView(model: model) }
+          NavigationStack { SetupView(model: model, onFinish: finishSetup) }
             .transition(.opacity)
         } else {
           TabView(selection: $selectedTab) {
@@ -43,15 +118,30 @@ struct RootView: View {
                 }
               }
             }
+            if model.bootstrap?.capabilities?.developerTools == true {
+              // Coming: talk through where you are and where you want to be next.
+              Tab("Bit", image: "BitTab", value: "bit") {
+                NavigationStack {
+                  Color.clear.navigationTitle("Bit")
+                    .containerBackground(AppPalette.background, for: .navigation)
+                    .accessibilityIdentifier("bitTab")
+                }
+              }
+            }
           }
+          // One layer over the whole TabView: tab tips measure the bar themselves, and the shield covers it too.
+          .coachMark(pageCoach(selectedTab), shielding: tourRunning, dismiss: advanceTour)
           .transition(.opacity)
         }
       } else {
-        WelcomeView(model: model)
-          .transition(.opacity)
+        NavigationStack { SignInView(model: model) }
+          .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .opacity))
       }
     }
     .animation(DrillbitMotion.page, value: stage)
+    // Signing in after setup: apply the saved draft and open the first question without another tap.
+    .onChange(of: signedIn) { _, now in if now { Task { await openFirstQuestionIfPending() } } else { resetFirstRunIfSignedOut() } }
+    .task(id: signedIn) { if signedIn { await openFirstQuestionIfPending() } }
     .preferredColorScheme(model.fixture && ProcessInfo.processInfo.arguments.contains("--dark") ? .dark : appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
     .background(WindowFloorColor().allowsHitTesting(false))
     .onReceive(NotificationCenter.default.publisher(for: .init("OpenPractice"))) { _ in
@@ -153,6 +243,19 @@ private struct LaunchSurface: View {
     // Mirrors the system launch screen (LaunchBit on LaunchBackground): Bit at the exact screen centre.
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: Alignment(horizontal: .center, vertical: .launchMark))
     .ignoresSafeArea()
+    .overlay(alignment: .bottom) {
+      // Who built this, in the wordmark face it wears on t23.dev; only here, like Instagram's "from Meta".
+      VStack(spacing: 1) {
+        Text("by").font(.caption2.weight(.medium)).foregroundStyle(AppPalette.secondary)
+        Text("t23.dev")
+          .font(.custom("Literata", size: 19, relativeTo: .title3).weight(.medium))
+          .tracking(-0.4)
+          .foregroundStyle(AppPalette.primary)
+      }
+      .padding(.bottom, 12)
+      .accessibilityElement(children: .combine)
+      .accessibilityLabel("Made by t23.dev")
+    }
     .background(AppPalette.background)
     .environment(\.colorScheme, .dark)
     .accessibilityElement(children: .contain)

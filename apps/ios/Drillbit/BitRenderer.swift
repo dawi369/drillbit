@@ -6,7 +6,7 @@ enum BitFinish: String, CaseIterable, Sendable {
   case satin, gummy, anodized, glazed, ember, oxide, tempered, plush, blueprint
 }
 
-struct BitStop: Sendable {
+struct BitStop: Sendable, Hashable {
   var location: Double
   var color: UInt32
   var opacity: Double
@@ -522,11 +522,24 @@ enum BitRenderer {
     layer.rotate(by: .radians(rotation))
     layer.scaleBy(x: 1, y: ry / rx)
     layer.fill(Path(ellipseIn: CGRect(x: -rx, y: -rx, width: rx * 2, height: rx * 2)),
-      with: .radialGradient(Gradient(colors: [color, color.opacity(0)]), center: .zero, startRadius: 0, endRadius: rx))
+      with: .radialGradient(falloff(color), center: .zero, startRadius: 0, endRadius: rx))
+  }
+  /// The soft falloffs use a handful of colours; each resolves to one Gradient rather than one per draw per frame.
+  nonisolated(unsafe) private static var falloffs: [Color: Gradient] = [:]
+  private static func falloff(_ color: Color) -> Gradient {
+    if let cached = falloffs[color] { return cached }
+    let made = Gradient(colors: [color, color.opacity(0)])
+    if falloffs.count < 64 { falloffs[color] = made }
+    return made
   }
 
+  /// Styles are static, so each stop list resolves to one Gradient for the app's lifetime instead of once per frame.
+  nonisolated(unsafe) private static var gradients: [[BitStop]: Gradient] = [:]
   private static func gradient(_ list: [BitStop]) -> Gradient {
-    Gradient(stops: list.map { Gradient.Stop(color: hex($0.color, $0.opacity), location: $0.location) })
+    if let cached = gradients[list] { return cached }
+    let made = Gradient(stops: list.map { Gradient.Stop(color: hex($0.color, $0.opacity), location: $0.location) })
+    gradients[list] = made
+    return made
   }
 }
 

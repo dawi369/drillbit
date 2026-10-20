@@ -217,26 +217,40 @@ struct Job: Codable, Identifiable, Sendable {
 }
 struct VoiceCapability: Codable, Sendable {
   var available: Bool
+  var plan: String? = nil
   var reason: String?
   var checkedAt: String
-  /// Absent for unlimited accounts.
+  /// The server's cap for the next session, in seconds.
+  var sessionSeconds: Int? = nil
+  /// Absent on Pro. `kind` is `intro` for the first free sessions and `taste` for the periodic one.
   var remaining: Int? = nil
   var limit: Int? = nil
   var resetsAt: String? = nil
+  var kind: String? = nil
   func isFresh(at now: Date = Date()) -> Bool {
     guard let date = Date.fromAPI(checkedAt) else { return false }
     return (0..<60).contains(now.timeIntervalSince(date))
   }
-  /// "4 of 6 left today · resets 2 AM", in the device's own time.
-  func allowanceLine(timeZone: TimeZone = .current, locale: Locale = .current) -> String? {
+  /// What a free account sees under Start: the intro count, the weekly taste, or when it's back. Nothing on Pro.
+  func allowanceLine(timeZone: TimeZone = .current, locale: Locale = .current, now: Date = Date()) -> String? {
     guard let remaining, let limit else { return nil }
-    var line = remaining == 0 ? "None left today" : "\(remaining) of \(limit) left today"
-    if let reset = resetsAt.flatMap(Date.fromAPI) {
-      var style = Date.FormatStyle(date: .omitted, time: .shortened, locale: locale)
+    if kind == "taste" {
+      if remaining > 0 { return "Your free voice session this week is ready." }
+      guard let back = resetsAt.flatMap(Date.fromAPI) else { return "Your free voice session comes back next week." }
+      var calendar = Calendar(identifier: .gregorian)
+      calendar.timeZone = timeZone
+      var style = Date.FormatStyle(date: .omitted, time: .omitted, locale: locale).weekday(.wide)
       style.timeZone = timeZone
-      line += " · resets \(reset.formatted(style))"
+      let tomorrow = calendar.date(byAdding: .day, value: 1, to: now) ?? now
+      let day = calendar.isDate(back, inSameDayAs: now) ? "later today" : calendar.isDate(back, inSameDayAs: tomorrow) ? "tomorrow" : back.formatted(style)
+      return "Your free voice session comes back \(day). Pro has it any time."
     }
-    return line
+    switch remaining {
+    case 0: return nil
+    case 1: return "Last free voice session. After this, one a week."
+    case limit: return "\(limit) free voice sessions to start."
+    default: return "\(remaining) of \(limit) free voice sessions left."
+    }
   }
 }
 struct Bootstrap: Codable, Sendable {
@@ -249,6 +263,8 @@ struct Bootstrap: Codable, Sendable {
   struct Account: Codable, Sendable {
     var id: String
     var status: String
+    /// "free" or "pro"; older servers omit it.
+    var plan: String? = nil
   }
   struct Credential: Codable, Sendable { var suffix: String; var model: String? }
   var account: Account
@@ -262,9 +278,14 @@ struct Bootstrap: Codable, Sendable {
 }
 /// Free reps apply only while the server's gate is on; `freeReps` is false for unlimited accounts.
 struct PracticeAccess: Codable, Sendable, Equatable {
+  var plan: String? = nil
   var freeReps: Bool
   var available: Bool
   var nextFreeRepAt: String?
+  /// Today's free reps; absent on Pro.
+  var remaining: Int? = nil
+  var limit: Int? = nil
+  var resetsAt: String? = nil
 }
 struct TodayPlan: Codable, Sendable, Equatable {
   var state: String
@@ -615,11 +636,13 @@ struct InterviewReadingState: Codable, Sendable {
 }
 
 struct InterviewStreamSnapshot: Decodable { var status: String; var text: String }
-struct QuestionStreamSnapshot: Decodable { var status: String; var error: String?; var title: String; var prompt: String }
+struct QuestionStreamSnapshot: Decodable { var status: String; var error: String?; var title: String; var prompt: String; var textDone: Bool?; var challenge: Challenge? }
 /// A question as the model writes it; provisional until the finished challenge replaces it.
 struct QuestionDraft: Equatable, Sendable {
   var title = ""
   var prompt = ""
+  /// The model has finished the text; only the job's bookkeeping is left.
+  var textDone = false
   var guidanceMode: GuidanceMode?
   var warmUp = false
 }
@@ -768,6 +791,15 @@ enum QuestionMarkup {
           continue
         }
         if candidates.contains(where: { $0.hasPrefix(rest) }) { break scan }
+        // A tag the app doesn't know (a model's invention, or a question stored before the server folded them):
+        // skip the tag itself and keep its text. A literal "<" arrives as &lt;, so this never eats real content.
+        if character == "<", let close = rest.dropFirst().firstIndex(of: ">"),
+           rest[rest.index(after: rest.startIndex)..<close].allSatisfy({ $0.isLetter || $0.isNumber || $0 == "/" || $0 == "-" || $0 == "_" }),
+           close > rest.index(after: rest.startIndex) {
+          index = source.index(after: close)
+          continue
+        }
+        if character == "<", rest.dropFirst().allSatisfy({ $0.isLetter || $0 == "/" }) { break scan }
       }
       if code != nil { code?.append(character) } else { run.append(character) }
       index = source.index(after: index)

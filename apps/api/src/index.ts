@@ -23,6 +23,8 @@ import { coverage, libraryPage, questionDetail, setEligibility, startQuestion } 
 import { consumeUsage, encrypt, hash, identity, type Env } from "./platform";
 import { adopt, requestHelp } from "./practice";
 import { freeRepTaken, onFreeReps, practiceAccess, practiceGateFault } from "./practice-gate";
+import { limits, planFor } from "./plans";
+import { applyAppleNotification, recordEntitlement } from "./entitlements";
 import {
     accountFor,
     activeChallenge,
@@ -114,6 +116,8 @@ app.onError((error, c) => {
   );
 });
 app.get("/health", (c) => c.json({ status: "ok" }));
+// Apple posts here unauthenticated; the payload's own signature chain is the credential.
+app.post("/apple/notifications", async c => c.json(await applyAppleNotification(c.env, await c.req.json())));
 app.get("/v1/widget", async (c) => {
   const token = c.req.header("Authorization")?.replace(/^Bearer /, "");
   if (!token)
@@ -136,7 +140,7 @@ app.get("/v1/widget", async (c) => {
 });
 app.use("/v1/*", async (c, next) => {
   const subject = await identity(c.env, c.req.header("Authorization"));
-  const permitted = ["/v1/bootstrap", "/v1/invite", "/v1/account"];
+  const permitted = ["/v1/bootstrap", "/v1/invite", "/v1/account", "/v1/entitlement"];
   const [account, epoch] = await Promise.all([
     accountFor(c.env, subject),
     c.req.method !== "GET" && !permitted.includes(c.req.path)
@@ -176,7 +180,7 @@ app.get("/v1/bootstrap", async (c) => {
     .bind(a.id)
     .first();
   return c.json({
-    account: { id: a.id, status: a.status },
+    account: { id: a.id, status: a.status, plan: await planFor(c.env, a.id) },
     practiceEpoch: (await c.env.DB.prepare("SELECT value FROM practice_epoch WHERE id=1").first<{value:string}>())!.value,
     settings,
     todayPlan: await todayPlan(c.env, a.id, active, settings),
@@ -193,6 +197,22 @@ app.get("/v1/bootstrap", async (c) => {
       developerTools: (c.env.DEVELOPER_ACCOUNTS ?? "").split(",").map(id => id.trim()).filter(Boolean).includes(a.id),
     },
   });
+});
+app.post("/v1/entitlement", async c => {
+  const account = c.get("account").id;
+  const entitlement = await recordEntitlement(c.env, account, await c.req.json());
+  return c.json({ plan: await planFor(c.env, account), entitlement });
+});
+// Puts the owner's account back behind the invite gate so the very first run can be replayed; the next redeem reactivates it.
+app.post("/v1/developer/reinvite", async c => {
+  const account = c.get("account").id;
+  const permitted = (c.env.DEVELOPER_ACCOUNTS ?? "").split(",").map(id => id.trim()).filter(Boolean);
+  if (!permitted.includes(account)) throw new Fault("not_found", 404, "Not found.");
+  await c.env.DB.batch([
+    c.env.DB.prepare("UPDATE invites SET redeemed_by=NULL WHERE redeemed_by=?").bind(account),
+    c.env.DB.prepare("UPDATE accounts SET status='invited' WHERE id=?").bind(account),
+  ]);
+  return c.json({ ok: true });
 });
 app.delete("/v1/developer/practice", async (c) => {
   const account = c.get("account").id;
@@ -337,10 +357,11 @@ app.post("/v1/challenges", async (c) => {
   // A free rep is spent when its question is prepared; one swap of that question is part of the same rep.
   const replaced = preparation.replaceId && active ? parseJSON<{ freeRepAt?: string; swapped?: boolean }>(active.data) : undefined;
   const swap = replaced?.freeRepAt && !replaced.swapped;
-  const freeRep = !onFreeReps(c.env, a) ? {} : swap ? { freeRepAt: replaced!.freeRepAt, swapped: true } : { freeRepAt: timestamp() };
-  const unless = "freeRepAt" in freeRep && !swap ? freeRepTaken(a) : undefined;
+  const plan = await planFor(c.env, a);
+  const freeRep = plan === "pro" ? {} : swap ? { freeRepAt: replaced!.freeRepAt, swapped: true } : { freeRepAt: timestamp() };
+  const unless = "freeRepAt" in freeRep && !swap ? freeRepTaken(c.env, a) : undefined;
   if (unless && await c.env.DB.prepare("SELECT 1 WHERE " + unless.sql).bind(...unless.binds).first()) throw practiceGateFault();
-  await consumeUsage(c.env, a, "generate", 10);
+  await consumeUsage(c.env, a, "generate", limits(c.env, plan).generationsPerDay);
   const job = await createJob(c.env, a, id, "generate", null, {
     ...preparation,
     followUp,
@@ -544,11 +565,13 @@ app.get("/v1/jobs/:id/stream", async (c) => {
   const account = c.get("account").id, id = c.req.param("id");
   const snapshot = async () => {
     const row = await c.env.DB.prepare(
-      "SELECT j.status,j.error,s.text FROM jobs j LEFT JOIN interview_streams s ON s.job_id=j.id WHERE j.id=? AND j.account_id=? AND j.kind='generate'",
-    ).bind(id, account).first<{ status: string; error: string | null; text: string | null }>();
+      "SELECT j.status,j.error,j.challenge_id,s.text FROM jobs j LEFT JOIN interview_streams s ON s.job_id=j.id WHERE j.id=? AND j.account_id=? AND j.kind='generate'",
+    ).bind(id, account).first<{ status: string; error: string | null; challenge_id: string | null; text: string | null }>();
     if (!row) throw new Fault("not_found", 404, "Operation not found.");
-    const draft = row.text ? parseJSON<{ title?: string; prompt?: string }>(row.text) : {};
-    return { status: row.status, error: row.error, title: draft.title ?? "", prompt: draft.prompt ?? "" };
+    const draft = row.text ? parseJSON<{ title?: string; prompt?: string; textDone?: boolean }>(row.text) : {};
+    // The last frame carries the finished question itself: the client needs no further request to show it.
+    const challenge = row.status === "completed" ? await detail(c.env, account, row.challenge_id ?? id).catch(() => undefined) : undefined;
+    return { status: row.status, error: row.error, title: draft.title ?? "", prompt: draft.prompt ?? "", textDone: draft.textDone === true || !["pending", "running"].includes(row.status), ...(challenge ? { challenge } : {}) };
   };
   const initial = await snapshot();
   return streamSSE(c, async (stream) => {
@@ -576,7 +599,7 @@ app.post("/v1/jobs/:id/retry", async (c) => {
   const id = requireCommand(c.req.header("Idempotency-Key"));
   const input = parseJSON<{ freeRepAt?: string; swapped?: boolean }>(old.input);
   // A retried preparation is a fresh rep; the failed one never counted.
-  const unless = old.kind === "generate" && onFreeReps(c.env, a) ? freeRepTaken(a) : undefined;
+  const unless = old.kind === "generate" && await onFreeReps(c.env, a) ? freeRepTaken(c.env, a) : undefined;
   if (unless && await c.env.DB.prepare("SELECT 1 WHERE " + unless.sql).bind(...unless.binds).first()) throw practiceGateFault();
   await consumeUsage(c.env, a, old.kind, old.kind === "summarize" ? 20 : 10);
   const { swapped: _swapped, ...rest } = input;

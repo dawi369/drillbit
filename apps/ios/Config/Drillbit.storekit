@@ -1,0 +1,59 @@
+{
+  "identifier" : "4C1D3F2A-0000-4000-8000-DRILLBITPRO0",
+  "nonRenewingSubscriptions" : [ ],
+  "products" : [ ],
+  "settings" : {
+    "_applicationInternalID" : "0",
+    "_developerTeamID" : "7M4NDAAP73",
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [ ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21500001",
+      "localizations" : [ ],
+      "name" : "Drillbit Pro",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [ ],
+          "codeOffers" : [ ],
+          "displayPrice" : "7.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6760000001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            { "description" : "Unlimited reps and voice, billed monthly.", "displayName" : "Pro Monthly", "locale" : "en_US" }
+          ],
+          "productID" : "dawi.drillbit.pro.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Pro Monthly",
+          "subscriptionGroupID" : "21500001",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [ ]
+        },
+        {
+          "adHocOffers" : [ ],
+          "codeOffers" : [ ],
+          "displayPrice" : "59.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6760000002",
+          "introductoryOffer" : null,
+          "localizations" : [
+            { "description" : "Unlimited reps and voice, billed yearly.", "displayName" : "Pro Yearly", "locale" : "en_US" }
+          ],
+          "productID" : "dawi.drillbit.pro.yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Pro Yearly",
+          "subscriptionGroupID" : "21500001",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [ ]
+        }
+      ]
+    }
+  ],
+  "version" : { "major" : 4, "minor" : 0 }
+}

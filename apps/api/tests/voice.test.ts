@@ -17,59 +17,87 @@ it('failed configuration performs no paid startup',async()=>{const {a,id}=await 
 it('closed sessions cannot delegate new paid work',async()=>{const {a,id}=await fixture(),cmd=crypto.randomUUID(),mock=connection();try{await startVoice(e,a,id,cmd,{sdp:'offer',revision:2});await voiceEvents(e,a,id,cmd,{fragments:[],closed:true,finalized:false});await expect(delegateVoice(e,a,id,cmd,{id:'d1'})).rejects.toMatchObject({code:'inactive'});expect(mock).toHaveBeenCalledTimes(1);}finally{mock.mockRestore();}});
 it('does not activate a session if the question was skipped during provider startup',async()=>{const {a,id}=await fixture(),cmd=crypto.randomUUID();const mock=vi.spyOn(globalThis,'fetch').mockImplementation(async()=>{await e.DB.prepare("UPDATE challenges SET lifecycle='skipped' WHERE id=?").bind(id).run();return new Response(JSON.stringify({session:{id:'live_late'},transport:{sdp:'answer'}}));});try{await expect(startVoice(e,a,id,cmd,{sdp:'offer',revision:2})).rejects.toMatchObject({code:'inactive'});const row=await e.DB.prepare('SELECT status FROM voice_sessions WHERE id=?').bind(cmd).first<any>();expect(row.status).toBe('uncertain');}finally{mock.mockRestore();}});
 
-it('voice capability is read-only, account-scoped and reflects the daily limit', async()=>{
+const free={...e,PRACTICE_GATE:'true'} as Env;
+const day=()=>new Date().toISOString().slice(0,10);
+/** Past sessions that reached the provider; the free allowance counts these. */
+async function spentSessions(account:string,challenge:string,n:number,agoDays=0){
+ for(let i=0;i<n;i++){
+  const id=crypto.randomUUID(), at=new Date(Date.now()-agoDays*86_400_000-i*1000).toISOString();
+  await e.DB.batch([
+   e.DB.prepare("INSERT INTO jobs(id,account_id,challenge_id,kind,status,input,created_at,updated_at) VALUES(?,?,?,'voice','completed','{}',?,?)").bind(id,account,challenge,at,at),
+   e.DB.prepare("INSERT INTO interview_turns(id,challenge_id,ordinal,kind,prompt,text,job_id,created_at) VALUES(?,?,(SELECT COALESCE(MAX(ordinal)+1,0) FROM interview_turns WHERE challenge_id=?),'voice','','',?,?)").bind(id,challenge,challenge,id,at),
+   e.DB.prepare("INSERT INTO voice_sessions(id,account_id,challenge_id,provider_id,status,created_at,expires_at,finalized) VALUES(?,?,?,'live_past','closed',?,?,1)").bind(id,account,challenge,at,at),
+  ]);
+ }
+}
+
+it('voice capability is read-only, account-scoped and pauses Pro at the fair-use cap', async()=>{
  const {a}=await fixture(), other=await fixture();
- expect((await voiceCapability(e,a)).available).toBe(true);
+ expect(await voiceCapability(e,a)).toMatchObject({available:true,plan:'pro',sessionSeconds:20*60});
+ expect(await voiceCapability(e,a)).not.toHaveProperty('remaining');
  expect((await voiceCapability({...e,VOICE_ENABLED:'false'},a)).available).toBe(false);
- const day=new Date().toISOString().slice(0,10);
- await e.DB.prepare("INSERT INTO usage(account_id,day,kind,count) VALUES(?,?,'voice_start',6)").bind(a,day).run();
- expect((await voiceCapability(e,a)).available).toBe(false);
+ await e.DB.prepare("INSERT INTO usage(account_id,day,kind,count) VALUES(?,?,'voice_start',20)").bind(a,day()).run();
+ expect(await voiceCapability(e,a)).toMatchObject({available:false,reason:expect.stringContaining('back tomorrow')});
  expect((await voiceCapability(e,other.a)).available).toBe(true);
- expect((await e.DB.prepare("SELECT count FROM usage WHERE account_id=? AND day=? AND kind='voice_start'").bind(a,day).first<any>()).count).toBe(6);
+ expect((await e.DB.prepare("SELECT count FROM usage WHERE account_id=? AND day=? AND kind='voice_start'").bind(a,day()).first<any>()).count).toBe(20);
 });
 
-it('voice capability reports the remaining starts and the next UTC reset', async()=>{
+it('free voice: three intro sessions, then one taste a week, each capped by the plan', async()=>{
  const {a,id}=await fixture();
- const before=await voiceCapability(e,a);
- expect(before).toMatchObject({available:true,remaining:6,limit:6,resetsAt:new Date(Date.UTC(new Date().getUTCFullYear(),new Date().getUTCMonth(),new Date().getUTCDate()+1)).toISOString()});
+ expect(await voiceCapability(free,a)).toMatchObject({available:true,plan:'free',remaining:3,limit:3,kind:'intro',sessionSeconds:180});
  const mock=connection();
- try { await startVoice(e,a,id,crypto.randomUUID(),{sdp:'offer',revision:2}); } finally { mock.mockRestore(); }
- expect(await voiceCapability(e,a)).toMatchObject({available:true,remaining:5});
- expect(await voiceCapability({...e,VOICE_UNLIMITED_ACCOUNTS:a},a)).not.toHaveProperty('remaining');
+ try {
+  const started=await startVoice(free,a,id,crypto.randomUUID(),{sdp:'offer',revision:2});
+  expect(started.sessionSeconds).toBe(180);
+  expect(Date.parse(started.expiresAt)-Date.now()).toBeLessThanOrEqual(210_000);
+  expect(Date.parse(started.expiresAt)-Date.now()).toBeGreaterThan(180_000);
+ } finally { mock.mockRestore(); }
+ expect(await voiceCapability(free,a)).toMatchObject({available:true,remaining:2,kind:'intro'});
+ await e.DB.prepare("UPDATE voice_sessions SET status='closed', created_at=? WHERE account_id=?").bind(new Date(Date.now()-86_400_000-5000).toISOString(),a).run();
+ await spentSessions(a,id,2,1);
+ const paused=await voiceCapability(free,a);
+ expect(paused).toMatchObject({available:false,remaining:0,limit:1,kind:'taste',reason:expect.stringContaining('comes back')});
+ expect(Date.parse(paused.resetsAt!)).toBeGreaterThan(Date.now()+5*86_400_000);
+ await expect(startVoice(free,a,id,crypto.randomUUID(),{sdp:'offer',revision:2})).rejects.toMatchObject({code:'voice_gate',status:402});
+ // A week on, the taste is back; a shorter cadence can be configured.
+ expect(await voiceCapability({...free,FREE_VOICE_TASTE_DAYS:'1'} as Env,a)).toMatchObject({available:true,remaining:1,limit:1,kind:'taste'});
+ await e.DB.prepare("UPDATE voice_sessions SET created_at=? WHERE account_id=?").bind(new Date(Date.now()-8*86_400_000).toISOString(),a).run();
+ expect(await voiceCapability(free,a)).toMatchObject({available:true,remaining:1,limit:1,kind:'taste'});
+ expect(await voiceCapability({...free,VOICE_UNLIMITED_ACCOUNTS:a} as Env,a)).toMatchObject({plan:'pro'});
+ expect(await voiceCapability({...free,VOICE_UNLIMITED_ACCOUNTS:a} as Env,a)).not.toHaveProperty('remaining');
 });
 
 it('refunds a voice start when the provider never creates a session', async()=>{
  const {a,id}=await fixture();
- const day=new Date().toISOString().slice(0,10);
  const failing=vi.spyOn(globalThis,'fetch').mockResolvedValue(new Response('busy',{status:503}));
- try { await expect(startVoice(e,a,id,crypto.randomUUID(),{sdp:'offer',revision:2})).rejects.toMatchObject({code:'voice_provider'}); }
+ try { await expect(startVoice(free,a,id,crypto.randomUUID(),{sdp:'offer',revision:2})).rejects.toMatchObject({code:'voice_provider'}); }
  finally { failing.mockRestore(); }
- expect((await e.DB.prepare("SELECT count FROM usage WHERE account_id=? AND day=? AND kind='voice_start'").bind(a,day).first<any>())?.count ?? 0).toBe(0);
- await expect(startVoice(e,a,id,crypto.randomUUID(),{sdp:'offer',revision:99})).rejects.toMatchObject({status:404});
- expect((await e.DB.prepare("SELECT count FROM usage WHERE account_id=? AND day=? AND kind='voice_start'").bind(a,day).first<any>())?.count ?? 0).toBe(0);
- expect(await voiceCapability(e,a)).toMatchObject({remaining:6});
+ expect((await e.DB.prepare("SELECT count FROM usage WHERE account_id=? AND day=? AND kind='voice_start'").bind(a,day()).first<any>())?.count ?? 0).toBe(0);
+ await expect(startVoice(free,a,id,crypto.randomUUID(),{sdp:'offer',revision:99})).rejects.toMatchObject({status:404});
+ expect((await e.DB.prepare("SELECT count FROM usage WHERE account_id=? AND day=? AND kind='voice_start'").bind(a,day()).first<any>())?.count ?? 0).toBe(0);
+ // Sessions that never reached the provider don't spend the intro allowance either.
+ expect(await voiceCapability(free,a)).toMatchObject({remaining:3});
 });
 
-it('unlimited voice is an exact account override and still records usage', async()=>{
+it('allowlisted accounts are Pro: an exact override that still records usage', async()=>{
  const {a,id}=await fixture(), other=await fixture();
- const owner={...e,VOICE_UNLIMITED_ACCOUNTS: a};
- const day=new Date().toISOString().slice(0,10);
- for (const account of [a,other.a]) await e.DB.prepare("INSERT INTO usage(account_id,day,kind,count) VALUES(?,?,'voice_start',6)").bind(account,day).run();
+ const owner={...free,VOICE_UNLIMITED_ACCOUNTS: a} as Env;
+ await spentSessions(other.a,other.id,3);
  expect((await voiceCapability(owner,a)).available).toBe(true);
  expect((await voiceCapability(owner,other.a)).available).toBe(false);
- expect((await voiceCapability({...owner,VOICE_ENABLED:'false'},a)).available).toBe(false);
- expect((await voiceCapability({...owner,VOICE_UNLIMITED_ACCOUNTS:a+'-suffix'},a)).available).toBe(false);
+ expect((await voiceCapability({...owner,VOICE_ENABLED:'false'} as Env,a)).available).toBe(false);
+ expect(await voiceCapability({...owner,VOICE_UNLIMITED_ACCOUNTS:a+'-suffix'} as Env,a)).toMatchObject({plan:'free'});
  const mock=connection();
  try {
   const session=crypto.randomUUID();
   await startVoice(owner,a,id,session,{sdp:'offer',revision:2}); expect(mock).toHaveBeenCalledTimes(1);
-  await e.DB.prepare("INSERT INTO usage(account_id,day,kind,count) VALUES(?,?,'voice_reasoning',40)").bind(a,day).run();
+  await e.DB.prepare("INSERT INTO usage(account_id,day,kind,count) VALUES(?,?,'voice_reasoning',40)").bind(a,day()).run();
   mock.mockResolvedValue(new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({move:'ask_one',text:'What happens on a retry?'})}}],usage:{prompt_tokens:1,completion_tokens:1}}),{status:200}));
   expect(await delegateVoice(owner,a,id,session,{id:'over-limit'})).toEqual({text:'What happens on a retry?'});
-  expect((await e.DB.prepare("SELECT count FROM usage WHERE account_id=? AND day=? AND kind='voice_reasoning'").bind(a,day).first<any>()).count).toBe(41);
+  expect((await e.DB.prepare("SELECT count FROM usage WHERE account_id=? AND day=? AND kind='voice_reasoning'").bind(a,day()).first<any>()).count).toBe(41);
  }
  finally { mock.mockRestore(); }
- expect((await e.DB.prepare("SELECT count FROM usage WHERE account_id=? AND day=? AND kind='voice_start'").bind(a,day).first<any>()).count).toBe(7);
+ expect((await e.DB.prepare("SELECT count FROM usage WHERE account_id=? AND day=? AND kind='voice_start'").bind(a,day()).first<any>()).count).toBe(1);
 });
 
 it('captures selected voice mode and leaves no running delegation after quota failure',async()=>{
@@ -80,7 +108,7 @@ it('captures selected voice mode and leaves no running delegation after quota fa
   expect(sent.session.instructions).toContain('mode="learn_together"');
   expect(sent.session.instructions).toContain('Never claim you are checking');
   expect((await detail(e,a,id)).guidanceMode).toBe('learn_together');
-  await e.DB.prepare("INSERT INTO usage(account_id,day,kind,count) VALUES(?,?,'voice_reasoning',40)").bind(a,new Date().toISOString().slice(0,10)).run();
+  await e.DB.prepare("INSERT INTO usage(account_id,day,kind,count) VALUES(?,?,'voice_reasoning',400)").bind(a,new Date().toISOString().slice(0,10)).run();
   await expect(delegateVoice(e,a,id,session,{id:'limited'})).rejects.toBeTruthy();
   const row=await e.DB.prepare('SELECT status FROM voice_delegations WHERE session_id=? AND id=?').bind(session,'limited').first<any>();
   expect(row.status).toBe('failed');

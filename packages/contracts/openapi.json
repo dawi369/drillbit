@@ -10,6 +10,115 @@
     }
   ],
   "paths": {
+    "/v1/entitlement": {
+      "post": {
+        "summary": "Record a verified StoreKit 2 signed transaction for the caller's account",
+        "operationId": "post_entitlement",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EntitlementInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/undefined"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invite required or account unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not owned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision or lifecycle conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid invitation or provider credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Usage limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Provider temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/challenges/{id}/voice": {
       "post": {
         "summary": "Start a voice session without submitting the typed draft",
@@ -6093,6 +6202,83 @@
         ],
         "additionalProperties": false
       },
+      "EntitlementInput": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "signedTransaction": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16000
+          }
+        },
+        "required": [
+          "signedTransaction"
+        ],
+        "additionalProperties": false
+      },
+      "Entitlement": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "plan": {
+            "type": "string",
+            "enum": [
+              "free",
+              "pro"
+            ]
+          },
+          "entitlement": {
+            "type": "object",
+            "properties": {
+              "productId": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "grace",
+                  "expired",
+                  "revoked"
+                ]
+              },
+              "activeUntil": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "productId",
+              "status",
+              "activeUntil"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "plan",
+          "entitlement"
+        ],
+        "additionalProperties": false
+      },
+      "AppleNotification": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "signedPayload": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32000
+          }
+        },
+        "required": [
+          "signedPayload"
+        ],
+        "additionalProperties": false
+      },
       "VoiceConnection": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
@@ -6105,6 +6291,11 @@
           },
           "expiresAt": {
             "type": "string"
+          },
+          "sessionSeconds": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
           }
         },
         "required": [
@@ -12684,6 +12875,13 @@
               },
               "status": {
                 "type": "string"
+              },
+              "plan": {
+                "type": "string",
+                "enum": [
+                  "free",
+                  "pro"
+                ]
               }
             },
             "required": [
@@ -13018,6 +13216,13 @@
           "practice": {
             "type": "object",
             "properties": {
+              "plan": {
+                "type": "string",
+                "enum": [
+                  "free",
+                  "pro"
+                ]
+              },
               "freeReps": {
                 "type": "boolean"
               },
@@ -13029,6 +13234,19 @@
                   "string",
                   "null"
                 ]
+              },
+              "remaining": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "resetsAt": {
+                "type": "string"
               }
             },
             "required": [
@@ -14166,11 +14384,23 @@
                   "available": {
                     "type": "boolean"
                   },
+                  "plan": {
+                    "type": "string",
+                    "enum": [
+                      "free",
+                      "pro"
+                    ]
+                  },
                   "reason": {
                     "type": "string"
                   },
                   "checkedAt": {
                     "type": "string"
+                  },
+                  "sessionSeconds": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
                   },
                   "remaining": {
                     "type": "integer",
@@ -14184,6 +14414,13 @@
                   },
                   "resetsAt": {
                     "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "intro",
+                      "taste"
+                    ]
                   }
                 },
                 "required": [

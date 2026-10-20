@@ -6,8 +6,13 @@ private enum InterviewSheet: String, Identifiable { case style, assistance; var 
 struct InterviewView: View {
   @State private var liveVoice: LiveVoice?
   @State private var showingVoiceRoom = false
+  /// Opening out loud: the room shows connecting from the first frame, before the connection is actually requested.
+  @State private var openingVoice = false
+  @State private var voiceQuestionCollapsed = true
   @State private var checkingVoice = false
   @State private var voiceExplanation: String?
+  /// True when the explanation is a free-plan limit, so the alert can offer Pro.
+  @State private var voiceGated = false
   @State private var voicePermissionNeedsSettings = false
   @State private var assistanceRequestID: String?
   @State private var assistanceTitle = "Help"
@@ -47,21 +52,42 @@ struct InterviewView: View {
   @State private var openerTypes: Bool
   /// Fallback start for a round whose start time never reached this device.
   @State private var openedAt = Date()
+  @AppStorage(CoachMark.voice.storageKey) private var seenVoiceTip = false
+  @AppStorage(CoachMark.keyboard.storageKey) private var seenKeyboardTip = false
   @AppStorage(CoachMark.composer.storageKey) private var seenComposerTip = false
   @AppStorage(CoachMark.tools.storageKey) private var seenToolsTip = false
+  @AppStorage(CoachMark.path.storageKey) private var seenPathTip = false
+  @State private var showingPathSteps = false
+  private var showsPathBar: Bool { interview.mode == .learnTogether && !(challenge.path ?? []).isEmpty && interview.finished == nil }
   /// One tip at a time: the composer before the first reply, then the tools once a follow-up has landed.
   private var coach: CoachMark? {
-    guard CoachMark.enabled, sessionRestored, !showingVoiceRoom, sheet == nil, interview.finished == nil, showsDraft else { return nil }
+    guard CoachMark.enabled, sessionRestored, !showingVoiceRoom, sheet == nil, !showingPathSteps, interview.finished == nil, showsDraft else { return nil }
+    // Voice-first only: back from the voice tip's Show me, name the way back before anything else.
+    if seenVoiceTip, !seenKeyboardTip, !seenComposerTip, firstReply, interview.answer.isEmpty { return .keyboard }
     if !seenComposerTip { return firstReply && interview.answer.isEmpty && (openerSettled || !openerTypes || challenge.opener == nil) ? .composer : nil }
-    if !seenToolsTip, interview.mode != .mockInterview, !firstReply { return .tools }
+    // Then the header, top to bottom: Guided's roadmap, then the menu. Both sit clear of the keyboard.
+    if !seenPathTip, showsPathBar { return .path }
+    if !seenToolsTip, interview.mode != .mockInterview { return .tools }
     return nil
+  }
+  /// The voice room's own tip: once, while idle, before the first word is said.
+  private var voiceCoach: CoachMark? {
+    guard CoachMark.enabled, sessionRestored, showingVoiceRoom, !seenVoiceTip, firstReply, !openingVoice,
+      let phase = liveVoice?.phase, phase == .idle || phase == .connecting || phase == .active else { return nil }
+    return .voice
   }
   private func dismissCoach(_ mark: CoachMark) {
     withAnimation(DrillbitMotion.fast) {
       switch mark {
+      case .voice:
+        seenVoiceTip = true
+        // Text-first: they already know Talk, so the way-back tip has nothing to add.
+        if seenComposerTip { seenKeyboardTip = true }
+      case .keyboard: seenKeyboardTip = true
       case .composer: seenComposerTip = true
+      case .path: seenPathTip = true; showingPathSteps = true
       case .tools: seenToolsTip = true
-      case .recall: break
+      case .tour, .recallPage, .libraryPage, .recall, .settings: break
       }
     }
   }
@@ -75,7 +101,14 @@ struct InterviewView: View {
   @Environment(\.scenePhase) private var phase
   init(model: AppModel, challenge: Challenge) {
     self.model = model; self.challenge = challenge
-    _interview = State(initialValue: InterviewController(model: model, challenge: challenge))
+    let controller = InterviewController(model: model, challenge: challenge)
+    let voice = LiveVoice(interview: controller)
+    controller.voice = voice
+    _interview = State(initialValue: controller)
+    _liveVoice = State(initialValue: voice)
+    let opensOutLoud = model.talkOnOpen == challenge.id
+    _showingVoiceRoom = State(initialValue: opensOutLoud)
+    _openingVoice = State(initialValue: opensOutLoud)
     let types = challenge.interview?.turns.isEmpty ?? true
     let clock = RevealClock()
     // Lets the page settle before the interviewer starts talking.
@@ -83,6 +116,7 @@ struct InterviewView: View {
     _openerTypes = State(initialValue: types)
     _openerClock = State(initialValue: clock)
   }
+  private var streamTaskID: String { "\(interview.streamTurn?.jobId ?? ""):\(interview.streamEpoch):\(phase == .active)" }
   private var firstReply: Bool { !interview.displayState.turns.contains { $0.kind == "answer" } }
   private var exchanges: [InterviewExchange] { InterviewExchange.document(original: challenge.displayPrompt, state: interview.displayState) }
   private var activeID: String { exchanges.last?.id ?? "original" }
@@ -105,12 +139,11 @@ struct InterviewView: View {
   var body: some View {
     ZStack {
       if let finished = interview.finished { ReflectionView(model: model, initial: finished).transition(.opacity) }
-      else if showingVoiceRoom, let voice = liveVoice {
-        InterviewVoiceRoom(voice: voice, interview: interview, allowance: model.bootstrap?.capabilities?.voice?.allowanceLine(),
-          question: { voiceQuestion }, leave: leaveVoiceRoom)
-      } else { workspace }
+      else if showingVoiceRoom, let voice = liveVoice { voiceRoom(voice).transition(.opacity) }
+      else { workspace.transition(.opacity) }
     }
     .animation(reduceMotion ? nil : DrillbitMotion.page, value: interview.finished != nil)
+    .animation(reduceMotion ? nil : DrillbitMotion.page, value: showingVoiceRoom)
     .sensoryFeedback(.impact(weight: .light), trigger: acceptedAnswerID) { _, accepted in accepted != nil }
     .background(AppPalette.background)
     .containerBackground(AppPalette.background, for: .navigation)
@@ -124,9 +157,7 @@ struct InterviewView: View {
       await Task.yield()
       position.scrollTo(y: reading.offset)
       await interview.load()
-      let voice = LiveVoice(interview: interview)
-      liveVoice = voice
-      interview.voice = voice
+      guard let voice = liveVoice else { return }
       await voice.restore()
       voice.prepareIfAllowed()
       sessionRestored = true
@@ -134,8 +165,9 @@ struct InterviewView: View {
         model.talkOnOpen = nil
         await enterVoice(startNow: true)
       }
+      openingVoice = false
     }
-    .task(id: "\(interview.streamTurn?.jobId ?? ""):\(interview.streamEpoch):\(phase == .active)") {
+    .task(id: streamTaskID) {
       if phase == .active { await interview.watchResponse() }
     }
     .onChange(of: phase) { _, value in
@@ -150,7 +182,13 @@ struct InterviewView: View {
           voiceExplanation = nil
         }
       }
-      Button("Done", role: .cancel) { voiceExplanation = nil }
+      if voiceGated {
+        Button("See Pro") {
+          voiceExplanation = nil
+          PlanCoordinator.shared.register(.voiceSession) { await enterVoice(startNow: true) }
+        }
+      }
+      Button(voiceGated ? "Keep typing" : "Done", role: .cancel) { voiceExplanation = nil }
     } message: { Text(voiceExplanation ?? "") }
     .onChange(of: completedAssistance) { _, value in
       guard let value, !value.isEmpty else { return }
@@ -249,11 +287,14 @@ struct InterviewView: View {
     }
     .safeAreaInset(edge: .bottom, spacing: 0) { footer }
     .safeAreaInset(edge: .top, spacing: 0) {
-      if interview.mode == .learnTogether, let path = challenge.path, !path.isEmpty, interview.finished == nil {
-        GuidedPathBar(steps: path, current: guidedTurn?.result?.step ?? 0)
+      if showsPathBar, let path = challenge.path {
+        GuidedPathBar(steps: path, current: guidedTurn?.result?.step ?? 0, showingSteps: $showingPathSteps)
+          .coachAnchor(.path)
       }
     }
-    .coachMark(coach, trailingToolbar: true, dismiss: dismissCoach)
+    // First rep: the screen stays locked from the opener's first word until the composer tip has had its say.
+    .coachMark(coach, trailingToolbar: true, shielding: CoachMark.enabled && model.firstUse.stage == .firstRep && !seenComposerTip
+                 && !showingVoiceRoom && sheet == nil, dismiss: dismissCoach)
     // Typing answers the composer tip, whether or not it had appeared yet.
     .onChange(of: interview.answer.isEmpty) { _, empty in if !empty, !seenComposerTip { dismissCoach(.composer) } }
     .navigationTitle(scenarioTitle).navigationBarTitleDisplayMode(.inline)
@@ -281,14 +322,15 @@ struct InterviewView: View {
           }
         }
       }
-      // The warm-up has no way out but through: no Close, no Skip.
-      if !challenge.isWarmUp {
+      // The warm-up and the first rep have no way out but through: no Close. Nor while voice is coming up.
+      if !challenge.isWarmUp, model.firstUse.stage != .firstRep {
         ToolbarItem(placement: .cancellationAction) {
           Button("Close") {
             persistReading()
             model.presented = nil
             Task { if !interview.locked { try? await interview.flush() } }
           }
+          .disabled(liveVoice?.blocksText == true)
         }
       }
       ToolbarItem(placement: .topBarTrailing) {
@@ -375,6 +417,11 @@ struct InterviewView: View {
       persistReading()
     }
   }
+  private func voiceRoom(_ voice: LiveVoice) -> some View {
+    InterviewVoiceRoom(voice: voice, interview: interview, allowance: model.bootstrap?.capabilities?.voice?.allowanceLine(), opening: openingVoice,
+      question: { voiceQuestion }, leave: leaveVoiceRoom, text: leaveVoiceRoomToText,
+      coach: voiceCoach, coachReturnsToText: !seenComposerTip, dismissCoach: dismissCoach)
+  }
   /// The room's question, whole: you read it, then talk.
   private var voiceQuestion: some View {
     VStack(alignment: .leading, spacing: 12) {
@@ -406,10 +453,14 @@ struct InterviewView: View {
           identifier: "original" == activeID ? "interviewPrompt" : "earlierPrompt-original", markup: true)
     }.animation(disclosureMotion, value: collapsed)
   }
-  private func enterVoice(startNow: Bool = false) async {
-    guard !checkingVoice, let voice = liveVoice, !voice.blocksText else { return }
+  private func enterVoice(startNow: Bool = true) async {
+    guard !checkingVoice, let voice = liveVoice else { return }
+    // A transcript still waiting to sync blocks a new session; Talk tries the sync again rather than announcing it.
+    if voice.phase == .unavailable, voice.blocksText { await voice.retrySync() }
+    guard !voice.blocksText else { return }
     checkingVoice = true
     voicePermissionNeedsSettings = false
+    voiceGated = false
     defer { checkingVoice = false }
     do {
       var capability = model.bootstrap?.capabilities?.voice
@@ -425,8 +476,9 @@ struct InterviewView: View {
       }
       guard interview.currentAccount, phase == .active else { return }
       if let capability, !capability.available {
-        let reason = capability.reason ?? "Live voice is currently unavailable. You can continue in text."
-        voiceExplanation = [reason, capability.allowanceLine().map { $0 + "." }].compactMap { $0 }.joined(separator: " "); return
+        // A free-plan limit opens the way to Pro; anything else is just news.
+        voiceGated = capability.plan == "free" && capability.remaining != nil
+        voiceExplanation = capability.reason ?? "Live voice is currently unavailable. You can continue in text."; return
       }
       if !model.fixture {
         let allowed = await AVAudioApplication.requestRecordPermission()
@@ -440,8 +492,9 @@ struct InterviewView: View {
       }
       // Older compatible servers may not advertise the field; Start remains authoritative.
       focused = false
-      showingVoiceRoom = true
+      voiceQuestionCollapsed = true
       voice.dismiss()
+      showingVoiceRoom = true
       if startNow { await voice.start() }
     } catch { voiceExplanation = "Voice isn’t reachable right now. Your reply is unchanged." }
   }
@@ -492,6 +545,14 @@ struct InterviewView: View {
     Task { await liveVoice?.end() }
     focused = false
     showingVoiceRoom = false
+  }
+  /// Text mode: same exit, then the keyboard comes up once the editor is back on screen.
+  private func leaveVoiceRoomToText() {
+    leaveVoiceRoom()
+    Task { @MainActor in
+      await Task.yield()
+      focused = true
+    }
   }
   @ViewBuilder private func exchangeContent(_ exchange: InterviewExchange) -> some View {
     let collapsed = reading.collapsed.contains(exchange.id)
@@ -645,28 +706,10 @@ struct InterviewView: View {
   }
   private var footer: some View {
     VStack(spacing: 8) {
-      if let voice = liveVoice, voice.phase == .unavailable {
-        HStack {
-          Text(voice.message ?? "Voice could not connect.").font(.footnote).foregroundStyle(.secondary)
-          Button(voice.blocksText ? "Try again" : "Dismiss") { Task { if voice.blocksText { await voice.retrySync() } else { voice.dismiss() } } }
-        }
-      }
-      // One row at regular sizes; at accessibility sizes the nudge takes its own line so no label wraps letter by letter.
-      ViewThatFits(in: .horizontal) {
-        HStack(spacing: 16) {
-          talkButton
-          nudgeButton
-          Spacer(minLength: 0)
-          sendButton
-        }
-        VStack(alignment: .leading, spacing: 8) {
-          HStack(spacing: 16) {
-            talkButton
-            Spacer(minLength: 0)
-            sendButton
-          }
-          nudgeButton
-        }
+      HStack(spacing: 16) {
+        talkButton
+        Spacer(minLength: 0)
+        sendButton
       }
     }.padding(16)
       // The document scrolls under this bar; without a floor the draft's placeholder peeks through between the controls.
@@ -674,7 +717,9 @@ struct InterviewView: View {
       .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { footerFrame = $0; if followingLiveEnd, sheet == nil, let lastCaret { revealCaret(lastCaret) } }
   }
   private var talkButton: some View {
-    let voiceDisabled = checkingVoice || liveVoice == nil || interview.locked || interview.voice?.blocksText == true
+    // A transcript stuck waiting to sync (unavailable) keeps Talk live: tapping it retries the sync.
+    let voiceDisabled = checkingVoice || liveVoice == nil || interview.locked
+      || (interview.voice?.blocksText == true && interview.voice?.phase != .unavailable)
     return Button { Task { await enterVoice() } } label: {
       Label("Talk", systemImage: AppIcon.voice.rawValue)
         .font(.subheadline.weight(.semibold))
@@ -688,17 +733,7 @@ struct InterviewView: View {
       .buttonStyle(DrillbitPressStyle())
       .opacity(voiceDisabled ? 0.42 : 1)
       .disabled(voiceDisabled).accessibilityLabel("Talk it through").accessibilityHint("Switch to live voice. Your writing stays here.").accessibilityIdentifier("liveVoice")
-  }
-  @ViewBuilder private var nudgeButton: some View {
-    if interview.mode != .mockInterview {
-      Button("Need a nudge?") { requestAssistance("hint", title: "Nudge") }
-        .font(.subheadline.weight(.medium))
-        .tint(AppPalette.secondary)
-        .fixedSize()
-        .frame(minHeight: 44)
-        .disabled(requestingAssistance || interview.locked || interview.failedTurn != nil || liveVoice?.blocksText == true)
-        .accessibilityIdentifier("inlineNudge")
-    }
+      .coachAnchor(.keyboard)
   }
   private var sendButton: some View {
     Button {
@@ -786,7 +821,7 @@ struct RoundClock: View {
 struct GuidedPathBar: View {
   let steps: [String]
   let current: Int
-  @State private var showingSteps = false
+  @Binding var showingSteps: Bool
   var body: some View {
     let index = min(max(current, 0), steps.count - 1)
     Button { showingSteps = true } label: {
@@ -840,7 +875,7 @@ private struct GuidedPathSteps: View {
               Text(steps[step]).font(.subheadline.weight(step == current ? .semibold : .regular))
                 .foregroundStyle(step > current ? AppPalette.secondary : AppPalette.primary)
                 .fixedSize(horizontal: false, vertical: true)
-              if step == current { Text("You’re here").font(.caption.weight(.medium)).foregroundStyle(AppPalette.accent) }
+
             }
           }
           .padding(.vertical, 6)

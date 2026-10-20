@@ -11,6 +11,7 @@ import tenth from "../migrations/0010_daily_visits.sql?raw";
 import eleventh from "../migrations/0011_learning_loop.sql?raw";
 import twelfth from "../migrations/0012_credential_model.sql?raw";
 import thirteenth from "../migrations/0013_tickets_and_tomorrow.sql?raw";
+import fourteenth from "../migrations/0014_entitlements.sql?raw";
 export async function initializeDatabase(db: D1Database) {
   for (const sql of [first, second, third, fourth, fifth, sixth, seventh, eighth, ninth, tenth, eleventh])
     for (const statement of sql.split(";").filter((s) => s.trim()))
@@ -30,6 +31,6 @@ export async function initializeDatabase(db: D1Database) {
     await db.prepare(statement).run().catch((error: Error) => {
       if (!/duplicate column/i.test(error.message)) throw error;
     });
-  for (const statement of thirteenth.split(";").filter((s) => s.trim()))
-    await db.prepare(statement.replace(/CREATE TABLE /g, "CREATE TABLE IF NOT EXISTS ")).run();
+  for (const statement of [...thirteenth.split(";"), ...fourteenth.split(";")].filter((s) => s.trim()))
+    await db.prepare(statement.replace(/CREATE TABLE /g, "CREATE TABLE IF NOT EXISTS ").replace(/CREATE INDEX /g, "CREATE INDEX IF NOT EXISTS ")).run();
 }

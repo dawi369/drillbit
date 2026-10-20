@@ -1,3 +1,5 @@
 API_BASE_URL = https:/$()/example.invalid
 CLERK_PUBLISHABLE_KEY =
+// Superwall public key (pk_...). Empty means the native App Store paywall is used instead.
+SUPERWALL_API_KEY =
 #include? "Local.xcconfig"

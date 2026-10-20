@@ -32,13 +32,29 @@ The app renders a small tag set in the prompt and constraints. The title is alwa
 - <i>…</i> for a nuance the reader must not miss, such as "exactly one" or "at least".
 - <code>…</code> for identifiers, field names, endpoints, variable definitions and literal values.
 - <pre>…</pre> for a short payload, schema or snippet (12 lines at most) that is easier to read than to describe. Pretty-print JSON with two-space indentation. Put it between sentences, never inside a list.
-Use formatting only where it helps someone read the question faster; most sentences have none. No other tags, no Markdown, no backticks, no nesting. Write a literal <, > or & as &lt;, &gt; or &amp;.
+Use formatting only where it helps someone read the question faster; most sentences have none. These four are the only tags that exist: never invent one, and never wrap a payload in a tag named after it; a payload goes in <pre>. No Markdown, no backticks, no nesting. Write a literal <, > or & as &lt;, &gt; or &amp;.
 Examples of well-formatted prompts:
 ${examples.map((example) => `<example>${example}</example>`).join("\n")}
 </question_formatting>`;
 }
 
 /** Removes question markup, e.g. for places that show a plain preview. */
+/**
+ * Models sometimes invent a tag (`<practice>{…}</practice>`, `<payload>…</payload>`). The app only knows
+ * QUESTION_TAGS, so anything else is folded into them: a block-shaped body (several lines, or JSON) becomes
+ * <pre>, otherwise the tag is dropped and its text kept. Tolerates an unclosed tag at the end of streaming text.
+ */
+export function normalizeQuestionMarkup(text: string): string {
+  const known = new Set<string>(QUESTION_TAGS);
+  return text
+    .replace(/<([a-zA-Z][\w-]*)>([\s\S]*?)<\/\1>/g, (whole, tag: string, body: string) => {
+      if (known.has(tag)) return whole;
+      const block = body.includes("\n") || /^\s*[\[{]/.test(body);
+      return block ? `<pre>${body.trim()}</pre>` : body;
+    })
+    .replace(/<\/?([a-zA-Z][\w-]*)>/g, (whole, tag: string) => (known.has(tag) ? whole : ""));
+}
+
 export function plainQuestion(text: string): string {
   return text
     .replace(/<\/?(?:b|i|code|pre)>/g, "")

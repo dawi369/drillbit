@@ -134,7 +134,7 @@ struct ReflectionView: View {
           if offersReminder { reminderOffer }
           completionAction(reflection: reflection)
           if !model.mayStartRep(), let next = model.nextFreeRep {
-            Text(AppModel.freeRepLine(next)).font(.subheadline).foregroundStyle(AppPalette.secondary)
+            ProNudge(message: AppModel.freeRepLine(next), placement: .practiceRep) { await model.refresh() }
               .accessibilityIdentifier("freeRepNotice")
           }
           if model.mayStartRep(), let turn = (current ?? initial).interview?.turns.last(where: { $0.kind == "answer" }) {

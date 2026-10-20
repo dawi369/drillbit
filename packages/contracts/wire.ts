@@ -25,6 +25,7 @@ import { interviewInputSchema, interviewResultSchema, interviewStyleSchema } fro
 import { guidanceModeSchema } from "../../apps/api/src/prompts/teaching";
 import { conceptId, eligibilityInput, observationSchema } from "../../apps/api/src/taxonomy";
 import { voiceDelegateSchema, voiceEventsSchema, voiceFragmentSchema, voiceStartSchema } from "../../apps/api/src/voice";
+import { appleNotificationSchema, entitlementInputSchema } from "../../apps/api/src/entitlements";
 const job = z
   .object({
     id: z.string(),
@@ -142,7 +143,10 @@ const todayPlan=z.object({state:z.enum(["first_session","resume","review_due","q
 const queuedNext=z.object({sourceId:z.string(),title:z.string(),conceptId:conceptId.optional(),label:z.string().optional(),createdAt:z.string()});
 export const wire = {
   VoiceStart:voiceStartSchema, VoiceEvents:voiceEventsSchema, VoiceDelegate:voiceDelegateSchema,
-  VoiceConnection:z.object({id:z.string(),sdp:z.string(),expiresAt:z.string()}),
+  EntitlementInput: entitlementInputSchema,
+  Entitlement: z.object({ plan: z.enum(["free", "pro"]), entitlement: z.object({ productId: z.string(), status: z.enum(["active", "grace", "expired", "revoked"]), activeUntil: z.string().nullable() }) }),
+  AppleNotification: appleNotificationSchema,
+  VoiceConnection:z.object({id:z.string(),sdp:z.string(),expiresAt:z.string(),sessionSeconds:z.number().int().optional()}),
   Taxonomy:z.object({version:z.literal(1),concepts:z.array(z.object({id:conceptId,label:z.string(),category:z.string(),aliases:z.array(z.string()),description:z.string().optional()}))}),
   LibraryQuestion:libraryQuestion,
   LibraryPage:z.object({questions:z.array(libraryQuestion),nextCursor:z.string().nullable()}),
@@ -190,12 +194,12 @@ export const wire = {
   Credential: z.object({ suffix: z.string(), model: z.string() }),
   Bootstrap: z.object({
     practiceEpoch:z.string().optional(),
-    account: z.object({ id: z.string(), status: z.string() }),
+    account: z.object({ id: z.string(), status: z.string(), plan: z.enum(["free", "pro"]).optional() }),
     settings: settingsSchema,
     todayPlan: todayPlan.optional(),
     queuedNext: queuedNext.nullable().optional(),
-    // freeReps is false while the gate is off or the account is unlimited.
-    practice: z.object({ freeReps: z.boolean(), available: z.boolean(), nextFreeRepAt: z.string().nullable() }).optional(),
+    // freeReps is false on Pro (gate off, allowlist or entitlement). remaining/limit/resetsAt describe today's free reps.
+    practice: z.object({ plan: z.enum(["free", "pro"]).optional(), freeReps: z.boolean(), available: z.boolean(), nextFreeRepAt: z.string().nullable(), remaining: z.number().int().optional(), limit: z.number().int().optional(), resetsAt: z.string().optional() }).optional(),
     challenge: challenge.nullable(),
     jobs: z.array(job),
     credential: z.object({ suffix: z.string(), model: z.string().nullable() }).nullable(),
@@ -203,7 +207,8 @@ export const wire = {
       automaticCompanion: z.boolean().optional(),
       managedAI: z.boolean(),
       voiceInterview: z.boolean(),
-      voice: z.object({ available: z.boolean(), reason: z.string().optional(), checkedAt: z.string(), remaining: z.number().int().optional(), limit: z.number().int().optional(), resetsAt: z.string().optional() }).optional(),
+      // sessionSeconds is the cap for the next session; kind says whether free sessions are the intro ones or the periodic taste.
+      voice: z.object({ available: z.boolean(), plan: z.enum(["free", "pro"]).optional(), reason: z.string().optional(), checkedAt: z.string(), sessionSeconds: z.number().int().optional(), remaining: z.number().int().optional(), limit: z.number().int().optional(), resetsAt: z.string().optional(), kind: z.enum(["intro", "taste"]).optional() }).optional(),
       developerTools: z.boolean().optional(),
     }),
   }),

@@ -47,8 +47,17 @@ async function person() {
   return { subject, id: account.id };
 }
 const prepare = (subject: string, body: object = {}) => request("challenges", subject, "POST", body, crypto.randomUUID());
-const access = async (subject: string) => ((await (await request("bootstrap", subject)).json()) as { practice: { freeReps: boolean; available: boolean; nextFreeRepAt: string | null } }).practice;
+const access = async (subject: string) => ((await (await request("bootstrap", subject)).json()) as { practice: { plan: string; freeReps: boolean; available: boolean; nextFreeRepAt: string | null; remaining?: number; limit?: number; resetsAt?: string } }).practice;
+const utcMidnight = () => { const d = new Date(); d.setUTCHours(24, 0, 0, 0); return d.toISOString(); };
 const generations = (account: string) => bindings.DB.prepare("SELECT id,status,input FROM jobs WHERE account_id=? AND kind='generate' ORDER BY created_at").bind(account).all<{ id: string; status: string; input: string }>();
+/** Completed free reps from earlier today; each carries its own stamp. */
+async function spentToday(account: string, n: number) {
+  for (let i = 0; i < n; i++) {
+    const at = new Date(Date.now() - 60_000 - i * 1000).toISOString();
+    await bindings.DB.prepare("INSERT INTO challenges(id,account_id,lifecycle,data,created_at,available_at,completed_at) VALUES(?,?,'completed',?,?,?,?)")
+      .bind(crypto.randomUUID(), account, JSON.stringify({ title: "Queue", prompt: "Design a reliable job queue for email.", topic: "System design", freeRepAt: at }), at, at, at).run();
+  }
+}
 async function readyQuestion(account: string, data: object) {
   const id = crypto.randomUUID();
   await bindings.DB.prepare("INSERT INTO challenges(id,account_id,lifecycle,data,created_at,available_at) VALUES(?,?,'ready',?,?,?)")
@@ -62,33 +71,50 @@ it("leaves practice unlimited while the gate is off", async () => {
   const previous = bindings.PRACTICE_GATE;
   bindings.PRACTICE_GATE = undefined;
   try {
-    expect(await access(subject)).toEqual({ freeReps: false, available: true, nextFreeRepAt: null });
+    expect(await access(subject)).toEqual({ plan: "pro", freeReps: false, available: true, nextFreeRepAt: null });
     expect((await prepare(subject)).status).toBe(202);
     expect(JSON.parse((await generations(id)).results[0].input).freeRepAt).toBeUndefined();
   } finally { bindings.PRACTICE_GATE = previous; }
 });
 
-it("spends one free rep when a question is prepared and blocks the next until seven days pass", async () => {
+it("spends free reps as questions are prepared and blocks the fourth until UTC midnight", async () => {
   const { subject, id } = await person();
-  expect(await access(subject)).toEqual({ freeReps: true, available: true, nextFreeRepAt: null });
-  const first = await prepare(subject);
-  expect(first.status).toBe(202);
-  const job = (await generations(id)).results[0];
-  expect(JSON.parse(job.input).freeRepAt).toBeTruthy();
-  // The preparation finishing is the rep, not starting it.
-  await bindings.DB.prepare("UPDATE jobs SET status='completed' WHERE id=?").bind(job.id).run();
-  await readyQuestion(id, { freeRepAt: JSON.parse(job.input).freeRepAt });
-  await bindings.DB.prepare("UPDATE challenges SET lifecycle='completed' WHERE account_id=?").bind(id).run();
+  expect(await access(subject)).toEqual({ plan: "free", freeReps: true, available: true, nextFreeRepAt: null, remaining: 3, limit: 3, resetsAt: utcMidnight() });
+  const stamps: string[] = [];
+  for (let rep = 0; rep < 3; rep++) {
+    const prepared = await prepare(subject);
+    expect(prepared.status).toBe(202);
+    const job = (await generations(id)).results.find(j => j.status === "pending")!;
+    const stamp = JSON.parse(job.input).freeRepAt as string;
+    expect(stamp).toBeTruthy();
+    stamps.push(stamp);
+    // The preparation finishing is the rep, not starting it.
+    await bindings.DB.prepare("UPDATE jobs SET status='completed' WHERE id=?").bind(job.id).run();
+    await readyQuestion(id, { freeRepAt: stamp });
+    await bindings.DB.prepare("UPDATE challenges SET lifecycle='completed' WHERE account_id=?").bind(id).run();
+    expect((await access(subject)).remaining).toBe(2 - rep);
+  }
   const blocked = await prepare(subject);
   expect(blocked.status).toBe(402);
   expect(await blocked.json()).toMatchObject({ error: { code: "practice_gate" } });
   const later = await access(subject);
-  expect(later.available).toBe(false);
-  expect(Date.parse(later.nextFreeRepAt!) - Date.parse(JSON.parse(job.input).freeRepAt)).toBe(7 * 86_400_000);
-  // Seven days on, the free rep is back.
-  await bindings.DB.prepare("UPDATE challenges SET data=json_set(data,'$.freeRepAt',?) WHERE account_id=?").bind(new Date(Date.now() - 7 * 86_400_000 - 1000).toISOString(), id).run();
-  expect((await access(subject)).available).toBe(true);
+  expect(later).toMatchObject({ available: false, remaining: 0, nextFreeRepAt: utcMidnight() });
+  // Yesterday's reps don't count today.
+  await bindings.DB.prepare("UPDATE challenges SET data=json_set(data,'$.freeRepAt',?) WHERE account_id=? AND json_extract(data,'$.freeRepAt')=?").bind(new Date(Date.now() - 86_400_000).toISOString(), id, stamps[0]).run();
+  expect((await access(subject)).remaining).toBe(1);
   expect((await prepare(subject)).status).toBe(202);
+});
+
+it("honours a configured daily rep count", async () => {
+  const { subject, id } = await person();
+  bindings.FREE_REPS_PER_DAY = "1";
+  try {
+    expect((await access(subject)).limit).toBe(1);
+    expect((await prepare(subject)).status).toBe(202);
+    await bindings.DB.prepare("UPDATE jobs SET status='completed' WHERE account_id=?").bind(id).run();
+    await spentToday(id, 1);
+    expect((await prepare(subject)).status).toBe(402);
+  } finally { bindings.FREE_REPS_PER_DAY = undefined; }
 });
 
 it("never charges a failed preparation and retries it as a fresh rep", async () => {
@@ -101,7 +127,7 @@ it("never charges a failed preparation and retries it as a fresh rep", async () 
   expect(retried.status).toBe(202);
   const fresh = (await generations(id)).results.find(j => j.status === "pending")!;
   expect(Date.parse(JSON.parse(fresh.input).freeRepAt)).toBeGreaterThan(Date.parse(JSON.parse(failed.input).freeRepAt));
-  expect((await access(subject)).available).toBe(false);
+  expect((await access(subject)).remaining).toBe(2);
 });
 
 it("includes exactly one swap of a free rep's question", async () => {
@@ -117,11 +143,16 @@ it("includes exactly one swap of a free rep's question", async () => {
     bindings.DB.prepare("UPDATE challenges SET lifecycle='expired' WHERE id=?").bind(original),
   ]);
   const swapped = await readyQuestion(id, { freeRepAt: spentAt, swapped: true });
+  // A swap shares its rep's stamp, so the original and its replacement count once.
+  expect((await access(subject)).remaining).toBe(2);
+  await spentToday(id, 2);
+  expect((await access(subject)).remaining).toBe(0);
   expect((await prepare(subject, { replaceId: swapped })).status).toBe(402);
 });
 
-it("prepares one question when two preparations race for the same free rep", async () => {
+it("prepares one question when two preparations race for the last free rep", async () => {
   const { subject, id } = await person();
+  await spentToday(id, 2);
   const [a, b] = await Promise.all([prepare(subject), prepare(subject)]);
   expect([a.status, b.status].sort()).toEqual([202, 202]);
   expect((await generations(id)).results).toHaveLength(1);
@@ -141,10 +172,9 @@ it("keeps allowlisted accounts unlimited and never auto-prepares a free account'
   expect((await generations(free.id)).results).toHaveLength(0);
 });
 
-it("gates starting a Library question once the free rep is spent", async () => {
+it("gates starting a Library question once today's free reps are spent", async () => {
   const { subject, id } = await person();
-  await readyQuestion(id, { freeRepAt: new Date().toISOString() });
-  await bindings.DB.prepare("UPDATE challenges SET lifecycle='completed' WHERE account_id=?").bind(id).run();
+  await spentToday(id, 3);
   const question = crypto.randomUUID();
   await bindings.DB.prepare("INSERT INTO questions(id,account_id,data,created_at,eligibility_updated_at) VALUES(?,?,?,?,?)")
     .bind(question, id, JSON.stringify({ title: "Cache", prompt: "Design a read-through cache for profiles.", topic: "System design" }), "now", "now").run();
@@ -160,13 +190,19 @@ it("publishes the opener, free-rep markers and practice access on the wire", asy
   expect(bootstrap.challenge.opener).toContain("What should a client be able to rely on?");
 });
 
-it("caps follow-ups and nudges inside a free rep only", () => {
+it("caps follow-ups and nudges inside a free rep only", async () => {
   const turns = (kind: string, n: number) => Array.from({ length: n }, () => ({ kind }));
   const data = { freeRepAt: new Date().toISOString() };
-  expect(() => freeRepLimit(bindings, "a", data, "answer", turns("answer", 7))).not.toThrow();
-  expect(() => freeRepLimit(bindings, "a", data, "answer", [...turns("answer", 6), ...turns("clarification", 2)])).toThrow(/every follow-up/);
-  expect(() => freeRepLimit(bindings, "a", data, "hint", [...turns("hint", 1), ...turns("answer", 3)])).not.toThrow();
-  expect(() => freeRepLimit(bindings, "a", data, "example", [...turns("hint", 1), ...turns("example", 1)])).toThrow(/nudges/);
-  expect(() => freeRepLimit({ ...bindings, FREE_REP_NUDGES: "5" }, "a", data, "hint", turns("hint", 3))).not.toThrow();
-  expect(() => freeRepLimit(bindings, "a", {}, "answer", turns("answer", 30))).not.toThrow();
+  const { id } = await person();
+  await expect(freeRepLimit(bindings, id, data, "answer", turns("answer", 7))).resolves.toBeUndefined();
+  await expect(freeRepLimit(bindings, id, data, "answer", [...turns("answer", 6), ...turns("clarification", 2)])).rejects.toThrow(/every follow-up/);
+  await expect(freeRepLimit(bindings, id, data, "hint", [...turns("hint", 1), ...turns("answer", 3)])).resolves.toBeUndefined();
+  await expect(freeRepLimit(bindings, id, data, "example", [...turns("hint", 1), ...turns("example", 1)])).rejects.toThrow(/nudges/);
+  await expect(freeRepLimit({ ...bindings, FREE_REP_NUDGES: "5" }, id, data, "hint", turns("hint", 3))).resolves.toBeUndefined();
+  await expect(freeRepLimit(bindings, id, {}, "answer", turns("answer", 30))).resolves.toBeUndefined();
+  // Going Pro mid-rep lifts the budget.
+  await bindings.DB.prepare("INSERT INTO entitlements(original_transaction_id,account_id,product_id,environment,status,active_until,signed_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)")
+    .bind(crypto.randomUUID(), id, "dawi.drillbit.pro.monthly", "Sandbox", "active", new Date(Date.now() + 86_400_000).toISOString(), "now", "now", "now").run();
+  await expect(freeRepLimit(bindings, id, data, "answer", turns("answer", 30))).resolves.toBeUndefined();
+  expect(await access((await bindings.DB.prepare("SELECT subject FROM accounts WHERE id=?").bind(id).first<{ subject: string }>())!.subject)).toMatchObject({ plan: "pro", freeReps: false });
 });

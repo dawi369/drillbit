@@ -1,6 +1,7 @@
 import { env, fetchMock } from "cloudflare:test";
 import { afterAll, beforeAll, expect, it } from "vitest";
-import { partialJSONString, textDeltas } from "../src/ai";
+import { partialJSONString, partialJSONStrings, textDeltas } from "../src/ai";
+import { normalizeQuestionMarkup } from "../src/prompts/formatting";
 import { boundedContext } from "../src/context";
 import { roundTiming } from "../src/domain";
 import { reconcile, runJob } from "../src/jobs";
@@ -168,9 +169,10 @@ it("durably generates a valid challenge and replay does not call the provider ag
       .bind(id)
       .first(),
   ).toEqual({ status: "completed" });
-  // The preview's streamed draft ends as exactly the question's title and prompt.
+  // The preview's streamed draft ends as exactly the question's title and prompt, marked finished before the job's bookkeeping.
   const draft = await bindings.DB.prepare("SELECT text FROM interview_streams WHERE job_id=?").bind(id).first<{ text: string }>();
   expect(JSON.parse(draft!.text)).toEqual({
+    textDone: true,
     title: "Safe flag rollout",
     prompt: "Design a feature flag control plane that keeps local evaluation available during a regional outage.",
   });
@@ -227,6 +229,17 @@ it("reads a partial question field without exposing a split escape", () => {
   const raw = '{"kind":"design","title":"Queue \\"retries\\"","prompt":"Design a queue\\u00';
   expect(partialJSONString(raw, "title")).toBe('Queue "retries"');
   expect(partialJSONString(raw, "prompt")).toBe("Design a queue");
+  expect(partialJSONStrings('{"constraints":["At most one \\"charge\\"","Reads stay fa', "constraints")).toEqual(['At most one "charge"', "Reads stay fa"]);
+  expect(partialJSONStrings('{"constraints":[],"x":1}', "constraints")).toEqual([]);
+  expect(partialJSONStrings('{"constraints":["one","two"],"x":1}', "constraints")).toEqual(["one", "two"]);
+});
+
+it("an invented tag is folded into the four the app knows", () => {
+  expect(normalizeQuestionMarkup('Key facts:\n<practice>{"productId":"204",\n "qty":2}</practice>\nGo.'))
+    .toBe('Key facts:\n<pre>{"productId":"204",\n "qty":2}</pre>\nGo.');
+  expect(normalizeQuestionMarkup("Read <field>orderId</field> and <b>dedupe</b>.")).toBe("Read orderId and <b>dedupe</b>.");
+  expect(normalizeQuestionMarkup("<pre>{\n \"a\": 1\n}</pre> stays")).toBe("<pre>{\n \"a\": 1\n}</pre> stays");
+  expect(normalizeQuestionMarkup("streaming <payload>{\"a\":")).toBe('streaming {"a":');
   expect(partialJSONString('{"kind":"de', "title")).toBe("");
 });
 it("parses streamed events split across chunks, including CRLF framing", async () => {

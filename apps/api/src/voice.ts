@@ -5,6 +5,7 @@ import { Fault, practiceProfileSchema, timestamp } from './domain';
 import { historicalSnapshot } from './history';
 import { interviewFor, mockRound } from './interview';
 import { consumeUsage, type Env } from './platform';
+import { limits, nextUtcMidnight, planFor } from './plans';
 import { practicePersonality, questionTerminology } from "./prompts/interviewer";
 import { personalizationInstructions } from "./prompts/personalization";
 import { guidanceModeSchema, TEACHING_VERSION, teachingPolicy, truthfulVoiceProgress } from "./prompts/teaching";
@@ -24,35 +25,39 @@ async function sessionFor(env:Env, account:string, challenge:string, id:string) 
  if(!s) throw new Fault('not_found',404,'Voice session not found.');
  return s;
 }
-function unlimitedVoice(env: Env, account: string): boolean {
- return (env.VOICE_UNLIMITED_ACCOUNTS ?? '').split(',').map(id => id.trim()).filter(Boolean).includes(account);
-}
-async function consumeVoiceUsage(env: Env, account: string, kind: string, limit: number) {
- if (!unlimitedVoice(env, account)) return consumeUsage(env, account, kind, limit);
- // Explicit account exemptions retain accounting for every voice operation.
- await env.DB.prepare("INSERT INTO usage(account_id,day,kind,count) VALUES(?,?,?,1) ON CONFLICT(account_id,day,kind) DO UPDATE SET count=count+1").bind(account,timestamp().slice(0,10),kind).run();
-}
 // A start that never produced a provider session costs nothing, so it doesn't count.
 async function refundVoiceStart(env: Env, account: string, day: string) {
  await env.DB.prepare("UPDATE usage SET count=count-1 WHERE account_id=? AND day=? AND kind='voice_start' AND count>0").bind(account, day).run();
 }
-const VOICE_DAILY_STARTS = 6;
-function nextUtcMidnight(now: string) {
- const next = new Date(now.slice(0,10) + 'T00:00:00.000Z');
- next.setUTCDate(next.getUTCDate() + 1);
- return next.toISOString();
-}
+const weekday = (iso: string) => new Date(iso).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+/**
+ * What this account may do with voice right now. Free: the first few sessions, then one taste every
+ * `voiceTasteDays`. Pro: a daily fair-use cap that is never shown. Both carry the session cap in seconds.
+ */
 export async function voiceCapability(env: Env, account: string) {
  const checkedAt = timestamp();
  if (env.VOICE_ENABLED !== 'true' || !env.OPENAI_API_KEY)
   return { available: false, reason: 'Live voice is currently unavailable. You can continue in text.', checkedAt };
- if (unlimitedVoice(env, account)) return { available: true, checkedAt };
- const usage = await env.DB.prepare("SELECT count FROM usage WHERE account_id=? AND day=? AND kind='voice_start'").bind(account, checkedAt.slice(0,10)).first<{count:number}>();
- const remaining = Math.max(0, VOICE_DAILY_STARTS - (usage?.count ?? 0));
- const allowance = { remaining, limit: VOICE_DAILY_STARTS, resetsAt: nextUtcMidnight(checkedAt) };
- if (remaining === 0)
-  return { available: false, reason: 'You’ve used today’s voice sessions. You can keep going in text.', checkedAt, ...allowance };
- return { available: true, checkedAt, ...allowance };
+ const plan = await planFor(env, account), caps = limits(env, plan);
+ const sessionSeconds = caps.voiceSessionSeconds;
+ // `plan` on the capability tells the start handler whether a refusal is a paywall or a fair-use pause.
+ const today = await env.DB.prepare("SELECT count FROM usage WHERE account_id=? AND day=? AND kind='voice_start'").bind(account, checkedAt.slice(0,10)).first<{count:number}>();
+ if (plan === 'pro') {
+  if ((today?.count ?? 0) >= caps.voiceStartsPerDay)
+   return { available: false, plan, reason: 'That’s a lot of talking for one day. Voice is back tomorrow.', checkedAt, sessionSeconds, resetsAt: nextUtcMidnight(checkedAt) };
+  return { available: true, plan, checkedAt, sessionSeconds };
+ }
+ // Sessions that reached the provider; refunded starts never activate.
+ const history = await env.DB.prepare("SELECT COUNT(*) n, MAX(created_at) last FROM voice_sessions WHERE account_id=? AND provider_id IS NOT NULL").bind(account).first<{n:number; last:string|null}>();
+ const used = history?.n ?? 0;
+ if (used < caps.voiceFreeLifetime) {
+  const remaining = caps.voiceFreeLifetime - used;
+  return { available: true, plan, checkedAt, sessionSeconds, remaining, limit: caps.voiceFreeLifetime, kind: 'intro' as const };
+ }
+ const nextAt = history?.last ? new Date(Date.parse(history.last) + caps.voiceTasteDays * 86_400_000).toISOString() : checkedAt;
+ if (nextAt > checkedAt)
+  return { available: false, plan, reason: `Your next free voice session comes back ${weekday(nextAt)}. Pro has it any time.`, checkedAt, sessionSeconds, remaining: 0, limit: 1, resetsAt: nextAt, kind: 'taste' as const };
+ return { available: true, plan, checkedAt, sessionSeconds, remaining: 1, limit: 1, kind: 'taste' as const };
 }
 export async function assertNoVoice(env:Env,account:string,id:string) {
  const s=await env.DB.prepare("SELECT id FROM voice_sessions WHERE account_id=? AND challenge_id=? AND status IN ('connecting','active') AND expires_at>?").bind(account,id,timestamp()).first();
@@ -67,8 +72,13 @@ export async function startVoice(env:Env,account:string,id:string,command:string
  context.guidanceMode = input.guidanceMode ?? context.guidanceMode;
  if(context.turns.some(t=>['pending','running','failed'].includes(t.status))) throw new Fault('interview_pending',409,'Finish the current response first.');
  const day=timestamp().slice(0,10);
- await consumeVoiceUsage(env,account,'voice_start',VOICE_DAILY_STARTS);
- const now=timestamp(),expires=new Date(Date.now()+15*60*1000).toISOString();
+ const capability=await voiceCapability(env,account);
+ if(!capability.available || !capability.plan) throw capability.plan === 'free' ? new Fault('voice_gate',402,capability.reason ?? 'Voice isn’t available right now.') : new Fault('usage_limit',429,capability.reason ?? 'Voice isn’t available right now.');
+ const plan=capability.plan, caps=limits(env,plan);
+ await consumeUsage(env,account,'voice_start',caps.voiceStartsPerDay);
+ // The session cap plus a little slack for the close handshake; events after this are refused.
+ const sessionSeconds=caps.voiceSessionSeconds;
+ const now=timestamp(),expires=new Date(Date.now()+(sessionSeconds+30)*1000).toISOString();
  // Reserve before paid startup. Lost handshakes cannot be blindly retried.
  const s=await env.DB.batch([
   env.DB.prepare("UPDATE voice_sessions SET status='uncertain' WHERE account_id=? AND expires_at<=? AND status IN ('connecting','active')").bind(account,now),
@@ -91,7 +101,7 @@ export async function startVoice(env:Env,account:string,id:string,command:string
   const activated=await env.DB.prepare("UPDATE voice_sessions SET provider_id=?,status='active' WHERE id=? AND status='connecting' AND EXISTS(SELECT 1 FROM challenges WHERE id=? AND account_id=? AND lifecycle='in_progress')").bind(result.session.id,s.id,id,account).run();
   if (activated.meta.changes) await env.DB.prepare("UPDATE challenges SET data=json_set(data,'$.guidanceMode',?) WHERE id=? AND account_id=?").bind(context.guidanceMode,id,account).run();
   if(!activated.meta.changes)throw new Fault('inactive',409,'The interview ended while voice was connecting.');
-  return {id:command,sdp:result.transport.sdp,expiresAt:expires};
+  return {id:command,sdp:result.transport.sdp,expiresAt:expires,sessionSeconds};
  } catch(error) {
   await env.DB.prepare("UPDATE voice_sessions SET status='uncertain' WHERE id=?").bind(command).run();
   if(!providerSession) await refundVoiceStart(env,account,day);
@@ -130,7 +140,7 @@ export async function delegateVoice(env:Env,account:string,challenge:string,id:s
  const started=Date.now();
  const deadline=AbortSignal.timeout(12000);
  try {
-  await consumeVoiceUsage(env,account,'voice_reasoning',40);
+  await consumeUsage(env,account,'voice_reasoning',limits(env,await planFor(env,account)).voiceReasoningPerDay);
   const [settings,history,interview,voiceJob]=await Promise.all([settingsFor(env,account),historicalSnapshot(env,account,challenge,JSON.parse(c.data).conceptIds ?? []),interviewFor(env,account,challenge),env.DB.prepare("SELECT input FROM jobs WHERE id=? AND account_id=?").bind(id,account).first<{input:string}>()]);
   const pinnedProfile=voiceJob ? JSON.parse(voiceJob.input).practiceProfile : undefined;
   const data=JSON.parse(c.data);
@@ -138,9 +148,14 @@ export async function delegateVoice(env:Env,account:string,challenge:string,id:s
   const messages=voiceDelegationMessages(data,history,{...interview,timing},pinnedProfile ?? settings.practiceProfile);
   const contextMs=Date.now()-started;
   const voiceSchema=interviewModelSchema({promptVersion:"interviewer-teaching-v3"},z.object({}));
-  const response=await provider(env,account,settings,messages,{kind:'voice_reasoning',maxTokens:900,schema:voiceSchema,reasoning:{enabled:false},signal:deadline});
-  const body=await response.json() as any;await recordUsage(env,account,settings,'voice_reasoning',body.usage,TEACHING_VERSION+'-'+interview.guidanceMode);
-  const text=(voiceSchema.parse(parseModelJSON(body.choices?.[0]?.message?.content)) as {text:string}).text;
+  // About one delegation in fifty comes back as a whitespace runaway cut off by max_tokens; one more try fits inside the deadline.
+  let text='';
+  for(let attempt=0;;attempt++){
+   const response=await provider(env,account,settings,messages,{kind:'voice_reasoning',maxTokens:900,schema:voiceSchema,reasoning:{enabled:false},signal:deadline});
+   const body=await response.json() as any;await recordUsage(env,account,settings,'voice_reasoning',body.usage,TEACHING_VERSION+'-'+interview.guidanceMode);
+   try { text=(voiceSchema.parse(parseModelJSON(body.choices?.[0]?.message?.content)) as {text:string}).text; break; }
+   catch(error){ if(attempt>0 || Date.now()-started>6000) throw error; console.log(JSON.stringify({event:'voice_delegation_retry',finishReason:body.choices?.[0]?.finish_reason})); }
+  }
   await env.DB.prepare("UPDATE voice_delegations SET status='completed',result=? WHERE session_id=? AND id=?").bind(text,id,delegation).run();
   console.log(JSON.stringify({event:'voice_delegation',contextMs,totalMs:Date.now()-started,inputCharacters:messages.reduce((n,m)=>n+m.content.length,0),mode:interview.guidanceMode}));
   return {text};

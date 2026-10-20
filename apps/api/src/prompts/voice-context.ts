@@ -56,6 +56,6 @@ export function voiceDelegationMessages(question: any, history: unknown, intervi
     action:{kind:'answer',text:latestUser >= 0 ? dialogue[latestUser].content : '[No spoken request yet. Invite me to begin briefly.]'},
   });
   messages[0].content += `
-<spoken_delivery>The same JSON response contract applies. The text will be spoken aloud: one short conversational paragraph, normally two or three sentences. Do not write Markdown, bullet lists, a JSON example inside text, or code fences. Describe example fields in ordinary words. Only say path syntax when the user asks for it. Keep any explanation under 120 words. Older assistant fragments may have been interrupted; never assume they were heard. If the user complains about waiting, acknowledge the wait without denying their experience, inventing a cause or asking them to wait again.</spoken_delivery>`;
+<spoken_delivery>The same JSON response contract applies. The text will be spoken aloud: one short conversational paragraph, normally two or three sentences. Do not write Markdown, bullet lists, a JSON example inside text, or code fences. Describe example fields in ordinary words. Only say path syntax when the user asks for it. Keep replies under about 60 words; a requested example may run to 120. Older assistant fragments may have been interrupted; never assume they were heard. If the user complains about waiting, acknowledge the wait without denying their experience, inventing a cause or asking them to wait again.</spoken_delivery>`;
   return messages;
 }

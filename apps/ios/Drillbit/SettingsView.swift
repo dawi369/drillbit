@@ -1,3 +1,4 @@
+import StoreKit
 import SwiftUI
 import UserNotifications
 
@@ -5,6 +6,7 @@ struct SettingsView: View {
   @Bindable var model: AppModel
   @Environment(\.dismiss) private var dismiss
   @State private var deleting = false
+  @State private var showingManageSubscriptions = false
   @State private var discarding = false
   @State private var saving = false
   @State private var reminderPermissionPending = false
@@ -74,6 +76,17 @@ struct SettingsView: View {
           Text("Dark").tag("dark")
         }.pickerStyle(.menu).accessibilityIdentifier("appearancePicker")
       }
+      Section("Plan") {
+        LabeledContent("Plan", value: model.isPro ? "Pro" : "Free").accessibilityIdentifier("planRow")
+        if model.isPro {
+          Button("Manage subscription") { showingManageSubscriptions = true }
+            .manageSubscriptionsSheet(isPresented: $showingManageSubscriptions)
+        } else {
+          Text(model.repsLeftLine ?? "3 free reps a day, voice to taste. Pro has no limits.").font(.footnote).foregroundStyle(.secondary)
+          Button("See Pro") { PlanCoordinator.shared.register(.practiceRep) { await model.refresh() } }.accessibilityIdentifier("settingsSeePro")
+          Button("Restore purchases") { Task { try? await AppStore.sync(); await PlanCoordinator.shared.syncEntitlements() } }
+        }
+      }
       Section("Account") {
         NavigationLink("Export practice data") { PracticeExportView(model: model) }
         Button("Sign out") {
@@ -113,16 +126,8 @@ struct SettingsView: View {
             Text("This permanently deletes your account, practice, feedback, Recall and saved key. There’s no undo.")
           }
       }
-      if model.bootstrap?.capabilities?.developerTools == true {
-        DeveloperSettingsSection {
-          Task {
-            await model.perform {
-              try await model.resetDeveloperPractice()
-              appearance = "dark"
-              dismiss()
-            }
-          }
-        }
+      if model.bootstrap?.capabilities?.developerTools == true || model.fixture {
+        DeveloperSettingsSection(model: model, appearance: $appearance, dismiss: { dismiss() })
       }
     }.navigationTitle("Settings")
       .toolbar {
@@ -142,21 +147,70 @@ struct SettingsView: View {
   }
 }
 private struct DeveloperSettingsSection: View {
-  var reset: () -> Void
-  @State private var confirming = false
+  @Bindable var model: AppModel
+  @Binding var appearance: String
+  var dismiss: () -> Void
+  @State private var confirming: Reset?
+  @State private var planPreview = AppModel.PlanPreview.live
+  @State private var coachReplayed = false
+  enum Reset: String, Identifiable { case practice, everything, reinvite; var id: String { rawValue } }
+
   var body: some View {
     Section {
-      Button("Reset Drillbit", role: .destructive) { confirming = true }
-        .confirmationDialog("Reset all Drillbit practice data?", isPresented: $confirming) {
-          Button("Reset Drillbit", role: .destructive, action: reset)
-          Button("Cancel", role: .cancel) {}
-        } message: {
-          Text("This permanently removes your practice, Recall history, preferences, reminders and LLM key. You’ll stay signed in and return to onboarding.")
-        }
+      Picker("Plan preview", selection: $planPreview) {
+        Text("Live").tag(AppModel.PlanPreview.live)
+        Text("Free · 2 reps left").tag(AppModel.PlanPreview.freeReps)
+        Text("Free · spent").tag(AppModel.PlanPreview.freeSpent)
+      }
+      .onChange(of: planPreview) { _, value in model.previewPlan(value) }
+      Button(coachReplayed ? "Tips will show again" : "Replay first-run tips") {
+        for mark in CoachMark.allCases { UserDefaults.standard.removeObject(forKey: mark.storageKey) }
+        coachReplayed = true
+      }
+      .disabled(coachReplayed)
+      resetButton("Replay onboarding questions", .practice)
+      resetButton("Back to the invite screen", .reinvite)
+      resetButton("Reset Drillbit", .everything, role: .destructive)
     } header: {
       Text("Developer")
     } footer: {
-      Text("Clears all Drillbit data and preferences, then returns to onboarding. Your sign-in stays active.")
+      Text("Plan preview changes only what this device shows until the next refresh. Replay onboarding keeps you signed in and clears practice. Reset Drillbit wipes practice and device memory and signs you out, so the next launch is the very first one.")
+    }
+  }
+  /// The dialog hangs off its own button, so the sheet points at what was tapped rather than the middle of the screen.
+  private func resetButton(_ title: String, _ reset: Reset, role: ButtonRole? = nil) -> some View {
+    Button(title, role: role) { confirming = reset }
+      .confirmationDialog(label(reset), isPresented: Binding(get: { confirming == reset }, set: { if !$0 { confirming = nil } })) {
+        Button(label(reset), role: .destructive) { run(reset) }
+        Button("Cancel", role: .cancel) {}
+      } message: { Text(message(reset)) }
+  }
+
+  private func label(_ reset: Reset) -> String {
+    switch reset {
+    case .practice: "Replay onboarding"
+    case .reinvite: "Back to invite"
+    case .everything: "Reset Drillbit"
+    }
+  }
+  private func message(_ reset: Reset) -> String {
+    switch reset {
+    case .practice: "Removes your practice, Recall history, preferences, reminders and LLM key. You stay signed in and go straight to the setup questions."
+    case .reinvite: "Everything in Replay onboarding, then signs you out and puts the account back behind the invite screen. You’ll need an unredeemed invite code."
+    case .everything: "Removes your practice, Recall history, preferences, reminders and LLM key, forgets the walkthrough and tips on this device, and signs you out. The next launch is the first launch."
+    }
+  }
+  private func run(_ reset: Reset) {
+    Task {
+      await model.perform {
+        switch reset {
+        case .practice: try await model.resetDeveloperPractice()
+        case .reinvite: try await model.resetDeveloperEverything(reinvite: true)
+        case .everything: try await model.resetDeveloperEverything(reinvite: false)
+        }
+        appearance = "dark"
+        dismiss()
+      }
     }
   }
 }

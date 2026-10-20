@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="23504" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="LS-1">
+    <device id="retina6_12" orientation="portrait" appearance="dark"/>
+    <dependencies>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="23506"/>
+        <capability name="Named colors" minToolsVersion="9.0"/>
+        <capability name="Safe area layout guides" minToolsVersion="9.0"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <scenes>
+        <!-- Bit at the exact screen centre, the maker's mark at the foot: what RootView's LaunchSurface then draws live. -->
+        <scene sceneID="LS-S">
+            <objects>
+                <viewController id="LS-1" sceneMemberID="viewController">
+                    <view key="view" contentMode="scaleToFill" id="LS-V">
+                        <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <subviews>
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" image="LaunchBit" translatesAutoresizingMaskIntoConstraints="NO" id="LS-B">
+                                <rect key="frame" x="136.5" y="360" width="120" height="132"/>
+                                <constraints>
+                                    <constraint firstAttribute="width" constant="120" id="LS-BW"/>
+                                    <constraint firstAttribute="height" constant="132" id="LS-BH"/>
+                                </constraints>
+                            </imageView>
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" image="LaunchMaker" translatesAutoresizingMaskIntoConstraints="NO" id="LS-M">
+                                <rect key="frame" x="162.5" y="776" width="68" height="42"/>
+                                <constraints>
+                                    <constraint firstAttribute="height" constant="42" id="LS-MH"/>
+                                </constraints>
+                            </imageView>
+                        </subviews>
+                        <viewLayoutGuide key="safeArea" id="LS-SA"/>
+                        <color key="backgroundColor" name="LaunchBackground"/>
+                        <constraints>
+                            <constraint firstItem="LS-B" firstAttribute="centerX" secondItem="LS-V" secondAttribute="centerX" id="LS-C1"/>
+                            <constraint firstItem="LS-B" firstAttribute="centerY" secondItem="LS-V" secondAttribute="centerY" id="LS-C2"/>
+                            <constraint firstItem="LS-M" firstAttribute="centerX" secondItem="LS-V" secondAttribute="centerX" id="LS-C3"/>
+                            <constraint firstItem="LS-SA" firstAttribute="bottom" secondItem="LS-M" secondAttribute="bottom" constant="12" id="LS-C4"/>
+                        </constraints>
+                    </view>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="LS-R" userLabel="First Responder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="0.0" y="0.0"/>
+        </scene>
+    </scenes>
+    <resources>
+        <image name="LaunchBit" width="120" height="132"/>
+        <image name="LaunchMaker" width="68" height="42"/>
+        <namedColor name="LaunchBackground">
+            <color red="0.122" green="0.141" blue="0.188" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+    </resources>
+</document>

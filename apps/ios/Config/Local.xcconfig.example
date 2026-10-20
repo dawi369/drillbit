@@ -1,3 +1,4 @@
 API_BASE_URL = https:/$()/drillbit-api-development.david-erwin-cz68.workers.dev
 CLERK_PUBLISHABLE_KEY = pk_test_REPLACE
+SUPERWALL_API_KEY =
 DEVELOPMENT_TEAM = YOUR_TEAM_ID

@@ -23,6 +23,17 @@ export interface Env {
   PRACTICE_UNLIMITED_ACCOUNTS?: string;
   FREE_REP_FOLLOW_UPS?: string;
   FREE_REP_NUDGES?: string;
+  FREE_REPS_PER_DAY?: string;
+  FREE_VOICE_LIFETIME?: string;
+  FREE_VOICE_TASTE_DAYS?: string;
+  FREE_VOICE_SESSION_MINUTES?: string;
+  PRO_REPS_PER_DAY?: string;
+  PRO_VOICE_STARTS_PER_DAY?: string;
+  PRO_VOICE_SESSION_MINUTES?: string;
+  APPLE_BUNDLE_ID?: string;
+  APPLE_PRODUCT_IDS?: string;
+  APPLE_ENVIRONMENT?: string;
+  APPLE_ROOT_CERTS?: string;
 }
 const jwks = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
 export async function identity(env: Env, authorization?: string) {
@@ -103,10 +114,12 @@ export async function consumeUsage(
   kind: string,
   limit: number,
 ) {
+  // Developer accounts burn through fair-use caps while testing; they are still counted, never stopped.
+  const developer = (env.DEVELOPER_ACCOUNTS ?? "").split(",").map(id => id.trim()).filter(Boolean).includes(account);
   const row = await env.DB.prepare(
     `INSERT INTO usage(account_id,day,kind,count) VALUES(?,?,?,1) ON CONFLICT(account_id,day,kind) DO UPDATE SET count=count+1 WHERE count<? RETURNING count`,
   )
-    .bind(account, timestamp().slice(0, 10), kind, limit)
+    .bind(account, timestamp().slice(0, 10), kind, developer ? 1_000_000 : limit)
     .first();
   if (!row)
     throw new Fault(

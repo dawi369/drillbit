@@ -2,7 +2,7 @@ import SwiftUI
 import AVFAudio
 @preconcurrency import WebRTC
 
-private struct VoiceConnection: Decodable { var id: String; var sdp: String; var expiresAt: String }
+private struct VoiceConnection: Decodable { var id: String; var sdp: String; var expiresAt: String; var sessionSeconds: Int? }
 private struct VoiceStart: Encodable { var sdp: String; var revision: Int; var guidanceMode: GuidanceMode; var practiceProfile: PracticeProfile? }
 private struct VoiceEvents: Codable { var fragments: [VoiceFragment]; var closed: Bool; var finalized: Bool; var usageSeconds: Double? }
 private struct VoiceAck: Decodable { var accepted: [String] }
@@ -18,7 +18,8 @@ private struct VoiceOutbox: Codable {
 
 @MainActor @Observable final class LiveVoice {
   enum Phase: Equatable { case idle, connecting, active, ending, unavailable }
-  static let sessionLimit: TimeInterval = 10 * 60
+  /// Server-issued cap for the next session; the plan decides it.
+  var sessionLimit: TimeInterval = 10 * 60
   var phase: Phase = .idle
   var muted = false
   var message: String?
@@ -65,6 +66,7 @@ private struct VoiceOutbox: Codable {
           AVAudioApplication.shared.recordPermission == .granted,
           let capability = interview.model.bootstrap?.capabilities?.voice,
           capability.available, capability.isFresh() else { return }
+    if let warm = interview.model.takeVoiceWarmup() { prepared = warm; return }
     let link = NativeVoiceTransport()
     prepared = (link, Task { try await link.offer() }, Date())
   }
@@ -76,7 +78,7 @@ private struct VoiceOutbox: Codable {
   func start() async {
     guard !blocksText, !interview.locked, interview.currentAccount, interview.acceptsVoiceInput else { return }
     let epoch = UUID(); generation = epoch
-    phase = .connecting; message = nil; muted = false; startedAt = nil; thinking = false; seen = []; delegations = []; guidanceDeliveries = [:]; acknowledged = []
+    phase = .connecting; message = nil; muted = true; startedAt = nil; thinking = false; seen = []; delegations = []; guidanceDeliveries = [:]; acknowledged = []
     do {
       #if DEBUG
       if interview.model.fixture, ProcessInfo.processInfo.arguments.contains("--fixture-voice-connecting") {
@@ -100,6 +102,7 @@ private struct VoiceOutbox: Codable {
       try await persist()
       guard generation == epoch, interview.currentAccount, interview.acceptsVoiceInput else { return }
       if interview.model.fixture {
+        if let seconds = interview.model.bootstrap?.capabilities?.voice?.sessionSeconds { sessionLimit = TimeInterval(seconds) }
         phase = .active
         startedAt = .now
         present([],id:id)
@@ -142,9 +145,12 @@ private struct VoiceOutbox: Codable {
       link.onFailure = { [weak self] in self?.interrupt("Voice disconnected. Your transcript is preserved.") }
       let result: VoiceConnection = try await interview.model.api.send("challenges/\(interview.challenge.id)/voice",method:"POST",body:VoiceStart(sdp:offer,revision:draft.revision,guidanceMode:interview.mode,practiceProfile:interview.model.settings.practiceProfile),command:id)
       guard generation == epoch else { link.close(); return }
+      if let seconds = result.sessionSeconds { sessionLimit = TimeInterval(seconds) }
       try await link.answer(result.sdp)
       guard generation == epoch, phase == .connecting || phase == .active else { link.close(); return }
       link.startAudio()
+      // The room opens muted; you unmute when you're ready to talk.
+      link.mute(true)
       startMeter(epoch: epoch)
       Task { [weak self] in
         try? await Task.sleep(for:.seconds(10))
@@ -152,8 +158,9 @@ private struct VoiceOutbox: Codable {
         self.interrupt("Voice could not finish connecting. Try again.")
       }
       present([],id:id)
+      let limit = sessionLimit
       deadline = Task { [weak self] in
-        try? await Task.sleep(for:.seconds(Self.sessionLimit))
+        try? await Task.sleep(for:.seconds(limit))
         guard !Task.isCancelled else { return }
         await self?.end()
       }
@@ -209,6 +216,14 @@ private struct VoiceOutbox: Codable {
     phase = .ending
     if wasConnecting { generation = UUID() }
     transport?.stopAudio()
+    // Cancelled before the line was ever open: nothing was said, so there is no transcript to keep or sync.
+    if wasConnecting, transport == nil, outbox?.fragments.isEmpty != false {
+      closeDeadline?.cancel(); deadline?.cancel()
+      outbox = nil; try? await persist()
+      cleanup()
+      phase = .idle
+      return
+    }
     if interview.model.fixture || transport == nil {
       await finalize(confirmed:interview.model.fixture); return
     }
@@ -236,7 +251,11 @@ private struct VoiceOutbox: Codable {
   }
   private func receive(_ data: Data) async {
     guard let event = try? JSONSerialization.jsonObject(with:data) as? [String:Any],let type=event["type"] as? String else { return }
-    if type == "session.started" { if phase == .connecting { phase = .active; startedAt = .now }; return }
+    if type == "session.started" {
+      if phase == .connecting { phase = .active; startedAt = .now }
+      if muted { transport?.send(["type": "session.input_audio.mute", "event_id": UUID().uuidString]) }
+      return
+    }
     if type == "session.closed" { if let usage=event["usage"] as? [String:Any] { outbox?.usageSeconds = usage["seconds"] as? Double }; await finalize(confirmed:true); return }
     if type == "error" { interrupt("Voice encountered a connection error. Your writing is safe."); return }
     if type == "session.usage.updated",let usage=event["usage"] as? [String:Any] { outbox?.usageSeconds = usage["seconds"] as? Double; return }
@@ -325,7 +344,7 @@ private struct VoiceOutbox: Codable {
       }
     } catch let error as APIError where error.status == 404 && captured.fragments.isEmpty {
       outbox = nil; try? await persist()
-    } catch { message = "Your transcript is safe. Try again when the connection is back." }
+    } catch { message = nil }
   }
   private func finalize(confirmed:Bool) async {
     guard phase != .idle else { return }

@@ -5,6 +5,8 @@ struct HomeView: View {
   var openSettings: () -> Void
   @State private var flow: QuestionFlowEntry?
   @State private var started: Challenge?
+  /// False from the moment the zoom leaves the ticket until the sheet is fully gone; the shadow then fades in instead of snapping.
+  @State private var ticketSettled = true
   @State private var skipping: Challenge?
   @State private var chooseAfterSkip = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -12,10 +14,15 @@ struct HomeView: View {
   @State private var bitCheers = 0
   @Namespace private var zoom
   @AppStorage(CoachMark.recall.storageKey) private var seenRecallTip = false
-  private var recallCoach: CoachMark? {
-    guard CoachMark.enabled, !seenRecallTip, flow == nil, model.firstUse.stage == .complete, model.firstUse.firstRepID != nil,
-      (model.bootstrap?.todayPlan?.dueRecallCount ?? 0) > 0 else { return nil }
-    return .recall
+  @AppStorage(CoachMark.settings.storageKey) private var seenSettingsTip = false
+  @AppStorage(CoachMark.homeReadyKey) private var homeReady = false
+  @AppStorage(CoachMark.libraryPage.storageKey) private var tourDone = false
+  /// After the tour of the tabs: recall if cards are due, then where the plan lives.
+  private var homeCoach: CoachMark? {
+    guard CoachMark.enabled, flow == nil, model.firstUse.stage == .complete, homeReady || model.firstUse.firstRepID != nil, tourDone else { return nil }
+    if !seenRecallTip, (model.bootstrap?.todayPlan?.dueRecallCount ?? 0) > 0 { return .recall }
+    if !seenSettingsTip { return .settings }
+    return nil
   }
 
   private enum Today {
@@ -29,8 +36,12 @@ struct HomeView: View {
   private var preparing: Bool {
     model.busy || model.bootstrap?.jobs.contains(where: { $0.kind == "generate" && ["pending", "running"].contains($0.status) }) == true
   }
+  /// The last draft, kept on the ticket after the job finished until its lines have written themselves out.
+  @State private var settlingDraft: QuestionDraft?
+  @State private var settledLines: Set<String> = []
   private var today: Today {
     if preparing { return .preparing(model.preparingDraft) }
+    if let settlingDraft { return .preparing(settlingDraft) }
     if let challenge = model.bootstrap?.challenge { return .question(challenge) }
     if let failure = model.preparationFailure { return .failed(failure) }
     if let session = todaysSession { return .done(session) }
@@ -40,8 +51,9 @@ struct HomeView: View {
   /// Changes when the ticket switches state, never while a title streams or jobs poll.
   private var todayState: String {
     switch today {
-    case .preparing: "preparing"
-    case .question(let challenge): "question|\(challenge.id)|\(challenge.lifecycle)"
+    // The draft and the question it becomes share one identity, so the finished text is not torn down and faded back in.
+    case .preparing: "today"
+    case .question(let challenge): challenge.lifecycle == "in_progress" ? "question|\(challenge.id)|resume" : "today"
     case .failed: "failed"
     case .done(let session): "done|\(session.id)"
     case .waiting: "waiting"
@@ -65,8 +77,19 @@ struct HomeView: View {
           afterTicket
         }
         .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: todayState)
-        .onChange(of: todayState) { old, new in
-          if old == "preparing", new.hasPrefix("question") { bitCheers += 1 }
+        .onChange(of: model.preparingDraft) { old, new in
+          // The job is done but the ticket may still be writing: hold the draft, marked finished, until it settles.
+          guard let old, new == nil, !old.title.isEmpty, model.bootstrap?.challenge != nil else { return }
+          var held = old; held.textDone = true
+          settledLines = []
+          settlingDraft = held
+        }
+        .task(id: settlingDraft != nil) {
+          guard settlingDraft != nil else { return }
+          // A line that never reports (no prompt, or an empty one) must not hold the question back.
+          try? await Task.sleep(for: .seconds(2.5))
+          guard !Task.isCancelled, settlingDraft != nil else { return }
+          settlingDraft = nil; bitCheers += 1
         }
         ForEach(model.bootstrap?.jobs.filter { $0.status == "failed" && $0.kind != "help" } ?? []) { job in
           VStack(alignment: .leading, spacing: 8) {
@@ -81,7 +104,11 @@ struct HomeView: View {
       .frame(maxWidth: 640, alignment: .leading).frame(maxWidth: .infinity)
       .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 40)
     }
-    .coachMark(recallCoach) { _ in withAnimation(DrillbitMotion.fast) { seenRecallTip = true } }
+    .coachMark(homeCoach) { mark in
+      withAnimation(DrillbitMotion.fast) {
+        if mark == .recall { seenRecallTip = true } else { seenSettingsTip = true }
+      }
+    }
     .drillbitTabClearance()
     .task(id: model.bootstrap?.account.id) { await model.ensureHomeQuestion() }
     .alert("Skip this question?", isPresented: Binding(get: { skipping != nil }, set: { if !$0 { skipping = nil } })) {
@@ -92,7 +119,9 @@ struct HomeView: View {
     .toolbar(.hidden, for: .navigationBar)
     .background(AppPalette.background)
     .refreshable { await model.refresh() }
+    .onChange(of: flow != nil) { _, presenting in if presenting { ticketSettled = false } }
     .sheet(item: $flow, onDismiss: {
+      withAnimation(reduceMotion ? nil : .easeOut(duration: 0.45)) { ticketSettled = true }
       if let started { model.presented = started; self.started = nil }
     }) { entry in
       QuestionFlow(model: model, initial: entry.challenge, source: entry.source, recovery: entry.recovery, browseTopics: entry.browseTopics, area: entry.area, onStart: { started = $0 })
@@ -119,6 +148,7 @@ struct HomeView: View {
           .labelStyle(.iconOnly)
           .buttonStyle(.glass).buttonBorderShape(.circle).controlSize(.large)
           .accessibilityIdentifier("homeSettings")
+          .coachAnchor(.settings)
       }
       Text(Date.now.formatted(.dateTime.weekday(.wide)))
         .font(.largeTitle.weight(.bold)).tracking(-0.6)
@@ -168,15 +198,29 @@ struct HomeView: View {
 
   // MARK: Today's ticket
 
+  private func lineSettled(_ line: String, needsPrompt: Bool) {
+    guard settlingDraft != nil else { return }
+    settledLines.insert(line)
+    if settledLines.contains("title"), !needsPrompt || settledLines.contains("prompt") {
+      settlingDraft = nil
+      bitCheers += 1
+    }
+  }
   @ViewBuilder private var todayTicket: some View {
     switch today {
     case .preparing(let draft):
       Ticket {
         VStack(alignment: .leading, spacing: 12) {
           TicketHeader(number: nextNumber, detail: shortDate)
-          StreamingLine(text: draft?.title ?? "", font: .title.weight(.semibold))
-          if let prompt = draft?.prompt, !prompt.isEmpty {
-            Text(QuestionMarkup.plain(prompt)).font(.subheadline).foregroundStyle(AppPalette.secondary).lineLimit(3)
+          // The title's caret stops once the prompt starts; the prompt carries it through the quiet tail of generation.
+          let textDone = draft?.textDone ?? false
+          let hasPrompt = !(draft?.prompt ?? "").isEmpty
+          StreamingLine(text: draft?.title ?? "", font: .title.weight(.semibold), streaming: !hasPrompt,
+                        finished: hasPrompt || textDone, settled: { lineSettled("title", needsPrompt: hasPrompt) })
+          if let prompt = draft?.prompt, hasPrompt {
+            StreamingLine(text: QuestionMarkup.plain(prompt), font: .subheadline, tracking: 0, color: AppPalette.secondary, lineLimit: 3,
+                          streaming: !textDone, finished: textDone, settled: { lineSettled("prompt", needsPrompt: true) })
+              .transition(.opacity)
           }
         }
       } stub: {
@@ -209,10 +253,10 @@ struct HomeView: View {
           TicketHeader(number: nextNumber, detail: shortDate)
           Text(AppModel.freeRepLine(next)).font(.title2.weight(.semibold)).tracking(-0.4)
             .fixedSize(horizontal: false, vertical: true)
-          Text("Recall and Library are still open in the meantime.").font(.subheadline).foregroundStyle(AppPalette.secondary)
+          ProNudge(message: "Recall and Library are still open in the meantime. Pro skips the wait.", placement: .practiceRep) { await model.refresh() }
         }
       } stub: {
-        stubText(title: "Free reps", note: "One a week, on the house")
+        stubText(title: "Free reps", note: "Three a day, on the house")
       }
       .accessibilityElement(children: .combine)
       .accessibilityIdentifier("freeRepWaiting")
@@ -301,7 +345,7 @@ struct HomeView: View {
         Text(tomorrowLine).font(.subheadline).foregroundStyle(AppPalette.secondary)
           .fixedSize(horizontal: false, vertical: true)
         if let next = model.nextFreeRep {
-          Text(AppModel.freeRepLine(next)).font(.subheadline).foregroundStyle(AppPalette.secondary)
+          ProNudge(message: AppModel.freeRepLine(next), placement: .practiceRep) { await model.refresh() }
             .accessibilityIdentifier("freeRepNotice")
         } else {
           Button("One more?") { flow = QuestionFlowEntry() }
@@ -365,13 +409,12 @@ struct HomeView: View {
   private func ticketButton<Content: View, Stub: View>(identifier: String? = nil, spoken: String, action: @escaping () -> Void,
     @ViewBuilder content: @escaping () -> Content, @ViewBuilder stub: @escaping () -> Stub) -> some View {
     Button(action: action) {
-      Ticket(content: content, stub: stub).contentShape(Rectangle())
+      Ticket(shadowed: ticketSettled, content: content, stub: stub).contentShape(Rectangle())
     }
     .buttonStyle(TicketPressStyle())
-    // The source carries the ticket's own shape and shadow, so the zoom's snapshot never settles with a different one.
+    // The source carries the ticket's shape; its shadow is the real view's, faded in once the zoom has returned.
     .matchedTransitionSource(id: "today", in: zoom) { source in
       source.background(AppPalette.ticket).clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: AppPalette.ticketShadow, radius: 14, y: 12)
     }
     .accessibilityIdentifier(identifier ?? "todayTicket")
     // The printed pill is decorative for VoiceOver, but Voice Control users say what they see.
@@ -438,16 +481,32 @@ struct TicketPressStyle: ButtonStyle {
 struct StreamingLine: View {
   let text: String
   var font: Font
+  var tracking: CGFloat = -0.6
+  var color: Color = AppPalette.primary
+  var lineLimit: Int? = nil
+  /// While the stream is still open the caret keeps blinking after the line is written, so a quiet tail never reads as a freeze.
+  var streaming = true
+  /// The text is complete: the trailing glyphs fade all the way in and `settled` fires once they have.
+  var finished = false
+  var settled: () -> Void = {}
   @State private var clock = RevealClock()
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   var body: some View {
-    TimelineView(.animation) { timeline in
-      let target = Double(text.count)
-      let cursor = clock.tick(timeline.date, target: target, instant: reduceMotion, finished: false) {}
+    TimelineView(.animation(minimumInterval: 1.0 / 30)) { timeline in
+      // The write head trails the cursor by the fade edge; only a finished line gets to write the edge out.
+      let target = Double(text.count) + (finished ? RevealRenderer.edge : 0)
+      let cursor = clock.tick(timeline.date, target: target, instant: reduceMotion, finished: finished) {
+        Task { @MainActor in settled() }
+      }
+      let writing = Double(text.count) > cursor || text.isEmpty
+      let blink = reduceMotion ? 1.0 : (sin(timeline.date.timeIntervalSinceReferenceDate * 2 * .pi / 1.1) > 0 ? 1.0 : 0.15)
       Text(text.isEmpty ? " " : text)
-        .font(font).tracking(-0.6)
+        .font(font).tracking(tracking)
+        .foregroundStyle(color)
+        .lineLimit(lineLimit)
         .fixedSize(horizontal: false, vertical: true)
-        .textRenderer(RevealRenderer(shown: text.isEmpty ? 0 : cursor, caret: text.count > Int(cursor) || text.isEmpty ? 1 : 0, caretColor: AppPalette.accent, motion: !reduceMotion))
+        .textRenderer(RevealRenderer(shown: text.isEmpty ? 0 : cursor, caret: writing ? 1 : streaming ? blink : 0, caretColor: AppPalette.accent, motion: !reduceMotion,
+                                     total: lineLimit == nil ? nil : Double(text.count)))
     }
     .accessibilityLabel(text)
   }

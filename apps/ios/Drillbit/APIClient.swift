@@ -1,5 +1,8 @@
 import ClerkKit
 import Foundation
+import OSLog
+
+private let streamLog = Logger(subsystem: "dawi.drillbit", category: "stream")
 
 @MainActor final class APIClient {
   let baseURL: URL
@@ -112,10 +115,19 @@ import Foundation
     let request = try await request("jobs/\(job)/stream")
     let (bytes, response) = try await URLSession.shared.bytes(for: request)
     guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { throw URLError(.badServerResponse) }
+    #if DEBUG
+    var last = Date(), lastLength = 0
+    #endif
     for try await line in bytes.lines {
       try Task.checkCancellation()
       guard line.hasPrefix("data:") else { continue }
       let value = try JSONDecoder().decode(QuestionStreamSnapshot.self, from: Data(line.dropFirst(5).utf8))
+      #if DEBUG
+      // Arrival cadence for one generation: gap since the previous frame and how much text it added.
+      let now = Date(), length = value.title.count + value.prompt.count
+      streamLog.debug("snapshot +\(Int(now.timeIntervalSince(last) * 1000), privacy: .public)ms +\(length - lastLength, privacy: .public)ch total=\(length, privacy: .public) \(value.status, privacy: .public)")
+      last = now; lastLength = length
+      #endif
       onSnapshot(value)
       if !["pending", "running"].contains(value.status) { return }
     }

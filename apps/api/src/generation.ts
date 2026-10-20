@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { questionGenerationSchema, type Settings } from "./domain";
+import { questionGenerationSchema, refineQuestionGeneration, type Settings } from "./domain";
 import { concepts } from "./taxonomy";
 
 type GenerationInput = { settings: Settings; guidanceMode?: string; instruction?: string; followUp?: unknown };
@@ -12,9 +12,13 @@ export function generationRequest(input: GenerationInput, selection: { primaryCo
     && input.guidanceMode !== "learn_together");
   // minutes is the round's time budget, set by the model; only Mock interview shows the clock. path is Guided's roadmap. opener is the interviewer's first line at Start.
   const roundLength = { minutes: z.number().int().min(10).max(60), path: z.array(z.string().trim().min(1).max(60)).min(3).max(5), opener: z.string().trim().min(1).max(240) };
-  const schema = exploratory
-    ? questionGenerationSchema.safeExtend({primaryConceptId:z.literal(selection.primaryConceptId),constraints:z.array(z.string().min(1).max(300)).max(0),...roundLength})
-    : questionGenerationSchema.safeExtend({primaryConceptId:z.literal(selection.primaryConceptId),...roundLength});
+  const fields = exploratory
+    ? questionGenerationSchema.safeExtend({primaryConceptId:z.literal(selection.primaryConceptId),constraints:z.array(z.string().min(1).max(300)).max(0),...roundLength}).shape
+    : questionGenerationSchema.safeExtend({primaryConceptId:z.literal(selection.primaryConceptId),...roundLength}).shape;
+  // Structured output follows the schema's key order. The text the preview streams comes last, so the ticket
+  // finishes writing when the job does, instead of sitting complete while the metadata is still being produced.
+  const order = ["kind","targetSkill","topic","scenario","primaryConceptId","ambiguityPolicy","minutes","path","opener","title","prompt","constraints","tagEvidence"] as const;
+  const schema = z.object(Object.fromEntries(order.map(key => [key, fields[key]])) as typeof fields).superRefine(refineQuestionGeneration);
   const context = {
     settings: input.settings,
     historicalSnapshot,

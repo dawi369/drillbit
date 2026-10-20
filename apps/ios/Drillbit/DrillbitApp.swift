@@ -62,6 +62,8 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         container: container,
         baseURL: URL(string: endpoint) ?? URL(string: "https://example.invalid")!, fixture: fixture)
       _model = State(initialValue: appModel)
+      if !fixture { PlanCoordinator.shared.configure(apiKey: Bundle.main.object(forInfoDictionaryKey: "SuperwallAPIKey") as? String ?? "") }
+      PlanCoordinator.shared.start(model: appModel)
       configurationError = nil
       UNUserNotificationCenter.current().delegate = notificationRouter
       BGTaskScheduler.shared.register(forTaskWithIdentifier: "dawi.drillbit.refresh", using: nil) {
@@ -85,6 +87,7 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
           .tint(AppPalette.accent)
           .scrollDismissesKeyboard(.interactively)
           .background(AppPalette.background.ignoresSafeArea(.all))
+          .modifier(PaywallHost())
       } else {
         ContentUnavailableView(
           "Setup required", systemImage: AppIcon.settings.rawValue,

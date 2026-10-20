@@ -58,10 +58,11 @@ struct BitView: View {
     hops += 1
   }
 
-  /// Calm moods run at 30 fps; hops, spins and speech get 60. Low Power Mode caps everything at 20.
+  /// Calm moods run at 30 fps; hops, spins and speech get 60. Low Power Mode halves each, so idle blinks tick at 15 instead of fighting the throttled CPU at 20.
   private var interval: Double {
-    if ProcessInfo.processInfo.isLowPowerModeEnabled { return 1.0 / 20 }
-    return lively || [.talking, .happy, .drilling].contains(mood) ? 1.0 / 60 : 1.0 / 30
+    let busy = lively || [.talking, .happy, .drilling].contains(mood)
+    if ProcessInfo.processInfo.isLowPowerModeEnabled { return busy ? 1.0 / 30 : 1.0 / 15 }
+    return busy ? 1.0 / 60 : 1.0 / 30
   }
 }
 

@@ -5,6 +5,7 @@ const definitions = Object.fromEntries(
   Object.entries(wire).map(([name, schema]) => [name, z.toJSONSchema(schema)]),
 );
 const operations: [string, string, string, string?][] = [
+  ["post","entitlement","Record a verified StoreKit 2 signed transaction for the caller's account","EntitlementInput"],
   ["post","challenges/{id}/voice","Start a voice session without submitting the typed draft","VoiceStart"],
   ["post","challenges/{id}/voice/{voice}/events","Persist idempotent voice fragments and close receipts","VoiceEvents"],
   ["post","challenges/{id}/voice/{voice}/delegate","Request technical guidance for a live session","VoiceDelegate"],

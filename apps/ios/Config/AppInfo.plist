@@ -46,17 +46,18 @@
 	<string>Talk with your practice interviewer using live voice.</string>
 	<key>SharedKeychainGroup</key>
 	<string>$(AppIdentifierPrefix)dawi.drillbit.shared</string>
+	<key>SuperwallAPIKey</key>
+	<string>$(SUPERWALL_API_KEY)</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Literata.ttf</string>
+	</array>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
 	</array>
-	<key>UILaunchScreen</key>
-	<dict>
-		<key>UIColorName</key>
-		<string>LaunchBackground</string>
-		<key>UIImageName</key>
-		<string>LaunchBit</string>
-	</dict>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
