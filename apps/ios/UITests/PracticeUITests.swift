@@ -301,8 +301,8 @@ final class PracticeUITests: XCTestCase {
     capture("Voice room question", app)
     app.buttons["voiceFixtureSpeech"].tap()
     // The interviewer's latest line stays on stage without opening the transcript.
-    XCTAssertTrue(app.descendants(matching: .any)["voiceCaption"].waitForExistence(timeout: 3))
-    XCTAssertTrue(app.descendants(matching: .any)["voiceCaption"].label.contains("What happens when a worker retries?"))
+    XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "voiceCaption").firstMatch.waitForExistence(timeout: 3))
+    XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "voiceCaption").firstMatch.label.contains("What happens when a worker retries?"))
     capture("Voice room live caption", app)
     // End lands in the editor with the transcript in the document.
     app.buttons["voiceEnd"].tap()
@@ -697,14 +697,19 @@ final class PracticeUITests: XCTestCase {
     app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Engineering level")).firstMatch.tap()
     app.buttons["Principal"].tap()
     XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Principal")).firstMatch.exists)
-    app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Time zone")).firstMatch.tap()
+    // Time zone and the provider are parked under Developer, below the fold.
+    let timeZone = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Time zone")).firstMatch
+    for _ in 0..<6 where !timeZone.exists || !timeZone.isHittable { app.swipeUp() }
+    timeZone.tap()
     XCTAssertTrue(app.navigationBars["Time zone"].waitForExistence(timeout: 5))
     app.searchFields.firstMatch.tap()
     app.searchFields.firstMatch.typeText("Kolkata")
     app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Kolkata")).firstMatch.tap()
     XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
     capture("Settings selected", app)
-    app.buttons["LLM provider"].tap()
+    let provider = app.buttons["LLM provider"]
+    for _ in 0..<6 where !provider.exists || !provider.isHittable { app.swipeUp() }
+    provider.tap()
     XCTAssertTrue(app.navigationBars["LLM provider"].waitForExistence(timeout: 5))
     capture("LLM provider", app)
   }

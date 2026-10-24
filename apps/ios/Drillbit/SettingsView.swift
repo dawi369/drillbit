@@ -24,15 +24,31 @@ struct SettingsView: View {
           + Calendar.current.component(.minute, from: $0)
       })
   }
+  private var plan: Binding<LearningPlan> { Binding(get: { model.settings.learningPlan ?? LearningPlan() }, set: { model.settings.learningPlan = $0 }) }
+  private static let objectives = [("interview", "An interview’s coming up"), ("learn", "Getting sharper"), ("stay_sharp", "Keeping fresh")]
+  private static let modes = [("voice", "Talking it out"), ("text", "Typing"), ("mix", "Depends on the day")]
+  /// What a student changes after week one, and nothing else. The plan's finer knobs, the free-text profile, the
+  /// provider key and the export live under Developer; the data behind them is untouched.
   var body: some View {
     SignalList {
-      Section {
-        NavigationLink("Learning plan") { LearningPlanSettingsView(model: model) }
-        NavigationLink("About your practice") { PracticeProfileView(model: model) }
-      }
       Section("Practice") {
         Picker("Engineering level", selection: $model.settings.selectedLevel) {
           ForEach(EngineeringLevel.choices, id: \.0) { Text($0.1).tag($0.0) }
+        }
+        Picker("Practice", selection: Binding(get: { model.practiceMode }, set: { model.practiceMode = $0 })) {
+          ForEach(Self.modes, id: \.0) { Text($0.1).tag($0.0) }
+        }.accessibilityIdentifier("practiceModePicker")
+        Picker("Here for", selection: plan.objective) { ForEach(Self.objectives, id: \.0) { Text($0.1).tag($0.0) } }
+          .onChange(of: plan.wrappedValue.objective) { _, value in if value != "interview" { var updated = plan.wrappedValue; updated.targetDate = nil; plan.wrappedValue = updated } }
+        if plan.wrappedValue.objective == "interview" {
+          Toggle("I know the date", isOn: Binding(get: { plan.wrappedValue.targetDate != nil }, set: { enabled in
+            var value = plan.wrappedValue; value.targetDate = enabled ? LearningPlanSettingsView.formatted(Date(), timezone: model.settings.timezone) : nil; plan.wrappedValue = value
+          }))
+          if plan.wrappedValue.targetDate != nil {
+            DatePicker("Interview date", selection: Binding(get: { LearningPlanSettingsView.parsed(plan.wrappedValue.targetDate, timezone: model.settings.timezone) ?? Date() }, set: { date in
+              var value = plan.wrappedValue; value.targetDate = LearningPlanSettingsView.formatted(date, timezone: model.settings.timezone); plan.wrappedValue = value
+            }), in: Calendar.current.startOfDay(for: Date())..., displayedComponents: .date)
+          }
         }
         Toggle("Daily reminder", isOn: Binding(
           get: { model.settings.reminderEnabled },
@@ -54,27 +70,7 @@ struct SettingsView: View {
         if model.settings.reminderEnabled {
           DatePicker("Reminder time", selection: time, displayedComponents: .hourAndMinute)
         }
-        NavigationLink { TimeZoneSelectionView(selection: $model.settings.timezone) } label: {
-          HStack(spacing: 8) {
-            Text("Time zone")
-            Spacer(minLength: 8)
-            Text(TimeZoneSelectionView.label(model.settings.timezone))
-              .foregroundStyle(.secondary).lineLimit(1)
-          }
-        }
         ReminderPermissionRow()
-        Toggle(isOn: $model.settings.formatsQuestions) {
-          Text("Formatted questions")
-          Text("Bold, italics and code blocks where they help")
-        }.accessibilityIdentifier("questionFormatting")
-      }
-      Section { NavigationLink("LLM provider") { AIAccessView(model: model) } }
-      Section {
-        Picker("Appearance", selection: $appearance) {
-          Text("System").tag("system")
-          Text("Light").tag("light")
-          Text("Dark").tag("dark")
-        }.pickerStyle(.menu).accessibilityIdentifier("appearancePicker")
       }
       Section("Plan") {
         LabeledContent("Plan", value: model.isPro ? "Pro" : "Free").accessibilityIdentifier("planRow")
@@ -88,7 +84,11 @@ struct SettingsView: View {
         }
       }
       Section("Account") {
-        NavigationLink("Export practice data") { PracticeExportView(model: model) }
+        Picker("Appearance", selection: $appearance) {
+          Text("System").tag("system")
+          Text("Light").tag("light")
+          Text("Dark").tag("dark")
+        }.pickerStyle(.menu).accessibilityIdentifier("appearancePicker")
         Button("Sign out") {
           Task {
             await model.perform {
@@ -156,6 +156,24 @@ private struct DeveloperSettingsSection: View {
   enum Reset: String, Identifiable { case practice, everything, reinvite; var id: String { rawValue } }
 
   var body: some View {
+    // Parked from the main list for the MVP: still wired, just out of a student's way.
+    Section("Developer · parked settings") {
+      NavigationLink("Learning plan") { LearningPlanSettingsView(model: model) }
+      NavigationLink("About your practice") { PracticeProfileView(model: model) }
+      NavigationLink("LLM provider") { AIAccessView(model: model) }
+      NavigationLink { TimeZoneSelectionView(selection: $model.settings.timezone) } label: {
+        HStack(spacing: 8) {
+          Text("Time zone")
+          Spacer(minLength: 8)
+          Text(TimeZoneSelectionView.label(model.settings.timezone)).foregroundStyle(.secondary).lineLimit(1)
+        }
+      }
+      Toggle(isOn: $model.settings.formatsQuestions) {
+        Text("Formatted questions")
+        Text("Bold, italics and code blocks where they help")
+      }.accessibilityIdentifier("questionFormatting")
+      NavigationLink("Export practice data") { PracticeExportView(model: model) }
+    }
     Section {
       Picker("Plan preview", selection: $planPreview) {
         Text("Live").tag(AppModel.PlanPreview.live)
@@ -253,8 +271,10 @@ struct LearningPlanSettingsView: View {
   private func choice(_ title: String, selected: Bool) -> some View {
     HStack { Text(title).foregroundStyle(.primary); Spacer(); if selected { Image(systemName: "checkmark") } }
   }
-  private func formatted(_ date: Date) -> String { let value = DateFormatter(); value.calendar = Calendar(identifier: .gregorian); value.locale = Locale(identifier: "en_US_POSIX"); value.timeZone = TimeZone(identifier: model.settings.timezone); value.dateFormat = "yyyy-MM-dd"; return value.string(from: date) }
-  private func parsed(_ text: String?) -> Date? { guard let text else { return nil }; let value = DateFormatter(); value.calendar = Calendar(identifier: .gregorian); value.locale = Locale(identifier: "en_US_POSIX"); value.timeZone = TimeZone(identifier: model.settings.timezone); value.dateFormat = "yyyy-MM-dd"; return value.date(from: text) }
+  static func formatted(_ date: Date, timezone: String) -> String { let value = DateFormatter(); value.calendar = Calendar(identifier: .gregorian); value.locale = Locale(identifier: "en_US_POSIX"); value.timeZone = TimeZone(identifier: timezone); value.dateFormat = "yyyy-MM-dd"; return value.string(from: date) }
+  static func parsed(_ text: String?, timezone: String) -> Date? { guard let text else { return nil }; let value = DateFormatter(); value.calendar = Calendar(identifier: .gregorian); value.locale = Locale(identifier: "en_US_POSIX"); value.timeZone = TimeZone(identifier: timezone); value.dateFormat = "yyyy-MM-dd"; return value.date(from: text) }
+  private func formatted(_ date: Date) -> String { Self.formatted(date, timezone: model.settings.timezone) }
+  private func parsed(_ text: String?) -> Date? { Self.parsed(text, timezone: model.settings.timezone) }
 }
 struct AIAccessView: View {
   @Bindable var model: AppModel

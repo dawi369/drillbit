@@ -785,6 +785,9 @@ import WidgetKit
       await refresh()
       guard bootstrap?.account.id == account.id else { return }
       if let bootstrap { try await disk.cache(key: "bootstrap:" + account.id, data: JSONEncoder().encode(bootstrap)) }
+    } catch is CancellationError {
+      // The watch was superseded (background, sign-out, a newer refresh); the job itself is still running.
+    } catch let error as URLError where error.code == .cancelled {
     } catch {
       if bootstrap?.account.id == account.id { preparationFailure = error.localizedDescription }
     }

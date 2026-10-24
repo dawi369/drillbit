@@ -204,12 +204,14 @@ private struct SeparatorSlide: View {
         }
       }
       .frame(height: 18)
-      VStack(alignment: .leading, spacing: 4) {
+      VStack(spacing: 4) {
         Text("System design")
           .font(.title3.weight(.semibold)).foregroundStyle(AppPalette.primary)
         Text("The one most people walk into cold.")
           .font(.subheadline).foregroundStyle(AppPalette.accent)
       }
+      .multilineTextAlignment(.center)
+      .frame(maxWidth: .infinity)
       .opacity(spotOn ? 1 : 0)
       .offset(y: spotOn ? 0 : 6)
       .padding(.top, 4)

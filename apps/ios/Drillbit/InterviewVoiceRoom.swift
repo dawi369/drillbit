@@ -59,8 +59,9 @@ struct InterviewVoiceRoom<Question: View>: View {
     InterviewConversation(state: interview.displayState, style: .room, latestIdentifier: "voiceCaption", resumeFollow: speech) {
       VStack(alignment: .leading, spacing: 0) {
         question().frame(maxWidth: 560, alignment: .leading)
-        // Bit holds the room while it connects, then steps aside for the words.
-        if phase == .idle || phase == .connecting, !typeSize.isAccessibilitySize {
+        // Bit holds the room while it connects, then steps aside for the words. `voice.phase` directly: the
+        // derived `phase` reads idle again after a drop, which brought him back under the question mid-session.
+        if voice.startedAt == nil, phase == .idle || phase == .connecting, !typeSize.isAccessibilitySize {
           VoiceBit(voice: voice, phase: phase).frame(height: 72).frame(maxWidth: .infinity).padding(.top, 32)
             .transition(.opacity)
         }
@@ -370,6 +371,8 @@ struct InterviewConversation<Header: View>: View {
   private func setFollowing(_ value: Bool) { if latestOnly { liveFollowing = value } else { historyFollowing = value } }
   @State private var scrolling = false
   @State private var observedIdentity: String?
+  /// Room only: earlier spoken rows fold to one line once the conversation has moved on; a tap reopens one.
+  @State private var opened: Set<String> = []
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   private var visibleTurns: [InterviewTurn] {
     let turns = state.turns.filter { turn in
@@ -387,12 +390,22 @@ struct InterviewConversation<Header: View>: View {
           VStack(alignment: .leading, spacing: 8) {
             if turn.kind == "voice" {
               let rows = latestOnly ? VoiceTranscript.latestRows(turn.voice ?? []) : VoiceTranscript.rows(turn.voice ?? [])
-              ForEach(rows) { row in
-                let latest = row.id == rows.last?.id && turn.id == visibleTurns.last?.id && row.speaker == "assistant"
-                Text(row.speaker == "user" ? "You" : "Interviewer").font(.caption).foregroundStyle(.secondary)
-                Text(row.text)
-                  .font(style == .room ? .body : nil)
-                  .accessibilityIdentifier(latest ? (latestIdentifier ?? "") : "")
+              // The current exchange (the last line from each side) stays open; everything before it folds.
+              let keepOpen = Set([rows.lastIndex { $0.speaker == "user" }, rows.lastIndex { $0.speaker == "assistant" }].compactMap { $0 })
+              ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                let latest = index == rows.count - 1 && turn.id == visibleTurns.last?.id && row.speaker == "assistant"
+                if style == .room, turn.id == visibleTurns.last?.id {
+                  let current = keepOpen.contains(index)
+                  InterviewTurnRow(title: row.speaker == "user" ? "You" : "Interviewer", text: row.text,
+                                   expanded: current || opened.contains(row.id), identifier: "voiceRowDisclosure-\(row.id)", textIdentifier: latest ? (latestIdentifier ?? "") : "voiceRow-\(row.id)") {
+                    withAnimation(reduceMotion ? nil : DrillbitMotion.reveal) { if opened.contains(row.id) { opened.remove(row.id) } else { opened.insert(row.id) } }
+                  }
+                } else {
+                  Text(row.speaker == "user" ? "You" : "Interviewer").font(.caption).foregroundStyle(.secondary)
+                  Text(row.text)
+                    .font(style == .room ? .body : nil)
+                    .accessibilityIdentifier(latest ? (latestIdentifier ?? "") : "")
+                }
               }
             } else {
             if turn.kind == "answer" { Text(turn.prompt).font(.headline) }

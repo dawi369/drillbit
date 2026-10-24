@@ -186,11 +186,8 @@ struct Challenge: Codable, Identifiable, Sendable {
   var lifecycle: String
   var title: String
   var prompt: String
-  var displayPrompt: String {
-    guard let constraints, !constraints.isEmpty else { return prompt }
-    let appendix = "\n\nConstraints\n" + constraints.map { "• " + $0 }.joined(separator: "\n")
-    return prompt.hasSuffix(appendix) ? String(prompt.dropLast(appendix.count)) : prompt
-  }
+  /// The whole question as the server wrote it, constraints included: they are the requirements, not an appendix.
+  var displayPrompt: String { prompt }
   var topic: String
   var createdAt: String?
   var completedAt: String?

@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFAudio
+import OSLog
 @preconcurrency import WebRTC
 
 private struct VoiceConnection: Decodable { var id: String; var sdp: String; var expiresAt: String; var sessionSeconds: Int? }
@@ -17,6 +18,7 @@ private struct VoiceOutbox: Codable {
 }
 
 @MainActor @Observable final class LiveVoice {
+  nonisolated static let log = Logger(subsystem: "dawi.drillbit", category: "voice")
   /// Routes to the loudspeaker unless something external (headphones, Bluetooth, CarPlay) is the output.
   nonisolated static func keepOnSpeaker() {
     let session = AVAudioSession.sharedInstance()
@@ -270,12 +272,23 @@ private struct VoiceOutbox: Codable {
       return
     }
     if type == "session.closed" { if let usage=event["usage"] as? [String:Any] { outbox?.usageSeconds = usage["seconds"] as? Double }; await finalize(confirmed:true); return }
-    if type == "error" { interrupt("Voice encountered a connection error. Your writing is safe."); return }
+    if type == "error" {
+      // Most provider errors are about one event (a rejected append, a bad field, a turn that was rate-limited)
+      // and the session goes on. Only session-level failures end the call.
+      let detail = event["error"] as? [String:Any]
+      let code = (detail?["code"] as? String) ?? (detail?["type"] as? String) ?? "unknown"
+      Self.log.error("live error \(code, privacy: .public): \((detail?["message"] as? String) ?? "", privacy: .public)")
+      let fatal = ["session_expired", "session_not_found", "invalid_session", "insufficient_quota", "server_error", "connection_error"]
+      if fatal.contains(code) { interrupt("Voice hit a connection problem. Your words are saved; you can start it again.") }
+      return
+    }
     if type == "session.usage.updated",let usage=event["usage"] as? [String:Any] { outbox?.usageSeconds = usage["seconds"] as? Double; return }
     if ["session.input_transcript.delta","session.output_transcript.delta"].contains(type),
        let id=event["event_id"] as? String, let delta=event["delta"] as? String,
        let start=event["start_ms"] as? Int,let end=event["end_ms"] as? Int, !seen.contains(id), outbox != nil {
-      let f = VoiceFragment(id:id,sequence:(outbox?.fragments.last?.sequence ?? -1)+1,speaker:type == "session.input_transcript.delta" ? "user":"assistant",text:delta,startMs:start,endMs:end)
+      // The provider marks breaths, clicks and laughs in the transcript; they are noise on the page.
+      let text = Self.stripNonVerbal(delta)
+      let f = VoiceFragment(id:id,sequence:(outbox?.fragments.last?.sequence ?? -1)+1,speaker:type == "session.input_transcript.delta" ? "user":"assistant",text:text,startMs:start,endMs:end)
       outbox?.fragments.append(f); seen.insert(id)
       do {
         try await persist()
@@ -320,6 +333,12 @@ private struct VoiceOutbox: Codable {
         }
       }
     }
+  }
+  /// Removes bracketed or parenthesised stage directions such as "[breath]", "(tongue click)" or "*laughs*".
+  nonisolated static func stripNonVerbal(_ text: String) -> String {
+    let pattern = #"\s*(\[[^\]]{1,40}\]|\([^)]{1,40}\)|\*[^*]{1,40}\*)"#
+    let cleaned = text.replacingOccurrences(of: pattern, with: "", options: .regularExpression)
+    return cleaned.replacingOccurrences(of: "  ", with: " ")
   }
   /// Whatever reaches the live model here is spoken in its own words, so a fallback is a line the interviewer could
   /// say, never an instruction about what to say. Steering ("say briefly", "offer to continue in text") was being read out.

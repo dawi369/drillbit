@@ -139,7 +139,15 @@ struct InterviewView: View {
   var body: some View {
     ZStack {
       if let finished = interview.finished { ReflectionView(model: model, initial: finished).transition(.opacity) }
-      else if showingVoiceRoom, let voice = liveVoice { voiceRoom(voice).transition(.opacity) }
+      else if showingVoiceRoom, let voice = liveVoice {
+        voiceRoom(voice).transition(.opacity)
+          // Guided's roadmap travels with the interview, spoken or typed.
+          .safeAreaInset(edge: .top, spacing: 0) {
+            if showsPathBar, let path = challenge.path {
+              GuidedPathBar(steps: path, current: guidedTurn?.result?.step ?? 0, showingSteps: $showingPathSteps)
+            }
+          }
+      }
       else { workspace.transition(.opacity) }
     }
     .animation(reduceMotion ? nil : DrillbitMotion.page, value: interview.finished != nil)

@@ -383,5 +383,7 @@ export async function reconcile(env: Env) {
 /** The ticket's text: the prompt, then its constraints as a bulleted list. */
 export function withConstraints(prompt: string, constraints: string[]): string {
   if (!constraints.length) return prompt;
-  return prompt + "\n\nConstraints\n" + constraints.map(value => "• " + value).join("\n");
+  // The model sometimes writes its own bullet or dash; one marker per line, ours.
+  const lines = constraints.map(value => value.replace(/^\s*(?:[•\-*–—]\s*)+/, "").trim()).filter(Boolean);
+  return prompt + "\n\nConstraints\n" + lines.map(value => "• " + value).join("\n");
 }
