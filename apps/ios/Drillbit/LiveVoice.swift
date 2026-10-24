@@ -17,6 +17,15 @@ private struct VoiceOutbox: Codable {
 }
 
 @MainActor @Observable final class LiveVoice {
+  /// Routes to the loudspeaker unless something external (headphones, Bluetooth, CarPlay) is the output.
+  nonisolated static func keepOnSpeaker() {
+    let session = AVAudioSession.sharedInstance()
+    let external: Set<AVAudioSession.Port> = [.headphones, .bluetoothA2DP, .bluetoothHFP, .bluetoothLE, .carAudio, .airPlay, .usbAudio, .HDMI, .lineOut]
+    guard !session.currentRoute.outputs.contains(where: { external.contains($0.portType) }) else { return }
+    if session.currentRoute.outputs.contains(where: { $0.portType == .builtInReceiver }) {
+      try? session.overrideOutputAudioPort(.speaker)
+    }
+  }
   enum Phase: Equatable { case idle, connecting, active, ending, unavailable }
   /// Server-issued cap for the next session; the plan decides it.
   var sessionLimit: TimeInterval = 10 * 60
@@ -119,10 +128,14 @@ private struct VoiceOutbox: Codable {
         if reason == AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue {
           Task { @MainActor in self?.interrupt("Your audio device disconnected. Voice has stopped.") }
         }
+        // WebRTC reapplies its own session settings when its audio unit starts; that can put the call back on the
+        // earpiece. With nothing external attached, the interview belongs on the loudspeaker.
+        Self.keepOnSpeaker()
       }
       let audio = AVAudioSession.sharedInstance()
       try audio.setCategory(.playAndRecord,mode:.voiceChat,options:[.defaultToSpeaker,.allowBluetoothHFP])
       try audio.setActive(true)
+      Self.keepOnSpeaker()
       if let prepared, Date().timeIntervalSince(prepared.date) > 60 { discardPreparation() }
       let preparation = prepared
       prepared = nil
@@ -280,39 +293,43 @@ private struct VoiceOutbox: Codable {
       thinking = true
       let timeout = Task {
         do { try await Task.sleep(until: deadline, clock: .continuous) } catch { return }
-        deliverGuidance("The response didn't arrive. Say briefly that guidance is unavailable right now; offer to continue in text. Don't ask them to keep waiting.", id: id, epoch: epoch)
+        deliverGuidance(Self.guidanceMissing, id: id, epoch: epoch)
       }
       Task {
         defer { timeout.cancel() }
         do {
           while syncing {
             guard generation == epoch, phase == .active else { return }
-            if ContinuousClock.now >= deadline {
-              deliverGuidance("The response didn't arrive. Briefly offer to continue in text; don't promise more waiting.", id: id, epoch: epoch)
-              return
-            }
+            if ContinuousClock.now >= deadline { deliverGuidance(Self.guidanceMissing, id: id, epoch: epoch); return }
             try await Task.sleep(for: .milliseconds(20))
           }
           await sync()
           guard generation == epoch, phase == .active, guidanceDeliveries[id]?.resolved == false else { return }
+          // The backend reasons over what it has stored. A sync still catching up gets one more try before giving up on this one.
+          if let pending = outbox, !pending.fragments.allSatisfy({ acknowledged.contains($0.id) }) {
+            try await Task.sleep(for: .milliseconds(600)); await sync()
+          }
+          guard generation == epoch, phase == .active, guidanceDeliveries[id]?.resolved == false else { return }
           guard let pending = outbox, pending.fragments.allSatisfy({ acknowledged.contains($0.id) }) else {
-            deliverGuidance("The latest words couldn't be saved remotely. Acknowledge that once and offer to continue in text; don't invent technical guidance or promise a wait.", id: id, epoch: epoch)
-            return
+            deliverGuidance(Self.guidanceMissing, id: id, epoch: epoch); return
           }
           let reply: VoiceReply = try await interview.model.api.send("challenges/\(interview.challenge.id)/voice/\(pending.id)/delegate", method: "POST", body: VoiceDelegation(id: id))
           deliverGuidance(reply.text, id: id, epoch: epoch)
         } catch {
-          deliverGuidance("Technical guidance is unavailable right now. Say so briefly and offer to continue in text; don't invent a result or ask them to wait.", id: id, epoch: epoch)
+          deliverGuidance(Self.guidanceMissing, id: id, epoch: epoch)
         }
       }
     }
   }
+  /// Whatever reaches the live model here is spoken in its own words, so a fallback is a line the interviewer could
+  /// say, never an instruction about what to say. Steering ("say briefly", "offer to continue in text") was being read out.
+  static let guidanceMissing = "Let's keep going from where you are."
   private func deliverGuidance(_ text: String, id: String, epoch: UUID) {
     guard generation == epoch, phase == .active, interview.currentAccount,
           guidanceDeliveries[id]?.resolved == false else { return }
     guard let outcome = guidanceDeliveries[id]?.resolve(at: .now) else { return }
     thinking = guidanceDeliveries.values.contains { !$0.resolved }
-    let content = outcome == .response ? text : "The response didn't arrive in time. Briefly acknowledge guidance is unavailable and offer to continue in text. Don't promise more waiting."
+    let content = outcome == .response ? text : Self.guidanceMissing
     transport?.send(["type":"session.commentary.append", "event_id":UUID().uuidString, "delegation_id":id, "content":content])
   }
   private func present(_ fragments:[VoiceFragment],id:String) {
@@ -403,6 +420,7 @@ private struct VoiceOutbox: Codable {
   private var track: RTCAudioTrack?
   private var stopped = false
   private var ownsAudio = false
+  private var recovery: Task<Void, Never>?
   override init() {
     super.init()
     RTCAudioSession.sharedInstance().useManualAudio = true
@@ -412,7 +430,17 @@ private struct VoiceOutbox: Codable {
     guard !stopped, peer != nil else { return }
     ownsAudio = true
     track?.isEnabled = true
-    RTCAudioSession.sharedInstance().isAudioEnabled = true
+    // Hand WebRTC the configuration we already set, so enabling its audio unit doesn't swap in its own.
+    let session = RTCAudioSession.sharedInstance()
+    let configuration = RTCAudioSessionConfiguration.webRTC()
+    configuration.category = AVAudioSession.Category.playAndRecord.rawValue
+    configuration.mode = AVAudioSession.Mode.voiceChat.rawValue
+    configuration.categoryOptions = [.defaultToSpeaker, .allowBluetoothHFP]
+    session.lockForConfiguration()
+    try? session.setConfiguration(configuration)
+    session.unlockForConfiguration()
+    session.isAudioEnabled = true
+    LiveVoice.keepOnSpeaker()
   }
   func offer() async throws -> String {
     guard !stopped else { throw CancellationError() }
@@ -460,14 +488,32 @@ private struct VoiceOutbox: Codable {
     }
   }
   func send(_ event:[String:Any]) { if let data=try? JSONSerialization.data(withJSONObject:event) { channel?.sendData(RTCDataBuffer(data:data,isBinary:false)) } }
-  func close() { stopAudio();channel?.delegate=nil;channel?.close();peer?.delegate=nil;peer?.close();peer=nil;channel=nil;track=nil }
+  func close() { recovery?.cancel();recovery=nil;stopAudio();channel?.delegate=nil;channel?.close();peer?.delegate=nil;peer?.close();peer=nil;channel=nil;track=nil }
   nonisolated func dataChannelDidChangeState(_ dataChannel:RTCDataChannel) {}
   nonisolated func dataChannel(_ dataChannel:RTCDataChannel,didReceiveMessageWith buffer:RTCDataBuffer) { let data=buffer.data; Task { @MainActor [weak self] in self?.onEvent?(data) } }
   nonisolated func peerConnection(_ peerConnection:RTCPeerConnection,didChange stateChanged:RTCSignalingState) {}
   nonisolated func peerConnection(_ peerConnection:RTCPeerConnection,didAdd stream:RTCMediaStream) {}
   nonisolated func peerConnection(_ peerConnection:RTCPeerConnection,didRemove stream:RTCMediaStream) {}
   nonisolated func peerConnectionShouldNegotiate(_ peerConnection:RTCPeerConnection) {}
-  nonisolated func peerConnection(_ peerConnection:RTCPeerConnection,didChange newState:RTCIceConnectionState) { if newState == .failed || newState == .disconnected { Task { @MainActor [weak self] in self?.onFailure?() } } }
+  // ICE goes `disconnected` for a moment on a route or network change and usually recovers; only `failed` is final.
+  // A disconnect that lasts is given a few seconds to come back before the call is declared lost.
+  nonisolated func peerConnection(_ peerConnection:RTCPeerConnection,didChange newState:RTCIceConnectionState) {
+    Task { @MainActor [weak self] in
+      guard let self else { return }
+      switch newState {
+      case .failed: self.onFailure?()
+      case .disconnected:
+        self.recovery?.cancel()
+        self.recovery = Task { [weak self] in
+          try? await Task.sleep(for: .seconds(8))
+          guard let self, !Task.isCancelled, self.peer?.iceConnectionState == .disconnected else { return }
+          self.onFailure?()
+        }
+      case .connected, .completed: self.recovery?.cancel(); self.recovery = nil
+      default: break
+      }
+    }
+  }
   nonisolated func peerConnection(_ peerConnection:RTCPeerConnection,didChange newState:RTCIceGatheringState) {}
   nonisolated func peerConnection(_ peerConnection:RTCPeerConnection,didGenerate candidate:RTCIceCandidate) {}
   nonisolated func peerConnection(_ peerConnection:RTCPeerConnection,didRemove candidates:[RTCIceCandidate]) {}

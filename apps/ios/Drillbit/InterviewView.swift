@@ -343,10 +343,11 @@ struct InterviewView: View {
               .disabled(requestingAssistance || interview.locked || interview.failedTurn != nil || liveVoice?.blocksText == true)
           }
           Button("Session style", systemImage: AppIcon.preferences.rawValue) { sheet = .style }.disabled(interview.locked || liveVoice?.blocksText == true)
+          // The ways out sit together below the line: finishing and skipping both end this question.
+          Divider()
           Button("Finish interview", systemImage: AppIcon.checkmark.rawValue) { seenToolsTip = true; focused = false; confirmFinish = true }
             .disabled(!interview.canFinish)
           if !challenge.isWarmUp {
-            Divider()
             Button("Skip question", systemImage: AppIcon.skip.rawValue, role: .destructive) { confirmSkip = true }.disabled(interview.voice?.blocksText == true)
           }
         } label: { Image(systemName: AppIcon.more.rawValue) }

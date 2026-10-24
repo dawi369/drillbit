@@ -546,7 +546,7 @@ Voice room: opens muted (`LiveVoice.start` mutes the track and sends `session.in
 
 ## Finish pass — 9 October 2026
 
-Fixes from the two-week walkthrough in [finish-report.md](finish-report.md); findings are numbered there.
+Fixes from the two-week walkthrough of 9 October 2026.
 
 - **Completion carries the session style.** `POST /v1/challenges/{id}/complete` accepts an optional `guidanceMode`. The lifecycle transaction writes it into the challenge only for the winning command, before the `completion_context` freeze, so a style switched after the last turn still decides the ending (Mock debrief, Guided recap). The client's outbox reads the per-attempt cached style when it drains a completion; `InterviewController.finish` stamps the same mode on the local copy. Older clients omit the field and keep the generated mode (F-005).
 - **Expired session.** A 401 while Clerk has no session returns to Welcome without clearing the local store; the draft is still there under the same account after signing in again. A 401 with a live Clerk session keeps the existing alert.

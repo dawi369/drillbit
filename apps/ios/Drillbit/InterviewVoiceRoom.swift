@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// Presentation only: the interview shell owns the connection and pending receipts.
-/// One quiet stage: the question, the interviewer's orb and their last line.
+/// The stage is the conversation itself: the question, then every line said, following the latest. Bit holds
+/// the room only while it connects.
 struct InterviewVoiceRoom<Question: View>: View {
   let voice: LiveVoice
   let interview: InterviewController
@@ -22,6 +23,7 @@ struct InterviewVoiceRoom<Question: View>: View {
   @State private var warned = false
   /// The mute hint shows for the first muted stretch only; after they've unmuted once it stays quiet.
   @State private var unmutedOnce = false
+  @State private var speech: SpeechTrigger?
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.dynamicTypeSize) private var typeSize
   private var phase: LiveVoice.Phase { opening && voice.phase == .idle ? .connecting : voice.phase }
@@ -35,6 +37,7 @@ struct InterviewVoiceRoom<Question: View>: View {
       .navigationTitle("Talk it through")
       .navigationBarTitleDisplayMode(.inline)
       .navigationBarBackButtonHidden()
+      .onAppear { if speech == nil { speech = SpeechTrigger(voice: voice) } }
       .toolbar { ToolbarItem(placement: .principal) { VoiceRoomClock(voice: voice, warned: $warned) } }
       .sensoryFeedback(.impact(weight: .medium), trigger: voice.phase == .active) { _, live in live }
       .sensoryFeedback(.warning, trigger: warned) { _, now in now }
@@ -53,50 +56,17 @@ struct InterviewVoiceRoom<Question: View>: View {
   // MARK: Stage
 
   private var stage: some View {
-    GeometryReader { proxy in
-      ScrollView {
-        VStack(spacing: 0) {
-          // The whole question, readable on open; the interviewer's reaction sits below it.
-          question()
-            .frame(maxWidth: 560, alignment: .leading)
-            .padding(.horizontal, 24).padding(.top, 8)
-          Spacer(minLength: 32)
-          VStack(spacing: 16) {
-            if !typeSize.isAccessibilitySize {
-              VoiceBit(voice: voice, phase: phase).frame(height: 72)
-            }
-            caption
-              .frame(maxWidth: 520)
-              .padding(.horizontal, 32)
-          }
-          Spacer(minLength: 24)
+    InterviewConversation(state: interview.displayState, style: .room, latestIdentifier: "voiceCaption", resumeFollow: speech) {
+      VStack(alignment: .leading, spacing: 0) {
+        question().frame(maxWidth: 560, alignment: .leading)
+        // Bit holds the room while it connects, then steps aside for the words.
+        if phase == .idle || phase == .connecting, !typeSize.isAccessibilitySize {
+          VoiceBit(voice: voice, phase: phase).frame(height: 72).frame(maxWidth: .infinity).padding(.top, 32)
+            .transition(.opacity)
         }
-        .frame(maxWidth: .infinity, minHeight: proxy.size.height)
       }
-      .scrollBounceBehavior(.basedOnSize)
     }
-  }
-
-  /// The interviewer's latest line, in a fixed four-line box so the stage never jumps while they talk.
-  @ViewBuilder private var caption: some View {
-    if let line = latestInterviewerLine, phase == .active || phase == .ending {
-      Text(line)
-        .font(.title3.weight(.medium))
-        .multilineTextAlignment(.center)
-        .lineLimit(4, reservesSpace: true)
-        .truncationMode(.head)
-        .foregroundStyle(AppPalette.primary)
-        .contentTransition(.opacity)
-        .animation(reduceMotion ? nil : DrillbitMotion.fast, value: line)
-        .accessibilityLabel("Interviewer said: \(line)")
-        .accessibilityIdentifier("voiceCaption")
-    } else {
-      // Nothing to read until the interviewer says something; the mic carries the state.
-      Text(" ")
-        .font(.title3)
-        .lineLimit(4, reservesSpace: true)
-        .accessibilityHidden(true)
-    }
+    .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: phase == .idle || phase == .connecting)
   }
   private var latestInterviewerLine: String? {
     guard let turn = interview.displayState.turns.last(where: { $0.kind == "voice" }) else { return nil }
@@ -381,8 +351,15 @@ private struct RoomControl: View {
 
 
 struct InterviewConversation<Header: View>: View {
+  enum Style { case transcript, room }
   var state: InterviewState
   var latestOnly = false
+  /// `.room` reads like the live interview: spoken lines in body type, the latest line kept a breath above the dock,
+  /// following smoothly and with no button; scrolling up is always allowed, and speaking brings it back down.
+  var style: Style = .transcript
+  var latestIdentifier: String? = nil
+  /// Something that changes when the person starts talking; the room returns to the latest line on it.
+  var resumeFollow: SpeechTrigger? = nil
   @ViewBuilder var header: () -> Header
   @State private var livePosition = ScrollPosition(y: 0)
   @State private var historyPosition = ScrollPosition(y: 0)
@@ -409,9 +386,13 @@ struct InterviewConversation<Header: View>: View {
         ForEach(visibleTurns) { turn in
           VStack(alignment: .leading, spacing: 8) {
             if turn.kind == "voice" {
-              ForEach(latestOnly ? VoiceTranscript.latestRows(turn.voice ?? []) : VoiceTranscript.rows(turn.voice ?? [])) { row in
+              let rows = latestOnly ? VoiceTranscript.latestRows(turn.voice ?? []) : VoiceTranscript.rows(turn.voice ?? [])
+              ForEach(rows) { row in
+                let latest = row.id == rows.last?.id && turn.id == visibleTurns.last?.id && row.speaker == "assistant"
                 Text(row.speaker == "user" ? "You" : "Interviewer").font(.caption).foregroundStyle(.secondary)
                 Text(row.text)
+                  .font(style == .room ? .body : nil)
+                  .accessibilityIdentifier(latest ? (latestIdentifier ?? "") : "")
               }
             } else {
             if turn.kind == "answer" { Text(turn.prompt).font(.headline) }
@@ -426,6 +407,8 @@ struct InterviewConversation<Header: View>: View {
         }
         Color.clear.frame(height: 1).id("voiceLatest")
       }.frame(maxWidth:.infinity,alignment:.leading).padding(24).textSelection(.enabled)
+      // The gap between the newest line and the mic: the words never sit against the dock.
+      .padding(.bottom, style == .room ? 56 : 0)
     }
     .scrollPosition(position)
     .onScrollPhaseChange { _, phase in scrolling = phase == .interacting || phase == .decelerating }
@@ -438,10 +421,16 @@ struct InterviewConversation<Header: View>: View {
       guard isUpdate else { return }
       await Task.yield()
       guard following, !scrolling, !Task.isCancelled else { return }
-      withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) { position.wrappedValue.scrollTo(id: "voiceLatest", anchor: .bottom) }
+      withAnimation(reduceMotion ? nil : style == .room ? .smooth(duration: 0.45, extraBounce: 0) : .easeOut(duration: 0.18)) { position.wrappedValue.scrollTo(id: "voiceLatest", anchor: .bottom) }
+    }
+    .onChange(of: resumeFollow?.speaking ?? false) { _, speaking in
+      // Started talking while scrolled up: glide back to where the conversation is.
+      guard speaking, !following else { return }
+      setFollowing(true)
+      withAnimation(reduceMotion ? nil : .smooth(duration: 0.5, extraBounce: 0)) { position.wrappedValue.scrollTo(id: "voiceLatest", anchor: .bottom) }
     }
     .safeAreaInset(edge: .bottom, alignment: .trailing, spacing: 0) {
-      if !following {
+      if !following, style != .room {
         Button { setFollowing(true); position.wrappedValue.scrollTo(id: "voiceLatest", anchor: .bottom) } label: {
           Image(systemName: AppIcon.latest.rawValue).font(.system(size: 20)).frame(width: 44, height: 44)
             .background(AppPalette.background, in: RoundedRectangle(cornerRadius: 12))
@@ -452,4 +441,23 @@ struct InterviewConversation<Header: View>: View {
 }
 extension InterviewConversation where Header == EmptyView {
   init(state: InterviewState) { self.state = state; self.header = { EmptyView() } }
+}
+
+/// Flips to true when the mic hears you over a sustained beat; the room watches it to return to the latest line.
+@MainActor @Observable final class SpeechTrigger {
+  private(set) var speaking = false
+  private var since: Date?
+  // Weak references end the loop with the room; no stored task, so nothing main-actor is touched in deinit.
+  init(voice: LiveVoice) {
+    Task { [weak self, weak voice] in
+      while true {
+        try? await Task.sleep(for: .milliseconds(120))
+        guard let self, let voice else { return }
+        let loud = voice.phase == .active && !voice.muted && voice.levels.input > 0.22
+        if loud { if since == nil { since = .now } } else { since = nil }
+        let now = since.map { Date.now.timeIntervalSince($0) > 0.35 } ?? false
+        if now != speaking { speaking = now }
+      }
+    }
+  }
 }

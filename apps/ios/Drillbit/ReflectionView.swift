@@ -3,8 +3,10 @@ import SwiftUI
 struct CompletionHeading: View {
   var warmUp = false
   var mode: GuidanceMode = .coachMe
+  var feedback = true
   private var copy: (eyebrow: String, title: String) {
-    switch mode {
+    guard feedback else { return ("Rep done", "That’s one in the bag.") }
+    return switch mode {
     case .learnTogether: ("Lesson recap", "Here’s what you worked out.")
     case .mockInterview: ("Interview debrief", "Here’s how the round went.")
     case .coachMe: ("Practice complete", "One idea to carry forward.")
@@ -103,6 +105,10 @@ struct DebriefCard: View {
   }
 }
 struct ReflectionView: View {
+  /// MVP: the generated feedback (summary, lesson, debrief, retry branches) is parked. Finishing shows a plain
+  /// completion with the reminder offer and the way home; the server still writes feedback and Recall cards,
+  /// so flipping this back on restores the full screen. Not a launch flag: it's the product for now.
+  static let showsFeedback = false
   @State private var waitingForFeedback = true
   @State private var feedbackCheck = 0
   @State private var preparingFollowUp = false
@@ -119,8 +125,15 @@ struct ReflectionView: View {
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 24) {
-        CompletionHeading(warmUp: warmUp, mode: mode)
-        if let reflection = (current ?? initial).reflection {
+        CompletionHeading(warmUp: warmUp, mode: mode, feedback: Self.showsFeedback)
+        if !Self.showsFeedback {
+          Text(warmUp ? "That’s the whole loop. This one didn’t count." : "Saved. It’s in your Library whenever you want to look back.")
+            .foregroundStyle(AppPalette.secondary).fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("feedbackLead")
+          if !warmUp, offersReminder { reminderOffer }
+          Button(warmUp ? "Done" : "Done for today") { leave() }.buttonStyle(PracticeButtonStyle())
+            .accessibilityIdentifier(warmUp ? "warmUpTour" : "completionDone")
+        } else if let reflection = (current ?? initial).reflection {
           Group {
           ReflectionContent(reflection: reflection, showsEnding: true)
           AssistanceSummary(challenge: current ?? initial)
@@ -181,7 +194,7 @@ struct ReflectionView: View {
             Button("Retry feedback") { Task { await model.retry(job); feedbackCheck += 1 } }
           }
         }
-        if let reflection = (current ?? initial).reflection, !warmUp {
+        if Self.showsFeedback, let reflection = (current ?? initial).reflection, !warmUp {
           Button("Review in Recall") {
             model.presented = nil
             NotificationCenter.default.post(name: .init("OpenRecall"), object: nil)

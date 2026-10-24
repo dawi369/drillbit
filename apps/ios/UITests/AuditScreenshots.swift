@@ -221,7 +221,7 @@ final class AuditScreenshots: XCTestCase {
     app.buttons["interviewOptions"].tap()
     app.buttons["Finish interview"].tap()
     app.alerts.buttons["Finish interview"].tap()
-    XCTAssertTrue(app.staticTexts["One idea to carry forward."].waitForExistence(timeout: 8))
+    XCTAssertTrue(app.staticTexts["That’s one in the bag."].waitForExistence(timeout: 8))
     Thread.sleep(forTimeInterval: 1.5)
     shot("b17-reflection", app)
     app.swipeUp()
@@ -410,7 +410,7 @@ final class AuditScreenshots: XCTestCase {
     shot("d22-interview-axxl", app)
   }
 
-  // MARK: Finish pass (docs/finish-report.md) — day one as a new person, in fixtures.
+  // MARK: Finish pass (9 October 2026) — day one as a new person, in fixtures.
 
   /// The whole text rep from Home with the tips on: a long answer, a question to the interviewer,
   /// a nudge, a style change, Finish, feedback and the return to Home.

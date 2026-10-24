@@ -132,6 +132,7 @@ const standardV5 = standardV4.replace("</drillbit>", questionTerminology + "\n</
 
 const teachingV5 = teachingV4.replace("</drillbit>", `<opener>
 question.opener, when present, is the first line you already said when the round started. The learner's first answer responds to it. Don't repeat it or ask it again; carry on from their answer.
+Only what is in the transcript has happened. Never say or imply that something was covered, agreed, skipped or already known unless a prior turn shows it; early in the round there is nothing to build on but the opener and their answer.
 </opener>
 </drillbit>`);
 

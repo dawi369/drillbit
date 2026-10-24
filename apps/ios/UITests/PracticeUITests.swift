@@ -930,11 +930,11 @@ final class PracticeUITests: XCTestCase {
     app.buttons["interviewOptions"].tap()
     app.buttons["Finish interview"].tap()
     app.alerts.buttons["Keep writing"].tap()
-    XCTAssertFalse(app.staticTexts["One idea to carry forward."].exists)
+    XCTAssertFalse(app.staticTexts["That’s one in the bag."].exists)
     app.buttons["interviewOptions"].tap()
     app.buttons["Finish interview"].tap()
     app.alerts.buttons["Finish interview"].tap()
-    XCTAssertTrue(app.staticTexts["One idea to carry forward."].waitForExistence(timeout:5))
+    XCTAssertTrue(app.staticTexts["That’s one in the bag."].waitForExistence(timeout:5))
     capture("Practice completion", app)
     app.buttons["Done for today"].firstMatch.tap()
     let done = app.buttons["todayDone"]
@@ -1187,7 +1187,8 @@ final class PracticeUITests: XCTestCase {
     // Feedback leads with what worked and what to fix, then offers the reminder once.
     XCTAssertTrue(app.descendants(matching: .any)["feedbackLead"].waitForExistence(timeout: 8))
     XCTAssertTrue(app.descendants(matching: .any)["reminderOffer"].exists)
-    XCTAssertTrue(app.buttons["Review in Recall"].exists, "The first rep counts")
+    // MVP: generated feedback is parked; the completion is plain, and the rep still counts on Home.
+    XCTAssertFalse(app.buttons["Review in Recall"].exists)
     capture("First rep feedback", app)
     let noThanks = app.buttons["No thanks"]
     for _ in 0..<4 where !noThanks.isHittable { app.swipeUp() }

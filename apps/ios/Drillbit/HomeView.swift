@@ -39,6 +39,10 @@ struct HomeView: View {
   /// The last draft, kept on the ticket after the job finished until its lines have written themselves out.
   @State private var settlingDraft: QuestionDraft?
   @State private var settledLines: Set<String> = []
+  /// A question that has just finished writing arrives in steps: level, then the stub, then the pill and the tap.
+  /// Nothing moves; the parts that could not be known while it streamed fade in, in reading order.
+  @State private var arriving: (id: String, step: Int)?
+  private static let arrivalSteps = 3
   private var today: Today {
     if preparing { return .preparing(model.preparingDraft) }
     if let settlingDraft { return .preparing(settlingDraft) }
@@ -89,7 +93,7 @@ struct HomeView: View {
           // A line that never reports (no prompt, or an empty one) must not hold the question back.
           try? await Task.sleep(for: .seconds(2.5))
           guard !Task.isCancelled, settlingDraft != nil else { return }
-          settlingDraft = nil; bitCheers += 1
+          settled()
         }
         ForEach(model.bootstrap?.jobs.filter { $0.status == "failed" && $0.kind != "help" } ?? []) { job in
           VStack(alignment: .leading, spacing: 8) {
@@ -201,11 +205,26 @@ struct HomeView: View {
   private func lineSettled(_ line: String, needsPrompt: Bool) {
     guard settlingDraft != nil else { return }
     settledLines.insert(line)
-    if settledLines.contains("title"), !needsPrompt || settledLines.contains("prompt") {
-      settlingDraft = nil
-      bitCheers += 1
+    if settledLines.contains("title"), !needsPrompt || settledLines.contains("prompt") { settled() }
+  }
+  /// The text is in; the rest of the ticket arrives over about half a second, Bit cheering as the pill lands.
+  private func settled() {
+    settlingDraft = nil
+    guard let id = model.bootstrap?.challenge?.id else { bitCheers += 1; return }
+    arriving = (id, 0)
+    Task {
+      for step in 1...Self.arrivalSteps {
+        // Level, then the stub's words, then a longer breath before the pill: three beats, not one flash.
+        try? await Task.sleep(for: .milliseconds(reduceMotion ? 0 : step == 1 ? 120 : step == 2 ? 200 : 320))
+        guard arriving?.id == id else { return }
+        withAnimation(reduceMotion ? nil : step == Self.arrivalSteps ? DrillbitMotion.selection : DrillbitMotion.reveal) { arriving = (id, step) }
+        if step == Self.arrivalSteps { bitCheers += 1 }
+      }
+      try? await Task.sleep(for: .milliseconds(400))
+      if arriving?.id == id { arriving = nil }
     }
   }
+  private func arrival(_ challenge: Challenge) -> Int { arriving?.id == challenge.id ? arriving!.step : Self.arrivalSteps }
   @ViewBuilder private var todayTicket: some View {
     switch today {
     case .preparing(let draft):
@@ -277,23 +296,36 @@ struct HomeView: View {
     let resuming = challenge.lifecycle == "in_progress"
     let mode = challenge.guidanceMode ?? .coachMe
     let lastLine = challenge.interview.flatMap { $0.turns.isEmpty ? nil : QuestionMarkup.plain($0.prompt) }
+    let step = arrival(challenge)
+    let ready = step >= Self.arrivalSteps
     return ticketButton(identifier: "startPractice", spoken: resuming ? "Resume" : "Open", action: {
       if resuming { Task { await model.open(challenge) } } else { flow = QuestionFlowEntry(challenge: challenge) }
     }) {
       VStack(alignment: .leading, spacing: 12) {
-        TicketHeader(number: challenge.ticketLabel(next: model.bootstrap?.todayPlan?.nextTicket), detail: "\(shortDate) · \(challenge.levelLabel)")
+        // The level is the one header fact the stream couldn't know; it joins the date once the question is real.
+        TicketHeader(number: challenge.ticketLabel(next: model.bootstrap?.todayPlan?.nextTicket), detail: step >= 1 ? "\(shortDate) · \(challenge.levelLabel)" : shortDate)
+          .contentTransition(.opacity)
         Text(challenge.title).font(.title.weight(.semibold)).tracking(-0.6)
           .fixedSize(horizontal: false, vertical: true)
         Text(challenge.plainPrompt).font(.subheadline).foregroundStyle(AppPalette.secondary)
           .lineLimit(3).fixedSize(horizontal: false, vertical: true)
       }
     } stub: {
-      if resuming {
-        stubRow(title: "Where you left off", note: lastLine.map { "“\($0)”" } ?? mode.title, pill: "Resume")
-      } else {
-        stubRow(title: mode.title, note: mode.stubNote, pill: "Open")
+      // Same stub geometry as while preparing: the words change in place, then the pill lands.
+      ZStack(alignment: .leading) {
+        stubText(title: "Drilling one out", note: "Takes a few seconds").opacity(step >= 2 ? 0 : 1).accessibilityHidden(step >= 2)
+        Group {
+          if resuming {
+            stubRow(title: "Where you left off", note: lastLine.map { "“\($0)”" } ?? mode.title, pill: "Resume", pillShown: ready)
+          } else {
+            stubRow(title: mode.title, note: mode.stubNote, pill: "Open", pillShown: ready)
+          }
+        }
+        .opacity(step >= 2 ? 1 : 0).accessibilityHidden(step < 2)
       }
     }
+    .disabled(!ready)
+    .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: step)
     .contextMenu {
       if challenge.lifecycle == "ready" && model.mayStartRep(swapping: challenge) {
         Button("Regenerate", systemImage: AppIcon.retry.rawValue) { Task {
@@ -412,25 +444,29 @@ struct HomeView: View {
       Ticket(shadowed: ticketSettled, content: content, stub: stub).contentShape(Rectangle())
     }
     .buttonStyle(TicketPressStyle())
-    // The source carries the ticket's shape; its shadow is the real view's, faded in once the zoom has returned.
+    // The source is the ticket itself, clipped to its corners and nothing more: a fill of its own would show
+    // through the notches and linger as a square while the system fades the source out after the zoom returns.
     .matchedTransitionSource(id: "today", in: zoom) { source in
-      source.background(AppPalette.ticket).clipShape(RoundedRectangle(cornerRadius: 12))
+      source.clipShape(RoundedRectangle(cornerRadius: 12))
     }
     .accessibilityIdentifier(identifier ?? "todayTicket")
     // The printed pill is decorative for VoiceOver, but Voice Control users say what they see.
     .accessibilityInputLabels([Text(spoken), Text("Today’s question")])
   }
 
-  private func stubRow(title: String, note: String, pill: String) -> some View {
-    ViewThatFits(in: .horizontal) {
+  private func stubRow(title: String, note: String, pill: String, pillShown: Bool = true) -> some View {
+    let pillView = StubPill(label: pill)
+      .scaleEffect(pillShown ? 1 : 0.86)
+      .opacity(pillShown ? 1 : 0)
+    return ViewThatFits(in: .horizontal) {
       HStack(spacing: 12) {
         stubText(title: title, note: note)
         Spacer(minLength: 8)
-        StubPill(label: pill)
+        pillView
       }
       VStack(alignment: .leading, spacing: 12) {
         stubText(title: title, note: note)
-        StubPill(label: pill)
+        pillView
       }
     }
   }
