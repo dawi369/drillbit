@@ -87,7 +87,6 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
           .tint(AppPalette.accent)
           .scrollDismissesKeyboard(.interactively)
           .background(AppPalette.background.ignoresSafeArea(.all))
-          .modifier(PaywallHost())
       } else {
         ContentUnavailableView(
           "Setup required", systemImage: AppIcon.settings.rawValue,

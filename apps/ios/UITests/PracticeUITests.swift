@@ -1274,6 +1274,20 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(plan.label.contains("Free"), plan.label)
     XCTAssertTrue(app.staticTexts["2 of 3 free reps left today"].exists)
     XCTAssertTrue(app.buttons["settingsSeePro"].exists)
+    // See Pro works from inside the Settings sheet too, and Not now lands back in Settings.
+    app.buttons["settingsSeePro"].tap()
+    XCTAssertTrue(app.descendants(matching: .any)["paywall"].waitForExistence(timeout: 5))
+    app.buttons["paywallDismiss"].tap()
+    XCTAssertTrue(app.descendants(matching: .any)["paywall"].waitForNonExistence(timeout: 5))
+    XCTAssertTrue(plan.exists, "Still in Settings")
+    // A swipe down dismisses it the same way, and it opens again afterwards.
+    app.buttons["settingsSeePro"].tap()
+    XCTAssertTrue(app.descendants(matching: .any)["paywall"].waitForExistence(timeout: 5))
+    app.descendants(matching: .any)["paywall"].swipeDown(velocity: .fast)
+    XCTAssertTrue(app.descendants(matching: .any)["paywall"].waitForNonExistence(timeout: 5))
+    app.buttons["settingsSeePro"].tap()
+    XCTAssertTrue(app.descendants(matching: .any)["paywall"].waitForExistence(timeout: 5))
+    app.buttons["paywallDismiss"].tap()
     let restore = app.buttons["Restore purchases"]
     for _ in 0..<2 where !restore.exists { app.swipeUp() }
     XCTAssertTrue(restore.waitForExistence(timeout: 3))

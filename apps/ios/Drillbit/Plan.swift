@@ -1,5 +1,6 @@
 import StoreKit
 import SwiftUI
+import UIKit
 #if canImport(SuperwallKit)
 import SuperwallKit
 #endif
@@ -20,8 +21,12 @@ private struct EntitlementReceipt: Decodable { var plan: String }
   /// Yearly first: it's the anchor the weekly price is measured against. Prices and the weekly intro offer live in
   /// App Store Connect (and `Config/Drillbit.storekit` for the simulator), never in code.
   static let productIDs = ["dawi.drillbit.pro.yearly", "dawi.drillbit.pro.weekly"]
-  /// Non-nil while the native paywall sheet is up.
-  var presenting: PaywallPlacement?
+  /// Non-nil while the native paywall is up.
+  private(set) var presenting: PaywallPlacement?
+  /// Presented from UIKit over whatever is on top. A SwiftUI sheet on the root can't appear while Settings or an
+  /// interview is already presented, so See Pro silently did nothing there.
+  private var paywallController: UIViewController?
+  private let sheetDelegate = PaywallSheetDelegate()
   private(set) var superwallConfigured = false
   private var pendingFeature: (() async -> Void)?
   private var updates: Task<Void, Never>?
@@ -53,19 +58,53 @@ private struct EntitlementReceipt: Decodable { var plan: String }
       return
     }
     #endif
+    guard presenting == nil else { return }
     pendingFeature = feature
     presenting = placement
+    Task { await presentNative(placement) }
+  }
+
+  private func presentNative(_ placement: PaywallPlacement) async {
+    // Wait out a presentation in flight, such as the alert whose See Pro button was just tapped.
+    for _ in 0..<20 {
+      guard presenting == placement else { return }
+      if let top = Self.topController(), !top.isBeingDismissed, !top.isBeingPresented, top.transitionCoordinator == nil {
+        let host = UIHostingController(rootView: NativePaywallSheet(placement: placement).tint(AppPalette.accent))
+        host.overrideUserInterfaceStyle = top.traitCollection.userInterfaceStyle
+        host.presentationController?.delegate = sheetDelegate
+        sheetDelegate.onSwipeDown = { [weak self] in self?.paywallController = nil; self?.dismissed() }
+        paywallController = host
+        top.present(host, animated: true)
+        return
+      }
+      try? await Task.sleep(for: .milliseconds(100))
+    }
+    dismissed()
+  }
+
+  private func closePaywall() {
+    presenting = nil
+    paywallController?.dismiss(animated: true)
+    paywallController = nil
+  }
+
+  private static func topController() -> UIViewController? {
+    let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+    let scene = scenes.first { $0.activationState == .foregroundActive } ?? scenes.first
+    var top = (scene?.windows.first { $0.isKeyWindow } ?? scene?.windows.first)?.rootViewController
+    while let next = top?.presentedViewController, !next.isBeingDismissed { top = next }
+    return top
   }
 
   /// The native sheet reports a finished purchase or restore here.
   func purchased() async {
-    presenting = nil
+    closePaywall()
     await syncEntitlements()
     let feature = pendingFeature
     pendingFeature = nil
     await feature?()
   }
-  func dismissed() { presenting = nil; pendingFeature = nil }
+  func dismissed() { closePaywall(); pendingFeature = nil }
 
   /// Listens for StoreKit transactions for the app's lifetime and posts each to the Worker.
   func start(model: AppModel) {
@@ -117,7 +156,6 @@ private struct EntitlementReceipt: Decodable { var plan: String }
 /// Fallback paywall: Apple's own subscription store for the Pro products.
 struct NativePaywallSheet: View {
   let placement: PaywallPlacement
-  @Environment(\.dismiss) private var dismiss
   var body: some View {
     NavigationStack {
       SubscriptionStoreView(productIDs: PlanCoordinator.productIDs) {
@@ -139,7 +177,7 @@ struct NativePaywallSheet: View {
         if case .success(.success) = result { Task { await PlanCoordinator.shared.purchased() } }
       }
       .toolbar {
-        ToolbarItem(placement: .cancellationAction) { Button("Not now") { PlanCoordinator.shared.dismissed(); dismiss() }.accessibilityIdentifier("paywallDismiss") }
+        ToolbarItem(placement: .cancellationAction) { Button("Not now") { PlanCoordinator.shared.dismissed() }.accessibilityIdentifier("paywallDismiss") }
       }
       .safeAreaInset(edge: .bottom) {
         #if DEBUG
@@ -254,11 +292,10 @@ struct ProNudge: View {
 }
 
 /// Hosts the native paywall sheet above the whole app when Superwall isn't configured.
-struct PaywallHost: ViewModifier {
-  @State private var plan = PlanCoordinator.shared
-  func body(content: Content) -> some View {
-    content.sheet(isPresented: Binding(get: { plan.presenting != nil }, set: { if !$0 { plan.dismissed() } })) {
-      if let placement = plan.presenting { NativePaywallSheet(placement: placement) }
-    }
+/// Swiping the paywall down counts as Not now.
+private final class PaywallSheetDelegate: NSObject, UIAdaptivePresentationControllerDelegate {
+  var onSwipeDown: (@MainActor () -> Void)?
+  func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
+    MainActor.assumeIsolated { onSwipeDown?() }
   }
 }
