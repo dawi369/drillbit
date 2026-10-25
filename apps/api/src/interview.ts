@@ -52,6 +52,15 @@ export function mockRound(data: Record<string, unknown>, fallbackStart: string, 
   };
 }
 export function interviewWrapUp(_context: unknown, _kind: string) { return null; }
+// Guided progress has two writers: typed replies carry it in result.step, voice delegations write it onto the challenge.
+export function guidedStepFor(data: any, turns: any[]): number {
+  const spoken = typeof data.guidedStep === "number" ? data.guidedStep : 0;
+  const typed = turns.filter(t => t.result?.step !== undefined).at(-1)?.result.step ?? 0;
+  return Math.max(spoken, typed);
+}
+export function guidedPathFor(data: any, guidanceMode: string | undefined, turns: any[]) {
+  return guidanceMode === "learn_together" && Array.isArray(data.path) ? { steps: data.path as string[], current: guidedStepFor(data, turns) } : undefined;
+}
 export function normalizeInterviewResult(output: z.infer<typeof interviewResultSchema>) { return output; }
 export async function interviewFor(env: Env, account: string, id: string) {
   const [challenge, rows, fragments] = await Promise.all([
@@ -64,7 +73,7 @@ export async function interviewFor(env: Env, account: string, id: string) {
   const last = turns.filter(t => ["answer", "continue"].includes(t.kind) && t.result).at(-1);
   return { guidanceMode: guidanceMode(data.guidanceMode), style: interviewStyleSchema.catch("standard").parse(data.interviewStyle),
     prompt: last?.result?.outcome === "follow_up" ? last.result.text : last?.prompt ?? data.prompt,
-    wrapUp: last?.result?.outcome === "wrap_up", turns };
+    wrapUp: last?.result?.outcome === "wrap_up", guidedStep: guidedStepFor(data, turns), turns };
 }
 export async function requestInterview(env: Env, account: string, id: string, command: string, raw: unknown, runImmediately?: (id: string) => void) {
   const input = interviewInputSchema.parse(raw);
@@ -106,9 +115,7 @@ export async function requestInterview(env: Env, account: string, id: string, co
   // A mock round runs on the clock, so the interviewer can pace it like a real one.
   const timing = context.guidanceMode === "mock_interview" ? mockRound(data, challenge.created_at, context.turns) : undefined;
   // Guided works through the question's path in order; the last reply says which step it reached.
-  const guidedPath = context.guidanceMode === "learn_together" && Array.isArray(data.path)
-    ? { steps: data.path, current: context.turns.filter(t => t.result?.step !== undefined).at(-1)?.result.step ?? 0 }
-    : undefined;
+  const guidedPath = guidedPathFor(data, context.guidanceMode, context.turns);
   const payload = JSON.stringify({ settings, action: input, turnId: command, context: { practiceProfile: settings.practiceProfile, promptVersion: INTERVIEW_PROMPT_VERSION, historicalSnapshot: history, currentDraft: session.answer, question: { ...data, interviewStyle: context.style }, interview: { ...context, timing, guidedPath } } });
   await env.DB.batch([
     env.DB.prepare(`INSERT OR IGNORE INTO jobs(id,account_id,challenge_id,kind,input,created_at,updated_at) SELECT ?,?,?,'interview',?,?,? WHERE EXISTS(SELECT 1 FROM sessions s JOIN challenges c ON c.id=s.challenge_id WHERE c.id=? AND c.account_id=? AND c.lifecycle='in_progress' AND s.revision=?) AND NOT EXISTS(SELECT 1 FROM jobs WHERE account_id=? AND kind='interview' AND status IN ('pending','running')) AND NOT EXISTS(SELECT 1 FROM voice_sessions WHERE account_id=? AND status IN ('connecting','active') AND expires_at>?)`).bind(command,account,id,payload,now,now,id,account,input.revision,account,account,now),

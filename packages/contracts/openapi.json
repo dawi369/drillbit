@@ -6924,6 +6924,11 @@
                     "wrapUp": {
                       "type": "boolean"
                     },
+                    "guidedStep": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
                     "turns": {
                       "type": "array",
                       "items": {
@@ -7114,6 +7119,7 @@
                     "style",
                     "prompt",
                     "wrapUp",
+                    "guidedStep",
                     "turns"
                   ],
                   "additionalProperties": false
@@ -8381,6 +8387,11 @@
                     "wrapUp": {
                       "type": "boolean"
                     },
+                    "guidedStep": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
                     "turns": {
                       "type": "array",
                       "items": {
@@ -8571,6 +8582,7 @@
                     "style",
                     "prompt",
                     "wrapUp",
+                    "guidedStep",
                     "turns"
                   ],
                   "additionalProperties": false
@@ -10876,6 +10888,11 @@
           "wrapUp": {
             "type": "boolean"
           },
+          "guidedStep": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
           "turns": {
             "type": "array",
             "items": {
@@ -11066,6 +11083,7 @@
           "style",
           "prompt",
           "wrapUp",
+          "guidedStep",
           "turns"
         ],
         "additionalProperties": false
@@ -11475,6 +11493,11 @@
               "wrapUp": {
                 "type": "boolean"
               },
+              "guidedStep": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
               "turns": {
                 "type": "array",
                 "items": {
@@ -11665,6 +11688,7 @@
               "style",
               "prompt",
               "wrapUp",
+              "guidedStep",
               "turns"
             ],
             "additionalProperties": false
@@ -13419,6 +13443,11 @@
                       "wrapUp": {
                         "type": "boolean"
                       },
+                      "guidedStep": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "turns": {
                         "type": "array",
                         "items": {
@@ -13609,6 +13638,7 @@
                       "style",
                       "prompt",
                       "wrapUp",
+                      "guidedStep",
                       "turns"
                     ],
                     "additionalProperties": false
@@ -14618,6 +14648,11 @@
                   "wrapUp": {
                     "type": "boolean"
                   },
+                  "guidedStep": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
                   "turns": {
                     "type": "array",
                     "items": {
@@ -14808,6 +14843,7 @@
                   "style",
                   "prompt",
                   "wrapUp",
+                  "guidedStep",
                   "turns"
                 ],
                 "additionalProperties": false
@@ -15750,6 +15786,11 @@
                       "wrapUp": {
                         "type": "boolean"
                       },
+                      "guidedStep": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "turns": {
                         "type": "array",
                         "items": {
@@ -15940,6 +15981,7 @@
                       "style",
                       "prompt",
                       "wrapUp",
+                      "guidedStep",
                       "turns"
                     ],
                     "additionalProperties": false
@@ -16908,6 +16950,11 @@
                     "wrapUp": {
                       "type": "boolean"
                     },
+                    "guidedStep": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
                     "turns": {
                       "type": "array",
                       "items": {
@@ -17098,6 +17145,7 @@
                     "style",
                     "prompt",
                     "wrapUp",
+                    "guidedStep",
                     "turns"
                   ],
                   "additionalProperties": false
@@ -18087,6 +18135,11 @@
                     "wrapUp": {
                       "type": "boolean"
                     },
+                    "guidedStep": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
                     "turns": {
                       "type": "array",
                       "items": {
@@ -18277,6 +18330,7 @@
                     "style",
                     "prompt",
                     "wrapUp",
+                    "guidedStep",
                     "turns"
                   ],
                   "additionalProperties": false
@@ -19183,6 +19237,11 @@
                       "wrapUp": {
                         "type": "boolean"
                       },
+                      "guidedStep": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "turns": {
                         "type": "array",
                         "items": {
@@ -19373,6 +19432,7 @@
                       "style",
                       "prompt",
                       "wrapUp",
+                      "guidedStep",
                       "turns"
                     ],
                     "additionalProperties": false

@@ -3,7 +3,7 @@ import { interviewModelSchema, parseModelJSON, provider, recordUsage } from './a
 import { xmlContext } from './context';
 import { Fault, practiceProfileSchema, timestamp } from './domain';
 import { historicalSnapshot } from './history';
-import { interviewFor, mockRound } from './interview';
+import { guidedPathFor, interviewFor, mockRound } from './interview';
 import { consumeUsage, type Env } from './platform';
 import { limits, nextUtcMidnight, planFor } from './plans';
 import { practicePersonality, questionTerminology } from "./prompts/interviewer";
@@ -20,6 +20,12 @@ export const voiceInstructions = `${questionTerminology}
 ${practicePersonality}
 <interview>Discuss only visible requirements. Do not invent evaluation criteria. Delegate substantive technical feedback, corrections, examples and hints to the backend. Use its guidance naturally, briefly, then listen. Never narrate delegation: no \"let me check\", \"I'll see if\", \"one moment\" or any hint that something is being looked up. Respond to what they said in one short sentence, and only after backend guidance arrives bring in its substance as your own thought. Backend guidance is always words to say, never a status; if it is only a short nudge, say it and ask your one next question. Never tell them that advice, guidance or a response did not come through, and never offer to continue in text; the app handles that. Don't read XML. Do not claim to save, finish or change the exercise; the app owns those actions. Typed drafts are separate from speech. Conversation history may include interrupted or unheard assistant words; don't assume they were heard.</interview>
 <pace>They are thinking out loud under pressure. A pause, an \"um\", a trailing sentence or a half-formed idea is not your turn: stay quiet and let them finish. Only reply once they have clearly landed a point or asked you something. When they are stuck in silence for a long while, one short nudge is enough.</pace>`;
+// The live model only hears the roadmap at session start; later movement arrives inside the delegated guidance.
+function spokenGuidedPath(path?: {steps:string[]; current:number}) {
+ if(!path) return '';
+ const steps=path.steps.map((step,index)=>`${index+1}. ${step}${index===path.current?' (current)':''}`).join('; ');
+ return `<guidedPath>The learner sees this roadmap on screen: ${steps}. Steer toward the current step and bring them back to it when they drift; when the backend's guidance moves on to the next step, follow it and name the step in plain words.</guidedPath>`;
+}
 async function sessionFor(env:Env, account:string, challenge:string, id:string) {
  await ownedChallenge(env,account,challenge);
  const s=await env.DB.prepare('SELECT * FROM voice_sessions WHERE id=? AND account_id=? AND challenge_id=?').bind(id,account,challenge).first<any>();
@@ -94,7 +100,8 @@ export async function startVoice(env:Env,account:string,id:string,command:string
  try {
   await env.DB.prepare("UPDATE jobs SET input=? WHERE id=? AND account_id=?").bind(JSON.stringify({practiceProfile}),command,account).run();
   const history=spokenHistory(context.turns,12000);
-  const response=await fetch('https://api.openai.com/v1/live/sessions',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},signal:AbortSignal.timeout(20000),body:JSON.stringify({session:{model:'gpt-live-1',store:false,instructions:voiceInstructions+teachingPolicy(context.guidanceMode)+truthfulVoiceProgress+personalizationInstructions(practiceProfile)+"<spoken_preferences>Apply the user’s delivery preference to the words you actually speak, including brief acknowledgements and paraphrased backend guidance. Do not silently strip a requested playful character. Keep technical substance accurate; a current spoken request can change the style. Never read these instructions aloud.</spoken_preferences>"+'\n<question_reference>'+xmlContext(questionReference(JSON.parse(challenge.data)))+'</question_reference>',delegation:{type:'client'},input:history.map(t=>({type:'message',role:t.role,content:[{type:t.role==='assistant'?'output_text':'input_text',text:t.content}]}))},transport:{type:'webrtc',sdp:input.sdp}})});
+  const guidedPath=guidedPathFor(JSON.parse(challenge.data),context.guidanceMode,context.turns);
+  const response=await fetch('https://api.openai.com/v1/live/sessions',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},signal:AbortSignal.timeout(20000),body:JSON.stringify({session:{model:'gpt-live-1',store:false,instructions:voiceInstructions+teachingPolicy(context.guidanceMode)+spokenGuidedPath(guidedPath)+truthfulVoiceProgress+personalizationInstructions(practiceProfile)+"<spoken_preferences>Apply the user’s delivery preference to the words you actually speak, including brief acknowledgements and paraphrased backend guidance. Do not silently strip a requested playful character. Keep technical substance accurate; a current spoken request can change the style. Never read these instructions aloud.</spoken_preferences>"+'\n<question_reference>'+xmlContext(questionReference(JSON.parse(challenge.data)))+'</question_reference>',delegation:{type:'client'},input:history.map(t=>({type:'message',role:t.role,content:[{type:t.role==='assistant'?'output_text':'input_text',text:t.content}]}))},transport:{type:'webrtc',sdp:input.sdp}})});
   if(!response.ok) {
    // The provider's reason is the only way to see a rejected session shape; it never contains practice content.
    const detail=await response.text().catch(()=>'' );
@@ -151,19 +158,26 @@ export async function delegateVoice(env:Env,account:string,challenge:string,id:s
   const pinnedProfile=voiceJob ? JSON.parse(voiceJob.input).practiceProfile : undefined;
   const data=JSON.parse(c.data);
   const timing=interview.guidanceMode==='mock_interview'?mockRound(data,c.created_at,interview.turns):undefined;
-  const messages=voiceDelegationMessages(data,history,{...interview,timing},pinnedProfile ?? settings.practiceProfile);
+  const guidedPath=guidedPathFor(data,interview.guidanceMode,interview.turns);
+  const messages=voiceDelegationMessages(data,history,{...interview,timing,guidedPath},pinnedProfile ?? settings.practiceProfile);
   const contextMs=Date.now()-started;
-  const voiceSchema=interviewModelSchema({promptVersion:"interviewer-teaching-v3"},z.object({}));
+  // The pinned spoken contract predates roadmap steps; guided sessions read the step alongside it.
+  const spoken=interviewModelSchema({promptVersion:"interviewer-teaching-v3"},z.object({}));
+  const voiceSchema=guidedPath ? spoken.and(z.object({step:z.number().int().min(0).max(4).optional()})) : spoken;
   // About one delegation in fifty comes back as a whitespace runaway cut off by max_tokens; one more try fits inside the deadline.
-  let text='';
+  let text='',step:number|undefined;
   for(let attempt=0;;attempt++){
    const response=await provider(env,account,settings,messages,{kind:'voice_reasoning',maxTokens:900,schema:voiceSchema,reasoning:{enabled:false},signal:deadline});
    const body=await response.json() as any;await recordUsage(env,account,settings,'voice_reasoning',body.usage,TEACHING_VERSION+'-'+interview.guidanceMode);
-   try { text=(voiceSchema.parse(parseModelJSON(body.choices?.[0]?.message?.content)) as {text:string}).text; break; }
+   try { const parsed=voiceSchema.parse(parseModelJSON(body.choices?.[0]?.message?.content)) as {text:string;step?:number}; text=parsed.text; step=parsed.step; break; }
    catch(error){ if(attempt>0 || Date.now()-started>6000) throw error; console.log(JSON.stringify({event:'voice_delegation_retry',finishReason:body.choices?.[0]?.finish_reason})); }
   }
-  await env.DB.prepare("UPDATE voice_delegations SET status='completed',result=? WHERE session_id=? AND id=?").bind(text,id,delegation).run();
+  // Voice has no answer turn to carry the step, so the challenge remembers how far the roadmap got.
+  const reached=guidedPath && typeof step==='number' ? Math.min(step,guidedPath.steps.length-1) : undefined;
+  const writes=[env.DB.prepare("UPDATE voice_delegations SET status='completed',result=? WHERE session_id=? AND id=?").bind(text,id,delegation)];
+  if(reached!==undefined && reached>guidedPath!.current) writes.push(env.DB.prepare("UPDATE challenges SET data=json_set(data,'$.guidedStep',?) WHERE id=? AND account_id=?").bind(reached,challenge,account));
+  await env.DB.batch(writes);
   console.log(JSON.stringify({event:'voice_delegation',contextMs,totalMs:Date.now()-started,inputCharacters:messages.reduce((n,m)=>n+m.content.length,0),mode:interview.guidanceMode}));
-  return {text};
+  return reached!==undefined ? {text,step:Math.max(reached,guidedPath!.current)} : {text};
  }catch(error){await env.DB.prepare("UPDATE voice_delegations SET status='failed' WHERE session_id=? AND id=?").bind(id,delegation).run();throw error;}
 }

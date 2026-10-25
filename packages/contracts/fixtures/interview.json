@@ -2,6 +2,7 @@
   "style": "standard",
   "prompt": "What happens when a worker crashes?",
   "wrapUp": false,
+  "guidedStep": 0,
   "turns": [
     {
       "id": "turn-1",

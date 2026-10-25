@@ -162,7 +162,7 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.buttons["Show an example"].exists)
     XCTAssertTrue(app.buttons["Finish interview"].exists)
   }
-  func testTourWalksTheTabsAfterTheFirstRep() throws {
+  func testFirstRunTipsStayInsideTheInterview() throws {
     let app = XCUIApplication()
     app.launchArguments = ["--fixtures", "--fixture-onboarding", "--fixture-coach"]
     app.launch()
@@ -172,7 +172,7 @@ final class PracticeUITests: XCTestCase {
     app.buttons["Show me my first question"].tap()
     XCTAssertTrue(app.buttons["previewStart"].waitForExistence(timeout: 10))
     app.buttons["previewStart"].tap()
-    // The composer tip comes first; skipping the first question still ends onboarding, and Home then offers the tour.
+    // The composer tip comes first; skipping the first question still ends onboarding.
     XCTAssertTrue(app.descendants(matching: .any)["coach-composer"].waitForExistence(timeout: 12))
     app.buttons["coachDone"].tap()
     // Guided: the roadmap tip's Show me opens the steps.
@@ -193,26 +193,13 @@ final class PracticeUITests: XCTestCase {
     let alert = app.alerts["Skip this question?"]
     XCTAssertTrue(alert.waitForExistence(timeout: 5))
     alert.buttons["Skip question"].tap()
-    let tour = app.descendants(matching: .any)["coach-tour"]
-    XCTAssertTrue(tour.waitForExistence(timeout: 10))
-    let recallTab = app.tabBars.buttons["Recall"].frame, libraryTab = app.tabBars.buttons["Library"].frame
-    XCTAssertEqual(tour.frame.maxY, recallTab.minY - 12, accuracy: 24, "tour \(tour.frame) sits on the tab bar \(recallTab)")
-    capture("Tour offered", app)
-    app.buttons["coachDone"].tap()
-    let recallTip = app.descendants(matching: .any)["coach-recallPage"]
-    XCTAssertTrue(recallTip.waitForExistence(timeout: 5))
-    XCTAssertEqual(recallTip.frame.midX, recallTab.midX, accuracy: 60, "recall tip \(recallTip.frame) over the Recall tab \(recallTab)")
-    capture("Tour recall", app)
-    app.buttons["coachDone"].tap()
-    let libraryTip = app.descendants(matching: .any)["coach-libraryPage"]
-    XCTAssertTrue(libraryTip.waitForExistence(timeout: 5))
-    // The callout centres on its tab unless the screen edge clamps it; either way the tab sits under it.
-    let clampedCentre = min(max(libraryTab.midX, 16 + libraryTip.frame.width / 2), app.frame.width - 16 - libraryTip.frame.width / 2)
-    XCTAssertEqual(libraryTip.frame.midX, clampedCentre, accuracy: 8, "library tip \(libraryTip.frame) over the Library tab \(libraryTab)")
-    capture("Tour library", app)
-    app.buttons["coachDone"].tap()
-    XCTAssertTrue(app.buttons["homeSettings"].waitForExistence(timeout: 5))
-    XCTAssertTrue(app.descendants(matching: .any)["coach-settings"].waitForExistence(timeout: 5))
+    // Tips live inside the interview only: Home and every tab stay clear after the first rep.
+    XCTAssertTrue(app.buttons["homeSettings"].waitForExistence(timeout: 10))
+    XCTAssertFalse(app.descendants(matching: .any)["coachDone"].waitForExistence(timeout: 2), "Home offers no tip")
+    for tab in ["Recall", "Library", "Home"] {
+      app.tabBars.buttons[tab].tap()
+      XCTAssertFalse(app.descendants(matching: .any)["coachDone"].waitForExistence(timeout: 2), "\(tab) offers no tip")
+    }
   }
   func testLiveVoiceAccessibleDark() throws { try voiceJourney(extra:["--dark","-UIPreferredContentSizeCategoryName","UICTContentSizeCategoryAccessibilityXXXL"]) }
   func testVoiceRoomCancelDuringConnection() throws {
@@ -580,7 +567,9 @@ final class PracticeUITests: XCTestCase {
     app.buttons["Caching"].tap()
     app.buttons["prepareLevel"].tap()
     app.buttons["Senior"].tap()
-    XCTAssertTrue(app.textFields["Optional request"].exists || app.textViews["Optional request"].exists)
+    // Style and custom instructions aren't offered here for now: nothing in Settings backs them.
+    XCTAssertFalse(app.buttons["interviewStyle"].exists)
+    XCTAssertFalse(app.textFields["Optional request"].exists || app.textViews["Optional request"].exists)
     capture("Temporary preparation", app)
     app.buttons["Cancel"].tap()
     app.buttons["prepareQuestion"].tap()
@@ -981,15 +970,20 @@ final class PracticeUITests: XCTestCase {
     app.launch()
     XCTAssertTrue(app.buttons["prepareQuestion"].waitForExistence(timeout: 10))
     app.buttons["prepareQuestion"].tap()
-    let selector = app.buttons["interviewStyle"]
-    for _ in 0..<3 where !selector.isHittable { app.swipeUp() }
-    selector.tap()
+    let submit = app.buttons["submitPreparation"]
+    for _ in 0..<3 where !submit.isHittable { app.swipeUp() }
+    submit.tap()
+    XCTAssertTrue(app.buttons["previewStart"].waitForExistence(timeout: 10))
+    app.buttons["previewStart"].tap()
+    XCTAssertTrue(app.buttons["interviewOptions"].waitForExistence(timeout: 5))
+    app.buttons["interviewOptions"].tap()
+    app.buttons["Session style"].tap()
+    XCTAssertTrue(app.navigationBars["Session style"].waitForExistence(timeout: 5))
     for title in ["Guided", "Practice", "Mock interview"] {
       let option = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", title)).firstMatch
-      for _ in 0..<3 where !option.isHittable { app.swipeUp() }
+      // The list is lazy at this size: rows below the fold only exist once scrolled to.
+      for _ in 0..<4 where !(option.exists && option.isHittable) { app.swipeUp() }
       XCTAssertTrue(option.isHittable)
-      option.tap()
-      XCTAssertTrue(option.isSelected)
     }
     capture("Largest practice modes light", app)
   }
@@ -1001,13 +995,15 @@ final class PracticeUITests: XCTestCase {
     app.launch()
     XCTAssertTrue(app.buttons["prepareQuestion"].waitForExistence(timeout: 10))
     app.buttons["prepareQuestion"].tap()
-    app.buttons["interviewStyle"].tap()
-    let mock = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Mock interview")).firstMatch
-    XCTAssertTrue(mock.waitForExistence(timeout: 5)); mock.tap()
-    app.navigationBars.buttons.element(boundBy: 0).tap()
     app.buttons["submitPreparation"].tap()
     XCTAssertTrue(app.buttons["previewStart"].waitForExistence(timeout: 10))
     app.buttons["previewStart"].tap()
+    // The round is chosen inside the interview; the new-question form doesn't offer styles for now.
+    XCTAssertTrue(app.buttons["interviewOptions"].waitForExistence(timeout: 5))
+    app.buttons["interviewOptions"].tap()
+    app.buttons["Session style"].tap()
+    let mock = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Mock interview")).firstMatch
+    XCTAssertTrue(mock.waitForExistence(timeout: 5)); mock.tap()
     let clock = app.descendants(matching: .any)["roundClock"]
     XCTAssertTrue(clock.waitForExistence(timeout: 5))
     XCTAssertTrue(clock.label.hasSuffix("minutes left"), clock.label)
@@ -1040,11 +1036,6 @@ final class PracticeUITests: XCTestCase {
     app.launch()
     XCTAssertTrue(app.buttons["prepareQuestion"].waitForExistence(timeout:10))
     app.buttons["prepareQuestion"].tap()
-    app.buttons["interviewStyle"].tap()
-    let deep = app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@", "Guided")).firstMatch
-    XCTAssertTrue(deep.waitForExistence(timeout:5)); XCTAssertTrue(deep.isEnabled); deep.tap()
-    capture("Interview styles", app)
-    app.navigationBars.buttons.element(boundBy:0).tap()
     app.buttons["submitPreparation"].tap()
     XCTAssertTrue(app.buttons["previewStart"].waitForExistence(timeout:8))
     XCTAssertFalse(app.staticTexts["Interview style · In-depth"].exists)

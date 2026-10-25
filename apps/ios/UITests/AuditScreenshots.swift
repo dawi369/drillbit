@@ -239,17 +239,18 @@ final class AuditScreenshots: XCTestCase {
     Thread.sleep(forTimeInterval: 1)
     shot("c01-home-dashboard", app)
     app.buttons["prepareQuestion"].tap()
-    app.buttons["interviewStyle"].tap()
-    let mock = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Mock interview")).firstMatch
-    XCTAssertTrue(mock.waitForExistence(timeout: 5)); mock.tap()
-    app.navigationBars.buttons.element(boundBy: 0).tap()
     app.buttons["submitPreparation"].tap()
     Thread.sleep(forTimeInterval: 0.4)
     shot("c02-preview-generating", app)
     XCTAssertTrue(app.buttons["previewStart"].waitForExistence(timeout: 10))
     Thread.sleep(forTimeInterval: 1)
-    shot("c03-preview-mock", app)
+    shot("c03-preview", app)
     app.buttons["previewStart"].tap()
+    XCTAssertTrue(app.buttons["interviewOptions"].waitForExistence(timeout: 5))
+    app.buttons["interviewOptions"].tap()
+    app.buttons["Session style"].tap()
+    let mock = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Mock interview")).firstMatch
+    XCTAssertTrue(mock.waitForExistence(timeout: 5)); mock.tap()
     XCTAssertTrue(app.descendants(matching: .any)["roundClock"].waitForExistence(timeout: 5))
     Thread.sleep(forTimeInterval: 1)
     shot("c04-mock-clock", app)
@@ -439,9 +440,6 @@ final class AuditScreenshots: XCTestCase {
     app.buttons["prepareLevel"].tap()
     let senior = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Senior")).firstMatch
     XCTAssertTrue(senior.waitForExistence(timeout: 2)); senior.tap()
-    let instruction = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Optional request")).firstMatch
-    XCTAssertTrue(instruction.waitForExistence(timeout: 2))
-    instruction.tap(); instruction.typeText("Keep it to one region. I’m shaky on caches.")
     Thread.sleep(forTimeInterval: 0.4)
     shot("e04-prepare-filled", app)
     app.buttons["submitPreparation"].tap()

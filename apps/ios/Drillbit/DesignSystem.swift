@@ -53,6 +53,8 @@ enum DrillbitMotion {
   static let page = Animation.smooth(duration: 0.38, extraBounce: 0)
   static let entrance = Animation.smooth(duration: 0.55, extraBounce: 0)
   static let celebrate = Animation.spring(duration: 0.5, bounce: 0.3)
+  /// Small controls arriving beside a primary one: a soft spring, no overshoot you'd notice.
+  static let pop = Animation.spring(duration: 0.42, bounce: 0.18)
   // Interview document timings are tuned against keyboard and streaming layout.
   static let document = Animation.smooth(duration: 0.38, extraBounce: 0)
   static let send = Animation.smooth(duration: 0.42, extraBounce: 0)

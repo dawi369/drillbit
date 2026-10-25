@@ -6,31 +6,6 @@ struct RootView: View {
   @State private var settingsOpen = false
   @State private var selectedTab = ProcessInfo.processInfo.arguments.contains("--fixture-recall") ? "recall" : "home"
   @AppStorage("appearance") private var appearance = "dark"
-  @AppStorage(CoachMark.tour.storageKey) private var seenTour = false
-  @AppStorage(CoachMark.recallPage.storageKey) private var seenRecallPage = false
-  @AppStorage(CoachMark.libraryPage.storageKey) private var seenLibraryPage = false
-  @AppStorage(CoachMark.homeReadyKey) private var homeReady = false
-  /// After the first rep, a short tour: Home offers it, Show me walks Recall then Library, Back home ends it.
-  private func pageCoach(_ tab: String) -> CoachMark? {
-    guard tourRunning, selectedTab == tab else { return nil }
-    switch tab {
-    case "home": return seenTour ? nil : .tour
-    case "recall": return seenRecallPage ? nil : .recallPage
-    case "library": return seenLibraryPage ? nil : .libraryPage
-    default: return nil
-    }
-  }
-  /// From the first rep's end until the Library tip is dismissed, the tour owns the screen, tab bar included.
-  private var tourRunning: Bool { CoachMark.enabled && homeReady && !settingsOpen && model.presented == nil && !seenLibraryPage }
-  private func advanceTour(_ mark: CoachMark) {
-    withAnimation(DrillbitMotion.page) {
-      switch mark {
-      case .tour: seenTour = true; selectedTab = "recall"
-      case .recallPage: seenTour = true; seenRecallPage = true; selectedTab = "library"
-      default: seenTour = true; seenRecallPage = true; seenLibraryPage = true; selectedTab = "home"
-      }
-    }
-  }
   @Environment(\.scenePhase) private var scenePhase
   @Environment(\.colorScheme) private var systemColorScheme
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -129,8 +104,6 @@ struct RootView: View {
               }
             }
           }
-          // One layer over the whole TabView: tab tips measure the bar themselves, and the shield covers it too.
-          .coachMark(pageCoach(selectedTab), shielding: tourRunning, dismiss: advanceTour)
           .transition(.opacity)
         }
       } else {

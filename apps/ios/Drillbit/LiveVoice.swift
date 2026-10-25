@@ -8,7 +8,7 @@ private struct VoiceStart: Encodable { var sdp: String; var revision: Int; var g
 private struct VoiceEvents: Codable { var fragments: [VoiceFragment]; var closed: Bool; var finalized: Bool; var usageSeconds: Double? }
 private struct VoiceAck: Decodable { var accepted: [String] }
 private struct VoiceDelegation: Encodable { var id: String }
-private struct VoiceReply: Decodable { var text: String }
+private struct VoiceReply: Decodable { var text: String; var step: Int? }
 private struct VoiceOutbox: Codable {
   var id: String
   var fragments: [VoiceFragment] = []
@@ -159,7 +159,7 @@ private struct VoiceOutbox: Codable {
       link.onEvent = { [weak self] data in self?.enqueue(data,epoch:epoch) }
       link.onFailure = { [weak self] in self?.interrupt("Voice disconnected. Your transcript is preserved.") }
       let result: VoiceConnection = try await interview.model.api.send("challenges/\(interview.challenge.id)/voice",method:"POST",body:VoiceStart(sdp:offer,revision:draft.revision,guidanceMode:interview.mode,practiceProfile:interview.model.settings.practiceProfile),command:id)
-      guard generation == epoch else { link.close(); return }
+      guard generation == epoch else { link.close(); abandon(id); return }
       if let seconds = result.sessionSeconds { sessionLimit = TimeInterval(seconds) }
       try await link.answer(result.sdp)
       guard generation == epoch, phase == .connecting || phase == .active else { link.close(); return }
@@ -243,6 +243,8 @@ private struct VoiceOutbox: Codable {
       await finalize(confirmed:interview.model.fixture); return
     }
     transport?.send(["type":"session.close","event_id":UUID().uuidString])
+    // The line never went live, so no goodbye is coming; waiting for one would only hold the keyboard hostage.
+    if wasConnecting, startedAt == nil { await finalize(confirmed:false); return }
     closeDeadline = Task { [weak self] in
       try? await Task.sleep(for:.seconds(5))
       guard !Task.isCancelled else { return }
@@ -255,6 +257,12 @@ private struct VoiceOutbox: Codable {
     Task { await end(); message = reason }
   }
   func dismiss() { if !blocksText { phase = .idle; message = nil } }
+  /// Startup was cancelled while the server was opening the line. Its outbox may already be gone, so close the
+  /// reservation directly; otherwise the next Talk is refused until it expires.
+  private func abandon(_ id: String) {
+    let api = interview.model.api, path = "challenges/\(interview.challenge.id)/voice/\(id)/events"
+    Task { let _: VoiceAck? = try? await api.send(path,method:"POST",body:VoiceEvents(fragments:[],closed:true,finalized:false)) }
+  }
   func retrySync() async { await sync(); if outbox == nil { phase = .idle; message = nil } }
   private func enqueue(_ data: Data, epoch: UUID) {
     let prior = eventTask
@@ -327,6 +335,7 @@ private struct VoiceOutbox: Codable {
             deliverGuidance(Self.guidanceMissing, id: id, epoch: epoch); return
           }
           let reply: VoiceReply = try await interview.model.api.send("challenges/\(interview.challenge.id)/voice/\(pending.id)/delegate", method: "POST", body: VoiceDelegation(id: id))
+          if let step = reply.step { interview.noteGuidedStep(step) }
           deliverGuidance(reply.text, id: id, epoch: epoch)
         } catch {
           deliverGuidance(Self.guidanceMissing, id: id, epoch: epoch)

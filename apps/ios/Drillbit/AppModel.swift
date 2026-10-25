@@ -703,7 +703,6 @@ import WidgetKit
     defaults.removeObject(forKey: "firstRun.stage")
     defaults.removeObject(forKey: SetupView.draftKey)
     for mark in CoachMark.allCases { defaults.removeObject(forKey: mark.storageKey) }
-    defaults.removeObject(forKey: CoachMark.homeReadyKey)
   }
   /// Developer preview of the free plan without touching the server; a refresh puts the real plan back.
   func previewPlan(_ preview: PlanPreview) {
@@ -1173,7 +1172,6 @@ import WidgetKit
       var done = FirstUseProgress()
       if !challenge.isWarmUp { done.firstRepID = challenge.id }
       try? await setFirstUse(done)
-      UserDefaults.standard.set(true, forKey: CoachMark.homeReadyKey)
     }
     await completeOnboarding()
     return completed
@@ -1193,7 +1191,6 @@ import WidgetKit
       // Skipping the first rep still ends onboarding; Home takes over.
       if firstUse.stage == .firstRep {
         try? await setFirstUse(FirstUseProgress())
-        UserDefaults.standard.set(true, forKey: CoachMark.homeReadyKey)
       }
       await completeOnboarding()
       locallySkipped[account, default: []].insert(id)
@@ -1355,7 +1352,6 @@ import WidgetKit
     #if DEBUG
     // Device-level choices from an earlier test run must not leak into this one.
     for mark in CoachMark.allCases { UserDefaults.standard.removeObject(forKey: mark.storageKey) }
-    UserDefaults.standard.removeObject(forKey: CoachMark.homeReadyKey)
     if ProcessInfo.processInfo.arguments.contains("--fixture-onboarding") {
       settings.onboardingComplete = false
       // A fresh first run: forget any draft or stage left behind by an earlier launch.

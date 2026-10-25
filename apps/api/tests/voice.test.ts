@@ -3,7 +3,7 @@ import {beforeAll,it,expect,vi} from 'vitest';
 import {initializeDatabase} from './migrations';
 import {accountFor,complete,detail,settingsFor} from '../src/store';
 import {startVoice,voiceEvents,delegateVoice,voiceCapability} from '../src/voice';
-import {requestInterview} from '../src/interview';
+import {interviewFor,requestInterview} from '../src/interview';
 import type {Env} from '../src/platform';
 const e={...env,VOICE_ENABLED:'true',OPENAI_API_KEY:'test',MANAGED_AI_ENABLED:'true',OPENROUTER_API_KEY:'test',JOBS:{create:async()=>({id:'test'})}} as unknown as Env;
 beforeAll(()=>initializeDatabase(e.DB));
@@ -116,6 +116,24 @@ it('captures selected voice mode and leaves no running delegation after quota fa
  }finally{mock.mockRestore();}
 });
 
+it('moves the guided roadmap from a spoken delegation and tells the live model about it',async()=>{
+ const {a,id}=await fixture(),session=crypto.randomUUID(),mock=connection();
+ await e.DB.prepare("UPDATE challenges SET data=json_set(data,'$.path',json('[\"Pin down the clients\",\"Sketch the API\",\"Choose the storage\"]')) WHERE id=?").bind(id).run();
+ try {
+  await startVoice(e,a,id,session,{sdp:'offer',revision:2,guidanceMode:'learn_together'});
+  const sent=JSON.parse(String(mock.mock.calls[0][1]?.body));
+  expect(sent.session.instructions).toContain('1. Pin down the clients (current); 2. Sketch the API');
+  mock.mockResolvedValue(new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({move:'ask_one',text:'Good. What does the API look like?',step:1,choices:[]})}}],usage:{prompt_tokens:1,completion_tokens:1}}),{status:200}));
+  expect(await delegateVoice(e,a,id,session,{id:'moved'})).toEqual({text:'Good. What does the API look like?',step:1});
+  const delegated=JSON.parse(String(mock.mock.calls[1][1]?.body));
+  expect(JSON.stringify(delegated.messages)).toContain('guidedPath');
+  expect((await interviewFor(e,a,id)).guidedStep).toBe(1);
+  // A later reply that works on an earlier step never walks the roadmap backwards.
+  mock.mockResolvedValue(new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({move:'chat',text:'Back to clients for a second.',step:0,choices:[]})}}],usage:{prompt_tokens:1,completion_tokens:1}}),{status:200}));
+  expect(await delegateVoice(e,a,id,session,{id:'back'})).toEqual({text:'Back to clients for a second.',step:1});
+  expect((await interviewFor(e,a,id)).guidedStep).toBe(1);
+ }finally{mock.mockRestore();}
+});
 it('returns completed delegation once without another inference and marks provider failure',async()=>{
  const {a,id}=await fixture(),session=crypto.randomUUID(),mock=connection();
  try {

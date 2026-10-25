@@ -13,17 +13,6 @@ struct HomeView: View {
   @Environment(\.dynamicTypeSize) private var typeSize
   @State private var bitCheers = 0
   @Namespace private var zoom
-  @AppStorage(CoachMark.recall.storageKey) private var seenRecallTip = false
-  @AppStorage(CoachMark.settings.storageKey) private var seenSettingsTip = false
-  @AppStorage(CoachMark.homeReadyKey) private var homeReady = false
-  @AppStorage(CoachMark.libraryPage.storageKey) private var tourDone = false
-  /// After the tour of the tabs: recall if cards are due, then where the plan lives.
-  private var homeCoach: CoachMark? {
-    guard CoachMark.enabled, flow == nil, model.firstUse.stage == .complete, homeReady || model.firstUse.firstRepID != nil, tourDone else { return nil }
-    if !seenRecallTip, (model.bootstrap?.todayPlan?.dueRecallCount ?? 0) > 0 { return .recall }
-    if !seenSettingsTip { return .settings }
-    return nil
-  }
 
   private enum Today {
     case preparing(QuestionDraft?)
@@ -108,11 +97,6 @@ struct HomeView: View {
       .frame(maxWidth: 640, alignment: .leading).frame(maxWidth: .infinity)
       .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 40)
     }
-    .coachMark(homeCoach) { mark in
-      withAnimation(DrillbitMotion.fast) {
-        if mark == .recall { seenRecallTip = true } else { seenSettingsTip = true }
-      }
-    }
     .drillbitTabClearance()
     .task(id: model.bootstrap?.account.id) { await model.ensureHomeQuestion() }
     .alert("Skip this question?", isPresented: Binding(get: { skipping != nil }, set: { if !$0 { skipping = nil } })) {
@@ -152,7 +136,6 @@ struct HomeView: View {
           .labelStyle(.iconOnly)
           .buttonStyle(.glass).buttonBorderShape(.circle).controlSize(.large)
           .accessibilityIdentifier("homeSettings")
-          .coachAnchor(.settings)
       }
       Text(Date.now.formatted(.dateTime.weekday(.wide)))
         .font(.largeTitle.weight(.bold)).tracking(-0.6)
@@ -403,7 +386,6 @@ struct HomeView: View {
     let introducing = model.firstUse.firstRepID != nil && !model.firstUse.recallIntroduced
     let count = plan.dueRecallCount
     return Button {
-      seenRecallTip = true
       if introducing { Task { await model.markRecallIntroduced() } }
       NotificationCenter.default.post(name: .init("OpenRecall"), object: nil)
     } label: {
@@ -427,7 +409,6 @@ struct HomeView: View {
     .accessibilityElement(children: .combine)
     .accessibilityLabel("Recall, \(plan.dueRecallCount) due")
     .accessibilityIdentifier("homeRecall")
-    .coachAnchor(.recall)
     .task { if model.recall.cards.isEmpty { await model.loadRecall() } }
   }
 
@@ -441,7 +422,7 @@ struct HomeView: View {
   private func ticketButton<Content: View, Stub: View>(identifier: String? = nil, spoken: String, action: @escaping () -> Void,
     @ViewBuilder content: @escaping () -> Content, @ViewBuilder stub: @escaping () -> Stub) -> some View {
     Button(action: action) {
-      Ticket(shadowed: ticketSettled, content: content, stub: stub).contentShape(Rectangle())
+      Ticket(shadowed: false, content: content, stub: stub).contentShape(Rectangle())
     }
     .buttonStyle(TicketPressStyle())
     // The source is the ticket itself, clipped to its corners and nothing more: a fill of its own would show
@@ -449,31 +430,30 @@ struct HomeView: View {
     .matchedTransitionSource(id: "today", in: zoom) { source in
       source.clipShape(RoundedRectangle(cornerRadius: 12))
     }
+    // The shadow sits outside the source, where the clip can't cut it off. The source's own shadow option fills the
+    // whole rounded rectangle and shows dark through the notches; this one follows the ticket's real outline, the
+    // same as while it's drilling.
+    .shadow(color: AppPalette.ticketContact.opacity(ticketSettled ? 1 : 0), radius: 1, y: 1)
+    .shadow(color: AppPalette.ticketShadow.opacity(ticketSettled ? 1 : 0), radius: 14, y: 12)
     .accessibilityIdentifier(identifier ?? "todayTicket")
     // The printed pill is decorative for VoiceOver, but Voice Control users say what they see.
     .accessibilityInputLabels([Text(spoken), Text("Today’s question")])
   }
 
+  // One row, same height as the drilling stub: the pill sits beside the words and never pushes them down.
   private func stubRow(title: String, note: String, pill: String, pillShown: Bool = true) -> some View {
-    let pillView = StubPill(label: pill)
-      .scaleEffect(pillShown ? 1 : 0.86)
-      .opacity(pillShown ? 1 : 0)
-    return ViewThatFits(in: .horizontal) {
-      HStack(spacing: 12) {
-        stubText(title: title, note: note)
-        Spacer(minLength: 8)
-        pillView
-      }
-      VStack(alignment: .leading, spacing: 12) {
-        stubText(title: title, note: note)
-        pillView
-      }
+    HStack(spacing: 12) {
+      stubText(title: title, note: note)
+      Spacer(minLength: 8)
+      StubPill(label: pill)
+        .scaleEffect(pillShown ? 1 : 0.86)
+        .opacity(pillShown ? 1 : 0)
     }
   }
   private func stubText(title: String, note: String) -> some View {
     VStack(alignment: .leading, spacing: 2) {
       Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(AppPalette.primary)
-      Text(note).font(.subheadline).foregroundStyle(AppPalette.secondary).lineLimit(2)
+      Text(note).font(.subheadline).foregroundStyle(AppPalette.secondary).lineLimit(1)
     }
     .multilineTextAlignment(.leading)
   }

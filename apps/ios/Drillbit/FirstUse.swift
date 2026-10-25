@@ -51,57 +51,34 @@ private struct CalloutPointer: Shape {
 
 // MARK: Coachmarks
 
-/// The three first-run tips. Each shows once, at the moment its control matters, and never blocks the screen.
+/// The first-run tips. They live inside the interview only, each shown once at the moment its control matters, and
+/// only for what the screen can't say itself. Home and the tabs carry none.
 enum CoachMark: String, CaseIterable {
-  case voice, keyboard, composer, path, tools, tour, recallPage, libraryPage, recall, settings
-  /// Set once the first rep is over, finished or skipped: Home's tips wait for it.
-  static let homeReadyKey = "coach.homeReady"
+  case voice, composer, path, tools
   var title: String {
     switch self {
     case .voice: "You’re in voice."
-    case .keyboard: "Back out loud any time."
     case .composer: "Your turn."
     case .path: "Your roadmap."
     case .tools: "Stuck? Tap ⋯ up here."
-    case .tour: "Two more tabs."
-    case .recall: "Keep this one."
-    case .recallPage: "Your cards."
-    case .libraryPage: "Every rep, kept."
-    case .settings: "Your plan, your call."
     }
   }
   var message: String {
     switch self {
     case .voice: "Interviews open out loud, like the real one. Prefer to type? One tap and the same interviewer is in writing."
-    case .keyboard: "Talk returns you to voice with the same interviewer. Typing here counts just the same."
     case .composer: "A rough first take is fine. End a line with “?” to ask the interviewer instead."
     case .path: "The steps a strong answer usually covers. You move along as you cover them; tap it any time to see the whole path."
     case .tools: "Need a nudge? gives you a hint. Show an example shows one. Finish ends the round when you’re done."
-    case .tour: "Recall and Library. Ten seconds, then it’s all yours."
-    case .recallPage: "Each one comes from something you said in a rep. A quick check every few days makes it stick."
-    case .libraryPage: "Questions, your answers and the feedback on them. Come back to any of them."
-    case .recall: "Cards from your own answers. A quick check now makes them stick."
-    case .settings: "Level, pace, voice or typing: everything you picked lives in here. Change it whenever."
     }
   }
   /// The dismiss button's label; the voice tip asks for the one tap it's pointing at.
   var action: String {
     switch self {
-    case .voice, .tour, .path: "Show me"
-    case .recallPage: "Next"
-    case .libraryPage: "Back home"
+    case .voice, .path: "Show me"
     default: "Got it"
     }
   }
   var storageKey: String { "coach." + rawValue }
-  /// Which tab bar item the tip points at: the tour at Recall, each page tip at its own tab.
-  var tabTitle: String? {
-    switch self {
-    case .tour, .recallPage: "Recall"
-    case .libraryPage: "Library"
-    default: nil
-    }
-  }
   /// UI tests opt in, so a tip never lands on top of an unrelated test's taps.
   static var enabled: Bool {
     let arguments = ProcessInfo.processInfo.arguments
@@ -178,16 +155,6 @@ private struct CoachMarkLayer: View {
 
   private func place(_ mark: CoachMark, width: CGFloat, in proxy: GeometryProxy) -> (origin: CGPoint, edge: Edge, pointerX: CGFloat)? {
     let size = proxy.size
-    // Tab tips point down at their tab bar item, measured from the bar itself.
-    if let tab = mark.tabTitle {
-      let global = proxy.frame(in: .global)
-      let item = TabBarGeometry.item(title: tab)
-      let tabX = item.midX - global.minX
-      let x = min(max(tabX - width / 2, 16), size.width - 16 - width)
-      // The layer may cover the bar itself, so sit above the measured item rather than the layer's bottom.
-      let bottom = min(size.height, item.minY - global.minY)
-      return (CGPoint(x: x, y: bottom - 12 - height), .bottom, min(max(tabX - x, 24), width - 24))
-    }
     if trailingToolbar && mark == .tools {
       // The trailing toolbar button's centre sits about 38 points in from the edge.
       let x = size.width - 12 - width
@@ -274,43 +241,5 @@ struct PracticeAreaGroupRow: View {
       Spacer(minLength: 8)
       Image(systemName: "chevron.right").font(.caption).foregroundStyle(AppPalette.secondary).accessibilityHidden(true)
     }.frame(minHeight: 64).contentShape(Rectangle())
-  }
-}
-
-/// Where the tab bar's items are. SwiftUI's tab bar can't carry anchors, so the bar is read from UIKit;
-/// if it isn't found, the items are assumed centred with the pitch iOS 26 uses on a phone.
-enum TabBarGeometry {
-  @MainActor static func itemCenterX(title: String) -> CGFloat { item(title: title).midX }
-  /// The tab item's frame in window coordinates; a centred guess when the bar can't be read.
-  @MainActor static func item(title: String) -> CGRect {
-    let guess = title == "Recall" ? 1 : 2
-    let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first { $0.activationState == .foregroundActive }
-      ?? UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-    let window = scene?.windows.first { $0.isKeyWindow } ?? scene?.windows.first
-    let bounds = window?.bounds ?? UIScreen.main.bounds
-    guard let window, let bar = find(UITabBar.self, in: window) else { return fallback(guess, count: 3, in: bounds) }
-    let items = bar.items?.count ?? 3
-    let index = bar.items?.firstIndex { $0.title == title } ?? guess
-    var candidates: [UIView] = []
-    for view in bar.subviews { candidates.append(view); candidates.append(contentsOf: view.subviews) }
-    var buttons: [CGRect] = []
-    for view in candidates {
-      let isButton = String(describing: type(of: view)).contains("TabBarButton") || view.accessibilityTraits.contains(.button)
-      guard isButton else { continue }
-      let frame = view.convert(view.bounds, to: window)
-      if frame.width > 20, frame.height > 20 { buttons.append(frame) }
-    }
-    buttons.sort { $0.minX < $1.minX }
-    guard buttons.count == items, index < buttons.count else { return fallback(index, count: items, in: bounds) }
-    return buttons[index]
-  }
-  private static func fallback(_ index: Int, count: Int, in bounds: CGRect) -> CGRect {
-    let x = bounds.width / 2 + (CGFloat(index) - CGFloat(count - 1) / 2) * 86
-    return CGRect(x: x - 43, y: bounds.height - 83, width: 86, height: 49)
-  }
-  private static func find<T: UIView>(_ type: T.Type, in view: UIView) -> T? {
-    if let match = view as? T { return match }
-    for child in view.subviews { if let match = find(type, in: child) { return match } }
-    return nil
   }
 }

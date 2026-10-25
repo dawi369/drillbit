@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// Presentation only: the interview shell owns the connection and pending receipts.
-/// The stage is the conversation itself: the question, then every line said, following the latest. Bit holds
-/// the room only while it connects.
+/// The stage is the conversation itself: the question, then every line said, following the latest. Bit sits beside
+/// the microphone from the moment it connects, reacting to whoever is talking.
 struct InterviewVoiceRoom<Question: View>: View {
   let voice: LiveVoice
   let interview: InterviewController
@@ -23,21 +23,35 @@ struct InterviewVoiceRoom<Question: View>: View {
   @State private var warned = false
   /// The mute hint shows for the first muted stretch only; after they've unmuted once it stays quiet.
   @State private var unmutedOnce = false
-  @State private var speech: SpeechTrigger?
+  /// Set on the way out: the room keeps the face it had while it fades, instead of flashing through ending states.
+  @State private var leavingAs: LiveVoice.Phase?
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  @Environment(\.dynamicTypeSize) private var typeSize
-  private var phase: LiveVoice.Phase { opening && voice.phase == .idle ? .connecting : voice.phase }
+  private var phase: LiveVoice.Phase { leavingAs ?? (opening && voice.phase == .idle ? .connecting : voice.phase) }
+  private var showsBit: Bool { phase == .connecting || phase == .active }
+  /// Bit and the way out arrive together, on the same spring.
+  private var pop: AnyTransition {
+    reduceMotion ? .opacity : .asymmetric(
+      insertion: .scale(scale: 0.6).combined(with: .opacity).animation(DrillbitMotion.pop),
+      removal: .scale(scale: 0.8).combined(with: .opacity).animation(DrillbitMotion.fast))
+  }
+  private func exit(_ action: () -> Void) {
+    guard leavingAs == nil else { return }
+    leavingAs = phase
+    action()
+  }
 
   var body: some View {
     stage
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       .background(AppPalette.background)
-      .safeAreaInset(edge: .bottom, spacing: 0) { dock }
-      .coachMark(coach, action: coachReturnsToText ? nil : "Got it") { mark in dismissCoach(mark); if mark == .voice, coachReturnsToText { text() } }
+      // A bar, not an inset: the conversation softly blurs and fades under the controls, like it does under the
+      // system's own bars, instead of running straight into them.
+      .safeAreaBar(edge: .bottom, spacing: 0) { dock }
+      .scrollEdgeEffectStyle(.soft, for: .bottom)
+      .coachMark(coach, action: coachReturnsToText ? nil : "Got it") { mark in dismissCoach(mark); if mark == .voice, coachReturnsToText { exit(text) } }
       .navigationTitle("Talk it through")
       .navigationBarTitleDisplayMode(.inline)
       .navigationBarBackButtonHidden()
-      .onAppear { if speech == nil { speech = SpeechTrigger(voice: voice) } }
       .toolbar { ToolbarItem(placement: .principal) { VoiceRoomClock(voice: voice, warned: $warned) } }
       .sensoryFeedback(.impact(weight: .medium), trigger: voice.phase == .active) { _, live in live }
       .sensoryFeedback(.warning, trigger: warned) { _, now in now }
@@ -56,18 +70,9 @@ struct InterviewVoiceRoom<Question: View>: View {
   // MARK: Stage
 
   private var stage: some View {
-    InterviewConversation(state: interview.displayState, style: .room, latestIdentifier: "voiceCaption", resumeFollow: speech) {
-      VStack(alignment: .leading, spacing: 0) {
-        question().frame(maxWidth: 560, alignment: .leading)
-        // Bit holds the room while it connects, then steps aside for the words. `voice.phase` directly: the
-        // derived `phase` reads idle again after a drop, which brought him back under the question mid-session.
-        if voice.startedAt == nil, phase == .idle || phase == .connecting, !typeSize.isAccessibilitySize {
-          VoiceBit(voice: voice, phase: phase).frame(height: 72).frame(maxWidth: .infinity).padding(.top, 32)
-            .transition(.opacity)
-        }
-      }
+    InterviewConversation(state: interview.displayState, style: .room, latestIdentifier: "voiceCaption") {
+      question().frame(maxWidth: 560, alignment: .leading)
     }
-    .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: phase == .idle || phase == .connecting)
   }
   private var latestInterviewerLine: String? {
     guard let turn = interview.displayState.turns.last(where: { $0.kind == "voice" }) else { return nil }
@@ -92,7 +97,8 @@ struct InterviewVoiceRoom<Question: View>: View {
       }
       switch phase {
       case .idle, .connecting, .active:
-        // The microphone sits dead centre in every state; the way out hangs off to the right like a phone call's hang-up.
+        // The microphone sits dead centre in every state; Bit keeps it company on the left, and the way out hangs off
+        // to the right like a phone call's hang-up.
         MicControl(state: micState) {
           switch phase {
           case .idle: Task { await voice.start() }
@@ -101,27 +107,42 @@ struct InterviewVoiceRoom<Question: View>: View {
           }
         }
         .frame(maxWidth: .infinity)
+        .overlay(alignment: .topLeading) {
+          if showsBit {
+            // Same slot as the controls on the right, sitting a touch below the microphone's centre so he rests
+            // beside it rather than floating.
+            VoiceBit(voice: voice, phase: phase)
+              .frame(height: 64)
+              .frame(width: 88, height: 80)
+              .padding(.top, 8)
+              .padding(.leading, 16)
+              .transition(pop)
+          }
+        }
         .overlay(alignment: .trailing) {
           Group {
             switch phase {
             case .idle:
               RoomControl(title: "Type", symbol: "keyboard", fill: AppPalette.elevated, ink: AppPalette.primary,
-                identifier: "voiceBack", spoken: "Type instead", action: text)
+                identifier: "voiceBack", spoken: "Type instead") { exit(text) }
                 .accessibilityHint("Returns to writing")
                 .coachAnchor(.voice)
+                .transition(pop)
             case .connecting:
               // The first rep has no way out of its own opening; the line either comes up or fails to Try again.
               if interview.model.firstUse.stage != .firstRep {
                 RoomControl(title: "Cancel", symbol: "xmark", fill: AppPalette.elevated, ink: AppPalette.primary,
-                  identifier: "voiceCancel", action: leave)
+                  identifier: "voiceCancel") { exit(leave) }
                   .accessibilityHint("Stops connecting and returns to writing")
+                  .transition(pop)
               }
             default:
               RoomControl(title: "End", symbol: AppIcon.end.rawValue, fill: AppPalette.destructive.opacity(0.16), ink: AppPalette.destructive,
-                identifier: "voiceEnd", spoken: "End voice", action: leave)
+                identifier: "voiceEnd", spoken: "End voice") { exit(leave) }
                 .accessibilityHint("Stops talking and returns to writing. The interview stays open.")
                 // Live, the tip points at End: that's the keyboard route once talking.
                 .coachAnchor(.voice)
+                .transition(pop)
             }
           }
           .frame(width: 88)
@@ -148,7 +169,7 @@ struct InterviewVoiceRoom<Question: View>: View {
           } label: { Label("Try again", systemImage: AppIcon.retry.rawValue) }
             .buttonStyle(PracticeButtonStyle())
             .accessibilityIdentifier("voiceRetry")
-          KeyboardControl(action: text)
+          KeyboardControl { exit(text) }
         }
       }
     }
@@ -179,40 +200,71 @@ private struct KeyboardControl: View {
   }
 }
 
-/// Bit as the interviewer's presence in the room: talking from measured output, listening while you speak, thinking while a reply is on its way.
+/// Bit as the interviewer's presence beside the mic. He drills while the line comes up and hops once it's live, then
+/// follows the room: mouthing the interviewer's measured output, all ears while you talk, and thinking only where
+/// a reply is actually being worked out, in the beat after you finish or while a delegated answer is in flight.
 private struct VoiceBit: View {
   let voice: LiveVoice
   let phase: LiveVoice.Phase
   @State private var gauge = SpeakerGauge()
-  var body: some View {
-    TimelineView(.periodic(from: .now, by: 0.2)) { context in
-      BitView(mood: mood(at: context.date), levels: voice.levels)
-    }
+  @State private var mood: BitMood
+  @State private var cheers = 0
+  init(voice: LiveVoice, phase: LiveVoice.Phase) {
+    self.voice = voice
+    self.phase = phase
+    _mood = State(initialValue: phase == .connecting ? .drilling : .idle)
   }
-  private func mood(at date: Date) -> BitMood {
+  var body: some View {
+    BitView(mood: mood, levels: voice.levels, cheers: cheers)
+      // Polls the meter rather than re-rendering on every level change; Bit only hears about real mood changes.
+      .task(id: phase) {
+        while !Task.isCancelled {
+          let next = currentMood(at: .now)
+          if next != mood { mood = next }
+          try? await Task.sleep(for: .milliseconds(100))
+        }
+      }
+      .onChange(of: phase) { _, now in if now == .active { cheers += 1 } }
+  }
+  private func currentMood(at date: Date) -> BitMood {
     switch phase {
     case .idle, .ending, .unavailable: return .idle
-    case .connecting: return .thinking
+    case .connecting: return .drilling
     case .active:
-      if voice.thinking { return .thinking }
-      switch gauge.speaker(input: voice.levels.input, output: voice.levels.output, at: date) {
-      case .interviewer: return .talking
-      case .you: return .listening
-      case nil: return .idle
-      }
+      let cue = gauge.cue(input: voice.levels.input, output: voice.levels.output, at: date)
+      if cue == .interviewer { return .talking }
+      if cue == .you { return .listening }
+      if voice.thinking || cue == .replyDue { return .thinking }
+      return .idle
     }
   }
 }
 
+/// Who has the floor, with a short hold so a breath between words doesn't flip Bit back and forth.
 @MainActor private final class SpeakerGauge {
-  enum Speaker { case interviewer, you }
+  enum Cue { case interviewer, you, replyDue }
+  private let hold: TimeInterval = 0.6
   private var interviewerUntil = Date.distantPast
   private var youUntil = Date.distantPast
-  func speaker(input: Double, output: Double, at now: Date) -> Speaker? {
-    if output > 0.18 { interviewerUntil = now.addingTimeInterval(0.6) }
-    if input > 0.22 { youUntil = now.addingTimeInterval(0.6) }
+  private var youSince: Date?
+  /// After a real stretch of talking, the interviewer owes a reply; Bit thinks until it starts, or gives up after a few seconds.
+  private var replyDueUntil: Date?
+  func cue(input: Double, output: Double, at now: Date) -> Cue? {
+    // The interviewer taking the floor answers whatever you just said.
+    if output > 0.18 { interviewerUntil = now.addingTimeInterval(hold); replyDueUntil = nil; youSince = nil }
+    if input > 0.22 {
+      if youSince == nil { youSince = now }
+      youUntil = now.addingTimeInterval(hold)
+    }
     if now < interviewerUntil { return .interviewer }
     if now < youUntil { return .you }
+    if let since = youSince {
+      youSince = nil
+      // A cough or an "mm" isn't a turn; half a second of speech is.
+      if youUntil.timeIntervalSince(since) - hold >= 0.5 { replyDueUntil = youUntil.addingTimeInterval(4) }
+    }
+    if let due = replyDueUntil, now < due { return .replyDue }
+    replyDueUntil = nil
     return nil
   }
 }
@@ -334,7 +386,8 @@ private struct RoomControl: View {
           .font(.system(size: 20, weight: .semibold))
           .foregroundStyle(ink)
           .frame(width: size, height: size)
-          .background(fill, in: Circle())
+          // Tinted fills sit on the page colour, so words scrolling under the dock never show through the button.
+          .background { Circle().fill(AppPalette.background).overlay { Circle().fill(fill) } }
           .contentShape(Circle())
         Text(title).font(.caption).foregroundStyle(AppPalette.secondary)
       }
@@ -356,18 +409,17 @@ struct InterviewConversation<Header: View>: View {
   var state: InterviewState
   var latestOnly = false
   /// `.room` reads like the live interview: spoken lines in body type, the latest line kept a breath above the dock,
-  /// following smoothly and with no button; scrolling up is always allowed, and speaking brings it back down.
+  /// following smoothly and with no button; once they scroll up the view is theirs until they come back to the end.
   var style: Style = .transcript
   var latestIdentifier: String? = nil
-  /// Something that changes when the person starts talking; the room returns to the latest line on it.
-  var resumeFollow: SpeechTrigger? = nil
   @ViewBuilder var header: () -> Header
   @State private var livePosition = ScrollPosition(y: 0)
   @State private var historyPosition = ScrollPosition(y: 0)
   @State private var liveFollowing = true
-  @State private var historyFollowing = false
+  /// Unset until they scroll: the room starts on the latest line, a transcript starts at the top.
+  @State private var historyFollowing: Bool?
   private var position: Binding<ScrollPosition> { latestOnly ? $livePosition : $historyPosition }
-  private var following: Bool { latestOnly ? liveFollowing : historyFollowing }
+  private var following: Bool { latestOnly ? liveFollowing : historyFollowing ?? (style == .room) }
   private func setFollowing(_ value: Bool) { if latestOnly { liveFollowing = value } else { historyFollowing = value } }
   @State private var scrolling = false
   @State private var observedIdentity: String?
@@ -436,12 +488,6 @@ struct InterviewConversation<Header: View>: View {
       guard following, !scrolling, !Task.isCancelled else { return }
       withAnimation(reduceMotion ? nil : style == .room ? .smooth(duration: 0.45, extraBounce: 0) : .easeOut(duration: 0.18)) { position.wrappedValue.scrollTo(id: "voiceLatest", anchor: .bottom) }
     }
-    .onChange(of: resumeFollow?.speaking ?? false) { _, speaking in
-      // Started talking while scrolled up: glide back to where the conversation is.
-      guard speaking, !following else { return }
-      setFollowing(true)
-      withAnimation(reduceMotion ? nil : .smooth(duration: 0.5, extraBounce: 0)) { position.wrappedValue.scrollTo(id: "voiceLatest", anchor: .bottom) }
-    }
     .safeAreaInset(edge: .bottom, alignment: .trailing, spacing: 0) {
       if !following, style != .room {
         Button { setFollowing(true); position.wrappedValue.scrollTo(id: "voiceLatest", anchor: .bottom) } label: {
@@ -454,23 +500,4 @@ struct InterviewConversation<Header: View>: View {
 }
 extension InterviewConversation where Header == EmptyView {
   init(state: InterviewState) { self.state = state; self.header = { EmptyView() } }
-}
-
-/// Flips to true when the mic hears you over a sustained beat; the room watches it to return to the latest line.
-@MainActor @Observable final class SpeechTrigger {
-  private(set) var speaking = false
-  private var since: Date?
-  // Weak references end the loop with the room; no stored task, so nothing main-actor is touched in deinit.
-  init(voice: LiveVoice) {
-    Task { [weak self, weak voice] in
-      while true {
-        try? await Task.sleep(for: .milliseconds(120))
-        guard let self, let voice else { return }
-        let loud = voice.phase == .active && !voice.muted && voice.levels.input > 0.22
-        if loud { if since == nil { since = .now } } else { since = nil }
-        let now = since.map { Date.now.timeIntervalSince($0) > 0.35 } ?? false
-        if now != speaking { speaking = now }
-      }
-    }
-  }
 }

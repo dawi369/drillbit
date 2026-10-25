@@ -579,6 +579,8 @@ struct InterviewState: Codable, Sendable {
   var style: InterviewStyle = .standard
   var prompt: String
   var wrapUp: Bool = false
+  /// How far along the roadmap the interview has reached, whichever way the steps were covered.
+  var guidedStep: Int? = nil
   var turns: [InterviewTurn] = []
 }
 struct InterviewInput: Codable, Sendable {

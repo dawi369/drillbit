@@ -10,10 +10,7 @@ struct PreparationView: View {
   @State private var focus = "System design"
   @State private var practiceArea = ""
   @State private var customTopic = ""
-  @State private var kind = "auto"
   @State private var engineeringLevel = "mid"
-  @State private var instruction = ""
-  @State private var guidanceMode = GuidanceMode.coachMe
   @State private var includeSource = true
   @State private var initialized = false
   @Environment(\.dismiss) private var dismiss
@@ -36,27 +33,16 @@ struct PreparationView: View {
         }
       }
       Section {
-        NavigationLink {
-          GuidanceModePicker(selection: $guidanceMode)
-        } label: {
-          LabeledContent("Session style", value: guidanceMode.title)
-        }.accessibilityIdentifier("interviewStyle")
-      }
-      Section {
-        TextField("Any custom instructions? (e.g. talk like a pirate)", text: $instruction, axis: .vertical)
-          .lineLimit(2...4).accessibilityLabel("Optional request")
-      }
-      Section {
         Button("Prepare question") {
           let requestedTopic = customTopic.trimmingCharacters(in: .whitespacesAndNewlines)
-          let request = instruction.trimmingCharacters(in: .whitespacesAndNewlines)
-          let combinedInstruction = [requestedTopic.isEmpty ? nil : "Use this product or system domain: \(requestedTopic).", request.isEmpty ? nil : request]
-            .compactMap { $0 }.joined(separator: " ")
+          // Session style isn't picked here for now: a retry keeps the one it failed with, otherwise it follows
+          // the last real session, like the daily question. The interview's own menu still changes it.
+          let mode = recovery?.guidanceMode ?? model.memory.sessions.first { !$0.isWarmUp }?.guidanceMode
           let input = PreparationInput(
-            primaryConceptId: practiceArea.isEmpty ? nil : practiceArea, guidanceMode: guidanceMode, interviewStyle: .standard, focus: "System design", kind: "design", difficulty: model.settings.difficulty,
+            primaryConceptId: practiceArea.isEmpty ? nil : practiceArea, guidanceMode: mode, interviewStyle: .standard, focus: "System design", kind: "design", difficulty: model.settings.difficulty,
             engineeringLevel: engineeringLevel,
             replaceId: model.bootstrap?.challenge?.lifecycle == "ready" ? model.bootstrap?.challenge?.id : nil,
-            instruction: combinedInstruction,
+            instruction: requestedTopic.isEmpty ? "" : "Use this product or system domain: \(requestedTopic).",
             followUpId: includeSource && source?.reflection != nil ? source?.id : nil)
           if let submit { submit(input) }
           else {
@@ -87,12 +73,12 @@ struct PreparationView: View {
       engineeringLevel = model.settings.selectedLevel
       customTopic = initialCustomTopic ?? ""
       if let recovery {
-        guidanceMode = recovery.guidanceMode ?? .coachMe
         practiceArea = recovery.primaryConceptId ?? ""
         engineeringLevel = recovery.engineeringLevel ?? EngineeringLevel.legacy(recovery.difficulty)
-        kind = recovery.kind
-        instruction = recovery.instruction
         includeSource = recovery.followUpId != nil
+        if customTopic.isEmpty, let topic = recovery.instruction.firstMatch(of: /^Use this product or system domain: (.+?)\.(?: |$)/)?.1 {
+          customTopic = String(topic)
+        }
       }
     }
   }

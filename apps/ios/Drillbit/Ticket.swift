@@ -64,7 +64,7 @@ struct Perforation: View {
 
 /// Today's question as an object: a body for the question and a stub below the perforation for what you do with it.
 struct Ticket<Content: View, Stub: View>: View {
-  /// Off while a zoomed sheet owns the ticket; Home fades it back in so the shadow never snaps on after the return.
+  /// Off when the caller draws the shadow itself: Home's zoom source clips the ticket, so its shadow lives outside the clip.
   var shadowed = true
   @ViewBuilder var content: () -> Content
   @ViewBuilder var stub: () -> Stub

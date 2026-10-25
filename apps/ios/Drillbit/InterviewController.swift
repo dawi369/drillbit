@@ -42,6 +42,8 @@ import UIKit
     return value
   }
   var streamTurn: InterviewTurn? { state.turns.first(where: \.pending) }
+  /// A spoken reply moved along the roadmap; the bar shows it before the next refresh.
+  func noteGuidedStep(_ step: Int) { state.guidedStep = max(state.guidedStep ?? 0, step) }
   func watchResponse() async {
     guard !model.fixture, let turn = streamTurn else { return }
     do {

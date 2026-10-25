@@ -8,6 +8,8 @@ struct InterviewView: View {
   @State private var showingVoiceRoom = false
   /// Opening out loud: the room shows connecting from the first frame, before the connection is actually requested.
   @State private var openingVoice = false
+  /// Bumped on every exit from the room; an entry still waiting on the network or a permission prompt sees it and stays out.
+  @State private var voiceEntry = 0
   @State private var voiceQuestionCollapsed = true
   @State private var checkingVoice = false
   @State private var voiceExplanation: String?
@@ -53,7 +55,6 @@ struct InterviewView: View {
   /// Fallback start for a round whose start time never reached this device.
   @State private var openedAt = Date()
   @AppStorage(CoachMark.voice.storageKey) private var seenVoiceTip = false
-  @AppStorage(CoachMark.keyboard.storageKey) private var seenKeyboardTip = false
   @AppStorage(CoachMark.composer.storageKey) private var seenComposerTip = false
   @AppStorage(CoachMark.tools.storageKey) private var seenToolsTip = false
   @AppStorage(CoachMark.path.storageKey) private var seenPathTip = false
@@ -62,8 +63,6 @@ struct InterviewView: View {
   /// One tip at a time: the composer before the first reply, then the tools once a follow-up has landed.
   private var coach: CoachMark? {
     guard CoachMark.enabled, sessionRestored, !showingVoiceRoom, sheet == nil, !showingPathSteps, interview.finished == nil, showsDraft else { return nil }
-    // Voice-first only: back from the voice tip's Show me, name the way back before anything else.
-    if seenVoiceTip, !seenKeyboardTip, !seenComposerTip, firstReply, interview.answer.isEmpty { return .keyboard }
     if !seenComposerTip { return firstReply && interview.answer.isEmpty && (openerSettled || !openerTypes || challenge.opener == nil) ? .composer : nil }
     // Then the header, top to bottom: Guided's roadmap, then the menu. Both sit clear of the keyboard.
     if !seenPathTip, showsPathBar { return .path }
@@ -79,15 +78,10 @@ struct InterviewView: View {
   private func dismissCoach(_ mark: CoachMark) {
     withAnimation(DrillbitMotion.fast) {
       switch mark {
-      case .voice:
-        seenVoiceTip = true
-        // Text-first: they already know Talk, so the way-back tip has nothing to add.
-        if seenComposerTip { seenKeyboardTip = true }
-      case .keyboard: seenKeyboardTip = true
+      case .voice: seenVoiceTip = true
       case .composer: seenComposerTip = true
       case .path: seenPathTip = true; showingPathSteps = true
       case .tools: seenToolsTip = true
-      case .tour, .recallPage, .libraryPage, .recall, .settings: break
       }
     }
   }
@@ -144,7 +138,7 @@ struct InterviewView: View {
           // Guided's roadmap travels with the interview, spoken or typed.
           .safeAreaInset(edge: .top, spacing: 0) {
             if showsPathBar, let path = challenge.path {
-              GuidedPathBar(steps: path, current: guidedTurn?.result?.step ?? 0, showingSteps: $showingPathSteps)
+              GuidedPathBar(steps: path, current: interview.displayState.guidedStep ?? guidedTurn?.result?.step ?? 0, showingSteps: $showingPathSteps)
             }
           }
       }
@@ -296,7 +290,7 @@ struct InterviewView: View {
     .safeAreaInset(edge: .bottom, spacing: 0) { footer }
     .safeAreaInset(edge: .top, spacing: 0) {
       if showsPathBar, let path = challenge.path {
-        GuidedPathBar(steps: path, current: guidedTurn?.result?.step ?? 0, showingSteps: $showingPathSteps)
+        GuidedPathBar(steps: path, current: interview.displayState.guidedStep ?? guidedTurn?.result?.step ?? 0, showingSteps: $showingPathSteps)
           .coachAnchor(.path)
       }
     }
@@ -464,9 +458,10 @@ struct InterviewView: View {
   }
   private func enterVoice(startNow: Bool = true) async {
     guard !checkingVoice, let voice = liveVoice else { return }
+    let entry = voiceEntry
     // A transcript still waiting to sync blocks a new session; Talk tries the sync again rather than announcing it.
     if voice.phase == .unavailable, voice.blocksText { await voice.retrySync() }
-    guard !voice.blocksText else { return }
+    guard !voice.blocksText, entry == voiceEntry else { return }
     checkingVoice = true
     voicePermissionNeedsSettings = false
     voiceGated = false
@@ -483,7 +478,7 @@ struct InterviewView: View {
         capability = refreshed.capabilities?.voice
         model.bootstrap?.capabilities = refreshed.capabilities
       }
-      guard interview.currentAccount, phase == .active else { return }
+      guard interview.currentAccount, phase == .active, entry == voiceEntry else { return }
       if let capability, !capability.available {
         // A free-plan limit opens the way to Pro; anything else is just news.
         voiceGated = capability.plan == "free" && capability.remaining != nil
@@ -491,7 +486,7 @@ struct InterviewView: View {
       }
       if !model.fixture {
         let allowed = await AVAudioApplication.requestRecordPermission()
-        guard interview.currentAccount, phase == .active else { return }
+        guard interview.currentAccount, phase == .active, entry == voiceEntry else { return }
         guard allowed else {
           voicePermissionNeedsSettings = true
           voiceExplanation = "Allow microphone access to use live voice."
@@ -548,6 +543,10 @@ struct InterviewView: View {
     requestingAssistance = false
   }
   private func leaveVoiceRoom() {
+    // An opening that hasn't reached `start` yet must not bring the room back once they've left it.
+    voiceEntry += 1
+    openingVoice = false
+    if model.talkOnOpen == challenge.id { model.talkOnOpen = nil }
     // Route changes never own audio lifetime. End stops local audio before any
     // network finalization; the shell retains the outbox after returning.
     liveVoice?.stopAudioImmediately()
@@ -742,7 +741,6 @@ struct InterviewView: View {
       .buttonStyle(DrillbitPressStyle())
       .opacity(voiceDisabled ? 0.42 : 1)
       .disabled(voiceDisabled).accessibilityLabel("Talk it through").accessibilityHint("Switch to live voice. Your writing stays here.").accessibilityIdentifier("liveVoice")
-      .coachAnchor(.keyboard)
   }
   private var sendButton: some View {
     Button {
