@@ -95,7 +95,11 @@ targets:
   DrillbitUITests:
     type: bundle.ui-testing
     platform: iOS
-    sources: [UITests]
+    sources:
+      - UITests
+      # The local products, so a UI test can open a StoreKit test session and see the real paywall options.
+      - path: Config/Drillbit.storekit
+        buildPhase: resources
     settings:
       base:
         DEVELOPMENT_TEAM: 7M4NDAAP73

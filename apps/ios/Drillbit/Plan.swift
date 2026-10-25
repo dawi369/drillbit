@@ -17,7 +17,9 @@ private struct EntitlementReceipt: Decodable { var plan: String }
 /// native subscription store does. Either way the Worker decides the plan from Apple's signed transaction.
 @MainActor @Observable final class PlanCoordinator {
   static let shared = PlanCoordinator()
-  static let productIDs = ["dawi.drillbit.pro.monthly", "dawi.drillbit.pro.yearly"]
+  /// Yearly first: it's the anchor the weekly price is measured against. Prices and the weekly intro offer live in
+  /// App Store Connect (and `Config/Drillbit.storekit` for the simulator), never in code.
+  static let productIDs = ["dawi.drillbit.pro.yearly", "dawi.drillbit.pro.weekly"]
   /// Non-nil while the native paywall sheet is up.
   var presenting: PaywallPlacement?
   private(set) var superwallConfigured = false
@@ -126,7 +128,13 @@ struct NativePaywallSheet: View {
         }
         .padding(.horizontal, 24)
       }
+      .subscriptionStoreControlStyle(PlanPicker())
       .storeButton(.visible, for: .restorePurchases)
+      .storeButton(.visible, for: .policies)
+      // One way out: Not now, which also drops the feature waiting behind the paywall.
+      .storeButton(.hidden, for: .cancellation)
+      .subscriptionStorePolicyDestination(url: LegalLinks.terms, for: .termsOfService)
+      .modifier(PrivacyPolicyDestination())
       .onInAppPurchaseCompletion { _, result in
         if case .success(.success) = result { Task { await PlanCoordinator.shared.purchased() } }
       }
@@ -143,6 +151,90 @@ struct NativePaywallSheet: View {
       }
     }
     .accessibilityIdentifier("paywall")
+  }
+}
+
+/// Where the terms and privacy policy live. Terms are Apple's standard EULA; the privacy policy comes from
+/// `PRIVACY_POLICY_URL` in the xcconfig and must be set before the App Store build.
+enum LegalLinks {
+  static let terms = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
+  static var privacy: URL? {
+    guard let value = Bundle.main.object(forInfoDictionaryKey: "PrivacyPolicyURL") as? String, value.hasPrefix("https://") else { return nil }
+    return URL(string: value)
+  }
+}
+
+private struct PrivacyPolicyDestination: ViewModifier {
+  func body(content: Content) -> some View {
+    if let privacy = LegalLinks.privacy { content.subscriptionStorePolicyDestination(url: privacy, for: .privacyPolicy) }
+    else { content }
+  }
+}
+
+/// The plan choice: yearly with what it saves against paying weekly, weekly with its first-week offer when they're
+/// eligible. Every figure comes from the products themselves, so it stays right whatever the prices become.
+private struct PlanPicker: SubscriptionStoreControlStyle {
+  func makeBody(configuration: Configuration) -> some View { PlanPickerBody(configuration: configuration) }
+}
+
+/// Holds the selection so each option can show whether it's the one Subscribe will buy.
+private struct PlanPickerBody: View {
+  let configuration: SubscriptionStoreControlStyleConfiguration
+  @State private var selection: SubscriptionStoreControlStyleConfiguration.Option?
+  var body: some View {
+    let weekly = configuration.allOptions.first { $0.subscription?.subscriptionPeriod.unit == .week }
+    SubscriptionStorePicker(configuration, selection: $selection) { option in
+      PlanOptionLabel(product: option.subscription, offer: option.activeOffer, weekly: weekly,
+                      selected: option.subscription.id == selection?.subscription.id)
+    } confirmation: { option in
+      SubscriptionStoreButton(option)
+    }
+    .onAppear { if selection == nil { selection = configuration.options.first } }
+  }
+}
+
+private struct PlanOptionLabel: View {
+  let product: StoreKit.Product
+  let offer: StoreKit.Product.SubscriptionOffer?
+  let weekly: StoreKit.Product?
+  var selected = false
+  private var period: StoreKit.Product.SubscriptionPeriod.Unit? { product.subscription?.subscriptionPeriod.unit }
+  private var format: Decimal.FormatStyle.Currency { product.priceFormatStyle }
+
+  var body: some View {
+    HStack(alignment: .firstTextBaseline, spacing: 12) {
+      Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+        .font(.title3)
+        .foregroundStyle(selected ? AppPalette.action : AppPalette.secondary)
+        .contentTransition(.symbolEffect(.replace))
+        .accessibilityHidden(true)
+      VStack(alignment: .leading, spacing: 4) {
+        Text(period == .year ? "Yearly" : "Weekly").font(.headline)
+        Text(detail).font(.subheadline).foregroundStyle(AppPalette.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      Spacer(minLength: 8)
+      if period == .year, let weekly, let saving = PlanPricing.yearlySaving(yearly: product.price, weekly: weekly.price) {
+        Text("Save \(saving)%")
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(AppPalette.actionInk)
+          .padding(.horizontal, 8).padding(.vertical, 4)
+          .background(AppPalette.action, in: Capsule())
+      }
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityAddTraits(selected ? .isSelected : [])
+  }
+
+  private var detail: String {
+    if period == .year {
+      let monthly = PlanPricing.monthly(fromYearly: product.price).formatted(format)
+      return "\(product.displayPrice) a year, so \(monthly) a month"
+    }
+    if let offer, offer.paymentMode != .freeTrial, offer.period.unit == .week, offer.period.value * offer.periodCount == 1 {
+      return "Try a week for \(offer.displayPrice), then \(product.displayPrice) a week"
+    }
+    return "\(product.displayPrice) a week"
   }
 }
 

@@ -31,7 +31,10 @@
 		5298401BAA9BE8477CDBCFFF /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D561B63C630BDBE5ABC6DF2 /* LibraryView.swift */; };
 		5980E7756037BF8082CA3F81 /* InterviewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66848CC15C0E69172DC285E0 /* InterviewController.swift */; };
 		60C8FC1C39DFF81C6C1F19A8 /* ClerkKit in Frameworks */ = {isa = PBXBuildFile; productRef = D0E2F449415E69EBA68ED8CD /* ClerkKit */; };
+		6BDB8C72060A37F8C10CBBE9 /* PlanPricingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9FE8777717765C5DE0E9907 /* PlanPricingTests.swift */; };
+		6CEB77927E5BC56B7E403D54 /* PlanPricing.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD1F1245F3B3C8AA845AD3BA /* PlanPricing.swift */; };
 		70BF4744A694732D3FFBCDBC /* CompanionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A193915AEBBE5F30D2A8AECA /* CompanionCoordinator.swift */; };
+		799EE25FEAF4DCBD0C89E23A /* Drillbit.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 3304113E3A0EC6040CBB22E4 /* Drillbit.storekit */; };
 		7B6A96CC518B000450D6AEEB /* SuperwallKit in Frameworks */ = {isa = PBXBuildFile; productRef = 0D0EC2EEC55E12E65A2CEE74 /* SuperwallKit */; };
 		7DD8D81CCC22B716F6BA3C47 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01713294F3436278FCEE46B6 /* Models.swift */; };
 		80F82D669F2089A6E63149CD /* BitRig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13F8E4917CAF05B015AA09E0 /* BitRig.swift */; };
@@ -55,8 +58,10 @@
 		D8B1269DC65D854F474432E6 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8E06A264C65F45E7AD14AD1 /* AppModel.swift */; };
 		DAC50998C02EF3CB03CAF744 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EB6666339982040006AC57A /* HomeView.swift */; };
 		DE0942626B20E564770F34F3 /* BitRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82CAC54FBF8FD27088584441 /* BitRenderer.swift */; };
+		DED8B583C89AC49487E723C6 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 47DC20AA0A42DCF87633ED5D /* PrivacyInfo.xcprivacy */; };
 		E151B6BC51DB2FE7D15DA008 /* VoiceTranscript.swift in Sources */ = {isa = PBXBuildFile; fileRef = 658B4C2655924F8CC0AE95C3 /* VoiceTranscript.swift */; };
 		E4DF89EDCDE360281E583E6A /* DrillbitWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 9A2B037FAEC89AAC90414A59 /* DrillbitWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		E53626C10CFE64FCCB08DF7D /* PlanPricing.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD1F1245F3B3C8AA845AD3BA /* PlanPricing.swift */; };
 		EA7151E7DC60BF9B5C5A521E /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 165CE5F9FA389F64A4730557 /* APIClient.swift */; };
 		EAC2A5859464998CB025529A /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BA600A70A653AC369122638 /* WelcomeView.swift */; };
 		EAEFF3596AD2741C1A97EF7B /* RecallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA7AEA4C9157169D31D8D3B8 /* RecallView.swift */; };
@@ -117,10 +122,12 @@
 		1BA600A70A653AC369122638 /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
 		1DCB42472B027EF8556E83E2 /* AppDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDiagnostics.swift; sourceTree = "<group>"; };
 		20B8BC792201909C6B627383 /* InterviewDocumentRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterviewDocumentRows.swift; sourceTree = "<group>"; };
+		3304113E3A0EC6040CBB22E4 /* Drillbit.storekit */ = {isa = PBXFileReference; path = Drillbit.storekit; sourceTree = "<group>"; };
 		366045A34DEB9127B61D057D /* Literata.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Literata.ttf; sourceTree = "<group>"; };
 		3805DAF1DC8F8A3A0256EBF7 /* GrowingInterviewEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrowingInterviewEditor.swift; sourceTree = "<group>"; };
 		39439B81E58CADD0F8243F46 /* CompanionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionTests.swift; sourceTree = "<group>"; };
 		44C89C686607D2F20377EADE /* InterviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterviewTests.swift; sourceTree = "<group>"; };
+		47DC20AA0A42DCF87633ED5D /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		4C0456C5AFA3D9C114B4F80D /* Drillbit.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Drillbit.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4D561B63C630BDBE5ABC6DF2 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		4EB6666339982040006AC57A /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
@@ -144,6 +151,7 @@
 		AD095763BDFB10A241582226 /* ReflectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReflectionView.swift; sourceTree = "<group>"; };
 		AE08B55DBCD760BE95D68FCB /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		B8F2A363927CDF8EB6A14D5C /* InterviewVoiceRoom.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterviewVoiceRoom.swift; sourceTree = "<group>"; };
+		B9FE8777717765C5DE0E9907 /* PlanPricingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanPricingTests.swift; sourceTree = "<group>"; };
 		BA47F5B6A6BBF68259182059 /* FirstUse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirstUse.swift; sourceTree = "<group>"; };
 		C197A270F91EB4CC5F520C1D /* AuditScreenshots.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditScreenshots.swift; sourceTree = "<group>"; };
 		C8E06A264C65F45E7AD14AD1 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
@@ -157,6 +165,7 @@
 		EF24F5F233F85813B521B540 /* DrillbitUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = DrillbitUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F69DED8C37D39A2D21CC2A84 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F7FE2F3D17D6A2010A948002 /* HelpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpView.swift; sourceTree = "<group>"; };
+		FD1F1245F3B3C8AA845AD3BA /* PlanPricing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanPricing.swift; sourceTree = "<group>"; };
 		FDE151C29EEC1990D2C7E840 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -234,6 +243,7 @@
 				153D45AC2868C4FBAF088C71 /* PracticeEvidence.swift */,
 				5CF83E5C54AF9B2C1262CAB8 /* PracticeWorkspace.swift */,
 				D48C7CE46F73492E41D2DDDD /* PreparationView.swift */,
+				47DC20AA0A42DCF87633ED5D /* PrivacyInfo.xcprivacy */,
 				52EA11B5A88C191EA7F6F9B2 /* QuestionFlow.swift */,
 				EA7AEA4C9157169D31D8D3B8 /* RecallView.swift */,
 				AD095763BDFB10A241582226 /* ReflectionView.swift */,
@@ -252,6 +262,7 @@
 			isa = PBXGroup;
 			children = (
 				01713294F3436278FCEE46B6 /* Models.swift */,
+				FD1F1245F3B3C8AA845AD3BA /* PlanPricing.swift */,
 				8049B9471B01CBFBD8C80764 /* SharedStore.swift */,
 				658B4C2655924F8CC0AE95C3 /* VoiceTranscript.swift */,
 			);
@@ -281,6 +292,7 @@
 			isa = PBXGroup;
 			children = (
 				E1126329A3402DB0A44CA474 /* Defaults.xcconfig */,
+				3304113E3A0EC6040CBB22E4 /* Drillbit.storekit */,
 			);
 			path = Config;
 			sourceTree = "<group>";
@@ -302,6 +314,7 @@
 				39439B81E58CADD0F8243F46 /* CompanionTests.swift */,
 				7ED772ACFEBFA6EBE9753089 /* ContractTests.swift */,
 				44C89C686607D2F20377EADE /* InterviewTests.swift */,
+				B9FE8777717765C5DE0E9907 /* PlanPricingTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -338,6 +351,7 @@
 			buildConfigurationList = 150830310085315300AC6D85 /* Build configuration list for PBXNativeTarget "DrillbitUITests" */;
 			buildPhases = (
 				1DDCFFC4F1B22B1FF7343362 /* Sources */,
+				9FCBEF9E0BC5E627B2C475C8 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -438,6 +452,15 @@
 				9D0A9C663935A2276F7DA317 /* LaunchScreen.storyboard in Resources */,
 				22EAA8C50206081D7F3562EA /* Literata.ttf in Resources */,
 				103427E2C089BEA93890BA94 /* OFL-Literata.txt in Resources */,
+				DED8B583C89AC49487E723C6 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9FCBEF9E0BC5E627B2C475C8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				799EE25FEAF4DCBD0C89E23A /* Drillbit.storekit in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -460,6 +483,7 @@
 			files = (
 				D090F4FDF85CBD331AA6CAB7 /* DrillbitWidget.swift in Sources */,
 				7DD8D81CCC22B716F6BA3C47 /* Models.swift in Sources */,
+				6CEB77927E5BC56B7E403D54 /* PlanPricing.swift in Sources */,
 				AE7741A51A7892B3DB5B5C08 /* SharedStore.swift in Sources */,
 				CEEEB3987FECE2F2B2B61FF0 /* VoiceTranscript.swift in Sources */,
 			);
@@ -492,6 +516,7 @@
 				ADA43CF08FADFB23365A14E8 /* Models.swift in Sources */,
 				3D0DACC7801A3CCC832A9840 /* Persistence.swift in Sources */,
 				9BF823A35BDAA8B8E137FD8F /* Plan.swift in Sources */,
+				E53626C10CFE64FCCB08DF7D /* PlanPricing.swift in Sources */,
 				8D4370BA4D4B112FDA7560A6 /* PracticeCompanion.swift in Sources */,
 				BA66BF7CF5979DAA6AC4E9C5 /* PracticeEvidence.swift in Sources */,
 				868D112482709522C36A981D /* PracticeWorkspace.swift in Sources */,
@@ -517,6 +542,7 @@
 				20212ED453359321401BBE55 /* CompanionTests.swift in Sources */,
 				ECEC2C8AFBB8086D0EA78BEC /* ContractTests.swift in Sources */,
 				38084B68C426518EDAE4F208 /* InterviewTests.swift in Sources */,
+				6BDB8C72060A37F8C10CBBE9 /* PlanPricingTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

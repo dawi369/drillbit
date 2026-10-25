@@ -129,6 +129,12 @@ struct SettingsView: View {
       if model.bootstrap?.capabilities?.developerTools == true || model.fixture {
         DeveloperSettingsSection(model: model, appearance: $appearance, dismiss: { dismiss() })
       }
+      Section("Legal") {
+        Link("Terms of Use", destination: LegalLinks.terms).accessibilityIdentifier("settingsTerms")
+        if let privacy = LegalLinks.privacy {
+          Link("Privacy Policy", destination: privacy).accessibilityIdentifier("settingsPrivacy")
+        }
+      }
     }.navigationTitle("Settings")
       .toolbar {
         ToolbarItem(placement: .confirmationAction) {

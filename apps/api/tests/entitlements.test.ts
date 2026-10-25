@@ -61,7 +61,7 @@ async function person() {
   return { subject, id: account.id };
 }
 const transaction = (overrides: object = {}) => ({
-  bundleId: "dawi.drillbit", productId: "dawi.drillbit.pro.monthly", originalTransactionId: crypto.randomUUID(), transactionId: crypto.randomUUID(),
+  bundleId: "dawi.drillbit", productId: "dawi.drillbit.pro.weekly", originalTransactionId: crypto.randomUUID(), transactionId: crypto.randomUUID(),
   type: "Auto-Renewable Subscription", environment: "Sandbox", purchaseDate: Date.now() - 1000, expiresDate: Date.now() + 30 * 86_400_000, signedDate: Date.now(), ...overrides,
 });
 const post = async (subject: string | null, body: object) => request("v1/entitlement", subject, "POST", body);
@@ -95,7 +95,7 @@ it("records a verified purchase for the caller and turns the plan Pro", async ()
   const claims = transaction();
   const accepted = await post(subject, { signedTransaction: await apple.sign(claims) });
   expect(accepted.status).toBe(200);
-  expect(await accepted.json()).toMatchObject({ plan: "pro", entitlement: { productId: "dawi.drillbit.pro.monthly", status: "active" } });
+  expect(await accepted.json()).toMatchObject({ plan: "pro", entitlement: { productId: "dawi.drillbit.pro.weekly", status: "active" } });
   expect(await planFor(bindings, id)).toBe("pro");
   const bootstrap = await (await request("v1/bootstrap", subject)).json() as { account: { plan: string }; practice: { freeReps: boolean } };
   expect(bootstrap.account.plan).toBe("pro");

@@ -72,7 +72,7 @@ Start muted; crossfade room ↔ workspace; remove the status line; dock lower; l
 Blocking before phase 3 can be live-verified (phases 0–2 and the iOS code can proceed without them):
 
 1. **App Store Connect**
-   - Create a subscription group "Drillbit Pro" with products `dawi.drillbit.pro.monthly` and `dawi.drillbit.pro.yearly` (or tell me your ids). Prices are yours; the vision doc assumes a 7-day free trial offered on the paywall only — confirm or drop.
+   - Create a subscription group "Drillbit Pro" with products `dawi.drillbit.pro.weekly` and `dawi.drillbit.pro.yearly` (or tell me your ids). Prices are yours; the vision doc assumes a 7-day free trial offered on the paywall only — confirm or drop.
    - App Store Server Notifications V2: set both Sandbox and Production URLs to `https://<api-host>/apple/notifications` once deployed (I'll give the exact host).
    - A Sandbox tester Apple ID signed in on your test device.
 2. **Superwall**

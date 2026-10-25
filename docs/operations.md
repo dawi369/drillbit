@@ -267,10 +267,25 @@ Development Worker `ac52cdb8-fabb-4715-84df-88bc92fbed0b` runs with targeted pla
 
 ## Plans, Apple entitlements and Superwall — 10 October 2026
 
-Worker vars (see `wrangler.jsonc`): `PRACTICE_GATE` (off = everyone Pro, for the invite beta), `FREE_REPS_PER_DAY`, `FREE_VOICE_LIFETIME`, `FREE_VOICE_TASTE_DAYS`, `FREE_VOICE_SESSION_MINUTES`, `PRO_REPS_PER_DAY`, `PRO_VOICE_STARTS_PER_DAY`, `PRO_VOICE_SESSION_MINUTES`, `APPLE_BUNDLE_ID`, `APPLE_PRODUCT_IDS`. Optional: `APPLE_ENVIRONMENT=Production` to ignore sandbox receipts on the production Worker, `APPLE_ROOT_CERTS` to replace the pinned Apple Root CA G3 (base64 DER, comma-separated). No new secrets: receipt verification needs only Apple's public root. Apply migration `0014_entitlements.sql` before deploying.
+Worker vars (see `wrangler.jsonc`): `PRACTICE_GATE` (off = everyone Pro, for the invite beta), `FREE_REPS_PER_DAY`, `FREE_VOICE_LIFETIME`, `FREE_VOICE_TASTE_DAYS`, `FREE_VOICE_SESSION_MINUTES`, `PRO_REPS_PER_DAY`, `PRO_VOICE_STARTS_PER_DAY`, `PRO_VOICE_SESSION_MINUTES`, `APPLE_BUNDLE_ID`, `APPLE_PRODUCT_IDS`. Optional: `APPLE_ENVIRONMENT` pins one App Store environment; leave it unset on production, because App Review purchases with sandbox accounts against the production Worker and a pinned `Production` rejects them; `APPLE_ROOT_CERTS` to replace the pinned Apple Root CA G3 (base64 DER, comma-separated). No new secrets: receipt verification needs only Apple's public root. Apply migration `0014_entitlements.sql` before deploying.
 
-App Store Connect: create subscription group “Drillbit Pro” with `dawi.drillbit.pro.monthly` and `dawi.drillbit.pro.yearly` (or change `APPLE_PRODUCT_IDS` and `PlanCoordinator.productIDs` together). Under App Information → App Store Server Notifications, set the Production and Sandbox URLs to `https://<worker-host>/apple/notifications` (version 2). Test with a Sandbox tester on device; the simulator uses `apps/ios/Config/Drillbit.storekit` through the Drillbit scheme.
+App Store Connect: create subscription group “Drillbit Pro” with `dawi.drillbit.pro.weekly` and `dawi.drillbit.pro.yearly` (or change `APPLE_PRODUCT_IDS` and `PlanCoordinator.productIDs` together). Under App Information → App Store Server Notifications, set the Production and Sandbox URLs to `https://<worker-host>/apple/notifications` (version 2). Test with a Sandbox tester on device; the simulator uses `apps/ios/Config/Drillbit.storekit` through the Drillbit scheme.
 
 Superwall: put the public key in `apps/ios/Config/Local.xcconfig` as `SUPERWALL_API_KEY`. Create placements `practice_rep` and `voice_session` in the dashboard and attach a paywall with the two products. With the key empty the app shows Apple's native subscription store instead, so the paywall is never missing.
 
 Support: `SELECT * FROM entitlements WHERE account_id=?` shows the bound subscription; a user who moved accounts sees 409 `entitlement_taken` until the old row is deleted by hand. Refunds and expiries arrive by notification; until Apple sends it the user keeps Pro.
+
+## Production environment — 25 October 2026
+
+`apps/api/wrangler.jsonc` has an `env.production` block (`drillbit-api`, D1 `drillbit-production`, Workflow `drillbit-jobs`) with `PRACTICE_GATE=true` and no developer allowlists. Its `REPLACE_` placeholders fail closed until filled. From `apps/api`:
+
+1. Create a Clerk **production** instance with native Sign in with Apple and the `drillbit` JWT template (see “Clerk and Apple configuration”); put its issuer in `CLERK_ISSUER`.
+2. `./node_modules/.bin/wrangler d1 create drillbit-production`, then put the id in `database_id`.
+3. `./node_modules/.bin/wrangler d1 migrations apply drillbit-production --remote --env production`
+4. Secrets, each with `--env production`: `CLERK_SECRET_KEY`, `OPENROUTER_API_KEY` (fresh, budget-limited), `OPENAI_API_KEY` (voice), `CREDENTIAL_KEY` (new 32 random bytes, base64; never the development one).
+5. `./node_modules/.bin/wrangler deploy --env production`, then check `GET /health` and that an unauthenticated `/v1/bootstrap` returns 401.
+6. App Store Connect → App Store Server Notifications (V2), Production and Sandbox: `https://<production-host>/apple/notifications`.
+
+The release build needs `API_BASE_URL` (production host), `CLERK_PUBLISHABLE_KEY` (`pk_live_…`) and `PRIVACY_POLICY_URL` set in `Config/Local.xcconfig`. Write URLs as `https:/$()/host/path`, since xcconfig reads `//` as a comment. Without `PRIVACY_POLICY_URL` the paywall and Settings show no privacy link, which App Review rejects for subscription apps.
+
+Subscriptions: group “Drillbit Pro” with `dawi.drillbit.pro.yearly` and `dawi.drillbit.pro.weekly`; give the weekly product an introductory offer of one week, pay as you go. Prices live only in App Store Connect; the paywall derives “Save N%” (yearly against 52 weeks of weekly, rounded down) and the first-week line from the products. `Config/Drillbit.storekit` holds placeholder prices for the simulator only.

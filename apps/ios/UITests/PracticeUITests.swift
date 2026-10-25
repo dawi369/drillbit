@@ -1,3 +1,4 @@
+import StoreKitTest
 import XCTest
 
 @MainActor
@@ -988,7 +989,7 @@ final class PracticeUITests: XCTestCase {
     capture("Largest practice modes light", app)
   }
 
-  func testMockInterviewRunsOnTheClockAndEndsWithADebrief() throws {
+  func testMockInterviewRunsOnTheClockAndFinishes() throws {
     continueAfterFailure = false
     let app = XCUIApplication()
     app.launchArguments = ["--fixtures", "--fixture-dashboard"]
@@ -1022,11 +1023,11 @@ final class PracticeUITests: XCTestCase {
     app.buttons["interviewOptions"].tap()
     app.buttons["Finish interview"].tap()
     app.alerts.buttons["Finish interview"].tap()
-    XCTAssertTrue(app.staticTexts["INTERVIEW DEBRIEF"].waitForExistence(timeout: 8))
-    XCTAssertTrue(app.staticTexts["Borderline. Could go either way."].waitForExistence(timeout: 5))
-    XCTAssertTrue(app.staticTexts["TO PASS"].exists)
+    // Generated feedback is parked for MVP (`ReflectionView.showsFeedback`): the round ends on the plain finish.
+    XCTAssertTrue(app.staticTexts["That’s one in the bag."].waitForExistence(timeout: 8))
+    XCTAssertFalse(app.staticTexts["INTERVIEW DEBRIEF"].exists)
     XCTAssertFalse(clock.exists, "The clock stops once the round is over")
-    capture("Mock interview debrief", app)
+    capture("Mock interview finished", app)
   }
 
   func testInterviewStyle() throws {
@@ -1200,6 +1201,9 @@ final class PracticeUITests: XCTestCase {
   }
 
   func testSpentFreeRepWaitsOnHome() throws {
+    // The local products from Config/Drillbit.storekit, so the paywall shows real plan options.
+    let store = try SKTestSession(configurationFileNamed: "Drillbit")
+    store.resetToDefaultState(); store.disableDialogs = true; store.clearTransactions()
     let app = XCUIApplication()
     app.launchArguments = ["--fixtures", "--fixture-dashboard", "--fixture-gate"]
     app.launch()
@@ -1212,6 +1216,11 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.buttons["seePro"].exists)
     app.buttons["seePro"].tap()
     XCTAssertTrue(app.descendants(matching: .any)["paywall"].waitForExistence(timeout: 5))
+    // Every figure comes from the products: 39.99 a year against 52 × 6.99 saves 88%, and the weekly intro shows.
+    let option = { (text: String) in app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch }
+    XCTAssertTrue(option("Save 88%").waitForExistence(timeout: 10))
+    XCTAssertTrue(option("$3.33 a month").exists)
+    XCTAssertTrue(option("Try a week for $0.99, then $6.99 a week").exists)
     capture("Paywall from the rep gate", app)
     app.buttons["paywallDismiss"].tap()
     XCTAssertTrue(waiting.waitForExistence(timeout: 5))
@@ -1243,6 +1252,10 @@ final class PracticeUITests: XCTestCase {
     let restore = app.buttons["Restore purchases"]
     for _ in 0..<2 where !restore.exists { app.swipeUp() }
     XCTAssertTrue(restore.waitForExistence(timeout: 3))
+    // Subscription apps must reach their terms from inside the app.
+    let terms = app.descendants(matching: .any)["settingsTerms"]
+    for _ in 0..<8 where !terms.exists { app.swipeUp() }
+    XCTAssertTrue(terms.waitForExistence(timeout: 3))
     capture("Settings on Free", app)
   }
 

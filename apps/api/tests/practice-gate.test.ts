@@ -202,7 +202,7 @@ it("caps follow-ups and nudges inside a free rep only", async () => {
   await expect(freeRepLimit(bindings, id, {}, "answer", turns("answer", 30))).resolves.toBeUndefined();
   // Going Pro mid-rep lifts the budget.
   await bindings.DB.prepare("INSERT INTO entitlements(original_transaction_id,account_id,product_id,environment,status,active_until,signed_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)")
-    .bind(crypto.randomUUID(), id, "dawi.drillbit.pro.monthly", "Sandbox", "active", new Date(Date.now() + 86_400_000).toISOString(), "now", "now", "now").run();
+    .bind(crypto.randomUUID(), id, "dawi.drillbit.pro.weekly", "Sandbox", "active", new Date(Date.now() + 86_400_000).toISOString(), "now", "now", "now").run();
   await expect(freeRepLimit(bindings, id, data, "answer", turns("answer", 30))).resolves.toBeUndefined();
   expect(await access((await bindings.DB.prepare("SELECT subject FROM accounts WHERE id=?").bind(id).first<{ subject: string }>())!.subject)).toMatchObject({ plan: "pro", freeReps: false });
 });

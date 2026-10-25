@@ -19,17 +19,23 @@
         {
           "adHocOffers" : [ ],
           "codeOffers" : [ ],
-          "displayPrice" : "7.99",
+          "displayPrice" : "6.99",
           "familyShareable" : false,
           "groupNumber" : 1,
           "internalID" : "6760000001",
-          "introductoryOffer" : null,
+          "introductoryOffer" : {
+            "displayPrice" : "0.99",
+            "internalID" : "6760000003",
+            "numberOfPeriods" : 1,
+            "paymentMode" : "payAsYouGo",
+            "subscriptionPeriod" : "P1W"
+          },
           "localizations" : [
-            { "description" : "Unlimited reps and voice, billed monthly.", "displayName" : "Pro Monthly", "locale" : "en_US" }
+            { "description" : "Unlimited reps and voice, billed weekly.", "displayName" : "Pro Weekly", "locale" : "en_US" }
           ],
-          "productID" : "dawi.drillbit.pro.monthly",
-          "recurringSubscriptionPeriod" : "P1M",
-          "referenceName" : "Pro Monthly",
+          "productID" : "dawi.drillbit.pro.weekly",
+          "recurringSubscriptionPeriod" : "P1W",
+          "referenceName" : "Pro Weekly",
           "subscriptionGroupID" : "21500001",
           "type" : "RecurringSubscription",
           "winbackOffers" : [ ]
@@ -37,7 +43,7 @@
         {
           "adHocOffers" : [ ],
           "codeOffers" : [ ],
-          "displayPrice" : "59.99",
+          "displayPrice" : "39.99",
           "familyShareable" : false,
           "groupNumber" : 1,
           "internalID" : "6760000002",

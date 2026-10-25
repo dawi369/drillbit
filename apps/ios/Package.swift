@@ -8,9 +8,9 @@ let package = Package(
     .target(
       name: "DrillbitCore", path: ".",
       exclude: [
-        "Config", "Drillbit/Assets.xcassets", "Tests", "DrillbitWidget", "Drillbit.xcodeproj",
+        "Config", "Drillbit/Assets.xcassets", "Drillbit/Resources", "Drillbit/PrivacyInfo.xcprivacy", "Tests", "DrillbitWidget", "Drillbit.xcodeproj",
         "project.yml", "build", "Shared/SharedStore.swift", "Drillbit/APIClient.swift",
         "Drillbit/AppModel.swift", "Drillbit/DrillbitApp.swift",
-      ], sources: ["Shared/Models.swift", "Shared/VoiceTranscript.swift", "Drillbit/Persistence.swift", "Drillbit/CompanionCoordinator.swift", "Drillbit/BitRig.swift"]),
+      ], sources: ["Shared/Models.swift", "Shared/PlanPricing.swift", "Shared/VoiceTranscript.swift", "Drillbit/Persistence.swift", "Drillbit/CompanionCoordinator.swift", "Drillbit/BitRig.swift"]),
     .testTarget(name: "DrillbitCoreTests", dependencies: ["DrillbitCore"], path: "Tests"),
   ])

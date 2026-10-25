@@ -25,7 +25,7 @@
     "PRO_VOICE_STARTS_PER_DAY": "20",
     "PRO_VOICE_SESSION_MINUTES": "20",
     "APPLE_BUNDLE_ID": "dawi.drillbit",
-    "APPLE_PRODUCT_IDS": "dawi.drillbit.pro.monthly,dawi.drillbit.pro.yearly",
+    "APPLE_PRODUCT_IDS": "dawi.drillbit.pro.weekly,dawi.drillbit.pro.yearly",
     "VOICE_UNLIMITED_ACCOUNTS": "3ded3cde-2d6d-44cf-8fae-cc024232b663",
     "DEVELOPER_ACCOUNTS": "3ded3cde-2d6d-44cf-8fae-cc024232b663",
     "COMPANION_AUTO_ENABLED": "true",
@@ -52,5 +52,49 @@
     "crons": [
       "*/5 * * * *"
     ]
+  },
+  // Production: `wrangler deploy --env production`. Vars and bindings don't inherit from the top level, so every one
+  // is restated. REPLACE_ placeholders fail closed: the issuer rejects every token and the database id refuses to deploy.
+  "env": {
+    "production": {
+      "name": "drillbit-api",
+      "vars": {
+        "CLERK_ISSUER": "https://REPLACE_WITH_CLERK_PRODUCTION_ISSUER",
+        "MODEL_ID": "openai/gpt-6-luna",
+        "MANAGED_AI_ENABLED": "true",
+        "VOICE_ENABLED": "true",
+        "PRACTICE_GATE": "true",
+        "FREE_REPS_PER_DAY": "3",
+        "FREE_VOICE_LIFETIME": "3",
+        "FREE_VOICE_TASTE_DAYS": "7",
+        "FREE_VOICE_SESSION_MINUTES": "3",
+        "PRO_REPS_PER_DAY": "30",
+        "PRO_VOICE_STARTS_PER_DAY": "20",
+        "PRO_VOICE_SESSION_MINUTES": "20",
+        "APPLE_BUNDLE_ID": "dawi.drillbit",
+        // No APPLE_ENVIRONMENT here: App Review buys with sandbox accounts against this Worker, and pinning
+        // Production would reject the reviewer's purchase. Each entitlement row records its environment instead.
+        "APPLE_PRODUCT_IDS": "dawi.drillbit.pro.weekly,dawi.drillbit.pro.yearly",
+        "COMPANION_AUTO_ENABLED": "true",
+        "INTERACTIVE_INLINE_ENABLED": "true",
+        "CREDENTIAL_KEY_VERSION": "1",
+        "CLERK_AUDIENCE": "drillbit"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "drillbit-production",
+          "database_id": "REPLACE_WITH_PRODUCTION_D1_ID",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "workflows": [
+        {
+          "binding": "JOBS",
+          "name": "drillbit-jobs",
+          "class_name": "PracticeWorkflow"
+        }
+      ]
+    }
   }
 }

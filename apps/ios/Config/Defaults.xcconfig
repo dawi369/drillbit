@@ -2,4 +2,6 @@ API_BASE_URL = https:/$()/example.invalid
 CLERK_PUBLISHABLE_KEY =
 // Superwall public key (pk_...). Empty means the native App Store paywall is used instead.
 SUPERWALL_API_KEY =
+// Public privacy policy page, required for the App Store build. Write it as https:/$()/host/path: xcconfig reads // as a comment.
+PRIVACY_POLICY_URL =
 #include? "Local.xcconfig"

@@ -260,11 +260,12 @@ final class AuditScreenshots: XCTestCase {
     app.buttons["interviewOptions"].tap()
     app.buttons["Finish interview"].tap()
     app.alerts.buttons["Finish interview"].tap()
-    XCTAssertTrue(app.staticTexts["INTERVIEW DEBRIEF"].waitForExistence(timeout: 8))
+    // Generated feedback is parked for MVP: the round ends on the plain finish.
+    XCTAssertTrue(app.staticTexts["That’s one in the bag."].waitForExistence(timeout: 8))
     Thread.sleep(forTimeInterval: 1.5)
-    shot("c05-mock-debrief", app)
+    shot("c05-mock-finished", app)
     app.swipeUp()
-    shot("c06-mock-debrief-scrolled", app)
+    shot("c06-mock-finished-scrolled", app)
     app.terminate()
 
     app = launch(["--fixtures", "--fixture-voice"])

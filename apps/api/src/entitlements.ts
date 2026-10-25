@@ -70,7 +70,7 @@ export async function verifyAppleJWS(env: Env, token: string, now = new Date()):
 }
 
 export function knownProducts(env: Env) {
-  return (env.APPLE_PRODUCT_IDS ?? "dawi.drillbit.pro.monthly,dawi.drillbit.pro.yearly").split(",").map(s => s.trim()).filter(Boolean);
+  return (env.APPLE_PRODUCT_IDS ?? "dawi.drillbit.pro.weekly,dawi.drillbit.pro.yearly").split(",").map(s => s.trim()).filter(Boolean);
 }
 
 /** The row an Apple transaction (plus optional renewal info) implies right now. */
