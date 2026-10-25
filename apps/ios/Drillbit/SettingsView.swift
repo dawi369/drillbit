@@ -157,7 +157,7 @@ private struct DeveloperSettingsSection: View {
   @Binding var appearance: String
   var dismiss: () -> Void
   @State private var confirming: Reset?
-  @State private var planPreview = AppModel.PlanPreview.live
+  @State private var switchingPlan = false
   @State private var coachReplayed = false
   enum Reset: String, Identifiable { case practice, everything, reinvite; var id: String { rawValue } }
 
@@ -181,12 +181,18 @@ private struct DeveloperSettingsSection: View {
       NavigationLink("Export practice data") { PracticeExportView(model: model) }
     }
     Section {
-      Picker("Plan preview", selection: $planPreview) {
-        Text("Live").tag(AppModel.PlanPreview.live)
-        Text("Free · 2 reps left").tag(AppModel.PlanPreview.freeReps)
-        Text("Free · spent").tag(AppModel.PlanPreview.freeSpent)
+      Picker("Act as", selection: Binding(
+        get: { model.bootstrap?.account.planOverride ?? "billed" },
+        set: { value in
+          switchingPlan = true
+          Task { await model.setDeveloperPlan(value == "billed" ? nil : value); switchingPlan = false }
+        })) {
+        Text("Billed plan").tag("billed")
+        Text("Free").tag("free")
+        Text("Pro").tag("pro")
       }
-      .onChange(of: planPreview) { _, value in model.previewPlan(value) }
+      .disabled(switchingPlan)
+      .accessibilityIdentifier("developerPlan")
       Button(coachReplayed ? "Tips will show again" : "Replay first-run tips") {
         for mark in CoachMark.allCases { UserDefaults.standard.removeObject(forKey: mark.storageKey) }
         coachReplayed = true
@@ -198,7 +204,7 @@ private struct DeveloperSettingsSection: View {
     } header: {
       Text("Developer")
     } footer: {
-      Text("Plan preview changes only what this device shows until the next refresh. Replay onboarding keeps you signed in and clears practice. Reset Drillbit wipes practice and device memory and signs you out, so the next launch is the very first one.")
+      Text("Act as switches this account to Free or Pro on the server, so the rep gate, voice limits and paywall behave for real; Billed plan goes back to what you pay for. Replay onboarding keeps you signed in and clears practice. Reset Drillbit wipes practice and device memory and signs you out, so the next launch is the very first one.")
     }
   }
   /// The dialog hangs off its own button, so the sheet points at what was tapped rather than the middle of the screen.

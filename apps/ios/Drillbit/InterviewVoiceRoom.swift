@@ -90,7 +90,7 @@ struct InterviewVoiceRoom<Question: View>: View {
   // MARK: Dock
 
   @ViewBuilder private var dock: some View {
-    VStack(spacing: 12) {
+    VStack(spacing: 8) {
       if let message = voice.message {
         Text(message).font(.footnote).foregroundStyle(AppPalette.secondary)
           .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
@@ -174,7 +174,9 @@ struct InterviewVoiceRoom<Question: View>: View {
       }
     }
     .frame(maxWidth: 560)
-    .padding(.horizontal, 24).padding(.top, 16)
+    // The taller top gives the soft edge effect more room to fade the words; the controls sit a touch into the
+    // home-indicator margin so the dock reads lower on the screen.
+    .padding(.horizontal, 24).padding(.top, 28).padding(.bottom, -4)
     .frame(maxWidth: .infinity)
     .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: phase)
   }

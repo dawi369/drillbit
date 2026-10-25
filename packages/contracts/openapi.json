@@ -679,6 +679,115 @@
         }
       }
     },
+    "/v1/developer/plan": {
+      "post": {
+        "summary": "Developer accounts only: act as Free or Pro regardless of billing; null clears",
+        "operationId": "post_developer_plan",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeveloperPlan"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/undefined"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invite required or account unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not owned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision or lifecycle conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid invitation or provider credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Usage limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Provider temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/taxonomy": {
       "get": {
         "summary": "Get the versioned system-design concept vocabulary",
@@ -6214,6 +6323,54 @@
         },
         "required": [
           "signedTransaction"
+        ],
+        "additionalProperties": false
+      },
+      "DeveloperPlan": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "plan": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "free",
+                  "pro"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "plan"
+        ],
+        "additionalProperties": false
+      },
+      "DeveloperPlanResult": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "plan": {
+            "type": "string",
+            "enum": [
+              "free",
+              "pro"
+            ]
+          },
+          "planOverride": {
+            "type": "string",
+            "enum": [
+              "free",
+              "pro"
+            ]
+          }
+        },
+        "required": [
+          "plan"
         ],
         "additionalProperties": false
       },
@@ -12901,6 +13058,13 @@
                 "type": "string"
               },
               "plan": {
+                "type": "string",
+                "enum": [
+                  "free",
+                  "pro"
+                ]
+              },
+              "planOverride": {
                 "type": "string",
                 "enum": [
                   "free",

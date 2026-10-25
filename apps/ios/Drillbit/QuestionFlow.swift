@@ -56,6 +56,10 @@ struct QuestionFlow: View {
   }
   /// Bit shows up only while the question is being written, then gets out of the way.
   private var writing: Bool { question == nil && failure == nil }
+  /// Bit fades while still live, then leaves the hierarchy. A removal transition snapshots his per-frame Canvas,
+  /// which on device can flash as a black square while it fades.
+  @State private var bitMounted = true
+  @State private var bitVisible = true
   /// The note is fixed copy but still written out, so the page reads as one voice.
   private var previewSegments: [StreamSegment] {
     var segments = [
@@ -135,9 +139,6 @@ struct QuestionFlow: View {
           .accessibilityIdentifier("questionPreviewScroll")
         .safeAreaInset(edge: .bottom) {
           VStack(spacing: 12) {
-            if writing && !typeSize.isAccessibilitySize {
-              BitView(mood: .drilling).frame(height: 56).transition(.opacity)
-            }
             if let question, revealed {
               let resuming = question.lifecycle == "in_progress"
               let title = resuming ? "Resume" : "Start"
@@ -169,8 +170,23 @@ struct QuestionFlow: View {
                 .disabled(starting)
                 .transition(arrival(2))
             }
-          }.padding(16).background(AppPalette.background)
-            .animation(reduceMotion ? nil : DrillbitMotion.fast, value: writing)
+          }
+          // Bit holds the slot the Start button arrives in, so the hand-off is a crossfade, not a jump.
+          .frame(minHeight: bitMounted && !typeSize.isAccessibilitySize ? 56 : 0, alignment: .top)
+          .overlay(alignment: .top) {
+            if bitMounted && !typeSize.isAccessibilitySize {
+              BitView(mood: .drilling).frame(height: 56).opacity(bitVisible ? 1 : 0).allowsHitTesting(false)
+            }
+          }
+          .padding(16).background(AppPalette.background)
+          .onChange(of: writing) { _, now in
+            if now {
+              bitMounted = true
+              withAnimation(reduceMotion ? nil : DrillbitMotion.fast) { bitVisible = true }
+            } else {
+              withAnimation(reduceMotion ? nil : DrillbitMotion.fast) { bitVisible = false } completion: { if !writing { bitMounted = false } }
+            }
+          }
         }.navigationTitle("Question preview").navigationBarTitleDisplayMode(.inline)
           .containerBackground(AppPalette.background, for: .navigation)
           .toolbar { if !firstRep { Button("Close") { dismiss() } } }
@@ -186,7 +202,7 @@ struct QuestionFlow: View {
       initialized = true
       account = model.bootstrap?.account.id
       selectedArea = area
-      if let initial { question = initial; showingPreview = true; instantReveal = true; revealed = true }
+      if let initial { question = initial; showingPreview = true; instantReveal = true; revealed = true; bitMounted = false; bitVisible = false }
       else if firstRep { prepare(nil) }
     }
     // The question object may land after its text has already settled on the page.

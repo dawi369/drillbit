@@ -23,7 +23,9 @@ import { coverage, libraryPage, questionDetail, setEligibility, startQuestion } 
 import { consumeUsage, encrypt, hash, identity, type Env } from "./platform";
 import { adopt, requestHelp } from "./practice";
 import { freeRepTaken, onFreeReps, practiceAccess, practiceGateFault } from "./practice-gate";
-import { limits, planFor } from "./plans";
+import { limits, planFor, planOverride } from "./plans";
+
+const developerPlanSchema = z.object({ plan: z.enum(["free", "pro"]).nullable() });
 import { applyAppleNotification, recordEntitlement } from "./entitlements";
 import {
     accountFor,
@@ -180,7 +182,7 @@ app.get("/v1/bootstrap", async (c) => {
     .bind(a.id)
     .first();
   return c.json({
-    account: { id: a.id, status: a.status, plan: await planFor(c.env, a.id) },
+    account: { id: a.id, status: a.status, plan: await planFor(c.env, a.id), planOverride: await planOverride(c.env, a.id) },
     practiceEpoch: (await c.env.DB.prepare("SELECT value FROM practice_epoch WHERE id=1").first<{value:string}>())!.value,
     settings,
     todayPlan: await todayPlan(c.env, a.id, active, settings),
@@ -213,6 +215,15 @@ app.post("/v1/developer/reinvite", async c => {
     c.env.DB.prepare("UPDATE accounts SET status='invited' WHERE id=?").bind(account),
   ]);
   return c.json({ ok: true });
+});
+// Developer-only: act as Free or Pro to see gates and the paywall for real; null returns to the billed plan.
+app.post("/v1/developer/plan", async c => {
+  const account = c.get("account").id;
+  const permitted = (c.env.DEVELOPER_ACCOUNTS ?? "").split(",").map(id => id.trim()).filter(Boolean);
+  if (!permitted.includes(account)) throw new Fault("not_found", 404, "Not found.");
+  const { plan } = developerPlanSchema.parse(await c.req.json());
+  await c.env.DB.prepare("UPDATE accounts SET plan_override=? WHERE id=?").bind(plan, account).run();
+  return c.json({ plan: await planFor(c.env, account), planOverride: plan ?? undefined });
 });
 app.delete("/v1/developer/practice", async (c) => {
   const account = c.get("account").id;

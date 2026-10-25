@@ -114,6 +114,32 @@ it("publishes a bootstrap matching the cross-platform wire schema", async () => 
   expect(response.status).toBe(200);
   expect(wire.Bootstrap.safeParse(await response.json()).success).toBe(true);
 });
+it("lets only developers act as Free or Pro, ahead of the gate, and clears on null", async () => {
+  const owner = await accountFor(bindings, "plan-owner");
+  const other = await accountFor(bindings, "plan-other");
+  await bindings.DB.prepare("UPDATE accounts SET status='active' WHERE id IN (?,?)").bind(owner.id, other.id).run();
+  const gate = bindings.PRACTICE_GATE, developers = bindings.DEVELOPER_ACCOUNTS;
+  try {
+    bindings.PRACTICE_GATE = "false";
+    bindings.DEVELOPER_ACCOUNTS = owner.id;
+    expect((await request("developer/plan", "plan-other", "POST", { plan: "free" })).status).toBe(404);
+    // Gate off means everyone is Pro; the override still wins, so the paywall can be seen for real.
+    const free = await request("developer/plan", "plan-owner", "POST", { plan: "free" });
+    expect(await free.json()).toEqual({ plan: "free", planOverride: "free" });
+    const boot = await (await request("bootstrap", "plan-owner")).json() as any;
+    expect(boot.account).toMatchObject({ plan: "free", planOverride: "free" });
+    expect(wire.Bootstrap.safeParse(boot).success).toBe(true);
+    expect(boot.practice.plan).toBe("free");
+    expect(await (await request("developer/plan", "plan-owner", "POST", { plan: "pro" })).json()).toEqual({ plan: "pro", planOverride: "pro" });
+    expect(await (await request("developer/plan", "plan-owner", "POST", { plan: null })).json()).toEqual({ plan: "pro" });
+    expect((await request("developer/plan", "plan-owner", "POST", { plan: "gold" })).status).toBe(400);
+    // A value left behind after the account leaves the developer list never changes the plan.
+    await bindings.DB.prepare("UPDATE accounts SET plan_override='free' WHERE id=?").bind(owner.id).run();
+    bindings.DEVELOPER_ACCOUNTS = "";
+    expect((await (await request("bootstrap", "plan-owner")).json() as any).account).toEqual(expect.not.objectContaining({ planOverride: expect.anything() }));
+    expect((await (await request("bootstrap", "plan-owner")).json() as any).account.plan).toBe("pro");
+  } finally { bindings.PRACTICE_GATE = gate; bindings.DEVELOPER_ACCOUNTS = developers; }
+});
 it("keeps the development reset owner-only, clears account data and returns settings to onboarding", async () => {
   const owner = await accountFor(bindings, "reset-owner");
   const other = await accountFor(bindings, "other-person");

@@ -1237,6 +1237,31 @@ final class PracticeUITests: XCTestCase {
     capture("Settings on Pro", app)
   }
 
+  func testDeveloperCanActAsFreeAndMeetThePaywall() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures", "--fixture-dashboard"]
+    app.launch()
+    XCTAssertTrue(app.buttons["Settings"].waitForExistence(timeout: 10))
+    app.buttons["Settings"].tap()
+    let picker = app.buttons["developerPlan"]
+    for _ in 0..<8 where !picker.isHittable { app.swipeUp() }
+    picker.tap()
+    app.buttons["Free"].tap()
+    capture("Developer acting as Free", app)
+    app.buttons["Done"].tap()
+    // Free with today's reps spent: Home waits, and See Pro opens the paywall.
+    XCTAssertTrue(app.descendants(matching: .any)["freeRepWaiting"].waitForExistence(timeout: 5))
+    app.buttons["seePro"].tap()
+    XCTAssertTrue(app.descendants(matching: .any)["paywall"].waitForExistence(timeout: 5))
+    app.buttons["paywallDismiss"].tap()
+    app.buttons["Settings"].tap()
+    for _ in 0..<8 where !picker.isHittable { app.swipeUp() }
+    picker.tap()
+    app.buttons["Pro"].tap()
+    app.buttons["Done"].tap()
+    XCTAssertTrue(app.buttons["prepareQuestion"].waitForExistence(timeout: 5), "Pro opens practice again")
+  }
+
   func testFreePlanShowsRepsLeftAndVoiceIntroInSettings() throws {
     let app = XCUIApplication()
     app.launchArguments = ["--fixtures", "--fixture-free-reps"]

@@ -262,6 +262,8 @@ struct Bootstrap: Codable, Sendable {
     var status: String
     /// "free" or "pro"; older servers omit it.
     var plan: String? = nil
+    /// Developer accounts only: the plan they've chosen to act as, ahead of billing.
+    var planOverride: String? = nil
   }
   struct Credential: Codable, Sendable { var suffix: String; var model: String? }
   var account: Account

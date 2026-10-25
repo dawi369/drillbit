@@ -41,12 +41,21 @@ const listed = (value: string | undefined, account: string) =>
  * with it on, Pro comes from a verified App Store entitlement or an environment allowlist.
  */
 export async function planFor(env: Env, account: string): Promise<Plan> {
+  const override = await planOverride(env, account);
+  if (override) return override;
   if (env.PRACTICE_GATE !== "true") return "pro";
   if (listed(env.PRACTICE_UNLIMITED_ACCOUNTS, account) || listed(env.VOICE_UNLIMITED_ACCOUNTS, account) || listed(env.DEVELOPER_ACCOUNTS, account)) return "pro";
   const row = await env.DB.prepare(
     "SELECT 1 FROM entitlements WHERE account_id=? AND status IN ('active','grace') AND (active_until IS NULL OR active_until>?) LIMIT 1",
   ).bind(account, timestamp()).first();
   return row ? "pro" : "free";
+}
+
+/** A developer's chosen plan, ahead of billing and the gate; nil for everyone else. */
+export async function planOverride(env: Env, account: string): Promise<Plan | undefined> {
+  if (!listed(env.DEVELOPER_ACCOUNTS, account)) return undefined;
+  const row = await env.DB.prepare("SELECT plan_override FROM accounts WHERE id=?").bind(account).first<{ plan_override: Plan | null }>();
+  return row?.plan_override ?? undefined;
 }
 
 export function nextUtcMidnight(now = timestamp()) {

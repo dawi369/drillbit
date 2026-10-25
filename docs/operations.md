@@ -289,3 +289,7 @@ Support: `SELECT * FROM entitlements WHERE account_id=?` shows the bound subscri
 The release build needs `API_BASE_URL` (production host), `CLERK_PUBLISHABLE_KEY` (`pk_live_…`) and `PRIVACY_POLICY_URL` set in `Config/Local.xcconfig`. Write URLs as `https:/$()/host/path`, since xcconfig reads `//` as a comment. Without `PRIVACY_POLICY_URL` the paywall and Settings show no privacy link, which App Review rejects for subscription apps.
 
 Subscriptions: group “Drillbit Pro” with `dawi.drillbit.pro.yearly` and `dawi.drillbit.pro.weekly`; give the weekly product an introductory offer of one week, pay as you go. Prices live only in App Store Connect; the paywall derives “Save N%” (yearly against 52 weeks of weekly, rounded down) and the first-week line from the products. `Config/Drillbit.storekit` holds placeholder prices for the simulator only.
+
+### Development: plan switch — 25 October 2026
+
+Migration `0015_plan_override.sql` was applied to `drillbit-development` after a private export at `.local/before-plan-override-20261025.sql` (mode 0600), and the development Worker redeployed. Developer accounts switch between Free, Pro and their billed plan from Settings → Developer → Act as. Production has no developer accounts, so the column is inert there; still apply the migration before deploying it.

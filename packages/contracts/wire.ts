@@ -144,6 +144,8 @@ const queuedNext=z.object({sourceId:z.string(),title:z.string(),conceptId:concep
 export const wire = {
   VoiceStart:voiceStartSchema, VoiceEvents:voiceEventsSchema, VoiceDelegate:voiceDelegateSchema,
   EntitlementInput: entitlementInputSchema,
+  DeveloperPlan: z.object({ plan: z.enum(["free", "pro"]).nullable() }),
+  DeveloperPlanResult: z.object({ plan: z.enum(["free", "pro"]), planOverride: z.enum(["free", "pro"]).optional() }),
   Entitlement: z.object({ plan: z.enum(["free", "pro"]), entitlement: z.object({ productId: z.string(), status: z.enum(["active", "grace", "expired", "revoked"]), activeUntil: z.string().nullable() }) }),
   AppleNotification: appleNotificationSchema,
   VoiceConnection:z.object({id:z.string(),sdp:z.string(),expiresAt:z.string(),sessionSeconds:z.number().int().optional()}),
@@ -194,7 +196,7 @@ export const wire = {
   Credential: z.object({ suffix: z.string(), model: z.string() }),
   Bootstrap: z.object({
     practiceEpoch:z.string().optional(),
-    account: z.object({ id: z.string(), status: z.string(), plan: z.enum(["free", "pro"]).optional() }),
+    account: z.object({ id: z.string(), status: z.string(), plan: z.enum(["free", "pro"]).optional(), planOverride: z.enum(["free", "pro"]).optional() }),
     settings: settingsSchema,
     todayPlan: todayPlan.optional(),
     queuedNext: queuedNext.nullable().optional(),

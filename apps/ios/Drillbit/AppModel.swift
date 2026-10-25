@@ -719,6 +719,27 @@ import WidgetKit
     }
   }
   enum PlanPreview: String, CaseIterable, Identifiable { case live, freeReps, freeSpent; var id: String { rawValue } }
+  /// Developer accounts act as Free or Pro on the server, so gates, voice limits and the paywall behave for real.
+  /// nil goes back to the billed plan. Fixture runs have no server and preview it locally instead.
+  func setDeveloperPlan(_ plan: String?) async {
+    if fixture {
+      switch plan {
+      case "free": previewPlan(.freeSpent)
+      case "pro":
+        bootstrap?.account.plan = "pro"
+        bootstrap?.practice = PracticeAccess(plan: "pro", freeReps: false, available: true)
+      default: previewPlan(.live)
+      }
+      bootstrap?.account.planOverride = plan
+      return
+    }
+    await perform {
+      struct Result: Decodable { var plan: String }
+      // Encodes `"plan": null` explicitly: the endpoint clears the override only on an explicit null.
+      let _: Result = try await api.send("developer/plan", method: "POST", body: DeveloperPlanInput(plan: plan))
+      await refresh()
+    }
+  }
   private var checkingDailyQuestion = false
   private var automaticPreparationAccounts: Set<String> = []
   func ensureHomeQuestion() async {
@@ -1435,4 +1456,14 @@ import WidgetKit
     }
     #endif
   }
+}
+
+/// `plan: null` must reach the server as null, not be dropped, so it clears the override.
+private struct DeveloperPlanInput: Encodable {
+  var plan: String?
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(plan, forKey: .plan)
+  }
+  enum CodingKeys: String, CodingKey { case plan }
 }
