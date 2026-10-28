@@ -13,6 +13,12 @@ device="${1:-$(xcrun devicectl list devices 2>/dev/null | awk '/physical/ && /av
 derived=/tmp/drillbit-device
 log=/tmp/drillbit-device.log
 
+# codesign needs the login keychain unlocked in this session (it isn't over SSH or screen sharing).
+keychain="$HOME/Library/Keychains/login.keychain-db"
+if ! security show-keychain-info "$keychain" >/dev/null 2>&1; then
+  echo "Unlocking your login keychain so codesign can sign (macOS asks for your Mac password)…"
+  security unlock-keychain "$keychain"
+fi
 xcodegen generate --spec "$root/apps/ios/project.yml" >/dev/null
 echo "Building Release for ${device}…"
 xcodebuild -project "$root/apps/ios/Drillbit.xcodeproj" -scheme Drillbit -configuration Release \
