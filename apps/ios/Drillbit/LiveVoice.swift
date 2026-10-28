@@ -43,6 +43,10 @@ private struct VoiceOutbox: Codable {
   static let idleLimit: TimeInterval = 180
   /// The last thirty seconds before a quiet session ends.
   var idleWarning = false
+  /// Unmuted for a while and the microphone has picked up nothing: wrong input, a muted Mac or no permission.
+  var hearsNothing = false
+  private var unmutedAt: Date?
+  private var heardInput = false
   private var lastActivity = Date()
   private var idleWatch: Task<Void,Never>?
   var isOpen: Bool { phase != .idle }
@@ -200,6 +204,9 @@ private struct VoiceOutbox: Codable {
     guard phase == .active else { return }
     muted.toggle()
     markActivity()
+    unmutedAt = muted ? nil : .now
+    heardInput = false
+    hearsNothing = false
     transport?.mute(muted)
     transport?.send(["type": muted ? "session.input_audio.mute" : "session.input_audio.unmute", "event_id":UUID().uuidString])
   }
@@ -218,6 +225,9 @@ private struct VoiceOutbox: Codable {
         guard !Task.isCancelled, self.generation == epoch else { break }
         self.levels.input = self.muted ? 0 : Self.perceptual(sample.input)
         self.levels.output = Self.perceptual(sample.output)
+        if !self.muted, self.levels.input > 0.08 { self.heardInput = true }
+        let silent = !self.muted && !self.heardInput && self.unmutedAt.map { Date().timeIntervalSince($0) > 8 } == true
+        if silent != self.hearsNothing { self.hearsNothing = silent }
         try? await Task.sleep(for: .milliseconds(80))
       }
       self?.levels.reset()
@@ -235,7 +245,7 @@ private struct VoiceOutbox: Codable {
   }
   func end() async {
     guard isOpen, phase != .ending else { return }
-    idleWatch?.cancel(); idleWarning = false
+    idleWatch?.cancel(); idleWarning = false; hearsNothing = false; unmutedAt = nil
     let wasConnecting = phase == .connecting
     phase = .ending
     if wasConnecting { generation = UUID() }

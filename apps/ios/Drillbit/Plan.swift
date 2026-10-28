@@ -96,6 +96,17 @@ private struct EntitlementReceipt: Decodable { var plan: String }
     return top
   }
 
+  /// Asks the App Store for this Apple Account's purchases; true (and the paywall closes) when Pro came back.
+  func restore() async -> Bool {
+    try? await AppStore.sync()
+    for await result in Transaction.currentEntitlements {
+      if case .verified(let transaction) = result, Self.productIDs.contains(transaction.productID) {
+        await purchased()
+        return true
+      }
+    }
+    return false
+  }
   /// The native sheet reports a finished purchase or restore here.
   func purchased() async {
     closePaywall()
@@ -192,7 +203,8 @@ struct NativePaywallSheet: View {
     }
     .subscriptionStoreControlStyle(PlanPicker())
     .containerBackground(for: .subscriptionStoreFullHeight) { PaywallBackdrop() }
-    .storeButton(.visible, for: .restorePurchases)
+    // Restore is ours, styled like the rest of the app and sitting right under Subscribe.
+    .storeButton(.hidden, for: .restorePurchases)
     .storeButton(.visible, for: .policies)
     // One way out: Not now, which also drops the feature waiting behind the paywall.
     .storeButton(.hidden, for: .cancellation)
@@ -261,9 +273,10 @@ private struct PaywallHeader: View {
           }
         }
       }
-      .frame(maxWidth: 320)
+      // Left-aligned with the plan cards' checkmarks below, not floating centred.
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .padding(.horizontal, 24)
+    .padding(.horizontal, 16)
     .frame(maxWidth: 520)
     .onAppear {
       guard !reduceMotion else { return }
@@ -316,9 +329,69 @@ private struct PlanPickerBody: View {
       PlanOptionLabel(product: option.subscription, offer: option.activeOffer, weekly: weekly,
                       selected: option.subscription.id == selection?.subscription.id)
     } confirmation: { option in
-      SubscriptionStoreButton(option)
+      PaywallCheckout(option: option)
     }
     .onAppear { if selection == nil { selection = configuration.options.first } }
+  }
+}
+
+/// The plan's terms, then Subscribe and Restore in the app's own button styles. The terms say what renews and
+/// when, which App Review requires next to the purchase button.
+private struct PaywallCheckout: View {
+  let option: SubscriptionStoreControlStyleConfiguration.Option
+  @Environment(\.purchase) private var purchase
+  @State private var working = false
+  @State private var note: String?
+  private var product: StoreKit.Product { option.subscription }
+  private var yearly: Bool { product.subscription?.subscriptionPeriod.unit == .year }
+  private var intro: StoreKit.Product.SubscriptionOffer? {
+    guard let offer = option.activeOffer, offer.paymentMode != .freeTrial else { return nil }
+    return offer
+  }
+  private var terms: String {
+    let period = yearly ? "a year" : "a week"
+    if let intro { return "\(intro.displayPrice) for your first week, then \(product.displayPrice) \(period). Renews until you cancel." }
+    return "\(product.displayPrice) \(period), renews until you cancel. Cancel any time in Settings."
+  }
+  var body: some View {
+    VStack(spacing: 12) {
+      Text(terms).font(.footnote).foregroundStyle(AppPalette.secondary)
+        .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+        .padding(.bottom, 4)
+        .accessibilityIdentifier("paywallTerms")
+      Button { buy() } label: {
+        HStack(spacing: 8) {
+          if working { ProgressView().controlSize(.small).tint(AppPalette.actionInk) }
+          Text(intro.map { "Start for \($0.displayPrice)" } ?? "Subscribe")
+        }
+      }
+      .buttonStyle(PracticeButtonStyle()).disabled(working)
+      .accessibilityIdentifier("paywallSubscribe")
+      Button("Restore purchases") { restore() }
+        .buttonStyle(PracticeButtonStyle(secondary: true)).disabled(working)
+        .accessibilityIdentifier("paywallRestore")
+      if let note { Text(note).font(.footnote).foregroundStyle(AppPalette.secondary).multilineTextAlignment(.center) }
+    }
+    .animation(DrillbitMotion.fast, value: note)
+  }
+  private func buy() {
+    working = true; note = nil
+    Task {
+      defer { working = false }
+      do {
+        if case .success(let verification) = try await purchase(product) {
+          if case .verified(let transaction) = verification { await transaction.finish() }
+          await PlanCoordinator.shared.purchased()
+        }
+      } catch { note = "That didn’t go through. You haven’t been charged." }
+    }
+  }
+  private func restore() {
+    working = true; note = nil
+    Task {
+      defer { working = false }
+      if await !PlanCoordinator.shared.restore() { note = "No Pro subscription on this Apple Account." }
+    }
   }
 }
 

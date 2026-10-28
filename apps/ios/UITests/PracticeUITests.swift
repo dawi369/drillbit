@@ -1333,8 +1333,17 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(option("Try a week for $1.99, then $7.99 a week").exists)
     // What App Review checks on a subscription paywall: terms, renewal terms, restore and a way out.
     XCTAssertTrue(option("Terms of Service").exists)
-    XCTAssertTrue(option("auto-renews").exists)
-    XCTAssertTrue(option("Restore").exists)
+    XCTAssertTrue(option("renews until you cancel").exists)
+    XCTAssertTrue(app.buttons["paywallRestore"].exists)
+    XCTAssertTrue(app.buttons["paywallSubscribe"].exists)
+    // The terms sit above Subscribe with room to breathe, and Restore sits right under it.
+    let terms = app.descendants(matching: .any)["paywallTerms"], subscribe = app.buttons["paywallSubscribe"], restore = app.buttons["paywallRestore"]
+    XCTAssertGreaterThanOrEqual(subscribe.frame.minY - terms.frame.maxY, 12)
+    XCTAssertLessThanOrEqual(restore.frame.minY - subscribe.frame.maxY, 16)
+    // Choosing weekly turns Subscribe into the intro offer.
+    app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "Weekly")).firstMatch.tap()
+    XCTAssertTrue(app.buttons["Start for $1.99"].waitForExistence(timeout: 3))
+    XCTAssertTrue(option("$1.99 for your first week, then $7.99 a week").exists)
     XCTAssertTrue(app.buttons["paywallDismiss"].isHittable)
     capture("Paywall from the rep gate", app)
     app.buttons["paywallDismiss"].tap()
