@@ -147,7 +147,7 @@ Don't provide a demo account unless review asks for one: Sign in with Apple crea
 
 ## 7. Physical-device acceptance (you, about 45 minutes; required before submitting)
 
-Install the production TestFlight build on an iPhone signed into a **Sandbox** Apple ID (Settings → Developer → Sandbox Apple Account) and go through:
+Install the production build on an iPhone signed into a **Sandbox** Apple ID (Settings → Developer → Sandbox Apple Account): either from TestFlight, or straight from the Mac with `scripts/install-ios-device.sh`, run from the Mac's own Terminal. Then go through:
 
 - [ ] Fresh install → intro → setup → AI consent → Sign in with Apple → first question generated
 - [ ] Only Sign in with Apple is offered (Google and GitHub come back once production OAuth apps exist in Clerk)
