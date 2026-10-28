@@ -132,8 +132,8 @@ struct SetupView: View {
 
   private func bitMood(page: Int) -> BitMood {
     switch page {
-    case 0: coordinator.draft.taste == nil ? .thinking : .content
-    case Self.pageCount - 1: .happy
+    case 0: coordinator.draft.taste == nil ? .thinking : .idle
+    case Self.pageCount - 1: .idle
     default: .idle
     }
   }

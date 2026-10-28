@@ -248,7 +248,7 @@ private struct PaywallHeader: View {
           .frame(width: 128, height: 128)
           .scaleEffect(glow ? 1.08 : 0.94)
           .accessibilityHidden(true)
-        BitView(mood: .happy, greets: true).frame(width: 52, height: 60).accessibilityHidden(true)
+        BitView(greets: true).frame(width: 52, height: 60).accessibilityHidden(true)
       }
       .frame(height: 80)
       VStack(spacing: 4) {

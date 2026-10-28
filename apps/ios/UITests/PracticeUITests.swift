@@ -53,6 +53,37 @@ final class PracticeUITests: XCTestCase {
     capture("Recall caught up", app)
   }
 
+  func testLibraryIsSimpleForCustomers() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures", "--fixture-dashboard", "--fixture-customer"]
+    app.launch()
+    XCTAssertTrue(app.tabBars.buttons["Library"].waitForExistence(timeout: 10))
+    app.tabBars.buttons["Library"].tap()
+    let question = app.buttons["library-question-library-completed"]
+    XCTAssertTrue(question.waitForExistence(timeout: 10))
+    XCTAssertFalse(app.buttons["Practice evidence"].exists)
+    question.tap()
+    XCTAssertTrue(app.buttons["practiseQuestion"].waitForExistence(timeout: 5))
+    XCTAssertFalse(app.buttons["Practise this concept"].exists)
+    capture("Library question for customers", app)
+    let attempt = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Finished")).firstMatch
+    for _ in 0..<6 where !attempt.isHittable { app.swipeUp() }
+    attempt.tap()
+    XCTAssertTrue(app.navigationBars["Attempt"].waitForExistence(timeout: 5))
+    XCTAssertFalse(app.staticTexts["No explicit help recorded"].exists)
+    XCTAssertFalse(app.staticTexts["Practised with help"].exists)
+    capture("Attempt for customers", app)
+    // Delete asks in the alert style, centred, not as a popover pointing somewhere odd.
+    app.buttons["deleteAttempt"].tap()
+    let dialog = app.descendants(matching: .any)["confirmDialog"]
+    XCTAssertTrue(dialog.waitForExistence(timeout: 3))
+    XCTAssertTrue(app.staticTexts["Delete this attempt?"].exists)
+    capture("Delete attempt", app)
+    dialog.buttons["Cancel"].tap()
+    XCTAssertTrue(dialog.waitForNonExistence(timeout: 3))
+    XCTAssertTrue(app.navigationBars["Attempt"].exists)
+  }
+
   func testHomeTicketResumesAndOffersActions() throws {
     let app = XCUIApplication()
     app.launchArguments = ["--fixtures", "--fixture-home-rich", "--fixture-interview-history"]
@@ -299,7 +330,10 @@ final class PracticeUITests: XCTestCase {
     // Talk connects straight away; the free allowance sits under the live mic.
     XCTAssertTrue(app.buttons["voiceMute"].waitForExistence(timeout:5))
     XCTAssertFalse(app.buttons["voiceStart"].exists)
-    XCTAssertEqual(app.descendants(matching: .any)["voiceAllowance"].label, "2 of 3 free voice sessions left.")
+    let allowance = app.descendants(matching: .any)["voiceAllowance"]
+    XCTAssertEqual(allowance.label, "2 of 3 free voice sessions left.")
+    // It says its piece, then gets out of the way.
+    XCTAssertTrue(allowance.waitForNonExistence(timeout: 6))
     // Live: Transcript, Mute and End sit in one dock; the keyboard waits in the toolbar.
     XCTAssertTrue(app.buttons["voiceEnd"].exists)
     XCTAssertFalse(app.buttons["voiceBack"].exists, "Live, End is the only way back; the keyboard key sits beside Start")
@@ -460,9 +494,11 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(question.exists)
     capture("Question library", app)
     question.tap()
-    for _ in 0..<10 where !app.buttons["Try again"].isHittable { app.swipeUp() }
-    XCTAssertTrue(app.buttons["Try again"].waitForExistence(timeout: 5))
-    app.buttons["Try again"].tap()
+    // The question itself, one way to practise it again, and nothing about pools or evidence for customers.
+    XCTAssertFalse(app.staticTexts["Original question"].exists)
+    for _ in 0..<10 where !app.buttons["Practise again"].isHittable { app.swipeUp() }
+    XCTAssertTrue(app.buttons["Practise again"].waitForExistence(timeout: 5))
+    app.buttons["Practise again"].tap()
     XCTAssertTrue(app.navigationBars["Question preview"].waitForExistence(timeout: 5))
     app.buttons["Close"].tap()
     app.navigationBars.buttons.element(boundBy: 0).tap()
@@ -470,10 +506,10 @@ final class PracticeUITests: XCTestCase {
     app.buttons["Skipped questions"].tap()
     let skipped = app.buttons["library-question-library-skipped"]
     XCTAssertTrue(skipped.waitForExistence(timeout: 5)); skipped.tap()
-    for _ in 0..<10 where !app.buttons["Add back to pool"].isHittable { app.swipeUp() }
-    XCTAssertTrue(app.buttons["Add back to pool"].waitForExistence(timeout: 5))
-    app.buttons["Add back to pool"].tap()
-    XCTAssertTrue(app.staticTexts["Available in your question pool"].waitForExistence(timeout: 5))
+    for _ in 0..<10 where !app.buttons["Add back to your questions"].isHittable { app.swipeUp() }
+    XCTAssertTrue(app.buttons["Add back to your questions"].waitForExistence(timeout: 5))
+    app.buttons["Add back to your questions"].tap()
+    XCTAssertTrue(app.buttons["Add back to your questions"].waitForNonExistence(timeout: 5))
     capture("Restored skipped question", app)
     for _ in 0..<10 where !app.buttons["Practise now"].isHittable { app.swipeDown() }
     app.buttons["Practise now"].tap()

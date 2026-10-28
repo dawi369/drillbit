@@ -80,56 +80,63 @@ struct SessionDetailView: View {
   @Environment(\.dismiss) private var dismiss
   var body: some View {
     let challenge = current ?? initial
+    let developer = model.bootstrap?.capabilities?.developerTools == true
     ScrollView {
       VStack(alignment: .leading, spacing: 24) {
         VStack(alignment: .leading, spacing: 8) {
           Text(challenge.title).font(.title.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
             .accessibilityAddTraits(.isHeader)
-          let date = challenge.completedAt.flatMap { Date.fromAPI($0) }?.formatted(date: .abbreviated, time: .shortened)
-          DrillbitMetadata(text: [challenge.levelLabel, date].compactMap { $0 }.joined(separator: " · "))
+          let date = (challenge.completedAt ?? challenge.createdAt).flatMap { Date.fromAPI($0) }?.formatted(date: .abbreviated, time: .shortened)
+          DrillbitMetadata(text: [date, challenge.levelLabel == "Level not recorded" ? nil : challenge.levelLabel].compactMap { $0 }.joined(separator: " · "))
         }
         Text(QuestionMarkup.plain(challenge.prompt)).foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
         if let interview = challenge.interview, !interview.turns.isEmpty {
-          NavigationLink("Interview conversation") { InterviewConversation(state: interview) }
+          NavigationLink { InterviewConversation(state: interview) } label: {
+            Label("Read the conversation", systemImage: "text.bubble")
+              .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+              .contentShape(Rectangle())
+          }
+          .accessibilityIdentifier("attemptConversation")
         }
         if let answer = challenge.session?.answer, !answer.isEmpty {
-          Text("Your answer").font(.headline)
-          Text(answer).textSelection(.enabled)
+          VStack(alignment: .leading, spacing: 8) {
+            Text("Your answer").font(.headline)
+            Text(answer).textSelection(.enabled)
+          }
         }
-        if let reflection = challenge.reflection {
-          ReflectionContent(reflection: reflection)
-          AssistanceSummary(challenge: challenge)
-          Button("Practise this next") { preparing = true }.buttonStyle(PracticeButtonStyle())
-        } else if challenge.lifecycle == "completed" {
-          AssistanceSummary(challenge: challenge)
-          Text("Feedback is pending. You can retry failed feedback from Home.").foregroundStyle(
-            .secondary)
+        if challenge.lifecycle == "completed" {
+          Button("Practise again") { preparing = true }.buttonStyle(PracticeButtonStyle())
+            .accessibilityIdentifier("practiseAgain")
         }
-        if let help = challenge.help, help.contains(where: { $0.body != nil }) {
-          DisclosureGroup("Help history") {
-            VStack(alignment: .leading, spacing: 16) {
-              ForEach(help.filter { $0.body != nil }) { item in
-                Text(item.title).font(.headline)
-                Text(item.body ?? "").textSelection(.enabled)
-                if let draft = item.suggestedAnswer { Text(draft).textSelection(.enabled) }
+        // Feedback and the help trail are still being shaped; developers see them, customers get the attempt itself.
+        if developer {
+          if let reflection = challenge.reflection { ReflectionContent(reflection: reflection) }
+          AssistanceSummary(challenge: challenge)
+          if let help = challenge.help, help.contains(where: { $0.body != nil }) {
+            DisclosureGroup("Help history") {
+              VStack(alignment: .leading, spacing: 16) {
+                ForEach(help.filter { $0.body != nil }) { item in
+                  Text(item.title).font(.headline)
+                  Text(item.body ?? "").textSelection(.enabled)
+                  if let draft = item.suggestedAnswer { Text(draft).textSelection(.enabled) }
+                }
               }
             }
           }
-        }
-        if let turns = challenge.turns, !turns.isEmpty {
-          DisclosureGroup("Assistance used") {
-            ForEach(turns) { turn in
-              Text(turn.text).frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 8)
+          if let turns = challenge.turns, !turns.isEmpty {
+            DisclosureGroup("Assistance used") {
+              ForEach(turns) { turn in
+                Text(turn.text).frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 8)
+              }
             }
           }
-        }
-        if challenge.example != nil {
-          NavigationLink("Example answer viewed") {
-            ExampleView(model: model, challenge: challenge)
+          if challenge.example != nil {
+            NavigationLink("Example answer viewed") { ExampleView(model: model, challenge: challenge) }
           }
         }
       }.padding(24)
-    }.background(AppPalette.background).navigationTitle("Session").navigationBarTitleDisplayMode(.inline)
+    }.background(AppPalette.background).navigationTitle("Attempt").navigationBarTitleDisplayMode(.inline)
       .sheet(isPresented: $preparing, onDismiss: { if let started { model.presented = started; self.started = nil } }) {
         QuestionFlow(model: model, source: challenge, onStart: { started = $0 })
       }
@@ -138,20 +145,21 @@ struct SessionDetailView: View {
           ShareLink(item: answer) { Label("Share answer", systemImage: "square.and.arrow.up") }
         }
         Button("Delete", systemImage: AppIcon.delete.rawValue, role: .destructive) { deleting = true }
+          .accessibilityIdentifier("deleteAttempt")
       }
-      .confirmationDialog("Delete this session and its learning evidence?", isPresented: $deleting)
-    {
-      Button("Delete session", role: .destructive) {
-        Task {
-          await model.perform {
-            let _: EmptyResponse = try await model.api.send(
-              "challenges/" + challenge.id, method: "DELETE")
-            try await model.refreshAfterSessionDeletion()
-            dismiss()
+      .drillbitConfirm("Delete this attempt?", isPresented: $deleting,
+                       message: "It comes out of your Library and Recall for good. There’s no undo.", actions: [
+        ConfirmAction("Delete", style: .destructive) {
+          Task {
+            await model.perform {
+              let _: EmptyResponse = try await model.api.send("challenges/" + challenge.id, method: "DELETE")
+              try await model.refreshAfterSessionDeletion()
+              dismiss()
+            }
           }
-        }
-      }
-    }
+        },
+        ConfirmAction("Cancel"),
+      ])
       .task {
         guard !model.fixture, current?.session == nil, initial.session == nil else { return }
         await model.perform { current = try await model.api.send("challenges/" + initial.id) }
@@ -214,7 +222,8 @@ struct LibraryView: View {
   private var identity: String { Self.cacheIdentity(search: search, tags: tags, level: level, days: days, skipped: skipped) }
   var body: some View {
     SignalList {
-      if !skipped { NavigationLink("Practice evidence") { PracticeEvidenceView(model: model) } }
+      // Evidence is still being shaped; the Library is just your questions for everyone else.
+      if !skipped, model.bootstrap?.capabilities?.developerTools == true { NavigationLink("Practice evidence") { PracticeEvidenceView(model: model) } }
       if tags.count == 1, let id = tags.first, let value = coverage.first(where: { $0.conceptId == id }) {
         Section {
           LabeledContent("Completed attempts", value: String(value.completedAttempts))
@@ -348,34 +357,47 @@ struct LibraryQuestionView: View {
   }
   private var question: LibraryQuestion { detail?.question ?? initial }
   var body: some View {
+    let developer = model.bootstrap?.capabilities?.developerTools == true
+    let concepts = question.conceptIds.compactMap { id in model.taxonomy.first { $0.id == id }?.label }
     SignalList {
       Section {
-        Text(question.title).font(.title2.weight(.semibold))
-        DisclosureGroup("Original question") { QuestionBody(markup: question.prompt).textSelection(.enabled) }
-      }
-      Section {
-        ForEach(question.conceptIds, id: \.self) { id in
-          NavigationLink(model.taxonomy.first { $0.id == id }?.label ?? id) { LibraryView(model: model, initialConcept: id) }
+        VStack(alignment: .leading, spacing: 8) {
+          Text(question.title).font(.title2.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
+            .accessibilityAddTraits(.isHeader)
+          DrillbitMetadata(text: ([question.levelLabel] + concepts.prefix(2)).joined(separator: " · "))
         }
-      } header: { Text("Concepts") }
-      Section {
-        Button((detail?.attempts.contains { $0.lifecycle == "completed" } ?? false) ? "Try again" : "Practise now") { preview = true }
-        Button("Practise this concept") { preparing = true }
-        if question.eligible { Text("Available in your question pool").foregroundStyle(.secondary) }
-        else if detail?.attempts.contains(where: { $0.lifecycle == "skipped" }) == true {
-          Button("Add back to pool") { Task { busy = true; defer { busy = false }; do { try await model.queueEligibility(question, eligible: true); if let account = model.bootstrap?.account.id { detail = model.libraryDetailSnapshots["library-detail:" + account + ":" + initial.id] ?? detail } } catch { failure = error.localizedDescription } } }.disabled(busy)
+        QuestionBody(markup: question.prompt).textSelection(.enabled)
+        Button((detail?.attempts.contains { $0.lifecycle == "completed" } ?? false) ? "Practise again" : "Practise now") { preview = true }
+          .buttonStyle(PracticeButtonStyle())
+          .listRowSeparator(.hidden)
+          .accessibilityIdentifier("practiseQuestion")
+        if !question.eligible, detail?.attempts.contains(where: { $0.lifecycle == "skipped" }) == true {
+          Button("Add back to your questions") { Task { busy = true; defer { busy = false }; do { try await model.queueEligibility(question, eligible: true); if let account = model.bootstrap?.account.id { detail = model.libraryDetailSnapshots["library-detail:" + account + ":" + initial.id] ?? detail } } catch { failure = error.localizedDescription } } }.disabled(busy)
         }
       }
-      Section("Attempts") {
-        ForEach(detail?.attempts ?? []) { attempt in
-          NavigationLink { SessionDetailView(model: model, initial: attempt) } label: {
-            VStack(alignment: .leading, spacing: 4) {
-              Text(attempt.lifecycle == "completed" ? "Completed" : attempt.lifecycle == "skipped" ? "Skipped" : "In progress")
-              if let date = (attempt.completedAt ?? attempt.createdAt).flatMap({ Date.fromAPI($0) }) { Text(date.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary) }
+      if developer {
+        Section("Developer") {
+          ForEach(question.conceptIds, id: \.self) { id in
+            NavigationLink(model.taxonomy.first { $0.id == id }?.label ?? id) { LibraryView(model: model, initialConcept: id) }
+          }
+          Button("Practise this concept") { preparing = true }
+          Text(question.eligible ? "In your question pool" : "Out of your question pool").foregroundStyle(.secondary)
+        }
+      }
+      if let attempts = detail?.attempts, !attempts.isEmpty {
+        Section("Your attempts") {
+          ForEach(attempts) { attempt in
+            NavigationLink { SessionDetailView(model: model, initial: attempt) } label: {
+              let date = (attempt.completedAt ?? attempt.createdAt).flatMap({ Date.fromAPI($0) })?.formatted(date: .abbreviated, time: .shortened)
+              VStack(alignment: .leading, spacing: 4) {
+                Text(date ?? "Attempt")
+                Text(attempt.lifecycle == "completed" ? "Finished" : attempt.lifecycle == "skipped" ? "Skipped" : "In progress")
+                  .font(.caption).foregroundStyle(.secondary)
+              }
             }
           }
+          if detail?.nextCursor != nil { Button("Earlier attempts") { Task { await load(more: true) } } }
         }
-        if detail?.nextCursor != nil { Button("Earlier attempts") { Task { await load(more: true) } } }
       }
       if let failure { Text(failure).foregroundStyle(.secondary); Button("Refresh") { Task { await load() } } }
     }.navigationTitle("Question").navigationBarTitleDisplayMode(.inline)

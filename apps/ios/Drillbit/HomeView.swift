@@ -68,7 +68,6 @@ struct HomeView: View {
           todayTicket
             .id(todayState)
             .transition(.opacity.combined(with: .offset(y: reduceMotion ? 0 : 8)))
-          afterTicket
         }
         .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: todayState)
         .onChange(of: model.preparingDraft) { old, new in
@@ -176,7 +175,7 @@ struct HomeView: View {
     switch today {
     case .preparing: .drilling
     case .failed: .concerned
-    case .done: .content
+    case .done: .idle
     default: .idle
     }
   }
@@ -346,53 +345,52 @@ struct HomeView: View {
     let line = (evidence.first { $0.signal == "demonstrated" } ?? evidence.first)?.quote
     let guided = (session.reflection?.guidanceMode ?? session.guidanceMode) == .learnTogether
     let time = session.completedAt.flatMap(Date.fromAPI)?.formatted(date: .omitted, time: .shortened) ?? ""
-    return NavigationLink { SessionDetailView(model: model, initial: session) } label: {
-      Ticket {
+    let takeaway = session.reflection?.takeaway ?? "Open it to see how it went."
+    let next = model.nextFreeRep
+    // The ticket opens today's attempt; its stub carries the next move, so nothing hangs underneath.
+    return Ticket {
+      NavigationLink { SessionDetailView(model: model, initial: session) } label: {
         VStack(alignment: .leading, spacing: 8) {
           TicketHeader(number: session.ticketLabel(next: nil), detail: "Done \(time)")
           Text(session.title).font(.title3.weight(.semibold)).foregroundStyle(AppPalette.secondary)
+            .multilineTextAlignment(.leading)
         }
-      } stub: {
-        VStack(alignment: .leading, spacing: 8) {
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(TicketPressStyle())
+      .accessibilityLabel("\(session.title). \(line ?? takeaway)")
+      .accessibilityIdentifier("todayDone")
+    } stub: {
+      HStack(alignment: .center, spacing: 12) {
+        VStack(alignment: .leading, spacing: 4) {
           if let line, !guided {
             // The underline already marks it as the person's own words.
-            YourLine(quote: line, font: .title3.weight(.medium))
+            YourLine(quote: line, font: .body.weight(.medium))
           } else {
             Text(guided ? "Worked out together" : "One thing to carry forward").font(.subheadline.weight(.medium)).foregroundStyle(AppPalette.secondary)
-            Text(session.reflection?.takeaway ?? "Open it to see how it went.").font(.body)
+            Text(takeaway).font(.body).fixedSize(horizontal: false, vertical: true)
+          }
+          if let next {
+            Text(AppModel.freeRepLine(next)).font(.footnote).foregroundStyle(AppPalette.secondary)
               .fixedSize(horizontal: false, vertical: true)
+              .accessibilityIdentifier("freeRepNotice")
           }
         }
-      }
-      .contentShape(Rectangle())
-    }
-    .buttonStyle(TicketPressStyle())
-    .accessibilityIdentifier("todayDone")
-  }
-
-  @ViewBuilder private var afterTicket: some View {
-    if case .done = today {
-      VStack(alignment: .leading, spacing: 4) {
-        Text(tomorrowLine).font(.subheadline).foregroundStyle(AppPalette.secondary)
-          .fixedSize(horizontal: false, vertical: true)
-        if let next = model.nextFreeRep {
-          ProNudge(message: AppModel.freeRepLine(next), placement: .practiceRep) { await model.refresh() }
-            .accessibilityIdentifier("freeRepNotice")
+        Spacer(minLength: 8)
+        if next != nil {
+          Button { PlanCoordinator.shared.register(.practiceRep) { await model.refresh() } } label: { StubPill(label: "See Pro") }
+            .buttonStyle(TicketPressStyle())
+            .accessibilityLabel("See Pro")
+            .accessibilityIdentifier("seePro")
         } else {
-          Button("One more?") { flow = QuestionFlowEntry() }
-            .font(.subheadline.weight(.semibold)).frame(minHeight: 44)
+          Button { flow = QuestionFlowEntry() } label: { StubPill(label: "One more") }
+            .buttonStyle(TicketPressStyle())
+            .accessibilityLabel("One more question")
             .accessibilityIdentifier("oneMore")
         }
       }
-      .padding(.horizontal, 4)
-    } else if case .question = today, let queued = model.bootstrap?.queuedNext {
-      Text("Tomorrow: \(queued.label ?? queued.title), picked from your last answer.")
-        .font(.subheadline).foregroundStyle(AppPalette.secondary).padding(.horizontal, 4)
     }
-  }
-  private var tomorrowLine: String {
-    guard let queued = model.bootstrap?.queuedNext else { return "Next one’s picked when you open the app tomorrow." }
-    return "Tomorrow: \(queued.label ?? queued.title), picked from today’s answer."
   }
 
   private func recallRow(_ plan: TodayPlan) -> some View {

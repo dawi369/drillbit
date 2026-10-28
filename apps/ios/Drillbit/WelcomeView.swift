@@ -225,7 +225,7 @@ private struct SeparatorSlide: View {
   /// Bit shows up with the pitch, cheers, and takes you through.
   private var pitch: some View {
     HStack(alignment: .center, spacing: 16) {
-      BitView(mood: .content, greets: true, cheers: cheers)
+      BitView(greets: true, cheers: cheers)
         .frame(width: 72, height: 80)
         .background { BitGlow(color: AppPalette.action, opacity: 0.2).scaleEffect(1.7) }
       Text("Drillbit is the complete package for that round.")
@@ -296,7 +296,7 @@ struct SignInView: View {
     GeometryReader { geometry in
       ScrollView {
         VStack(spacing: 16) {
-          BitView(mood: .content).frame(width: 76, height: 84).signalEntrance(0)
+          BitView().frame(width: 76, height: 84).signalEntrance(0)
           VStack(spacing: 8) {
             Text(inviting ? "One last step." : "Your question’s ready.")
               .font(.title2.weight(.semibold))
@@ -416,7 +416,7 @@ struct AIConsentGate: View {
     GeometryReader { geometry in
       ScrollView {
         VStack(spacing: 16) {
-          BitView(mood: .content).frame(width: 76, height: 84).signalEntrance(0)
+          BitView().frame(width: 76, height: 84).signalEntrance(0)
           VStack(spacing: 8) {
             Text("One quick thing.").font(.title2.weight(.semibold))
             Text("Then you’re back to practice.").font(.subheadline).foregroundStyle(AppPalette.secondary)

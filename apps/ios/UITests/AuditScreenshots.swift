@@ -515,7 +515,7 @@ final class AuditScreenshots: XCTestCase {
     Thread.sleep(forTimeInterval: 1.5)
     shot("e19-home-done", app)
     app.buttons["todayDone"].tap()
-    XCTAssertTrue(app.navigationBars["Session"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.navigationBars["Attempt"].waitForExistence(timeout: 5))
     Thread.sleep(forTimeInterval: 0.8)
     shot("e20-session-detail", app)
     app.swipeUp()
@@ -714,15 +714,15 @@ final class AuditScreenshots: XCTestCase {
     XCTAssertTrue(app.buttons["Practise this concept"].waitForExistence(timeout: 5))
     Thread.sleep(forTimeInterval: 0.6)
     shot("i06-library-question", app)
-    let attempt = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Completed")).firstMatch
+    let attempt = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Finished")).firstMatch
     XCTAssertTrue(attempt.waitForExistence(timeout: 3))
     attempt.tap()
-    XCTAssertTrue(app.navigationBars["Session"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.navigationBars["Attempt"].waitForExistence(timeout: 5))
     Thread.sleep(forTimeInterval: 0.8)
     shot("i07-completed-session", app)
     app.swipeUp()
     shot("i08-completed-session-end", app)
-    let next = app.buttons["Practise this next"]
+    let next = app.buttons["practiseAgain"]
     for _ in 0..<4 where !next.isHittable { app.swipeUp() }
     next.tap()
     XCTAssertTrue(app.buttons["submitPreparation"].waitForExistence(timeout: 5))

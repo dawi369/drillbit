@@ -21,6 +21,7 @@ struct InterviewVoiceRoom<Question: View>: View {
   var coachReturnsToText = true
   var dismissCoach: (CoachMark) -> Void = { _ in }
   @State private var warned = false
+  @State private var allowanceFaded = false
   /// The mute hint shows for the first muted stretch only; after they've unmuted once it stays quiet.
   @State private var unmutedOnce = false
   /// Set on the way out: the room keeps the face it had while it fades, instead of flashing through ending states.
@@ -65,6 +66,14 @@ struct InterviewVoiceRoom<Question: View>: View {
       }
       .onChange(of: warned) { _, now in if now { AccessibilityNotification.Announcement("Thirty seconds left in this voice session.").post() } }
       .onChange(of: voice.muted) { _, muted in if !muted { unmutedOnce = true } }
+      .task(id: allowance) {
+        allowanceFaded = false
+        guard let allowance else { return }
+        AccessibilityNotification.Announcement(allowance).post()
+        try? await Task.sleep(for: .seconds(3))
+        guard !Task.isCancelled else { return }
+        withAnimation(reduceMotion ? nil : DrillbitMotion.reveal) { allowanceFaded = true }
+      }
       .onChange(of: voice.hearsNothing) { _, now in if now { AccessibilityNotification.Announcement("Can’t hear you yet. Check your microphone.").post() } }
       .onChange(of: voice.idleWarning) { _, now in if now { AccessibilityNotification.Announcement("Still there? Voice ends in thirty seconds if it stays quiet.").post() } }
   }
@@ -161,11 +170,12 @@ struct InterviewVoiceRoom<Question: View>: View {
           .frame(width: 88)
           .padding(.trailing, 16)
         }
-        // The free allowance sits under the button, where the decision is made.
-        if let allowance {
+        // The free allowance shows under the button for a moment, then gets out of the way.
+        if let allowance, !allowanceFaded {
           Text(allowance)
             .font(.footnote).foregroundStyle(AppPalette.secondary)
             .multilineTextAlignment(.center)
+            .transition(.opacity)
             .accessibilityIdentifier("voiceAllowance")
         }
         #if DEBUG
