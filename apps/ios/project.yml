@@ -43,6 +43,7 @@ targets:
         APIBaseURL: $(API_BASE_URL)
         ClerkPublishableKey: $(CLERK_PUBLISHABLE_KEY)
         SuperwallAPIKey: $(SUPERWALL_API_KEY)
+        PrivacyPolicyURL: $(PRIVACY_POLICY_URL)
         SharedKeychainGroup: $(AppIdentifierPrefix)dawi.drillbit.shared
         CFBundleURLTypes:
           - CFBundleURLSchemes: [drillbit, dawi.drillbit]
@@ -58,6 +59,15 @@ targets:
         com.apple.security.application-groups: [group.dawi.drillbit]
         com.apple.developer.applesignin: [Default]
         keychain-access-groups: [$(AppIdentifierPrefix)dawi.drillbit, $(AppIdentifierPrefix)dawi.drillbit.shared]
+    preBuildScripts:
+      - name: Require privacy policy for Release
+        basedOnDependencyAnalysis: false
+        script: |
+          # App Review rejects subscription apps without a privacy policy link in the paywall and Settings.
+          if [ "$CONFIGURATION" = "Release" ] && [ "${PRIVACY_POLICY_URL#https://}" = "$PRIVACY_POLICY_URL" ]; then
+            echo "error: Set PRIVACY_POLICY_URL (https:/\$()/host/privacy) in Config/Local.xcconfig before archiving."
+            exit 1
+          fi
     dependencies:
       - package: WebRTC
       - package: Clerk

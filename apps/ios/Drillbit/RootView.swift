@@ -16,10 +16,12 @@ struct RootView: View {
   @State private var startedFirstRep: Challenge?
   @State private var applyingDraft = false
   enum FirstRunStage: String { case welcome, setup, signIn, done }
-  private enum Stage { case restoring, welcome, setup, signIn, app }
+  private enum Stage { case restoring, consent, welcome, setup, signIn, app }
   private var signedIn: Bool { model.bootstrap?.account.status == "active" }
   private var stage: Stage {
     if model.restoringSession || model.launchError != nil { return .restoring }
+    // Signed in without the AI consent (an update or a surviving Keychain session): ask before anything else runs.
+    if signedIn && !AIConsent.shared.granted { return .consent }
     if signedIn && model.settings.onboardingComplete { return .app }
     // Fixtures that start at onboarding skip Welcome; everything else follows the device's stage.
     let fixtureSetup = model.fixture && ProcessInfo.processInfo.arguments.contains("--fixture-onboarding")
@@ -37,7 +39,7 @@ struct RootView: View {
     else { withAnimation(DrillbitMotion.page) { firstRunStage = FirstRunStage.signIn.rawValue } }
   }
   private func openFirstQuestionIfPending() async {
-    guard !applyingDraft, signedIn, !model.settings.onboardingComplete else { return }
+    guard !applyingDraft, signedIn, AIConsent.shared.granted, !model.settings.onboardingComplete else { return }
     let draft = pendingDraft ?? UserDefaults.standard.data(forKey: SetupView.draftKey).flatMap { try? JSONDecoder().decode(LearningPlanCoordinator.Draft.self, from: $0) }
     guard let draft, draft.page >= SetupView.pageCount - 1 else { return }
     applyingDraft = true
@@ -52,6 +54,9 @@ struct RootView: View {
     Group {
       if model.restoringSession || model.launchError != nil {
         LaunchSurface(message: model.launchError) { Task { await model.launch() } }
+          .transition(.opacity)
+      } else if stage == .consent {
+        NavigationStack { AIConsentGate() }
           .transition(.opacity)
       } else if stage == .welcome {
         WelcomeView(model: model) { withAnimation(DrillbitMotion.page) { firstRunStage = FirstRunStage.setup.rawValue } }
@@ -114,6 +119,7 @@ struct RootView: View {
     .animation(DrillbitMotion.page, value: stage)
     // Signing in after setup: apply the saved draft and open the first question without another tap.
     .onChange(of: signedIn) { _, now in if now { Task { await openFirstQuestionIfPending() } } else { resetFirstRunIfSignedOut() } }
+    .onChange(of: AIConsent.shared.granted) { _, now in if now, signedIn { Task { await openFirstQuestionIfPending() } } }
     .task(id: signedIn) { if signedIn { await openFirstQuestionIfPending() } }
     .preferredColorScheme(model.fixture && ProcessInfo.processInfo.arguments.contains("--dark") ? .dark : appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
     .background(WindowFloorColor().allowsHitTesting(false))

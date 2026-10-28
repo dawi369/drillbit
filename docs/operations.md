@@ -96,7 +96,7 @@ Help request recovery uses the same stored job ID; do not create automatic repla
 
 Xcode UI tests install `DrillbitUITests-Runner` (`dawi.DrillbitUITests.xctrunner`) alongside the main app. It is a test harness, not an alternate Drillbit build. After tests finish, it can be uninstalled with `xcrun simctl uninstall <simulator-id> dawi.DrillbitUITests.xctrunner`; future UI tests recreate it. Do not uninstall `dawi.drillbit` to clean up the runner, because that would remove the app's local data.
 
-Screenshot set: `sh scripts/audit-shots.sh <dir> [testName ...]` runs the `AuditScreenshots` UI tests on the one booted simulator (all, or the named tests) and exports every attached screenshot as `<name>.png`. Fixture flags used by those tests: `--fixture-coach` turns the first-run tips on, `--fixture-talk` opens a fresh interview in the voice room as real installs do, `--fixture-persist` keeps the fixture store in a temp file across kill-and-relaunch and `--fixture-persist-reset` clears it first. Reduce Motion for a run: `xcrun simctl spawn <udid> defaults write com.apple.Accessibility ReduceMotionEnabled -bool true` before launching, and `-bool false` after.
+Screenshot set: `sh scripts/audit-shots.sh <dir> [testName ...]` runs the `AuditScreenshots` UI tests on the one booted simulator (all, or the named tests) and exports every attached screenshot as `<name>.png`. Fixture flags used by those tests: `--fixture-coach` turns the first-run tips on, `--fixture-talk` opens a fresh interview in the voice room as real installs do, `--fixture-persist` keeps the fixture store in a temp file across kill-and-relaunch and `--fixture-persist-reset` clears it first. `StoreScreenshots` produces the six App Store frames; `--fixture-customer` seeds a non-developer account, so the developer-only Bit tab is hidden. See [app-store-readiness.md](app-store-readiness.md). Reduce Motion for a run: `xcrun simctl spawn <udid> defaults write com.apple.Accessibility ReduceMotionEnabled -bool true` before launching, and `-bool false` after.
 
 `/Users/dawi/dev/drillbit-before-native-20260908-212600` is a 2.5 MB recovery bundle (`source.tar.gz`, `working-tree.patch`, `HEAD`), not a second active checkout. It was preserved during the native rebuild.
 
@@ -277,7 +277,7 @@ Support: `SELECT * FROM entitlements WHERE account_id=?` shows the bound subscri
 
 ## Production environment — 25 October 2026
 
-`apps/api/wrangler.jsonc` has an `env.production` block (`drillbit-api`, D1 `drillbit-production`, Workflow `drillbit-jobs`) with `PRACTICE_GATE=true` and no developer allowlists. Its `REPLACE_` placeholders fail closed until filled. From `apps/api`:
+`apps/api/wrangler.jsonc` has an `env.production` block (`drillbit-api`, D1 `drillbit-production`, Workflow `drillbit-jobs`) with `PRACTICE_GATE=true`, `OPEN_SIGNUP=true` (no invite needed) and no developer allowlists. Its `REPLACE_` placeholders fail closed until filled; `SUPPORT_EMAIL` is shown on the public `/privacy` and `/support` pages, which omit a placeholder rather than print it. From `apps/api`:
 
 1. Create a Clerk **production** instance with native Sign in with Apple and the `drillbit` JWT template (see “Clerk and Apple configuration”); put its issuer in `CLERK_ISSUER`.
 2. `./node_modules/.bin/wrangler d1 create drillbit-production`, then put the id in `database_id`.
@@ -286,10 +286,14 @@ Support: `SELECT * FROM entitlements WHERE account_id=?` shows the bound subscri
 5. `./node_modules/.bin/wrangler deploy --env production`, then check `GET /health` and that an unauthenticated `/v1/bootstrap` returns 401.
 6. App Store Connect → App Store Server Notifications (V2), Production and Sandbox: `https://<production-host>/apple/notifications`.
 
-The release build needs `API_BASE_URL` (production host), `CLERK_PUBLISHABLE_KEY` (`pk_live_…`) and `PRIVACY_POLICY_URL` set in `Config/Local.xcconfig`. Write URLs as `https:/$()/host/path`, since xcconfig reads `//` as a comment. Without `PRIVACY_POLICY_URL` the paywall and Settings show no privacy link, which App Review rejects for subscription apps.
+The release build needs `API_BASE_URL` (production host), `CLERK_PUBLISHABLE_KEY` (`pk_live_…`) and `PRIVACY_POLICY_URL` (`https:/$()/<production-host>/privacy`) set in `Config/Local.xcconfig`. Write URLs as `https:/$()/host/path`, since xcconfig reads `//` as a comment. `project.yml` copies it into Info.plist as `PrivacyPolicyURL` (before 27 October 2026 it was never copied, so no build had the link). Without it the paywall, Settings and the AI consent show no privacy link, which App Review rejects for subscription apps. The full submission checklist is [app-store-readiness.md](app-store-readiness.md).
 
 Subscriptions: group “Drillbit Pro” with `dawi.drillbit.pro.yearly` and `dawi.drillbit.pro.weekly`; give the weekly product an introductory offer of one week, pay as you go. Prices live only in App Store Connect; the paywall derives “Save N%” (yearly against 52 weeks of weekly, rounded down) and the first-week line from the products. `Config/Drillbit.storekit` holds placeholder prices for the simulator only.
 
 ### Development: plan switch — 25 October 2026
 
 Migration `0015_plan_override.sql` was applied to `drillbit-development` after a private export at `.local/before-plan-override-20261025.sql` (mode 0600), and the development Worker redeployed. Developer accounts switch between Free, Pro and their billed plan from Settings → Developer → Act as. Production has no developer accounts, so the column is inert there; still apply the migration before deploying it.
+
+### Development: public pages and open signup — 27 October 2026
+
+Development Worker `5d31f70f-da60-4e1b-87bd-be2238f67f53`, then `c9bf49e2-ab49-4a6d-9fbd-070b7ada0228` (the back-to-invite replay refuses with 409 when signup is open), serves `/privacy` and `/support` (HTML, `SUPPORT_EMAIL=support@t23.dev`) and understands `OPEN_SIGNUP`, which stays unset here so development remains invite-only. No migration. `/health` returned 200, unauthenticated `/v1/bootstrap` 401, and both pages 200. The owner's ignored `Local.xcconfig` now points `PRIVACY_POLICY_URL` at the development `/privacy`.

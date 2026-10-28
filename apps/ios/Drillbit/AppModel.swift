@@ -744,7 +744,7 @@ import WidgetKit
   private var automaticPreparationAccounts: Set<String> = []
   func ensureHomeQuestion() async {
     guard let account = bootstrap?.account, account.status == "active", settings.onboardingComplete,
-      firstUse.stage == .complete,
+      firstUse.stage == .complete, AIConsent.shared.granted,
       !busy, !checkingDailyQuestion else { return }
     if fixture {
       #if DEBUG
@@ -1434,7 +1434,9 @@ import WidgetKit
     #endif
     let tomorrow = Calendar(identifier: .gregorian).startOfDay(for: .now.addingTimeInterval(86_400))
     bootstrap = Bootstrap(
-      capabilities: .init(voice: VoiceCapability(available: true, plan: "free", checkedAt: Date.now.ISO8601Format(), sessionSeconds: 180, remaining: 2, limit: 3, resetsAt: tomorrow.ISO8601Format(), kind: "intro"), developerTools: true),
+      capabilities: .init(voice: VoiceCapability(available: true, plan: "free", checkedAt: Date.now.ISO8601Format(), sessionSeconds: 180, remaining: 2, limit: 3, resetsAt: tomorrow.ISO8601Format(), kind: "intro"),
+                          // A customer account for store screenshots: no developer-only tab.
+                          developerTools: !ProcessInfo.processInfo.arguments.contains("--fixture-customer")),
       account: .init(id: "fixture", status: "active"), settings: settings, challenge: challenge,
       jobs: [], todayPlan: TodayPlan(state: ProcessInfo.processInfo.arguments.contains("--fixture-dashboard") ? "complete_today" : "first_session",
         completedTotal: ProcessInfo.processInfo.arguments.contains("--fixture-dashboard") ? 12 : 0,

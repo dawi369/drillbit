@@ -144,3 +144,35 @@ describe("credentials and quotas", () => {
     expect(encrypted).not.toContain("a-provider-key");
   });
 });
+describe("open signup", () => {
+  const open = { ...bindings, OPEN_SIGNUP: "true" } as typeof bindings;
+  const status = (id: string) =>
+    bindings.DB.prepare("SELECT status FROM accounts WHERE id=?").bind(id).first<{ status: string }>().then(r => r?.status);
+  it("keeps new accounts behind the invite while closed", async () => {
+    const account = await accountFor(bindings, crypto.randomUUID());
+    expect(account.status).toBe("invited");
+  });
+  it("activates new accounts and lifts ones still waiting on an invite", async () => {
+    expect((await accountFor(open, crypto.randomUUID())).status).toBe("active");
+    const subject = crypto.randomUUID();
+    const waiting = await accountFor(bindings, subject);
+    expect(waiting.status).toBe("invited");
+    expect((await accountFor(open, subject)).status).toBe("active");
+    expect(await status(waiting.id)).toBe("active");
+  });
+  it("never revives an account being deleted, even under concurrent sign-ins", async () => {
+    const subject = crypto.randomUUID();
+    const account = await accountFor(open, subject);
+    await bindings.DB.prepare("UPDATE accounts SET status='deleting' WHERE id=?").bind(account.id).run();
+    const results = await Promise.allSettled([accountFor(open, subject), accountFor(open, subject), accountFor(bindings, subject)]);
+    expect(results.every(r => r.status === "rejected" && (r.reason as { code?: string }).code === "account_unavailable")).toBe(true);
+    expect(await status(account.id)).toBe("deleting");
+  });
+  it("creates exactly one account when the first sign-ins race", async () => {
+    const subject = crypto.randomUUID();
+    const accounts = await Promise.all(Array.from({ length: 5 }, () => accountFor(open, subject)));
+    expect(new Set(accounts.map(a => a.id)).size).toBe(1);
+    const { n } = (await bindings.DB.prepare("SELECT COUNT(*) n FROM accounts WHERE subject=?").bind(subject).first<{ n: number }>())!;
+    expect(n).toBe(1);
+  });
+});

@@ -456,6 +456,12 @@ final class AuditScreenshots: XCTestCase {
     XCTAssertTrue(app.descendants(matching: .any)["coach-composer"].waitForExistence(timeout: 12))
     shot("e07-interview-opener-coach", app)
     app.buttons["coachDone"].tap()
+    // The tools tip follows straight on and shields the screen until it's dismissed.
+    if app.descendants(matching: .any)["coach-tools"].waitForExistence(timeout: 5) {
+      shot("e10-interview-tools-coach", app)
+      app.buttons["coachDone"].tap()
+      XCTAssertTrue(app.descendants(matching: .any)["coach-tools"].waitForNonExistence(timeout: 3))
+    }
     editor(app).tap()
     let answer = "I’d start by pinning down what the client can rely on. A ticket is either held, paid, or released; nothing in between is visible. "
       + "Holds live in one table keyed by seat and event, with an expiry. The hold write and the inventory decrement happen in one transaction so a crash can’t leave a seat half-held. "
@@ -468,11 +474,6 @@ final class AuditScreenshots: XCTestCase {
     XCTAssertTrue(app.staticTexts["What happens if a worker stops after completing the operation but before acknowledging it?"].waitForExistence(timeout: 10))
     Thread.sleep(forTimeInterval: 1)
     shot("e09-interview-follow-up", app)
-    // The tools tip comes once a follow-up has landed.
-    if app.descendants(matching: .any)["coach-tools"].waitForExistence(timeout: 3) {
-      shot("e10-interview-tools-coach", app)
-      app.buttons["coachDone"].tap()
-    }
     // A line ending in “?” asks the interviewer instead of answering.
     editor(app).tap(); editor(app).typeText("Can I assume one region only?")
     Thread.sleep(forTimeInterval: 0.4)
@@ -593,8 +594,11 @@ final class AuditScreenshots: XCTestCase {
     Thread.sleep(forTimeInterval: 0.6)
     shot("g06-export", app)
     app.navigationBars.buttons.element(boundBy: 0).tap()
-    app.swipeUp()
-    app.buttons["Delete account"].tap()
+    // Account sits above Developer, so look back up the list for Delete account.
+    let deleteAccount = app.buttons["Delete account"]
+    for _ in 0..<6 where !deleteAccount.exists || !deleteAccount.isHittable { app.swipeDown() }
+    reveal(deleteAccount)
+    deleteAccount.tap()
     XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 3))
     shot("g07-delete-account-alert", app)
     app.alerts.buttons["Cancel"].tap()
@@ -788,6 +792,10 @@ final class AuditScreenshots: XCTestCase {
     XCTAssertTrue(app.descendants(matching: .any)["coach-composer"].waitForExistence(timeout: 12))
     shot("k08-interview-light-coach", app)
     app.buttons["coachDone"].tap()
+    if app.descendants(matching: .any)["coach-tools"].waitForExistence(timeout: 5) {
+      app.buttons["coachDone"].tap()
+      XCTAssertTrue(app.descendants(matching: .any)["coach-tools"].waitForNonExistence(timeout: 3))
+    }
     editor(app).tap(); editor(app).typeText("Leases with a visible expiry.")
     app.buttons["shareAnswer"].tap()
     XCTAssertTrue(app.staticTexts["What happens if a worker stops after completing the operation but before acknowledging it?"].waitForExistence(timeout: 10))

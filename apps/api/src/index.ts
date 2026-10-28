@@ -44,6 +44,7 @@ import {
 } from "./store";
 import { concepts } from "./taxonomy";
 import { delegateVoice, startVoice, voiceCapability, voiceEvents } from "./voice";
+import { privacyPolicy, supportPage } from "./legal";
 export { PracticeWorkflow } from "./jobs";
 export const app = new Hono<{
   Bindings: Env;
@@ -118,6 +119,8 @@ app.onError((error, c) => {
   );
 });
 app.get("/health", (c) => c.json({ status: "ok" }));
+app.get("/privacy", (c) => c.html(privacyPolicy(c.env)));
+app.get("/support", (c) => c.html(supportPage(c.env)));
 // Apple posts here unauthenticated; the payload's own signature chain is the credential.
 app.post("/apple/notifications", async c => c.json(await applyAppleNotification(c.env, await c.req.json())));
 app.get("/v1/widget", async (c) => {
@@ -210,6 +213,8 @@ app.post("/v1/developer/reinvite", async c => {
   const account = c.get("account").id;
   const permitted = (c.env.DEVELOPER_ACCOUNTS ?? "").split(",").map(id => id.trim()).filter(Boolean);
   if (!permitted.includes(account)) throw new Fault("not_found", 404, "Not found.");
+  // With open signup the next request would lift the account straight back out, so there's nothing to replay.
+  if (c.env.OPEN_SIGNUP === "true") throw new Fault("invites_off", 409, "Invites are off here, so there's no invite screen to go back to.");
   await c.env.DB.batch([
     c.env.DB.prepare("UPDATE invites SET redeemed_by=NULL WHERE redeemed_by=?").bind(account),
     c.env.DB.prepare("UPDATE accounts SET status='invited' WHERE id=?").bind(account),

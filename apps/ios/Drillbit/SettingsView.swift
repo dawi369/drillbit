@@ -129,11 +129,16 @@ struct SettingsView: View {
       if model.bootstrap?.capabilities?.developerTools == true || model.fixture {
         DeveloperSettingsSection(model: model, appearance: $appearance, dismiss: { dismiss() })
       }
-      Section("Legal") {
+      Section {
         Link("Terms of Use", destination: LegalLinks.terms).accessibilityIdentifier("settingsTerms")
         if let privacy = LegalLinks.privacy {
           Link("Privacy Policy", destination: privacy).accessibilityIdentifier("settingsPrivacy")
         }
+      } header: {
+        Text("Legal")
+      } footer: {
+        Text("Bit runs on outside AI. What you write goes to AI models through OpenRouter, and your voice goes to OpenAI, only to reply to you. Delete your account to remove everything.")
+          .accessibilityIdentifier("settingsAIDisclosure")
       }
     }.navigationTitle("Settings")
       .toolbar {

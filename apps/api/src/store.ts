@@ -38,11 +38,13 @@ export async function accountFor(env: Env, subject: string): Promise<Account> {
   const id = uuid(),
     now = timestamp();
   const defaults = settingsSchema.parse({});
+  // Open signup lets anyone in and lifts accounts still waiting on an invite; it never revives one being deleted.
+  const status = env.OPEN_SIGNUP === "true" ? "active" : "invited";
   // Every authenticated request starts here, so it is one round trip to D1.
   const [, , selected] = await env.DB.batch([
     env.DB.prepare(
-      "INSERT INTO accounts(id,subject,last_seen,created_at) VALUES(?,?,?,?) ON CONFLICT(subject) DO UPDATE SET last_seen=excluded.last_seen",
-    ).bind(id, subject, now, now),
+      "INSERT INTO accounts(id,subject,status,last_seen,created_at) VALUES(?,?,?,?,?) ON CONFLICT(subject) DO UPDATE SET last_seen=excluded.last_seen, status=CASE WHEN accounts.status='invited' AND excluded.status='active' THEN 'active' ELSE accounts.status END",
+    ).bind(id, subject, status, now, now),
     env.DB.prepare(
       "INSERT OR IGNORE INTO settings(account_id,data,next_due) SELECT id,?,? FROM accounts WHERE subject=? AND status<>'deleting'",
     ).bind(JSON.stringify(defaults), nextDaily(defaults), subject),

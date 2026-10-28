@@ -19,6 +19,7 @@
 		20212ED453359321401BBE55 /* CompanionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39439B81E58CADD0F8243F46 /* CompanionTests.swift */; };
 		2027DBB976212CFEA63A6BE4 /* BitView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17CD35FA19967623C29EB147 /* BitView.swift */; };
 		22EAA8C50206081D7F3562EA /* Literata.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 366045A34DEB9127B61D057D /* Literata.ttf */; };
+		25B42E211757613F3057B1B9 /* StoreScreenshots.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88E8FF3B4DEF6FBC2AC4EF69 /* StoreScreenshots.swift */; };
 		2657C9E9ADBD72C612B2A458 /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F9D42BA7EF7B514FEACC7F6 /* SetupView.swift */; };
 		2BCD05DC191DB1D3AC6E50FD /* SharedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8049B9471B01CBFBD8C80764 /* SharedStore.swift */; };
 		2C57626CC9CE91B722872E1D /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7437833C09799CF7937BCDD7 /* RootView.swift */; };
@@ -141,6 +142,7 @@
 		8049B9471B01CBFBD8C80764 /* SharedStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedStore.swift; sourceTree = "<group>"; };
 		82CAC54FBF8FD27088584441 /* BitRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitRenderer.swift; sourceTree = "<group>"; };
 		87BD787A61C3C037E268829C /* LiveVoice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveVoice.swift; sourceTree = "<group>"; };
+		88E8FF3B4DEF6FBC2AC4EF69 /* StoreScreenshots.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreScreenshots.swift; sourceTree = "<group>"; };
 		90A5D549D2FB1410F6D6B59B /* DrillbitTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = DrillbitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		92066D96F6C016361FF268E4 /* InterviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterviewView.swift; sourceTree = "<group>"; };
 		9A2B037FAEC89AAC90414A59 /* DrillbitWidget.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = DrillbitWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -302,6 +304,7 @@
 			children = (
 				C197A270F91EB4CC5F520C1D /* AuditScreenshots.swift */,
 				C8F1C4DE69AF2358015E8EDD /* PracticeUITests.swift */,
+				88E8FF3B4DEF6FBC2AC4EF69 /* StoreScreenshots.swift */,
 				1185BAB722977AA5EAC231D0 /* StreamProbe.swift */,
 			);
 			path = UITests;
@@ -326,6 +329,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = BCD41B31486971564EF9B32B /* Build configuration list for PBXNativeTarget "Drillbit" */;
 			buildPhases = (
+				771B5FDDBE672125B0C2B4A9 /* Require privacy policy for Release */,
 				8A5D28AA2404593D13D1E51A /* Sources */,
 				549CE0ACE8B75B40B3653E4F /* Resources */,
 				E7D8F7C63B36783F112E0C9D /* Frameworks */,
@@ -466,6 +470,28 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		771B5FDDBE672125B0C2B4A9 /* Require privacy policy for Release */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Require privacy policy for Release";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# App Review rejects subscription apps without a privacy policy link in the paywall and Settings.\nif [ \"$CONFIGURATION\" = \"Release\" ] && [ \"${PRIVACY_POLICY_URL#https://}\" = \"$PRIVACY_POLICY_URL\" ]; then\n  echo \"error: Set PRIVACY_POLICY_URL (https:/\\$()/host/privacy) in Config/Local.xcconfig before archiving.\"\n  exit 1\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		1DDCFFC4F1B22B1FF7343362 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -473,6 +499,7 @@
 			files = (
 				C65663B45DE7E6FB2F28D848 /* AuditScreenshots.swift in Sources */,
 				095A54CECC96E78F3BEA8F50 /* PracticeUITests.swift in Sources */,
+				25B42E211757613F3057B1B9 /* StoreScreenshots.swift in Sources */,
 				4E43449932FD2F5EE7F94EA3 /* StreamProbe.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

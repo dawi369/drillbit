@@ -282,6 +282,7 @@ struct SignInView: View {
   @Bindable var model: AppModel
   @State private var invite = ""
   @State private var signingIn = false
+  private var consented: Bool { AIConsent.shared.granted }
   @FocusState private var inviteFocused: Bool
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -302,6 +303,10 @@ struct SignInView: View {
           .id(inviting)
           .transition(.opacity)
           .signalEntrance(1)
+          // In the scrolling content, not the pinned footer, so the largest text sizes can still read all of it.
+          if !inviting && !consented {
+            AIDisclosure().padding(.top, 16).transition(.opacity).signalEntrance(2)
+          }
         }
         .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: inviteFocused)
         .frame(maxWidth: 400).padding(24).frame(maxWidth: .infinity, minHeight: geometry.size.height)
@@ -329,6 +334,12 @@ struct SignInView: View {
           }
           .buttonStyle(PracticeButtonStyle()).disabled(code.isEmpty || signingIn)
           .accessibilityLabel(signingIn ? "Checking invite" : "Open my question")
+        } else if !consented {
+          Button("Sounds good") {
+            withAnimation(reduceMotion ? nil : DrillbitMotion.page) { AIConsent.shared.grant() }
+          }
+          .buttonStyle(PracticeButtonStyle())
+          .accessibilityIdentifier("aiConsentAgree")
         } else {
           VStack(spacing: 12) {
             Button { authenticate { await model.signIn() } } label: { Label("Sign in with Apple", systemImage: AppIcon.apple.rawValue) }.buttonStyle(PracticeButtonStyle())
@@ -359,6 +370,90 @@ struct SignInView: View {
   private func authenticate(_ operation: @escaping @MainActor () async -> Void) {
     guard !signingIn else { return }; signingIn = true
     Task { defer { signingIn = false }; await operation() }
+  }
+}
+
+/// Permission to send practice content to third-party AI (App Review 5.1.2(i)). Asked before sign-in, and again at
+/// the root for anyone already signed in without it (an update, or a Keychain session that outlived a reinstall).
+/// Fixtures keep it in memory: signed-in fixtures start agreed, signed-out ones start fresh.
+@MainActor @Observable final class AIConsent {
+  static let shared = AIConsent()
+  private static let key = "aiConsent.v1"
+  private(set) var granted: Bool
+  private let fixture: Bool
+
+  private init() {
+    var fixture = false
+    var arguments: [String] = []
+    #if DEBUG
+    arguments = ProcessInfo.processInfo.arguments
+    fixture = arguments.contains("--fixtures")
+    #endif
+    self.fixture = fixture
+    granted = fixture
+      ? !arguments.contains("--fixture-signed-out") && !arguments.contains("--fixture-no-ai-consent")
+      : UserDefaults.standard.bool(forKey: Self.key)
+  }
+
+  func grant() {
+    granted = true
+    if !fixture { UserDefaults.standard.set(true, forKey: Self.key) }
+  }
+}
+
+/// The root's version of the question, for a signed-in account that hasn't agreed yet. Nothing behind it runs first.
+struct AIConsentGate: View {
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  var body: some View {
+    GeometryReader { geometry in
+      ScrollView {
+        VStack(spacing: 16) {
+          BitView(mood: .content).frame(width: 76, height: 84).signalEntrance(0)
+          VStack(spacing: 8) {
+            Text("One quick thing.").font(.title2.weight(.semibold))
+            Text("Then you’re back to practice.").font(.subheadline).foregroundStyle(AppPalette.secondary)
+          }
+          .multilineTextAlignment(.center)
+          .signalEntrance(1)
+          AIDisclosure().padding(.top, 16).signalEntrance(2)
+        }
+        .frame(maxWidth: 400).padding(24).frame(maxWidth: .infinity, minHeight: geometry.size.height)
+      }
+      .scrollBounceBehavior(.basedOnSize)
+    }
+    .background(AppPalette.background)
+    .containerBackground(AppPalette.background, for: .navigation)
+    .safeAreaInset(edge: .bottom, spacing: 0) {
+      Button("Sounds good") { withAnimation(reduceMotion ? nil : DrillbitMotion.page) { AIConsent.shared.grant() } }
+        .buttonStyle(PracticeButtonStyle())
+        .accessibilityIdentifier("aiConsentAgree")
+        .frame(maxWidth: 400).padding(.horizontal, 24).padding(.vertical, 16)
+        .frame(maxWidth: .infinity)
+        .background(AppPalette.background)
+    }
+  }
+}
+
+/// Who sees what you write and say, in plain words, with the policy one tap away.
+struct AIDisclosure: View {
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Label("Before we start: Bit runs on outside AI.", systemImage: "sparkles")
+        .font(.subheadline.weight(.semibold))
+        .fixedSize(horizontal: false, vertical: true)
+      Text("What you write goes to AI models through OpenRouter. When you talk, your voice goes to OpenAI. They get what the interview needs to reply. We never sell it or use it for ads.")
+        .font(.footnote).foregroundStyle(AppPalette.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+      if let privacy = LegalLinks.privacy {
+        Link("Privacy Policy", destination: privacy).font(.footnote.weight(.medium))
+          .accessibilityIdentifier("aiConsentPrivacy")
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .multilineTextAlignment(.leading)
+    .signalInset(padding: 16)
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("aiDisclosure")
   }
 }
 

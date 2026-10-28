@@ -88,6 +88,7 @@ scripts/check-ios.sh
 | [Product vision](docs/product-vision.md) | Positioning, principles and surviving product decisions |
 | [Context engineering](docs/context-engineering.md) | Interview context, history and prompt structure |
 | [Operations](docs/operations.md) | Configuration, deployment and recovery |
+| [App Store readiness](docs/app-store-readiness.md) | What's left before review, store listing drafts and screenshots |
 | [OpenAPI](packages/contracts/openapi.json) | The shared service contract |
 
 **Status:** actively developed. Text and live voice are implemented; simulator checks, live-service checks and physical-device acceptance are tracked separately. This repository is not a claim of App Store availability or production readiness. The earlier Expo prototype remains in [`legacy/expo`](legacy/expo), outside active build targets.

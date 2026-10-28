@@ -82,14 +82,16 @@ final class PracticeUITests: XCTestCase {
     app.launchArguments = ["--fixtures"]
     app.launch()
     XCTAssertTrue(app.buttons["Settings"].waitForExistence(timeout: 10))
-    app.buttons["Settings"].tap()
-    app.buttons["About your practice"].tap()
+    // The profile lives under Developer, below the fold since Settings gained Plan.
+    let about = app.buttons["About your practice"]
+    let openAbout = { app.buttons["Settings"].tap(); for _ in 0..<6 where !about.exists || !about.isHittable { app.swipeUp() }; about.tap() }
+    openAbout()
     let goals = app.descendants(matching: .any).matching(identifier: "practiceGoals").firstMatch
     XCTAssertTrue(goals.waitForExistence(timeout: 5))
     goals.tap(); goals.typeText("Senior interviews")
     app.navigationBars.buttons.firstMatch.tap()
     app.buttons["Done"].tap()
-    app.buttons["Settings"].tap(); app.buttons["About your practice"].tap()
+    openAbout()
     XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "practiceGoals").firstMatch.value as? String, "Senior interviews")
     for _ in 0..<4 where !app.buttons["Reset personalization"].isHittable { app.swipeUp() }
     capture("Practice personalization", app)
@@ -330,6 +332,44 @@ final class PracticeUITests: XCTestCase {
     capture("Grounded practice evidence", app)
   }
 
+  func testAIConsentReadsAtLargestTypeInLight() throws {
+    let app = XCUIApplication()
+    // Straight to the sign-in stage: the argument domain overrides the stage a signed-out launch clears.
+    app.launchArguments = ["--fixtures", "--fixture-signed-out", "-firstRun.stage", "signIn", "-appearance", "light",
+                           "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+    app.launch()
+    let agree = app.buttons["aiConsentAgree"]
+    XCTAssertTrue(agree.waitForExistence(timeout: 10))
+    XCTAssertTrue(agree.isHittable, "Agreeing stays reachable above the fold")
+    // The whole disclosure scrolls into view at the largest size, policy link included.
+    let policy = app.links["aiConsentPrivacy"].exists ? app.links["aiConsentPrivacy"] : app.buttons["aiConsentPrivacy"]
+    let body = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "never sell it")).firstMatch
+    for _ in 0..<8 where !(body.exists && body.isHittable) { app.swipeUp() }
+    XCTAssertTrue(body.isHittable)
+    if policy.exists { for _ in 0..<4 where !policy.isHittable { app.swipeUp() }; XCTAssertTrue(policy.isHittable) }
+    capture("AI consent at largest type", app)
+    agree.tap()
+    XCTAssertTrue(app.buttons["Sign in with Apple"].waitForExistence(timeout: 5))
+    XCTAssertFalse(app.descendants(matching: .any)["aiDisclosure"].exists)
+  }
+
+  func testSignedInWithoutConsentIsAskedBeforeAnythingElse() throws {
+    let app = XCUIApplication()
+    // An update, or a Keychain session that outlived a reinstall: signed in, but never agreed.
+    app.launchArguments = ["--fixtures", "--fixture-dashboard", "--fixture-no-ai-consent"]
+    app.launch()
+    let agree = app.buttons["aiConsentAgree"]
+    XCTAssertTrue(agree.waitForExistence(timeout: 10))
+    XCTAssertTrue(app.staticTexts["One quick thing."].exists)
+    XCTAssertTrue(app.descendants(matching: .any)["aiDisclosure"].exists)
+    XCTAssertFalse(app.tabBars.firstMatch.exists, "Nothing behind the gate is reachable")
+    XCTAssertFalse(app.buttons["homeSettings"].exists)
+    capture("AI consent for a signed-in account", app)
+    agree.tap()
+    XCTAssertTrue(app.buttons["homeSettings"].waitForExistence(timeout: 5))
+    XCTAssertFalse(agree.exists)
+  }
+
   func testSessionRestorationDoesNotShowSignIn() throws {
     let app = XCUIApplication()
     app.launchArguments = ["--fixtures", "--fixture-dashboard", "--fixture-cached-home", "--fixture-slow-launch"]
@@ -343,7 +383,10 @@ final class PracticeUITests: XCTestCase {
     app.launch()
     XCTAssertTrue(app.otherElements["sessionRestoration"].waitForExistence(timeout: 2))
     XCTAssertFalse(app.buttons["Sign in with Apple"].exists)
-    XCTAssertTrue(app.buttons["Sign in with Apple"].waitForExistence(timeout: 10))
+    // Signed out is a first run: Welcome, with sign-in (and the AI consent before it) waiting until after setup.
+    XCTAssertTrue(app.descendants(matching: .any)["separatorHeadline"].waitForExistence(timeout: 15))
+    XCTAssertFalse(app.buttons["Sign in with Apple"].exists)
+    XCTAssertFalse(app.buttons["aiConsentAgree"].exists)
   }
 
   func testCachedHomeAppearsOnFirstFrame() throws {
@@ -1221,6 +1264,11 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(option("Save 88%").waitForExistence(timeout: 10))
     XCTAssertTrue(option("$3.33 a month").exists)
     XCTAssertTrue(option("Try a week for $0.99, then $6.99 a week").exists)
+    // What App Review checks on a subscription paywall: terms, renewal terms, restore and a way out.
+    XCTAssertTrue(option("Terms of Service").exists)
+    XCTAssertTrue(option("auto-renews").exists)
+    XCTAssertTrue(option("Restore").exists)
+    XCTAssertTrue(app.buttons["paywallDismiss"].isHittable)
     capture("Paywall from the rep gate", app)
     app.buttons["paywallDismiss"].tap()
     XCTAssertTrue(waiting.waitForExistence(timeout: 5))
@@ -1295,6 +1343,11 @@ final class PracticeUITests: XCTestCase {
     let terms = app.descendants(matching: .any)["settingsTerms"]
     for _ in 0..<8 where !terms.exists { app.swipeUp() }
     XCTAssertTrue(terms.waitForExistence(timeout: 3))
+    // The third-party AI disclosure stays findable after the one-time consent.
+    let disclosure = app.descendants(matching: .any)["settingsAIDisclosure"]
+    for _ in 0..<2 where !disclosure.exists { app.swipeUp() }
+    XCTAssertTrue(disclosure.waitForExistence(timeout: 3))
+    XCTAssertTrue(disclosure.label.contains("OpenRouter") && disclosure.label.contains("OpenAI"), disclosure.label)
     capture("Settings on Free", app)
   }
 
@@ -1467,7 +1520,14 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.buttons["Show me my first question"].waitForExistence(timeout: 5))
     app.buttons["Show me my first question"].tap()
     XCTAssertTrue(app.staticTexts["Your question’s ready."].waitForExistence(timeout: 5))
-    XCTAssertTrue(app.buttons["Sign in with Apple"].exists)
+    // Third-party AI is disclosed and agreed to before any sign-in, so nothing reaches a model without permission.
+    XCTAssertTrue(app.descendants(matching: .any)["aiDisclosure"].exists)
+    XCTAssertTrue(app.staticTexts["Before we start: Bit runs on outside AI."].exists)
+    XCTAssertFalse(app.buttons["Sign in with Apple"].exists)
+    capture("AI consent before sign in", app)
+    app.buttons["aiConsentAgree"].tap()
+    XCTAssertTrue(app.buttons["Sign in with Apple"].waitForExistence(timeout: 5))
+    XCTAssertFalse(app.descendants(matching: .any)["aiDisclosure"].exists)
     capture("Sign in after setup", app)
   }
 

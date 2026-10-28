@@ -20,6 +20,10 @@ export interface Env {
   COMPANION_AUTO_ENABLED?: string;
   INTERACTIVE_INLINE_ENABLED?: string;
   PRACTICE_GATE?: string;
+  /** "true" activates new accounts without an invite. */
+  OPEN_SIGNUP?: string;
+  /** Shown on the public /privacy and /support pages. */
+  SUPPORT_EMAIL?: string;
   PRACTICE_UNLIMITED_ACCOUNTS?: string;
   FREE_REP_FOLLOW_UPS?: string;
   FREE_REP_NUDGES?: string;

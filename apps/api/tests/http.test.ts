@@ -80,6 +80,28 @@ it("blocks product access until an invitation is redeemed", async () => {
   const response = await request("memory", "new-person");
   expect(response.status).toBe(403);
 });
+it("lets a brand-new account practice without an invite when signup is open", async () => {
+  const before = bindings.OPEN_SIGNUP;
+  bindings.OPEN_SIGNUP = "true";
+  try {
+    const response = await request("memory", "open-signup-person");
+    expect(response.status).toBe(200);
+  } finally {
+    bindings.OPEN_SIGNUP = before;
+  }
+});
+it("serves the public privacy policy and support pages without signing in", async () => {
+  for (const [path, heading] of [["privacy", "Privacy Policy"], ["support", "Drillbit support"]]) {
+    const response = await app.fetch(new Request("https://api.test/" + path), { ...bindings, SUPPORT_EMAIL: "help@drillbit.test" } as Env);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/html");
+    const html = await response.text();
+    expect(html).toContain(heading);
+    expect(html).toContain("mailto:help@drillbit.test");
+  }
+  const placeholder = await app.fetch(new Request("https://api.test/privacy"), { ...bindings, SUPPORT_EMAIL: "REPLACE_WITH_SUPPORT_EMAIL" } as Env);
+  expect(await placeholder.text()).not.toContain("REPLACE");
+});
 it("rejects tokens for another audience", async () => {
   const response = await app.fetch(
     new Request("https://api.test/v1/bootstrap", {
@@ -166,6 +188,22 @@ it("keeps the development reset owner-only, clears account data and returns sett
   expect((await reset.json() as any).settings).toMatchObject({onboardingComplete:false,reminderEnabled:false,aiMode:"managed",difficulty:"medium"});
   expect((await request("bootstrap", "reset-owner").then(response => response.json()) as any).settings.practiceProfile).toBeUndefined();
   delete bindings.DEVELOPER_ACCOUNTS;
+});
+it("refuses the back-to-invite replay when signup is open, leaving the account active", async () => {
+  const owner = await accountFor(bindings, "reinvite-owner");
+  await bindings.DB.prepare("UPDATE accounts SET status='active' WHERE id=?").bind(owner.id).run();
+  const open = bindings.OPEN_SIGNUP;
+  bindings.DEVELOPER_ACCOUNTS = owner.id;
+  try {
+    bindings.OPEN_SIGNUP = "true";
+    const refused = await request("developer/reinvite", "reinvite-owner", "POST");
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toMatchObject({ error: { code: "invites_off" } });
+    expect((await bindings.DB.prepare("SELECT status FROM accounts WHERE id=?").bind(owner.id).first<{ status: string }>())?.status).toBe("active");
+    bindings.OPEN_SIGNUP = open;
+    expect((await request("developer/reinvite", "reinvite-owner", "POST")).status).toBe(200);
+    expect((await bindings.DB.prepare("SELECT status FROM accounts WHERE id=?").bind(owner.id).first<{ status: string }>())?.status).toBe("invited");
+  } finally { bindings.OPEN_SIGNUP = open; delete bindings.DEVELOPER_ACCOUNTS; }
 });
 it("paginates history without repeating sessions and supports topic search", async () => {
   const account = await accountFor(bindings, "history-person");
