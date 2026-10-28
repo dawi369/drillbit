@@ -11,6 +11,7 @@ const operations: [string, string, string, string?][] = [
   ["post","challenges/{id}/voice/{voice}/delegate","Request technical guidance for a live session","VoiceDelegate"],
   ["get", "account/export", "Export paginated account practice data without credentials"],
   ["delete", "developer/practice", "Clear owner development practice data while preserving account configuration"],
+  ["post", "developer/plan", "Developer accounts only: act as Free or Pro regardless of billing; null clears", "DeveloperPlan"],
   ["get","taxonomy","Get the versioned system-design concept vocabulary"],
   ["get","library","Search and filter the account question library"],
   ["get","library/coverage","Count completed practice by concept without inferring ability"],
