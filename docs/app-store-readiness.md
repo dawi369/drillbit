@@ -36,7 +36,7 @@ cd apps/api
 
 ## 2. Release build: one command
 
-Production values are committed in `apps/ios/Config/Production.xcconfig`, and every Release build uses them. Bump `CURRENT_PROJECT_VERSION` in `apps/ios/project.yml` for each upload (11 is next). `MARKETING_VERSION` stays `2.0.0`. Then, **in your own Terminal** (an agent or SSH shell can't reach the signing key):
+Production values are committed in `apps/ios/Config/Production.xcconfig`, and every Release build uses them. Bump `CURRENT_PROJECT_VERSION` in `apps/ios/project.yml` for each upload (11 is next). `MARKETING_VERSION` is `1.0`, matching the version record in App Store Connect; keep them equal. Then, **in your own Terminal** (an agent or SSH shell can't reach the signing key):
 
 ```sh
 scripts/release-ios.sh            # archive and verify: production API, pk_live key, privacy URL
@@ -58,7 +58,7 @@ The paywall reads everything from the products, so nothing in code changes with 
    - `dawi.drillbit.pro.yearly`: **$79.99** a year. The paywall shows "Save 80%" and "$6.67 a month"; `Config/Drillbit.storekit` uses the same prices for the simulator.
    - Prices and caps are explained in [paywall-plan.md](paywall-plan.md).
 3. For each product: display name, description (e.g. "Unlimited reps and voice, billed weekly."), and a **review screenshot** of the paywall. Take it on the device with the TestFlight build (section 7): the simulator fixture paywall shows a debug-only "Simulate purchase" button.
-4. **The first subscription has to be submitted with an app version.** On the 2.0.0 version page, under *In-App Purchases and Subscriptions*, add both products before you press Submit. Otherwise they stay "Ready to Submit" and the reviewer sees an empty paywall.
+4. **The first subscription has to be submitted with an app version.** On the 1.0 version page, under *In-App Purchases and Subscriptions*, add both products before you press Submit. Otherwise they stay "Ready to Submit" and the reviewer sees an empty paywall.
 5. App Information → **App Store Server Notifications**: Production and Sandbox URL `https://<prod-host>/apple/notifications`, Version 2. Leave `APPLE_ENVIRONMENT` unset on production; App Review buys with Sandbox accounts against your production Worker.
 
 What the paywall already does for Guideline 3.1.2 (no work needed; listed so you can answer reviewer questions):
@@ -97,7 +97,7 @@ If you want Superwall at launch instead:
 
 | Field | Draft |
 | --- | --- |
-| Name | Drillbit |
+| Name | Drillbit Practice (the App Store record; the home screen still says Drillbit) |
 | Subtitle (30) | Rehearse the system design interview |
 | Category | Education (secondary: Productivity) |
 | Support URL | `https://<prod-host>/support` |
@@ -167,7 +167,7 @@ Record the results in [operations.md](operations.md) under a new dated heading, 
 
 ## 8. Submit
 
-Version 2.0.0 → choose the build → attach both subscriptions → add the review notes → Submit. Usual first-review questions and answers:
+Version 1.0 → choose the build → attach both subscriptions → add the review notes → Submit. Usual first-review questions and answers:
 
 - *"What data goes to the AI?"* The consent screen and the privacy policy list it. Answers and transcripts go to OpenRouter models, live audio to OpenAI, and no email address is sent.
 - *"Why is there a camera string?"* The bundled WebRTC framework links camera APIs. Drillbit never asks for camera access. The string says so.
