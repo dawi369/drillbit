@@ -99,10 +99,14 @@ struct HomeView: View {
     }
     .drillbitTabClearance()
     .task(id: model.bootstrap?.account.id) { await model.ensureHomeQuestion() }
-    .alert("Skip this question?", isPresented: Binding(get: { skipping != nil }, set: { if !$0 { skipping = nil } })) {
-      Button("Keep practising", role: .cancel) { skipping = nil }
-      Button("Skip question", role: .destructive) { if let question = skipping { let choose = chooseAfterSkip; Task { await model.skip(question.id); if choose, model.bootstrap?.challenge == nil { flow = QuestionFlowEntry() } } }; skipping = nil }
-    } message: { Text("It goes to Skipped questions in Library. Your draft stays saved.") }
+    .drillbitConfirm("Skip this question?", isPresented: Binding(get: { skipping != nil }, set: { if !$0 { skipping = nil } }),
+                     message: "It goes to Skipped questions in Library. Your draft stays saved.", actions: [
+      ConfirmAction("Skip question", style: .destructive) {
+        if let question = skipping { let choose = chooseAfterSkip; Task { await model.skip(question.id); if choose, model.bootstrap?.challenge == nil { flow = QuestionFlowEntry() } } }
+        skipping = nil
+      },
+      ConfirmAction("Keep practising") { skipping = nil },
+    ])
     .navigationTitle("Home").navigationBarTitleDisplayMode(.inline)
     .toolbar(.hidden, for: .navigationBar)
     .background(AppPalette.background)

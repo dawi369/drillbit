@@ -93,9 +93,7 @@ struct RootView: View {
             }
             Tab("Library", systemImage: AppIcon.library.rawValue, value: "library") {
               NavigationStack {
-                MemoryView(model: model).drillbitTabClearance().toolbar {
-                  Button("Settings", systemImage: AppIcon.settings.rawValue) { settingsOpen = true }
-                }
+                MemoryView(model: model).drillbitTabClearance()
               }
             }
             if model.bootstrap?.capabilities?.developerTools == true {

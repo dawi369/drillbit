@@ -54,8 +54,8 @@ export async function voiceCapability(env: Env, account: string) {
    return { available: false, plan, reason: 'That’s a lot of talking for one day. Voice is back tomorrow.', checkedAt, sessionSeconds, resetsAt: nextUtcMidnight(checkedAt) };
   return { available: true, plan, checkedAt, sessionSeconds };
  }
- // Sessions that reached the provider; refunded starts never activate.
- const history = await env.DB.prepare("SELECT COUNT(*) n, MAX(created_at) last FROM voice_sessions WHERE account_id=? AND provider_id IS NOT NULL").bind(account).first<{n:number; last:string|null}>();
+ // Sessions that reached the provider; refunded starts never activate and waived ones never heard the user.
+ const history = await env.DB.prepare("SELECT COUNT(*) n, MAX(created_at) last FROM voice_sessions WHERE account_id=? AND provider_id IS NOT NULL AND waived=0").bind(account).first<{n:number; last:string|null}>();
  const used = history?.n ?? 0;
  if (used < caps.voiceFreeLifetime) {
   const remaining = caps.voiceFreeLifetime - used;
@@ -138,6 +138,12 @@ export async function voiceEvents(env:Env,account:string,challenge:string,id:str
   if(!saved||saved.text!==f.text||saved.sequence!==f.sequence||saved.speaker!==f.speaker||saved.start_ms!==f.startMs||saved.end_ms!==f.endMs)throw new Fault('voice_event_conflict',409,'The transcript changed or the interview ended before saving.');
  }
  if(input.closed) await env.DB.prepare("UPDATE voice_sessions SET status=?,finalized=MAX(finalized,?),usage_seconds=MAX(COALESCE(usage_seconds,0),?) WHERE id=? AND account_id=?").bind(input.finalized?'closed':'uncertain',input.finalized?1:0,input.usageSeconds??0,id,account).run();
+ // A confirmed close before the user said a word is a free look: it gives the start back, so switching between voice
+ // and text costs nothing. Unconfirmed closes still count, since more speech could yet arrive.
+ if(input.closed&&input.finalized){
+  const waived=await env.DB.prepare("UPDATE voice_sessions SET waived=1 WHERE id=? AND account_id=? AND waived=0 AND status='closed' AND provider_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM voice_fragments WHERE session_id=? AND speaker='user')").bind(id,account,id).run();
+  if(waived.meta.changes) await refundVoiceStart(env,account,String(s.created_at).slice(0,10));
+ }
  return {accepted:input.fragments.map(f=>f.id)};
 }
 export async function delegateVoice(env:Env,account:string,challenge:string,id:string,raw:unknown) {

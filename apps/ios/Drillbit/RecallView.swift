@@ -172,10 +172,13 @@ struct RecallView: View {
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 20) {
-        Picker("Recall section", selection: $section) {
-          ForEach(RecallSection.allCases) { Text($0.rawValue).tag($0) }
-        }.pickerStyle(.segmented)
-        switch section {
+        // Map and Paths are still being shaped; developers see them, everyone else gets their review deck.
+        if developer {
+          Picker("Recall section", selection: $section) {
+            ForEach(RecallSection.allCases) { Text($0.rawValue).tag($0) }
+          }.pickerStyle(.segmented)
+        }
+        switch developer ? section : .review {
         case .review: deck
         case .map: skillMap
         case .paths: learningPaths
@@ -191,6 +194,7 @@ struct RecallView: View {
     .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: selectedPath)
     .sensoryFeedback(.success, trigger: feedbackPulse)
     .onAppear { configureDeck() }
+    .task { if !model.recallLoaded { await model.loadRecall() } }
     .onChange(of: model.recall.cards) { _, _ in configureDeck() }
     .onDisappear {
       guard selectedPath == nil else { return }
@@ -215,7 +219,6 @@ struct RecallView: View {
         .transition(.opacity)
       }
       if let card = session.current {
-        if selectedPath == nil { SignalEyebrow(text: "One live idea") }
         status
         cardView(card)
           .id(card.id)
@@ -281,23 +284,26 @@ struct RecallView: View {
     }
     let due = model.recall.dueCount
     let recommended = min(due, model.bootstrap?.todayPlan?.recommendedRecallCount ?? due)
-    let minutes = Int(ceil(Double(max(recommended, 0)) / 2.0))
-    return Text(due > recommended && recommended > 0 ? "\(due) due · start with \(recommended) · about \(minutes) minutes" : "\(due) due · about \(minutes) minutes")
-      .font(.headline).accessibilityLabel("\(due) due, about \(minutes) minutes")
+    let minutes = max(1, Int(ceil(Double(max(recommended, 0)) / 2.0)))
+    let cards = "\(due) \(due == 1 ? "card" : "cards") to review"
+    let time = "about \(minutes) \(minutes == 1 ? "minute" : "minutes")"
+    let line = due > recommended && recommended > 0 ? "\(cards) · start with \(recommended) · \(time)" : "\(cards) · \(time)"
+    return Text(line).font(.headline).accessibilityLabel(line.replacingOccurrences(of: " · ", with: ", "))
   }
 
   private func cardView(_ card: RecallCard) -> some View {
     VStack(alignment: .leading, spacing: 20) {
-      if model.recall.cards.contains(where: { $0.id == card.id }) { SignalEyebrow(text: "From your interview") }
-      DrillbitMetadata(text: "\(card.area.rawValue) · \(card.depth.rawValue)")
+      // Your own cards say where they came from in one line; path cards say what they cover.
       if let source = model.recall.cards.first(where: { $0.id == card.id }) {
-        Text(source.sourceTitle ?? "From this interview").font(.subheadline.weight(.medium))
-        if let date = source.sourceCompletedAt.flatMap(Date.fromAPI) { Text(date.formatted(date: .abbreviated, time: .omitted)).font(.caption).foregroundStyle(.secondary) }
-        Text(source.evidence?.signal == "demonstrated" ? "Demonstrated evidence" : source.evidence?.signal == "needs_practice" ? "Worth revisiting" : "From this interview")
-          .font(.caption).foregroundStyle(.secondary)
+        let date = source.sourceCompletedAt.flatMap(Date.fromAPI).map { " · " + $0.formatted(.dateTime.month(.abbreviated).day()) } ?? ""
+        let signal = source.evidence?.signal == "demonstrated" ? " · You nailed this" : source.evidence?.signal == "needs_practice" ? " · Worth another look" : ""
+        DrillbitMetadata(text: "From " + (source.sourceTitle ?? "your interview") + date + signal)
+          .accessibilityIdentifier("recallSource")
+      } else {
+        DrillbitMetadata(text: "\(card.area.rawValue) · \(card.depth.rawValue)")
       }
       Text(card.question)
-        .font(.largeTitle.weight(.semibold)).tracking(-0.8)
+        .font(.title.weight(.semibold)).tracking(-0.4)
         .fixedSize(horizontal: false, vertical: true)
         .accessibilityIdentifier("recallQuestion")
 
@@ -335,25 +341,27 @@ struct RecallView: View {
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
-  private var completion: some View {
-    VStack(alignment: .leading, spacing: 16) {
-      SignalEyebrow(text: selectedPath != nil ? "Set complete" : model.recallLoaded || model.fixture ? "Nothing due" : "Recall")
-      Text(completionTitle)
-        .font(.title.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
-      if selectedPath != nil {
-        Text("Leave the path to return to your personal Recall.").foregroundStyle(AppPalette.secondary)
-      } else if model.recallLoaded || model.fixture {
-        Text(model.bootstrap?.todayPlan?.completedTotal == 0 ? "Finish an interview to bring its useful moments into Recall." : "New ideas will appear here when they are ready to revisit.")
-          .foregroundStyle(AppPalette.secondary)
-      }
-    }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 32)
-  }
+  private var developer: Bool { model.bootstrap?.capabilities?.developerTools == true }
 
-  private var completionTitle: String {
-    if selectedPath != nil { return "That’s the whole set." }
-    if !model.recallLoaded && !model.fixture { return "Your review will appear here." }
-    if model.bootstrap?.todayPlan?.completedTotal == 0 { return "Your first idea starts with a practice." }
-    return "You’re caught up."
+  /// Empty deck, in Library's style: what goes here and how it gets filled.
+  @ViewBuilder private var completion: some View {
+    if selectedPath != nil {
+      ContentUnavailableView {
+        Label("That’s the whole set", systemImage: AppIcon.recall.rawValue)
+      } description: {
+        Text("Leave the path to get back to your own cards.")
+      }
+    } else if !model.recallLoaded && !model.fixture {
+      ProgressView().frame(maxWidth: .infinity).padding(.vertical, 48).accessibilityLabel("Loading Recall")
+    } else if model.bootstrap?.todayPlan?.completedTotal == 0 && session.knownCount + session.againCount == 0 {
+      ContentUnavailableView("Your Recall deck", systemImage: AppIcon.recall.rawValue,
+                             description: Text("Finish an interview and the ideas worth keeping land here to revisit."))
+        .accessibilityIdentifier("recallEmpty")
+    } else {
+      ContentUnavailableView("You’re caught up", systemImage: AppIcon.recall.rawValue,
+                             description: Text("New cards show up here when they’re ready to revisit."))
+        .accessibilityIdentifier("recallCaughtUp")
+    }
   }
 
   private func resetSession() {

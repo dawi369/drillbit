@@ -177,21 +177,8 @@ struct InterviewView: View {
       if value == .background { persistReading(); Task { if !interview.locked { try? await interview.flush() } } }
       if value == .active { interview.acceptsVoiceInput = true; Task { await interview.refresh() } }
     }
-    .alert("Voice", isPresented: Binding(get: { voiceExplanation != nil }, set: { if !$0 { voiceExplanation = nil } })) {
-      if voicePermissionNeedsSettings {
-        Button("Open Settings") {
-          if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
-          voiceExplanation = nil
-        }
-      }
-      if voiceGated {
-        Button("See Pro") {
-          voiceExplanation = nil
-          PlanCoordinator.shared.register(.voiceSession) { await enterVoice(startNow: true) }
-        }
-      }
-      Button(voiceGated ? "Keep typing" : "Done", role: .cancel) { voiceExplanation = nil }
-    } message: { Text(voiceExplanation ?? "") }
+    .drillbitConfirm("Voice", isPresented: Binding(get: { voiceExplanation != nil }, set: { if !$0 { voiceExplanation = nil } }),
+                     message: voiceExplanation, actions: voiceActions)
     .onChange(of: completedAssistance) { _, value in
       guard let value, !value.isEmpty else { return }
       assistanceText = value
@@ -287,7 +274,9 @@ struct InterviewView: View {
         do { try await Task.sleep(for: .milliseconds(400)); persistReading() } catch {}
       }
     }
-    .safeAreaInset(edge: .bottom, spacing: 0) { footer }
+    // Floats like the voice room's dock: the document blurs softly under Talk and Send instead of stopping at a slab.
+    .safeAreaBar(edge: .bottom, spacing: 0) { footer }
+    .scrollEdgeEffectStyle(.soft, for: .bottom)
     .safeAreaInset(edge: .top, spacing: 0) {
       if showsPathBar, let path = challenge.path {
         GuidedPathBar(steps: path, current: interview.displayState.guidedStep ?? guidedTurn?.result?.step ?? 0, showingSteps: $showingPathSteps)
@@ -356,14 +345,16 @@ struct InterviewView: View {
           .accessibilityLabel("Interview options").accessibilityIdentifier("interviewOptions")
       }
     }
-    .alert("Skip this question?", isPresented: $confirmSkip) {
-      Button("Keep practising", role: .cancel) {}
-      Button("Skip question", role: .destructive) { Task { await model.skip(challenge.id, answer: interview.answer) } }
-    } message: { Text("End this interview without a review and return to Home.") }
-    .alert("Finish interview?", isPresented: $confirmFinish) {
-      Button("Keep writing", role: .cancel) {}
-      Button("Finish interview") { Task { await interview.finish() } }
-    } message: { Text("Your shared answers and current draft will be saved for review.") }
+    .drillbitConfirm("Skip this question?", isPresented: $confirmSkip,
+                     message: "End this interview without a review and return to Home.", actions: [
+      ConfirmAction("Skip question", style: .destructive) { Task { await model.skip(challenge.id, answer: interview.answer) } },
+      ConfirmAction("Keep practising"),
+    ])
+    .drillbitConfirm("Finish interview?", isPresented: $confirmFinish,
+                     message: "Your shared answers and current draft will be saved for review.", actions: [
+      ConfirmAction("Finish interview", style: .primary) { Task { await interview.finish() } },
+      ConfirmAction("Keep writing"),
+    ])
     .sheet(item: $sheet, onDismiss: resetAssistance) { selection in
       switch selection {
       case .style:
@@ -455,6 +446,22 @@ struct InterviewView: View {
         InterviewDisclosureText(text: challenge.displayPrompt, expanded: !collapsed,
           identifier: "original" == activeID ? "interviewPrompt" : "earlierPrompt-original", markup: true)
     }.animation(disclosureMotion, value: collapsed)
+  }
+  /// See Pro and Open Settings are the ways forward, so they're gold; staying in text is the quiet way out.
+  private var voiceActions: [ConfirmAction] {
+    var actions: [ConfirmAction] = []
+    if voicePermissionNeedsSettings {
+      actions.append(ConfirmAction("Open Settings", style: .primary) {
+        if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+      })
+    }
+    if voiceGated {
+      actions.append(ConfirmAction("See Pro", style: .primary) {
+        PlanCoordinator.shared.register(.voiceSession) { await enterVoice(startNow: true) }
+      })
+    }
+    actions.append(ConfirmAction(voiceGated || voicePermissionNeedsSettings ? "Keep typing" : "Done"))
+    return actions
   }
   private func enterVoice(startNow: Bool = true) async {
     guard !checkingVoice, let voice = liveVoice else { return }
@@ -713,15 +720,12 @@ struct InterviewView: View {
     Task { try? await model.disk.cache(key: interview.key + ":reading", data: JSONEncoder().encode(snapshot)) }
   }
   private var footer: some View {
-    VStack(spacing: 8) {
-      HStack(spacing: 16) {
-        talkButton
-        Spacer(minLength: 0)
-        sendButton
-      }
-    }.padding(16)
-      // The document scrolls under this bar; without a floor the draft's placeholder peeks through between the controls.
-      .background(AppPalette.background)
+    HStack(spacing: 16) {
+      talkButton
+      Spacer(minLength: 0)
+      sendButton
+    }
+    .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 4)
       .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { footerFrame = $0; if followingLiveEnd, sheet == nil, let lastCaret { revealCaret(lastCaret) } }
   }
   private var talkButton: some View {
@@ -848,7 +852,8 @@ struct GuidedPathBar: View {
         }
       }
       .padding(.horizontal, 24)
-      .padding(.vertical, 12)
+      .padding(.top, 8)
+      .padding(.bottom, 12)
       .frame(maxWidth: .infinity, alignment: .leading)
       .contentShape(Rectangle())
     }

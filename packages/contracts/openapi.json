@@ -8339,7 +8339,7 @@
                 "type": "string"
               },
               "dailyMinutes": {
-                "default": 540,
+                "default": 750,
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 1439
@@ -10734,7 +10734,7 @@
             "type": "string"
           },
           "dailyMinutes": {
-            "default": 540,
+            "default": 750,
             "type": "integer",
             "minimum": 0,
             "maximum": 1439
@@ -13218,7 +13218,7 @@
                 "type": "string"
               },
               "dailyMinutes": {
-                "default": 540,
+                "default": 750,
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 1439

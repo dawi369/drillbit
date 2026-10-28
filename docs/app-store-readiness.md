@@ -64,7 +64,7 @@ What the paywall already does for Guideline 3.1.2 (no work needed; listed so you
 - Shows each plan's name, period and full price. The yearly price comes first and is bigger than the per-month figure.
 - Shows the intro offer as "Try a week for $X, then $Y a week".
 - Has Restore Purchases, Terms of Service (Apple's standard EULA) and Privacy Policy links, plus a clear Not now.
-- Settings has Plan, Manage subscription, Restore purchases, Terms and Privacy.
+- Settings has Plan, See Pro or Manage subscription, Terms and Privacy. Restore lives on the paywall (Settings → See Pro → Restore).
 - The Worker unlocks Pro only from Apple-signed transactions (`POST /v1/entitlement`) and keeps it current from Apple's notifications.
 
 ## 4. App Privacy ("nutrition label") answers
@@ -135,7 +135,7 @@ Keep "fair use applies" next to "as much as you like": Pro has hidden daily caps
 
 > Sign in with Apple to create an account; no invite or demo code is needed. The first launch shows a short intro and a one-minute setup, then asks permission to use third-party AI (OpenRouter for text, OpenAI for voice) before sign-in.
 >
-> Subscriptions: free accounts get 3 questions per day. To reach the paywall, use Settings → See Pro, or finish 3 questions. Restore Purchases is in Settings and on the paywall.
+> Subscriptions: free accounts get 3 questions per day. To reach the paywall, use Settings → See Pro, or finish 3 questions. Restore Purchases is on the paywall (Settings → See Pro).
 >
 > Voice: open a question and tap Talk. Microphone permission is requested then. Free accounts get 3 voice sessions.
 >
@@ -154,7 +154,7 @@ Install the production build on an iPhone signed into a **Sandbox** Apple ID (Se
 - [ ] Answer, follow-up, nudge, Finish → feedback
 - [ ] Voice: microphone prompt, live conversation, back to text with the draft intact; a free account stops at the cap
 - [ ] Use 3 reps → Home waits → See Pro → paywall shows real prices and intro offer → buy weekly → Pro without relaunch
-- [ ] Delete and reinstall → sign in → Restore purchases → Pro
+- [ ] Delete and reinstall → sign in → See Pro → Restore → Pro
 - [ ] Settings → Manage subscription opens Apple's sheet; cancel there and check that the plan returns to Free after expiry (sandbox weeks last minutes)
 - [ ] `SELECT * FROM entitlements` in production D1 shows the row with `environment = Sandbox`
 - [ ] Airplane mode mid-answer → draft kept → reconnect → syncs

@@ -529,6 +529,7 @@ Implements [product vision: taste, tips and the voice room](product-vision.md#ta
 - **Bootstrap:** `capabilities.voice` adds optional `remaining`, `limit` and `resetsAt` (the next UTC midnight), omitted for unlimited accounts. The OpenAPI document and the `voice-capabilities` fixture are updated.
 - **Display:** `VoiceCapability.allowanceLine()` formats “5 of 6 left today · resets 2 AM” in the device's time zone.
 - **Refunds:** `startVoice` refunds the `voice_start` usage when no provider session id came back. That covers a reservation conflict, a reservation that didn't insert, a provider error or timeout, and an invalid provider response.
+- **First words count:** a session confirmed closed (`finalized`) with no user fragment is marked `waived` and its `voice_start` refunded; free allowance and taste cadence ignore waived sessions. Peeking at voice and returning to text costs the user nothing, though OpenAI still bills the open seconds. An unconfirmed close still counts.
 
 ## Plans, paywall and voice metering — 10 October 2026
 
@@ -586,3 +587,7 @@ Correction to “Model and prompt policy” above: managed requests use `deepsee
 - **Question preview hand-off.** Bit no longer leaves the preview with a removal transition: he fades while still live and is unmounted afterwards, in the slot Start arrives in. A removal transition snapshots his per-frame Canvas, which could flash a black square on device.
 - **Voice dock** sits 8 pt lower (4 pt tighter spacing, 4 pt into the home-indicator margin; more puts its lowest button where the system swallows taps) and its bar is 12 pt taller at the top for a longer soft fade.
 - **The native paywall presents from UIKit** over the top-most view controller. It was a SwiftUI sheet on the root, which can't appear while Settings or an interview is already presented, so See Pro there did nothing. It waits out an alert that's still closing; Not now, a purchase and a swipe down all close it through `PlanCoordinator`.
+
+## Confirmations — 28 October 2026
+
+Two-choice confirmations (Finish interview, Skip question, the voice gate, Delete account) use `drillbitConfirm` (`ConfirmDialog.swift`), not system alerts: system alerts colour every button with the app tint, so they can't mark which choice is the one we want. The wanted action is a gold `PracticeButtonStyle` capsule; the way out is white text; irreversible steps are red text. It is presented as a full-screen cover without its slide, fades in, is modal for VoiceOver, scrolls at large text sizes, and its first secondary action answers the escape gesture. Single-button notices stay system alerts.

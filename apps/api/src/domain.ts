@@ -58,7 +58,7 @@ export const settingsSchema = z.object({
       }
     }, "Invalid timezone")
     .default("Europe/Prague"),
-  dailyMinutes: z.number().int().min(0).max(1439).default(540),
+  dailyMinutes: z.number().int().min(0).max(1439).default(750),
   reminderEnabled: z.boolean().default(false),
   aiMode: z.enum(["managed", "byok"]).default("managed"),
   model: z.enum([MODEL_ID, "google/gemini-3.1-flash-lite", "google/gemini-2.5-flash-lite"]).default(MODEL_ID),

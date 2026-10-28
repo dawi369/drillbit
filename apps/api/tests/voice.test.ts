@@ -163,3 +163,27 @@ it('pins locally supplied profile into the actual live session instructions',asy
   expect(JSON.parse(saved!.input).practiceProfile).toEqual(profile);
  }finally{mock.mockRestore();}
 });
+
+it('a session counts only once the user speaks: a silent confirmed close is free, and refunds once', async()=>{
+ const {a,id}=await fixture(), usage=async()=>(await e.DB.prepare("SELECT count FROM usage WHERE account_id=? AND day=? AND kind='voice_start'").bind(a,day()).first<any>())?.count ?? 0;
+ const start=async()=>{const cmd=crypto.randomUUID(),mock=connection();try{await startVoice(free,a,id,cmd,{sdp:'offer',revision:2});}finally{mock.mockRestore();}return cmd;};
+ // Peek and leave without a word: nothing spent, however many times, even with a duplicated close.
+ for(let i=0;i<4;i++){
+  const cmd=await start();
+  expect(await voiceCapability(free,a)).toMatchObject({remaining:2});
+  await Promise.all([voiceEvents(free,a,id,cmd,{fragments:[],closed:true,finalized:true}),voiceEvents(free,a,id,cmd,{fragments:[],closed:true,finalized:true})]);
+  expect(await voiceCapability(free,a)).toMatchObject({available:true,remaining:3});
+  expect(await usage()).toBe(0);
+ }
+ // The interviewer talking alone doesn't count; the user's first words do.
+ const spoke=await start();
+ await voiceEvents(free,a,id,spoke,{fragments:[{...fragment,id:'s1',speaker:'assistant'},{...fragment,id:'s2',sequence:1}]});
+ await voiceEvents(free,a,id,spoke,{fragments:[],closed:true,finalized:true});
+ expect(await voiceCapability(free,a)).toMatchObject({remaining:2});
+ expect(await usage()).toBe(1);
+ // An unconfirmed close might still have speech in flight, so it keeps counting.
+ const lost=await start();
+ await voiceEvents(free,a,id,lost,{fragments:[],closed:true,finalized:false});
+ expect(await voiceCapability(free,a)).toMatchObject({remaining:1});
+ expect(await usage()).toBe(2);
+});

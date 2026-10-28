@@ -156,25 +156,16 @@ private struct EntitlementReceipt: Decodable { var plan: String }
 /// Fallback paywall: Apple's own subscription store for the Pro products.
 struct NativePaywallSheet: View {
   let placement: PaywallPlacement
+  /// Products are checked up front so a store that sends nothing gets a plain explanation and a retry, not
+  /// StoreKit's bare "Subscription unavailable".
+  private enum Availability { case checking, ready, missing }
+  @State private var availability = Availability.checking
+  @State private var attempt = 0
+
   var body: some View {
     NavigationStack {
-      SubscriptionStoreView(productIDs: PlanCoordinator.productIDs) {
-        VStack(spacing: 8) {
-          Text("Drillbit Pro").font(.title.weight(.semibold))
-          Text(placement == .voiceSession ? "Talk it through whenever you want, for as long as the interview needs." : "Practice as much as you like. Voice any time.")
-            .font(.subheadline).foregroundStyle(AppPalette.secondary).multilineTextAlignment(.center)
-        }
-        .padding(.horizontal, 24)
-      }
-      .subscriptionStoreControlStyle(PlanPicker())
-      .storeButton(.visible, for: .restorePurchases)
-      .storeButton(.visible, for: .policies)
-      // One way out: Not now, which also drops the feature waiting behind the paywall.
-      .storeButton(.hidden, for: .cancellation)
-      .subscriptionStorePolicyDestination(url: LegalLinks.terms, for: .termsOfService)
-      .modifier(PrivacyPolicyDestination())
-      .onInAppPurchaseCompletion { _, result in
-        if case .success(.success) = result { Task { await PlanCoordinator.shared.purchased() } }
+      Group {
+        if availability == .missing { unavailable } else { store }
       }
       .toolbar {
         ToolbarItem(placement: .cancellationAction) { Button("Not now") { PlanCoordinator.shared.dismissed() }.accessibilityIdentifier("paywallDismiss") }
@@ -189,6 +180,44 @@ struct NativePaywallSheet: View {
       }
     }
     .accessibilityIdentifier("paywall")
+    .task(id: attempt) {
+      let found = (try? await Product.products(for: PlanCoordinator.productIDs)) ?? []
+      availability = found.isEmpty ? .missing : .ready
+    }
+  }
+
+  private var store: some View {
+    SubscriptionStoreView(productIDs: PlanCoordinator.productIDs) {
+      VStack(spacing: 8) {
+        Text("Drillbit Pro").font(.title.weight(.semibold))
+        Text(placement == .voiceSession ? "Talk it through whenever you want, for as long as the interview needs." : "Practice as much as you like. Voice any time.")
+          .font(.subheadline).foregroundStyle(AppPalette.secondary).multilineTextAlignment(.center)
+      }
+      .padding(.horizontal, 24)
+    }
+    .subscriptionStoreControlStyle(PlanPicker())
+    .storeButton(.visible, for: .restorePurchases)
+    .storeButton(.visible, for: .policies)
+    // One way out: Not now, which also drops the feature waiting behind the paywall.
+    .storeButton(.hidden, for: .cancellation)
+    .subscriptionStorePolicyDestination(url: LegalLinks.terms, for: .termsOfService)
+    .modifier(PrivacyPolicyDestination())
+    .onInAppPurchaseCompletion { _, result in
+      if case .success(.success) = result { Task { await PlanCoordinator.shared.purchased() } }
+    }
+  }
+
+  private var unavailable: some View {
+    ContentUnavailableView {
+      Label("Couldn’t load Pro", systemImage: "sparkles")
+    } description: {
+      Text("The App Store didn’t send the plans over. Check your connection, then give it another go.")
+    } actions: {
+      Button("Try again") { availability = .checking; attempt += 1 }
+        .buttonStyle(PracticeButtonStyle()).frame(maxWidth: 240)
+        .accessibilityIdentifier("paywallRetry")
+    }
+    .accessibilityIdentifier("paywallUnavailable")
   }
 }
 

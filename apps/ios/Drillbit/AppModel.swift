@@ -572,6 +572,23 @@ import WidgetKit
     let version = recallRequestVersion
     let epoch = bootstrap?.practiceEpoch
     if fixture {
+      #if DEBUG
+      if ProcessInfo.processInfo.arguments.contains("--fixture-recall-due") {
+        let now = Date.now.ISO8601Format()
+        func card(_ id: String, _ concept: String, _ question: String, _ answer: String) -> RecallCardDTO {
+          RecallCardDTO(id: id, sourceChallengeId: "fixture", conceptId: concept, question: question, answer: answer, dueAt: now,
+                        intervalDays: 0, repetitions: 0, lapses: 0, createdAt: now, updatedAt: now,
+                        sourceTitle: "Design a reliable job queue", sourceCompletedAt: now, sourceTicket: 12)
+        }
+        let cards = [
+          card("due-1", "idempotency", "Why does a retried job need an idempotency key?",
+               "So a second delivery of the same job sees the key and skips the side effect instead of charging or sending twice."),
+          card("due-2", "backpressure", "What should a queue do when consumers fall behind?",
+               "Push back on producers, shed or delay low-priority work, and alert, instead of letting the backlog grow without a bound."),
+        ]
+        recall = RecallDeckResponse(cards: cards, dueCount: cards.count); recallLoaded = true; recallFetchedAt = Date(); return
+      }
+      #endif
       recall = RecallDeckResponse(cards: [], dueCount: 0); recallLoaded = true; recallFetchedAt = Date(); return
     }
     do {
@@ -604,6 +621,8 @@ import WidgetKit
       if plan.dueRecallCount == 0 { plan.state = plan.completedToday > 0 ? "complete_today" : (bootstrap?.challenge == nil ? "prepare" : "question_ready") }
       bootstrap?.todayPlan = plan
     }
+    // Fixtures have no account to tell; the local deck is the whole story.
+    if fixture { return }
     do {
       let result: RecallReviewResponse = try await api.send("recall/\(card.id)/review", method: "POST",
         body: RecallReviewInput(rating: rating, responseMs: responseMs), command: UUID().uuidString)

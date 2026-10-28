@@ -61,7 +61,7 @@ struct PracticeSettings: Codable, Equatable, Sendable {
     set { engineeringLevel = newValue }
   }
   var timezone = TimeZone.current.identifier
-  var dailyMinutes = 540
+  var dailyMinutes = 750
   var reminderEnabled = false
   var aiMode = "managed"
   var model = "openai/gpt-6-luna"

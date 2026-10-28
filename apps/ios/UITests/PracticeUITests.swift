@@ -13,7 +13,8 @@ final class PracticeUITests: XCTestCase {
     XCTAssertFalse(app.staticTexts["Loading Recall…"].exists)
     XCTAssertFalse(app.buttons["recallAreaPicker"].exists)
     XCTAssertFalse(app.buttons["recallDepthPicker"].exists)
-    XCTAssertTrue(app.staticTexts["Your first idea starts with a practice."].exists)
+    XCTAssertTrue(app.descendants(matching: .any)["recallEmpty"].exists)
+    // Developers keep the Map and Paths sections.
     app.buttons["Map"].tap()
     XCTAssertTrue(app.staticTexts["Your system design map"].waitForExistence(timeout: 2))
     app.buttons["Paths"].tap()
@@ -24,6 +25,32 @@ final class PracticeUITests: XCTestCase {
     app.buttons["recallReveal"].tap()
     XCTAssertTrue(app.descendants(matching: .any)["recallAnswer"].waitForExistence(timeout: 2))
     capture("Recall path answer", app)
+  }
+
+  func testRecallReviewForCustomers() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures", "--fixture-customer", "--fixture-recall-due"]
+    app.launch()
+    XCTAssertTrue(app.tabBars.buttons["Recall"].waitForExistence(timeout: 10))
+    app.tabBars.buttons["Recall"].tap()
+    // No section picker for customers: Recall is their review deck.
+    XCTAssertTrue(app.buttons["recallReveal"].waitForExistence(timeout: 5))
+    XCTAssertFalse(app.buttons["Map"].exists)
+    XCTAssertFalse(app.buttons["Paths"].exists)
+    let status = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "2 cards to review")).firstMatch
+    XCTAssertTrue(status.exists)
+    XCTAssertFalse(status.label.contains("1 minutes"), status.label)
+    let source = app.descendants(matching: .any)["recallSource"]
+    XCTAssertTrue(source.exists && source.label.hasPrefix("From Design a reliable job queue"), source.label)
+    XCTAssertFalse(app.staticTexts["One live idea"].exists)
+    capture("Recall review", app)
+    for _ in 0..<2 {
+      app.buttons["recallReveal"].tap()
+      XCTAssertTrue(app.buttons["recallGotIt"].waitForExistence(timeout: 3))
+      app.buttons["recallGotIt"].tap()
+    }
+    XCTAssertTrue(app.descendants(matching: .any)["recallCaughtUp"].waitForExistence(timeout: 5))
+    capture("Recall caught up", app)
   }
 
   func testHomeTicketResumesAndOffersActions() throws {
@@ -193,7 +220,7 @@ final class PracticeUITests: XCTestCase {
     app.buttons["coachDone"].tap()
     app.buttons["interviewOptions"].tap()
     app.buttons["Skip question"].tap()
-    let alert = app.alerts["Skip this question?"]
+    let alert = app.descendants(matching: .any)["confirmDialog"]
     XCTAssertTrue(alert.waitForExistence(timeout: 5))
     alert.buttons["Skip question"].tap()
     // Tips live inside the interview only: Home and every tab stay clear after the first rep.
@@ -253,9 +280,9 @@ final class PracticeUITests: XCTestCase {
     XCTAssertEqual(voiceFrame.height, sendFrame.height, accuracy: 1)
     capture("Native interview actions", app)
     app.buttons["liveVoice"].tap()
-    XCTAssertTrue(app.alerts["Voice"].waitForExistence(timeout: 3))
+    XCTAssertTrue(app.descendants(matching: .any)["confirmDialog"].waitForExistence(timeout: 3))
     XCTAssertFalse(app.buttons["voiceMute"].exists)
-    app.alerts.buttons["Done"].tap()
+    app.descendants(matching: .any)["confirmDialog"].buttons["Done"].tap()
     XCTAssertEqual(editor.value as? String, "Keep this reply")
     XCTAssertTrue(app.buttons["shareAnswer"].isEnabled)
   }
@@ -277,7 +304,9 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.buttons["voiceEnd"].exists)
     XCTAssertFalse(app.buttons["voiceBack"].exists, "Live, End is the only way back; the keyboard key sits beside Start")
     XCTAssertFalse(app.buttons["voiceCancel"].exists)
-    XCTAssertTrue(app.descendants(matching: .any)["voiceClock"].exists)
+    XCTAssertFalse(app.descendants(matching: .any)["voiceClock"].exists, "No running clock in the voice room")
+    XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label MATCHES %@", "^[0-9]+:[0-9]{2}( left)?$")).firstMatch.exists)
+    XCTAssertFalse(app.descendants(matching: .any)["voiceClosing"].exists)
     XCTAssertFalse(app.buttons["voiceUseText"].exists)
     XCTAssertFalse(app.buttons["voiceEndControl"].exists)
     // The room opens muted; one tap on the mic opens the line.
@@ -854,7 +883,7 @@ final class PracticeUITests: XCTestCase {
     editor.tap(); editor.typeText("Keep my draft")
     app.buttons["interviewOptions"].tap()
     app.buttons["Skip question"].tap()
-    let alert = app.alerts["Skip this question?"]
+    let alert = app.descendants(matching: .any)["confirmDialog"]
     XCTAssertTrue(alert.waitForExistence(timeout: 5))
     capture("Skip confirmation alert", app)
     alert.buttons["Keep practising"].tap()
@@ -967,11 +996,11 @@ final class PracticeUITests: XCTestCase {
     capture("Interview wrap-up", app)
     app.buttons["interviewOptions"].tap()
     app.buttons["Finish interview"].tap()
-    app.alerts.buttons["Keep writing"].tap()
+    app.descendants(matching: .any)["confirmDialog"].buttons["Keep writing"].tap()
     XCTAssertFalse(app.staticTexts["That’s one in the bag."].exists)
     app.buttons["interviewOptions"].tap()
     app.buttons["Finish interview"].tap()
-    app.alerts.buttons["Finish interview"].tap()
+    app.descendants(matching: .any)["confirmDialog"].buttons["Finish interview"].tap()
     XCTAssertTrue(app.staticTexts["That’s one in the bag."].waitForExistence(timeout:5))
     capture("Practice completion", app)
     app.buttons["Done for today"].firstMatch.tap()
@@ -1065,7 +1094,7 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.staticTexts["What happens if a worker stops after completing the operation but before acknowledging it?"].waitForExistence(timeout: 8))
     app.buttons["interviewOptions"].tap()
     app.buttons["Finish interview"].tap()
-    app.alerts.buttons["Finish interview"].tap()
+    app.descendants(matching: .any)["confirmDialog"].buttons["Finish interview"].tap()
     // Generated feedback is parked for MVP (`ReflectionView.showsFeedback`): the round ends on the plain finish.
     XCTAssertTrue(app.staticTexts["That’s one in the bag."].waitForExistence(timeout: 8))
     XCTAssertFalse(app.staticTexts["INTERVIEW DEBRIEF"].exists)
@@ -1223,7 +1252,7 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(path.label.hasPrefix("Step 2 of 4"), path.label)
     app.buttons["interviewOptions"].tap()
     app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Finish interview'")).firstMatch.tap()
-    app.alerts.buttons["Finish interview"].tap()
+    app.descendants(matching: .any)["confirmDialog"].buttons["Finish interview"].tap()
     // Feedback leads with what worked and what to fix, then offers the reminder once.
     XCTAssertTrue(app.descendants(matching: .any)["feedbackLead"].waitForExistence(timeout: 8))
     XCTAssertTrue(app.descendants(matching: .any)["reminderOffer"].exists)
@@ -1336,18 +1365,13 @@ final class PracticeUITests: XCTestCase {
     app.buttons["settingsSeePro"].tap()
     XCTAssertTrue(app.descendants(matching: .any)["paywall"].waitForExistence(timeout: 5))
     app.buttons["paywallDismiss"].tap()
-    let restore = app.buttons["Restore purchases"]
-    for _ in 0..<2 where !restore.exists { app.swipeUp() }
-    XCTAssertTrue(restore.waitForExistence(timeout: 3))
+    // Restore lives on the paywall now, not in Settings.
+    XCTAssertFalse(app.buttons["Restore purchases"].exists)
     // Subscription apps must reach their terms from inside the app.
     let terms = app.descendants(matching: .any)["settingsTerms"]
     for _ in 0..<8 where !terms.exists { app.swipeUp() }
     XCTAssertTrue(terms.waitForExistence(timeout: 3))
-    // The third-party AI disclosure stays findable after the one-time consent.
-    let disclosure = app.descendants(matching: .any)["settingsAIDisclosure"]
-    for _ in 0..<2 where !disclosure.exists { app.swipeUp() }
-    XCTAssertTrue(disclosure.waitForExistence(timeout: 3))
-    XCTAssertTrue(disclosure.label.contains("OpenRouter") && disclosure.label.contains("OpenAI"), disclosure.label)
+    XCTAssertFalse(app.descendants(matching: .any)["settingsAIDisclosure"].exists)
     capture("Settings on Free", app)
   }
 

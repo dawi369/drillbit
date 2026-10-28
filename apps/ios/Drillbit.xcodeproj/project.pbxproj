@@ -42,6 +42,7 @@
 		841482E9982EA21DA42B92E3 /* Ticket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 137147215B8FA4CA44DA4451 /* Ticket.swift */; };
 		868D112482709522C36A981D /* PracticeWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF83E5C54AF9B2C1262CAB8 /* PracticeWorkspace.swift */; };
 		8D4370BA4D4B112FDA7560A6 /* PracticeCompanion.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCDB9D254A54D86DF356AC77 /* PracticeCompanion.swift */; };
+		8FE983BB1C9DB26C639077DF /* ConfirmDialog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EF172C9FCF994285F13C65A /* ConfirmDialog.swift */; };
 		90F6ED92CF56317BB044798C /* WebRTC in Frameworks */ = {isa = PBXBuildFile; productRef = F2CD5EB14F805EA1C27B2674 /* WebRTC */; };
 		98976F6C3CDB3840953CD676 /* ReflectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD095763BDFB10A241582226 /* ReflectionView.swift */; };
 		9BF823A35BDAA8B8E137FD8F /* Plan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 015AF53243158079689CE24B /* Plan.swift */; };
@@ -148,6 +149,7 @@
 		92066D96F6C016361FF268E4 /* InterviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterviewView.swift; sourceTree = "<group>"; };
 		9A2B037FAEC89AAC90414A59 /* DrillbitWidget.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = DrillbitWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		9A7106218805AC5263A12438 /* Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persistence.swift; sourceTree = "<group>"; };
+		9EF172C9FCF994285F13C65A /* ConfirmDialog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmDialog.swift; sourceTree = "<group>"; };
 		9F6AAE6E7C477280E6A8A371 /* OFL-Literata.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "OFL-Literata.txt"; sourceTree = "<group>"; };
 		A193915AEBBE5F30D2A8AECA /* CompanionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionCoordinator.swift; sourceTree = "<group>"; };
 		A8BD0996355C1121C323D9E2 /* BitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitTests.swift; sourceTree = "<group>"; };
@@ -228,6 +230,7 @@
 				17CD35FA19967623C29EB147 /* BitView.swift */,
 				A193915AEBBE5F30D2A8AECA /* CompanionCoordinator.swift */,
 				04CE1C0E2D55B42FFFD0982A /* CompanionPanel.swift */,
+				9EF172C9FCF994285F13C65A /* ConfirmDialog.swift */,
 				FDE151C29EEC1990D2C7E840 /* DesignSystem.swift */,
 				DAD863FB5DA9BAE45F86B3AB /* DrillbitApp.swift */,
 				BA47F5B6A6BBF68259182059 /* FirstUse.swift */,
@@ -530,6 +533,7 @@
 				2027DBB976212CFEA63A6BE4 /* BitView.swift in Sources */,
 				70BF4744A694732D3FFBCDBC /* CompanionCoordinator.swift in Sources */,
 				387B66BE5AA3210DD6C8A017 /* CompanionPanel.swift in Sources */,
+				8FE983BB1C9DB26C639077DF /* ConfirmDialog.swift in Sources */,
 				B60776186F24C169754719F2 /* DesignSystem.swift in Sources */,
 				3D1A1EB693F960C1596B0D8F /* DrillbitApp.swift in Sources */,
 				EFE8C1C42E2D80F1C5FEA8D4 /* FirstUse.swift in Sources */,

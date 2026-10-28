@@ -264,7 +264,7 @@ struct ReflectionView: View {
   }
   private var reminderOffer: some View {
     let minutes = model.settings.dailyMinutes
-    let time = Calendar.current.date(from: DateComponents(hour: minutes / 60, minute: minutes % 60))?.formatted(date: .omitted, time: .shortened) ?? "9:00"
+    let time = Calendar.current.date(from: DateComponents(hour: minutes / 60, minute: minutes % 60))?.formatted(date: .omitted, time: .shortened) ?? "12:30"
     return VStack(alignment: .leading, spacing: 12) {
       VStack(alignment: .leading, spacing: 4) {
         Text("Want a nudge tomorrow?").font(.headline)

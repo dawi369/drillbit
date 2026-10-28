@@ -52,7 +52,7 @@ struct InterviewVoiceRoom<Question: View>: View {
       .navigationTitle("Talk it through")
       .navigationBarTitleDisplayMode(.inline)
       .navigationBarBackButtonHidden()
-      .toolbar { ToolbarItem(placement: .principal) { VoiceRoomClock(voice: voice, warned: $warned) } }
+      .toolbar { ToolbarItem(placement: .principal) { VoiceRoomTitle(voice: voice, warned: $warned) } }
       .sensoryFeedback(.impact(weight: .medium), trigger: voice.phase == .active) { _, live in live }
       .sensoryFeedback(.warning, trigger: warned) { _, now in now }
       .onChange(of: voice.phase) { _, phase in
@@ -63,7 +63,7 @@ struct InterviewVoiceRoom<Question: View>: View {
         default: break
         }
       }
-      .onChange(of: warned) { _, now in if now { AccessibilityNotification.Announcement("Two minutes left in this voice session.").post() } }
+      .onChange(of: warned) { _, now in if now { AccessibilityNotification.Announcement("Thirty seconds left in this voice session.").post() } }
       .onChange(of: voice.muted) { _, muted in if !muted { unmutedOnce = true } }
   }
 
@@ -91,6 +91,10 @@ struct InterviewVoiceRoom<Question: View>: View {
 
   @ViewBuilder private var dock: some View {
     VStack(spacing: 8) {
+      if warned, phase == .active, voice.message == nil {
+        Text("Thirty seconds left. Land the point.").font(.footnote).foregroundStyle(AppPalette.accent)
+          .accessibilityIdentifier("voiceClosing")
+      }
       if let message = voice.message {
         Text(message).font(.footnote).foregroundStyle(AppPalette.secondary)
           .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
@@ -271,30 +275,21 @@ private struct VoiceBit: View {
   }
 }
 
-/// The title, then the session clock once connected; it turns to a countdown in the last two minutes.
-private struct VoiceRoomClock: View {
+/// Just the title: no running clock. The session's end is flagged once, thirty seconds out, by `warned`.
+private struct VoiceRoomTitle: View {
   let voice: LiveVoice
   @Binding var warned: Bool
   var body: some View {
-    VStack(spacing: 0) {
-      Text("Talk it through").font(.subheadline.weight(.semibold))
-      if voice.phase == .active, let started = voice.startedAt {
-        TimelineView(.periodic(from: started, by: 1)) { context in
-          let elapsed = max(0, context.date.timeIntervalSince(started))
-          let left = max(0, voice.sessionLimit - elapsed)
-          let closing = left <= 120
-          Text(closing ? "\(Self.clock(left)) left" : Self.clock(elapsed))
-            .font(.caption.monospacedDigit())
-            .foregroundStyle(closing ? AppPalette.accent : AppPalette.secondary)
-            .onChange(of: closing) { _, now in if now { warned = true } }
+    Text("Talk it through").font(.subheadline.weight(.semibold))
+      .background {
+        if voice.phase == .active, let started = voice.startedAt {
+          TimelineView(.periodic(from: started, by: 1)) { context in
+            let closing = voice.sessionLimit - context.date.timeIntervalSince(started) <= 30
+            Color.clear.onChange(of: closing, initial: true) { _, now in if now { warned = true } }
+          }
+          .accessibilityHidden(true)
         }
-        .accessibilityIdentifier("voiceClock")
       }
-    }
-  }
-  static func clock(_ seconds: TimeInterval) -> String {
-    let total = Int(seconds.rounded(.down))
-    return String(format: "%d:%02d", total / 60, total % 60)
   }
 }
 

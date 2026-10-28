@@ -26,7 +26,9 @@ struct SettingsView: View {
   }
   private var plan: Binding<LearningPlan> { Binding(get: { model.settings.learningPlan ?? LearningPlan() }, set: { model.settings.learningPlan = $0 }) }
   private static let objectives = [("interview", "An interview’s coming up"), ("learn", "Getting sharper"), ("stay_sharp", "Keeping fresh")]
-  private static let modes = [("voice", "Talking it out"), ("text", "Typing"), ("mix", "Depends on the day")]
+  /// Onboarding's "Depends on the day" opens in voice just like "Talking it out", so Settings shows the two real
+  /// choices and leaves the stored answer alone until they pick one.
+  private static let modes = [("voice", "Talking it out"), ("text", "Typing")]
   /// What a student changes after week one, and nothing else. The plan's finer knobs, the free-text profile, the
   /// provider key and the export live under Developer; the data behind them is untouched.
   var body: some View {
@@ -35,7 +37,7 @@ struct SettingsView: View {
         Picker("Engineering level", selection: $model.settings.selectedLevel) {
           ForEach(EngineeringLevel.choices, id: \.0) { Text($0.1).tag($0.0) }
         }
-        Picker("Practice", selection: Binding(get: { model.practiceMode }, set: { model.practiceMode = $0 })) {
+        Picker("Practice style", selection: Binding(get: { model.practiceMode == "text" ? "text" : "voice" }, set: { model.practiceMode = $0 })) {
           ForEach(Self.modes, id: \.0) { Text($0.1).tag($0.0) }
         }.accessibilityIdentifier("practiceModePicker")
         Picker("Here for", selection: plan.objective) { ForEach(Self.objectives, id: \.0) { Text($0.1).tag($0.0) } }
@@ -80,7 +82,6 @@ struct SettingsView: View {
         } else {
           Text(model.repsLeftLine ?? "3 free reps a day, voice to taste. Pro has no limits.").font(.footnote).foregroundStyle(.secondary)
           Button("See Pro") { PlanCoordinator.shared.register(.practiceRep) { await model.refresh() } }.accessibilityIdentifier("settingsSeePro")
-          Button("Restore purchases") { Task { try? await AppStore.sync(); await PlanCoordinator.shared.syncEntitlements() } }
         }
       }
       Section("Account") {
@@ -110,8 +111,9 @@ struct SettingsView: View {
           }
         }
         Button("Delete account", role: .destructive) { deleting = true }
-          .alert("Delete your account?", isPresented: $deleting) {
-            Button("Delete", role: .destructive) {
+          .drillbitConfirm("Delete your account?", isPresented: $deleting,
+                           message: "This permanently deletes your account, practice, feedback, Recall and saved key. There’s no undo.", actions: [
+            ConfirmAction("Delete", style: .destructive) {
               Task {
                 await model.perform {
                   let _: [String: String] = try await model.api.send(
@@ -120,25 +122,18 @@ struct SettingsView: View {
                   dismiss()
                 }
               }
-            }
-            Button("Cancel", role: .cancel) {}
-          } message: {
-            Text("This permanently deletes your account, practice, feedback, Recall and saved key. There’s no undo.")
-          }
+            },
+            ConfirmAction("Cancel"),
+          ])
       }
       if model.bootstrap?.capabilities?.developerTools == true || model.fixture {
         DeveloperSettingsSection(model: model, appearance: $appearance, dismiss: { dismiss() })
       }
-      Section {
+      Section("Legal") {
         Link("Terms of Use", destination: LegalLinks.terms).accessibilityIdentifier("settingsTerms")
         if let privacy = LegalLinks.privacy {
           Link("Privacy Policy", destination: privacy).accessibilityIdentifier("settingsPrivacy")
         }
-      } header: {
-        Text("Legal")
-      } footer: {
-        Text("Bit runs on outside AI. What you write goes to AI models through OpenRouter, and your voice goes to OpenAI, only to reply to you. Delete your account to remove everything.")
-          .accessibilityIdentifier("settingsAIDisclosure")
       }
     }.navigationTitle("Settings")
       .toolbar {
