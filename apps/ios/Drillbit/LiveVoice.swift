@@ -38,6 +38,13 @@ private struct VoiceOutbox: Codable {
   var startedAt: Date?
   /// True only while a delegated reasoning request is actually in flight.
   var thinking = false
+  /// A session nobody speaks in still bills every open second, so it ends after this long without speech from
+  /// either side. Any transcript or an unmute resets the clock.
+  static let idleLimit: TimeInterval = 180
+  /// The last thirty seconds before a quiet session ends.
+  var idleWarning = false
+  private var lastActivity = Date()
+  private var idleWatch: Task<Void,Never>?
   var isOpen: Bool { phase != .idle }
   var blocksText: Bool { [.connecting,.active,.ending].contains(phase) || outbox != nil }
   let levels = VoiceLevels()
@@ -192,6 +199,7 @@ private struct VoiceOutbox: Codable {
   func toggleMute() {
     guard phase == .active else { return }
     muted.toggle()
+    markActivity()
     transport?.mute(muted)
     transport?.send(["type": muted ? "session.input_audio.mute" : "session.input_audio.unmute", "event_id":UUID().uuidString])
   }
@@ -227,6 +235,7 @@ private struct VoiceOutbox: Codable {
   }
   func end() async {
     guard isOpen, phase != .ending else { return }
+    idleWatch?.cancel(); idleWarning = false
     let wasConnecting = phase == .connecting
     phase = .ending
     if wasConnecting { generation = UUID() }
@@ -249,6 +258,24 @@ private struct VoiceOutbox: Codable {
       try? await Task.sleep(for:.seconds(5))
       guard !Task.isCancelled else { return }
       await self?.finalize(confirmed:false)
+    }
+  }
+  private func markActivity() { lastActivity = .now; idleWarning = false }
+  private func watchIdle(epoch: UUID) {
+    idleWatch?.cancel()
+    markActivity()
+    idleWatch = Task { [weak self] in
+      while !Task.isCancelled {
+        try? await Task.sleep(for: .seconds(5))
+        guard let self, self.generation == epoch, self.phase == .active else { return }
+        let quiet = Date().timeIntervalSince(self.lastActivity)
+        if quiet >= Self.idleLimit {
+          await self.end()
+          self.message = "Voice ended after three quiet minutes. Your transcript is saved."
+          return
+        }
+        self.idleWarning = quiet >= Self.idleLimit - 30
+      }
     }
   }
   func interrupt(_ reason: String) {
@@ -275,7 +302,7 @@ private struct VoiceOutbox: Codable {
   private func receive(_ data: Data) async {
     guard let event = try? JSONSerialization.jsonObject(with:data) as? [String:Any],let type=event["type"] as? String else { return }
     if type == "session.started" {
-      if phase == .connecting { phase = .active; startedAt = .now }
+      if phase == .connecting { phase = .active; startedAt = .now; watchIdle(epoch: generation) }
       if muted { transport?.send(["type": "session.input_audio.mute", "event_id": UUID().uuidString]) }
       return
     }
@@ -298,6 +325,7 @@ private struct VoiceOutbox: Codable {
       let text = Self.stripNonVerbal(delta)
       let f = VoiceFragment(id:id,sequence:(outbox?.fragments.last?.sequence ?? -1)+1,speaker:type == "session.input_transcript.delta" ? "user":"assistant",text:text,startMs:start,endMs:end)
       outbox?.fragments.append(f); seen.insert(id)
+      markActivity()
       do {
         try await persist()
         if let outbox { present(outbox.fragments,id:outbox.id) }

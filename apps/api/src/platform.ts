@@ -34,6 +34,8 @@ export interface Env {
   PRO_REPS_PER_DAY?: string;
   PRO_VOICE_STARTS_PER_DAY?: string;
   PRO_VOICE_SESSION_MINUTES?: string;
+  PRO_VOICE_MINUTES_PER_DAY?: string;
+  PRO_VOICE_MINUTES_PER_WEEK?: string;
   APPLE_BUNDLE_ID?: string;
   APPLE_PRODUCT_IDS?: string;
   APPLE_ENVIRONMENT?: string;

@@ -1,6 +1,6 @@
 # Paywall: how it works, what's free, what it costs, what to charge
 
-Status 28 October 2026. Costs are **measured** where marked and **estimated** otherwise. Prices and caps marked *proposed* need your decision (see the end).
+Status 28 October 2026. Costs are **measured** where marked and **estimated** otherwise. The section 7 proposals were accepted; see section 8.
 
 ## 1. Why See Pro said "Subscription unavailable"
 
@@ -28,13 +28,13 @@ Renewals, expiry, refunds → App Store Server Notifications v2 → POST /apple/
 - **The paywall** is Apple's `SubscriptionStoreView` with our plan picker: yearly first with "Save N%", weekly with its intro offer. It also carries Restore, Terms and Privacy, which App Review requires. Superwall is wired in but off; leave it off for launch.
 - **Plans are per account, not per device.** A subscription restored on a new phone attaches to whoever is signed in; it's refused if another Drillbit account already owns it.
 
-## 3. What's free and what's Pro (today)
+## 3. What's free and what's Pro
 
 | | Free | Pro |
 |---|---|---|
 | Questions (reps) | 3 a day (resets at UTC midnight) | Unlimited*, fair-use 30 a day |
 | Inside a rep | 8 follow-ups, 2 nudges or examples | Unlimited |
-| Voice | First 3 sessions, 3 min each, then 1 a week | Unlimited*, fair-use 20 sessions a day, 20 min each |
+| Voice | First 3 sessions, 3 min each, then one every 30 days | Unlimited*, fair use 60 min a day and 150 a week, up to 20 min a session |
 | Feedback, Recall, Library | ✓ | ✓ |
 | Daily question prepared for you | – | ✓ |
 
@@ -42,13 +42,13 @@ Renewals, expiry, refunds → App Store Server Notifications v2 → POST /apple/
 
 **New this pass:** a voice session counts only once you actually speak. Opening voice and going back to text without saying anything is free, however often you do it. The server refunds the session when it's confirmed closed with no speech from you. If the app dies mid-session, the session still counts, because more speech might have been in flight.
 
-## 4. When we ask people to upgrade (today)
+## 4. When we ask people to upgrade
 
 1. **Home, once today's free reps are used:** "That's today's free reps… See Pro".
 2. **Feedback screen after the last free rep of the day:** the same line with See Pro.
 3. **Voice, once the free sessions are used:** a dialog with **See Pro** (gold) and Keep typing.
 4. **Settings → Plan → See Pro**, any time.
-5. **Gap:** hitting the 8-follow-up or 2-nudge limit inside a free rep shows only a message, with no See Pro. *Proposed:* add See Pro there; it's the moment someone is most engaged.
+5. **Inside a free rep:** running out of follow-ups or nudges shows See Pro instead of a dead Retry. That's the moment someone is most engaged.
 
 There's no paywall at launch or during onboarding, and no nagging. Upgrades are offered only where a limit actually stopped someone.
 
@@ -123,9 +123,14 @@ Assumes an average free user costs $0.40 a month today and $0.25 with a monthly 
 
 Conversion and usage are guesses until real numbers arrive. Every price and cap here is an environment variable or an App Store Connect setting, so they can move without a release, apart from new App Store prices for existing subscribers.
 
-## 8. Decisions needed
+## 8. Decided 28 October
 
-- Voice: switch Pro to minute caps (60 a day, 150 a week)? Auto-end after 3 silent minutes?
-- Prices: weekly $7.99 with a $1.99 first week, yearly $79.99? Or keep $6.99 / $39.99?
-- Free voice taste: weekly or monthly?
-- See Pro inside the follow-up and nudge limits: yes or no?
+| | Decision | Where |
+|---|---|---|
+| Pro voice | 60 min a day and 150 min a rolling week; each session trimmed to what's left | `PRO_VOICE_MINUTES_PER_DAY`, `PRO_VOICE_MINUTES_PER_WEEK` |
+| Idle voice | Ends after 3 minutes with no speech from either side, with a "Still there?" warning 30 s before | `LiveVoice.idleLimit` |
+| Prices | Weekly $7.99 with the first week at $1.99, yearly $79.99 | App Store Connect (yours); `Config/Drillbit.storekit` matches |
+| Free voice | 3 intro sessions, then one 3-minute taste every 30 days | `FREE_VOICE_TASTE_DAYS=30` |
+| In-rep limits | Out of follow-ups or nudges shows See Pro instead of Retry | `InterviewView` |
+
+Minutes come from the billed seconds the app reports when a session closes. A session that never reports counts as its full cap. A tampered app could under-report, but each session is still bounded by its server-issued cap.

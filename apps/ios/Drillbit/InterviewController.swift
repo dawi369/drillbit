@@ -11,7 +11,9 @@ import UIKit
   var answer = ""
   var busy = false
   var loaded = false
-  var failure: String?
+  var failure: String? { didSet { if failure == nil { failureCode = nil } } }
+  /// The server's code for `failure`; `free_rep_limit` means a free rep's follow-ups or nudges are spent.
+  var failureCode: String?
   var finished: Challenge?
   var acceptsVoiceInput = true
   weak var voice: LiveVoice?
@@ -242,6 +244,13 @@ import UIKit
         let input = operation.input
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--fixture-slow-interview") { try await Task.sleep(for: .seconds(6)) }
+        // The server's answer once a free rep's follow-ups or nudges are spent.
+        if ProcessInfo.processInfo.arguments.contains("--fixture-rep-limit") {
+          let help = ["hint", "example"].contains(input.kind)
+          throw APIError(code: "free_rep_limit", message: help
+            ? "That’s all the nudges a free rep gets. Keep going, or finish for feedback."
+            : "That’s every follow-up a free rep gets. Finish to see your feedback.", status: 429)
+        }
         if ProcessInfo.processInfo.arguments.contains("--fixture-slow-assistance"), ["hint", "example"].contains(input.kind) {
           for _ in 0..<40 where !cancelledAssistance.contains(operation.command) { try await Task.sleep(for: .milliseconds(50)) }
         }
@@ -313,6 +322,7 @@ import UIKit
       pending = nil
       try? await persistPending()
       failure = error.localizedDescription
+      failureCode = error.code
       if error.code == "revision_conflict", currentAccount {
         try? await model.disk.markConflict(account: account, id: challenge.id)
         model.conflict = try? await model.api.send("challenges/" + challenge.id)

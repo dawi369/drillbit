@@ -5,7 +5,7 @@ import { Fault, practiceProfileSchema, timestamp } from './domain';
 import { historicalSnapshot } from './history';
 import { guidedPathFor, interviewFor, mockRound } from './interview';
 import { consumeUsage, type Env } from './platform';
-import { limits, nextUtcMidnight, planFor } from './plans';
+import { limits, nextUtcMidnight, planFor, utcDayStart } from './plans';
 import { practicePersonality, questionTerminology } from "./prompts/interviewer";
 import { personalizationInstructions } from "./prompts/personalization";
 import { guidanceModeSchema, TEACHING_VERSION, teachingPolicy, truthfulVoiceProgress } from "./prompts/teaching";
@@ -37,9 +37,21 @@ async function refundVoiceStart(env: Env, account: string, day: string) {
  await env.DB.prepare("UPDATE usage SET count=count-1 WHERE account_id=? AND day=? AND kind='voice_start' AND count>0").bind(account, day).run();
 }
 const weekday = (iso: string) => new Date(iso).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+/** "Thursday" within a week, "on November 27" beyond it. */
+const comesBack = (iso: string, now: string) => Date.parse(iso) - Date.parse(now) <= 6 * 86_400_000
+ ? weekday(iso) : 'on ' + new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' });
+/**
+ * Voice seconds an account has used since `since`. The app reports each session's billed seconds at close; a
+ * session that never reported counts as its whole cap, so a lost close can't hide time. Waived sessions are free.
+ */
+async function voiceSecondsSince(env: Env, account: string, since: string) {
+ const row = await env.DB.prepare("SELECT COALESCE(SUM(CASE WHEN usage_seconds > 0 THEN usage_seconds ELSE MAX(0, (julianday(expires_at) - julianday(created_at)) * 86400 - 30) END), 0) s, MIN(created_at) first FROM voice_sessions WHERE account_id=? AND provider_id IS NOT NULL AND waived=0 AND created_at>=?").bind(account, since).first<{ s: number; first: string | null }>();
+ return { seconds: row?.s ?? 0, first: row?.first ?? null };
+}
 /**
  * What this account may do with voice right now. Free: the first few sessions, then one taste every
- * `voiceTasteDays`. Pro: a daily fair-use cap that is never shown. Both carry the session cap in seconds.
+ * `voiceTasteDays`. Pro: fair-use minutes per day and per rolling week, never shown until hit. Both carry the
+ * session cap in seconds, trimmed to the minutes left.
  */
 export async function voiceCapability(env: Env, account: string) {
  const checkedAt = timestamp();
@@ -50,9 +62,17 @@ export async function voiceCapability(env: Env, account: string) {
  // `plan` on the capability tells the start handler whether a refusal is a paywall or a fair-use pause.
  const today = await env.DB.prepare("SELECT count FROM usage WHERE account_id=? AND day=? AND kind='voice_start'").bind(account, checkedAt.slice(0,10)).first<{count:number}>();
  if (plan === 'pro') {
-  if ((today?.count ?? 0) >= caps.voiceStartsPerDay)
+  const weekStart = new Date(Date.parse(checkedAt) - 7 * 86_400_000).toISOString();
+  const [day, week] = await Promise.all([voiceSecondsSince(env, account, utcDayStart(checkedAt)), voiceSecondsSince(env, account, weekStart)]);
+  const left = Math.min(caps.voiceSecondsPerDay - day.seconds, caps.voiceSecondsPerWeek - week.seconds);
+  if ((today?.count ?? 0) >= caps.voiceStartsPerDay || caps.voiceSecondsPerDay - day.seconds < 60)
    return { available: false, plan, reason: 'That’s a lot of talking for one day. Voice is back tomorrow.', checkedAt, sessionSeconds, resetsAt: nextUtcMidnight(checkedAt) };
-  return { available: true, plan, checkedAt, sessionSeconds };
+  if (left < 60) {
+   const back = new Date(Date.parse(week.first ?? checkedAt) + 7 * 86_400_000).toISOString();
+   return { available: false, plan, reason: `That’s a big week of talking. Voice is back ${comesBack(back, checkedAt)}.`, checkedAt, sessionSeconds, resetsAt: back };
+  }
+  // The next session never runs past what's left today or this week.
+  return { available: true, plan, checkedAt, sessionSeconds: Math.floor(Math.min(sessionSeconds, left)) };
  }
  // Sessions that reached the provider; refunded starts never activate and waived ones never heard the user.
  const history = await env.DB.prepare("SELECT COUNT(*) n, MAX(created_at) last FROM voice_sessions WHERE account_id=? AND provider_id IS NOT NULL AND waived=0").bind(account).first<{n:number; last:string|null}>();
@@ -63,7 +83,7 @@ export async function voiceCapability(env: Env, account: string) {
  }
  const nextAt = history?.last ? new Date(Date.parse(history.last) + caps.voiceTasteDays * 86_400_000).toISOString() : checkedAt;
  if (nextAt > checkedAt)
-  return { available: false, plan, reason: `Your next free voice session comes back ${weekday(nextAt)}. Pro has it any time.`, checkedAt, sessionSeconds, remaining: 0, limit: 1, resetsAt: nextAt, kind: 'taste' as const };
+  return { available: false, plan, reason: `Your next free voice session comes back ${comesBack(nextAt, checkedAt)}. Pro has it any time.`, checkedAt, sessionSeconds, remaining: 0, limit: 1, resetsAt: nextAt, kind: 'taste' as const };
  return { available: true, plan, checkedAt, sessionSeconds, remaining: 1, limit: 1, kind: 'taste' as const };
 }
 export async function assertNoVoice(env:Env,account:string,id:string) {
@@ -83,8 +103,8 @@ export async function startVoice(env:Env,account:string,id:string,command:string
  if(!capability.available || !capability.plan) throw capability.plan === 'free' ? new Fault('voice_gate',402,capability.reason ?? 'Voice isn’t available right now.') : new Fault('usage_limit',429,capability.reason ?? 'Voice isn’t available right now.');
  const plan=capability.plan, caps=limits(env,plan);
  await consumeUsage(env,account,'voice_start',caps.voiceStartsPerDay);
- // The session cap plus a little slack for the close handshake; events after this are refused.
- const sessionSeconds=caps.voiceSessionSeconds;
+ // The plan's session cap, already trimmed to the minutes left; plus slack for the close handshake.
+ const sessionSeconds=capability.sessionSeconds ?? caps.voiceSessionSeconds;
  const now=timestamp(),expires=new Date(Date.now()+(sessionSeconds+30)*1000).toISOString();
  // Reserve before paid startup. Lost handshakes cannot be blindly retried.
  const s=await env.DB.batch([

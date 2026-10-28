@@ -20,6 +20,8 @@ struct InterviewView: View {
   @State private var assistanceTitle = "Help"
   @State private var assistanceText: String?
   @State private var assistanceError: String?
+  /// The nudge failed because a free rep's nudges are spent, so the popup offers Pro instead of a dead end.
+  @State private var assistanceGated = false
   @State private var assistanceClock = RevealClock()
   @State private var assistanceSettled = false
   @State private var requestingAssistance = false
@@ -389,9 +391,14 @@ struct InterviewView: View {
           .accessibilityLabel("Preparing \(assistanceTitle.lowercased())")
           .accessibilityIdentifier("assistanceLoading")
       } else {
-        Text(assistanceError ?? "That didn’t load. Your reply is unchanged.")
-          .foregroundStyle(.secondary)
-          .frame(maxWidth: .infinity, alignment: .leading)
+        if assistanceGated, let assistanceError {
+          ProNudge(message: assistanceError, placement: .practiceRep) { sheet = nil }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+          Text(assistanceError ?? "That didn’t load. Your reply is unchanged.")
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
       }
       Button(requestingAssistance ? "Cancel" : "Got it") { dismissAssistance() }
         .buttonStyle(PracticeButtonStyle(secondary: requestingAssistance))
@@ -517,6 +524,7 @@ struct InterviewView: View {
     assistanceTitle = title
     assistanceText = nil
     assistanceError = nil
+    assistanceGated = false
     assistanceSettled = false
     assistanceClock.reset(after: 0.1)
     let command = UUID()
@@ -526,6 +534,7 @@ struct InterviewView: View {
       await interview.submit(kind, command: command)
       guard assistanceRequestID == command.uuidString else { return }
       if let failure = interview.failure {
+        assistanceGated = interview.failureCode == "free_rep_limit"
         assistanceError = failure
         assistanceRequestID = nil
         requestingAssistance = false
@@ -708,10 +717,15 @@ struct InterviewView: View {
     }
   }
 
-  private func recovery(_ message: String) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
-      Text(message).font(.footnote).foregroundStyle(.secondary)
-      Button("Retry") { Task { await interview.retry() } }.disabled(interview.busy)
+  @ViewBuilder private func recovery(_ message: String) -> some View {
+    if interview.failureCode == "free_rep_limit" {
+      // Retrying can't help: the free rep's follow-ups are spent. Finishing or Pro both move them on.
+      ProNudge(message: message, placement: .practiceRep) { interview.failure = nil }
+    } else {
+      VStack(alignment: .leading, spacing: 8) {
+        Text(message).font(.footnote).foregroundStyle(.secondary)
+        Button("Retry") { Task { await interview.retry() } }.disabled(interview.busy)
+      }
     }
   }
   private func persistReading() {

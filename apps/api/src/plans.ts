@@ -15,6 +15,9 @@ export function limits(env: Env, plan: Plan) {
       generationsPerDay: n(env.PRO_REPS_PER_DAY, 30),
       voiceStartsPerDay: n(env.PRO_VOICE_STARTS_PER_DAY, 20),
       voiceSessionSeconds: n(env.PRO_VOICE_SESSION_MINUTES, 20) * 60,
+      // Voice bills per open minute, so Pro's fair use is minutes: a day and a rolling week.
+      voiceSecondsPerDay: n(env.PRO_VOICE_MINUTES_PER_DAY, 60) * 60,
+      voiceSecondsPerWeek: n(env.PRO_VOICE_MINUTES_PER_WEEK, 150) * 60,
       voiceReasoningPerDay: 400,
       voiceFreeLifetime: Infinity,
       voiceTasteDays: 0,
@@ -26,9 +29,11 @@ export function limits(env: Env, plan: Plan) {
       generationsPerDay: 10,
       voiceStartsPerDay: n(env.FREE_VOICE_LIFETIME, 3),
       voiceSessionSeconds: n(env.FREE_VOICE_SESSION_MINUTES, 3) * 60,
+      voiceSecondsPerDay: Infinity,
+      voiceSecondsPerWeek: Infinity,
       voiceReasoningPerDay: 40,
       voiceFreeLifetime: n(env.FREE_VOICE_LIFETIME, 3),
-      voiceTasteDays: n(env.FREE_VOICE_TASTE_DAYS, 7),
+      voiceTasteDays: n(env.FREE_VOICE_TASTE_DAYS, 30),
       dailyQuestion: false,
     };
 }

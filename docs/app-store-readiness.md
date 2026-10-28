@@ -54,8 +54,9 @@ The paywall reads everything from the products, so nothing in code changes with 
 1. **Agreements, Tax and Banking:** the Paid Apps agreement must be active, or products never load and review rejects the paywall as broken.
 2. Subscription group **Drillbit Pro** with:
    - `dawi.drillbit.pro.yearly`: 1 year.
-   - `dawi.drillbit.pro.weekly`: 1 week, with an introductory offer of 1 week, pay as you go. The simulator file uses $0.99 then $6.99. If you'd rather use a free trial, the paywall copy falls back to the plain price and still passes, but test it.
-   - Prices are yours. The simulator file uses $39.99 a year and $6.99 a week, which shows "Save 88%".
+   - `dawi.drillbit.pro.weekly`: **$7.99** a week, with an introductory offer of 1 week at **$1.99**, pay as you go.
+   - `dawi.drillbit.pro.yearly`: **$79.99** a year. The paywall shows "Save 80%" and "$6.67 a month"; `Config/Drillbit.storekit` uses the same prices for the simulator.
+   - Prices and caps are explained in [paywall-plan.md](paywall-plan.md).
 3. For each product: display name, description (e.g. "Unlimited reps and voice, billed weekly."), and a **review screenshot** of the paywall. Take it on the device with the TestFlight build (section 7): the simulator fixture paywall shows a debug-only "Simulate purchase" button.
 4. **The first subscription has to be submitted with an app version.** On the 2.0.0 version page, under *In-App Purchases and Subscriptions*, add both products before you press Submit. Otherwise they stay "Ready to Submit" and the reviewer sees an empty paywall.
 5. App Information → **App Store Server Notifications**: Production and Sandbox URL `https://<prod-host>/apple/notifications`, Version 2. Leave `APPLE_ENVIRONMENT` unset on production; App Review buys with Sandbox accounts against your production Worker.

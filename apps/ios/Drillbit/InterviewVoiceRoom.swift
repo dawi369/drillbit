@@ -65,6 +65,7 @@ struct InterviewVoiceRoom<Question: View>: View {
       }
       .onChange(of: warned) { _, now in if now { AccessibilityNotification.Announcement("Thirty seconds left in this voice session.").post() } }
       .onChange(of: voice.muted) { _, muted in if !muted { unmutedOnce = true } }
+      .onChange(of: voice.idleWarning) { _, now in if now { AccessibilityNotification.Announcement("Still there? Voice ends in thirty seconds if it stays quiet.").post() } }
   }
 
   // MARK: Stage
@@ -94,6 +95,9 @@ struct InterviewVoiceRoom<Question: View>: View {
       if warned, phase == .active, voice.message == nil {
         Text("Thirty seconds left. Land the point.").font(.footnote).foregroundStyle(AppPalette.accent)
           .accessibilityIdentifier("voiceClosing")
+      } else if voice.idleWarning, phase == .active, voice.message == nil {
+        Text("Still there? Voice ends in 30 seconds if it stays quiet.").font(.footnote).foregroundStyle(AppPalette.accent)
+          .accessibilityIdentifier("voiceIdle")
       }
       if let message = voice.message {
         Text(message).font(.footnote).foregroundStyle(AppPalette.secondary)

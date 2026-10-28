@@ -59,9 +59,12 @@ it('free voice: three intro sessions, then one taste a week, each capped by the 
  expect(paused).toMatchObject({available:false,remaining:0,limit:1,kind:'taste',reason:expect.stringContaining('comes back')});
  expect(Date.parse(paused.resetsAt!)).toBeGreaterThan(Date.now()+5*86_400_000);
  await expect(startVoice(free,a,id,crypto.randomUUID(),{sdp:'offer',revision:2})).rejects.toMatchObject({code:'voice_gate',status:402});
- // A week on, the taste is back; a shorter cadence can be configured.
+ // A month on, the taste is back; a shorter cadence can be configured.
+ expect(paused.reason).toMatch(/comes back on [A-Z][a-z]+ \d+/);
  expect(await voiceCapability({...free,FREE_VOICE_TASTE_DAYS:'1'} as Env,a)).toMatchObject({available:true,remaining:1,limit:1,kind:'taste'});
  await e.DB.prepare("UPDATE voice_sessions SET created_at=? WHERE account_id=?").bind(new Date(Date.now()-8*86_400_000).toISOString(),a).run();
+ expect(await voiceCapability(free,a)).toMatchObject({available:false,kind:'taste'});
+ await e.DB.prepare("UPDATE voice_sessions SET created_at=? WHERE account_id=?").bind(new Date(Date.now()-31*86_400_000).toISOString(),a).run();
  expect(await voiceCapability(free,a)).toMatchObject({available:true,remaining:1,limit:1,kind:'taste'});
  expect(await voiceCapability({...free,VOICE_UNLIMITED_ACCOUNTS:a} as Env,a)).toMatchObject({plan:'pro'});
  expect(await voiceCapability({...free,VOICE_UNLIMITED_ACCOUNTS:a} as Env,a)).not.toHaveProperty('remaining');
@@ -186,4 +189,47 @@ it('a session counts only once the user speaks: a silent confirmed close is free
  await voiceEvents(free,a,id,lost,{fragments:[],closed:true,finalized:false});
  expect(await voiceCapability(free,a)).toMatchObject({remaining:1});
  expect(await usage()).toBe(2);
+});
+
+
+it('Pro voice is metered in minutes: today, the rolling week, and the next session trimmed to what is left', async()=>{
+ const {a,id}=await fixture(), pro={...e,PRACTICE_GATE:'false'} as Env;
+ const session=async(minutes:number|null, agoHours:number, opts:{waived?:boolean,capMinutes?:number}={})=>{
+  const sid=crypto.randomUUID(), at=new Date(Date.now()-agoHours*3_600_000), expires=new Date(at.getTime()+((opts.capMinutes??20)*60+30)*1000);
+  await e.DB.batch([
+   e.DB.prepare("INSERT INTO jobs(id,account_id,challenge_id,kind,status,input,created_at,updated_at) VALUES(?,?,?,'voice','completed','{}',?,?)").bind(sid,a,id,at.toISOString(),at.toISOString()),
+   e.DB.prepare("INSERT INTO interview_turns(id,challenge_id,ordinal,kind,prompt,text,job_id,created_at) VALUES(?,?,(SELECT COALESCE(MAX(ordinal)+1,0) FROM interview_turns WHERE challenge_id=?),'voice','','',?,?)").bind(sid,id,id,sid,at.toISOString()),
+   e.DB.prepare("INSERT INTO voice_sessions(id,account_id,challenge_id,provider_id,status,created_at,expires_at,finalized,usage_seconds,waived) VALUES(?,?,?,'live','closed',?,?,1,?,?)").bind(sid,a,id,at.toISOString(),expires.toISOString(),minutes===null?null:minutes*60,opts.waived?1:0),
+  ]);
+ };
+ const now=new Date(), hoursToday=Math.max(0, now.getUTCHours()-0.1);
+ expect(await voiceCapability(pro,a)).toMatchObject({available:true,sessionSeconds:20*60});
+ // 45 minutes today leaves 15: the next session is cut to fit.
+ await session(45, Math.min(0.5, hoursToday));
+ expect(await voiceCapability(pro,a)).toMatchObject({available:true,sessionSeconds:15*60});
+ // Waived sessions cost nothing; a session that never reported counts as its whole cap.
+ await session(null, Math.min(0.4, hoursToday), {waived:true});
+ expect(await voiceCapability(pro,a)).toMatchObject({sessionSeconds:15*60});
+ await session(null, Math.min(0.3, hoursToday), {capMinutes:15});
+ expect(await voiceCapability(pro,a)).toMatchObject({available:false,reason:expect.stringContaining('back tomorrow')});
+ // The week: 150 minutes across earlier days pauses voice until the oldest rolls off.
+ const other=await fixture();
+ for(const days of [2,3,4]){
+  const sid=crypto.randomUUID(), at=new Date(Date.now()-days*86_400_000).toISOString();
+  await e.DB.batch([
+   e.DB.prepare("INSERT INTO jobs(id,account_id,challenge_id,kind,status,input,created_at,updated_at) VALUES(?,?,?,'voice','completed','{}',?,?)").bind(sid,other.a,other.id,at,at),
+   e.DB.prepare("INSERT INTO interview_turns(id,challenge_id,ordinal,kind,prompt,text,job_id,created_at) VALUES(?,?,(SELECT COALESCE(MAX(ordinal)+1,0) FROM interview_turns WHERE challenge_id=?),'voice','','',?,?)").bind(sid,other.id,other.id,sid,at),
+   e.DB.prepare("INSERT INTO voice_sessions(id,account_id,challenge_id,provider_id,status,created_at,expires_at,finalized,usage_seconds) VALUES(?,?,?,'live','closed',?,?,1,3000)").bind(sid,other.a,other.id,at,at),
+  ]);
+ }
+ const week=await voiceCapability(pro,other.a);
+ expect(week).toMatchObject({available:false,reason:expect.stringContaining('big week')});
+ expect(Date.parse(week.resetsAt!)).toBeGreaterThan(Date.now()+2*86_400_000);
+ expect(Date.parse(week.resetsAt!)).toBeLessThan(Date.now()+4*86_400_000);
+ // A start honours the trimmed cap in its expiry.
+ const third=await fixture(), mock=connection();
+ try {
+  const trimmed=await startVoice({...pro,PRO_VOICE_MINUTES_PER_DAY:'5'} as Env,third.a,third.id,crypto.randomUUID(),{sdp:'offer',revision:2});
+  expect(trimmed.sessionSeconds).toBe(300);
+ } finally { mock.mockRestore(); }
 });

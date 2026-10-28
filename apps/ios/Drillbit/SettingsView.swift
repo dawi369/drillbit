@@ -80,7 +80,7 @@ struct SettingsView: View {
           Button("Manage subscription") { showingManageSubscriptions = true }
             .manageSubscriptionsSheet(isPresented: $showingManageSubscriptions)
         } else {
-          Text(model.repsLeftLine ?? "3 free reps a day, voice to taste. Pro has no limits.").font(.footnote).foregroundStyle(.secondary)
+          Text(model.repsLeftLine ?? "3 free reps a day, plus a taste of voice. Pro takes the daily limits off.").font(.footnote).foregroundStyle(.secondary)
           Button("See Pro") { PlanCoordinator.shared.register(.practiceRep) { await model.refresh() } }.accessibilityIdentifier("settingsSeePro")
         }
       }

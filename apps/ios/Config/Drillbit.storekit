@@ -1,65 +1,76 @@
 {
-  "identifier" : "4C1D3F2A-0000-4000-8000-DRILLBITPRO0",
-  "nonRenewingSubscriptions" : [ ],
-  "products" : [ ],
-  "settings" : {
-    "_applicationInternalID" : "0",
-    "_developerTeamID" : "7M4NDAAP73",
-    "_failTransactionsEnabled" : false,
-    "_locale" : "en_US",
-    "_storefront" : "USA",
-    "_storeKitErrors" : [ ]
+  "identifier": "4C1D3F2A-0000-4000-8000-DRILLBITPRO0",
+  "nonRenewingSubscriptions": [],
+  "products": [],
+  "settings": {
+    "_applicationInternalID": "0",
+    "_developerTeamID": "7M4NDAAP73",
+    "_failTransactionsEnabled": false,
+    "_locale": "en_US",
+    "_storefront": "USA",
+    "_storeKitErrors": []
   },
-  "subscriptionGroups" : [
+  "subscriptionGroups": [
     {
-      "id" : "21500001",
-      "localizations" : [ ],
-      "name" : "Drillbit Pro",
-      "subscriptions" : [
+      "id": "21500001",
+      "localizations": [],
+      "name": "Drillbit Pro",
+      "subscriptions": [
         {
-          "adHocOffers" : [ ],
-          "codeOffers" : [ ],
-          "displayPrice" : "6.99",
-          "familyShareable" : false,
-          "groupNumber" : 1,
-          "internalID" : "6760000001",
-          "introductoryOffer" : {
-            "displayPrice" : "0.99",
-            "internalID" : "6760000003",
-            "numberOfPeriods" : 1,
-            "paymentMode" : "payAsYouGo",
-            "subscriptionPeriod" : "P1W"
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "7.99",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "6760000001",
+          "introductoryOffer": {
+            "displayPrice": "1.99",
+            "internalID": "6760000003",
+            "numberOfPeriods": 1,
+            "paymentMode": "payAsYouGo",
+            "subscriptionPeriod": "P1W"
           },
-          "localizations" : [
-            { "description" : "Unlimited reps and voice, billed weekly.", "displayName" : "Pro Weekly", "locale" : "en_US" }
+          "localizations": [
+            {
+              "description": "Unlimited reps and voice, billed weekly.",
+              "displayName": "Pro Weekly",
+              "locale": "en_US"
+            }
           ],
-          "productID" : "dawi.drillbit.pro.weekly",
-          "recurringSubscriptionPeriod" : "P1W",
-          "referenceName" : "Pro Weekly",
-          "subscriptionGroupID" : "21500001",
-          "type" : "RecurringSubscription",
-          "winbackOffers" : [ ]
+          "productID": "dawi.drillbit.pro.weekly",
+          "recurringSubscriptionPeriod": "P1W",
+          "referenceName": "Pro Weekly",
+          "subscriptionGroupID": "21500001",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
         },
         {
-          "adHocOffers" : [ ],
-          "codeOffers" : [ ],
-          "displayPrice" : "39.99",
-          "familyShareable" : false,
-          "groupNumber" : 1,
-          "internalID" : "6760000002",
-          "introductoryOffer" : null,
-          "localizations" : [
-            { "description" : "Unlimited reps and voice, billed yearly.", "displayName" : "Pro Yearly", "locale" : "en_US" }
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "79.99",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "6760000002",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "Unlimited reps and voice, billed yearly.",
+              "displayName": "Pro Yearly",
+              "locale": "en_US"
+            }
           ],
-          "productID" : "dawi.drillbit.pro.yearly",
-          "recurringSubscriptionPeriod" : "P1Y",
-          "referenceName" : "Pro Yearly",
-          "subscriptionGroupID" : "21500001",
-          "type" : "RecurringSubscription",
-          "winbackOffers" : [ ]
+          "productID": "dawi.drillbit.pro.yearly",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "Pro Yearly",
+          "subscriptionGroupID": "21500001",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
         }
       ]
     }
   ],
-  "version" : { "major" : 4, "minor" : 0 }
+  "version": {
+    "major": 4,
+    "minor": 0
+  }
 }

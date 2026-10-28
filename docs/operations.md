@@ -307,3 +307,7 @@ Development Worker `5d31f70f-da60-4e1b-87bd-be2238f67f53`, then `c9bf49e2-ab49-4
 ### Voice counts on first words — 28 October 2026
 
 Additive migration `0016_voice_waived.sql` adds `voice_sessions.waived`. A session confirmed closed (`finalized`) with no user fragment is waived and its `voice_start` refunded, so peeking at voice is free; unconfirmed closes still count. Applied to development (backup `.local/before-voice-waived-dev-20261028.sql`, Worker `210efc3f-b312-46ca-a8a7-8f4eeba33b42`) and production (backup `.local/before-voice-waived-prod-20261028.sql`, Worker `fd56c6ce-c489-4745-a5e6-e7dbb7e023b2`); both backups are mode 0600. `/health` 200 on both, production `/v1/bootstrap` 401. The default reminder (`dailyMinutes`) is now 750 (12:30) for new accounts; existing settings keep theirs. Pricing and cost analysis: [paywall-plan.md](paywall-plan.md).
+
+### Voice minute caps and monthly taste — 28 October 2026
+
+`PRO_VOICE_MINUTES_PER_DAY=60` and `PRO_VOICE_MINUTES_PER_WEEK=150` (rolling 7 days) replace sessions as Pro's real voice limit; `PRO_VOICE_STARTS_PER_DAY` stays as a start-abuse guard. `FREE_VOICE_TASTE_DAYS=30`. No migration. Development Worker `35d7278d-eda7-4411-ba89-5567396a20df`, production `9b408a8f-52b3-4b8c-bc7b-dca008656b9a`; health 200, production bootstrap 401. The app ends voice after three minutes without speech. App Store Connect prices to set: weekly $7.99 with a $1.99 first week, yearly $79.99.

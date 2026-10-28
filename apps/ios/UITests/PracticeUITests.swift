@@ -1288,11 +1288,11 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.buttons["seePro"].exists)
     app.buttons["seePro"].tap()
     XCTAssertTrue(app.descendants(matching: .any)["paywall"].waitForExistence(timeout: 5))
-    // Every figure comes from the products: 39.99 a year against 52 × 6.99 saves 88%, and the weekly intro shows.
+    // Every figure comes from the products: 79.99 a year against 52 × 7.99 saves 80%, and the weekly intro shows.
     let option = { (text: String) in app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch }
-    XCTAssertTrue(option("Save 88%").waitForExistence(timeout: 10))
-    XCTAssertTrue(option("$3.33 a month").exists)
-    XCTAssertTrue(option("Try a week for $0.99, then $6.99 a week").exists)
+    XCTAssertTrue(option("Save 80%").waitForExistence(timeout: 10))
+    XCTAssertTrue(option("$6.67 a month").exists)
+    XCTAssertTrue(option("Try a week for $1.99, then $7.99 a week").exists)
     // What App Review checks on a subscription paywall: terms, renewal terms, restore and a way out.
     XCTAssertTrue(option("Terms of Service").exists)
     XCTAssertTrue(option("auto-renews").exists)
@@ -1373,6 +1373,35 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(terms.waitForExistence(timeout: 3))
     XCTAssertFalse(app.descendants(matching: .any)["settingsAIDisclosure"].exists)
     capture("Settings on Free", app)
+  }
+
+  func testFreeRepLimitsOfferPro() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures", "--fixture-home-rich", "--fixture-rep-limit"]
+    app.launch()
+    XCTAssertTrue(app.buttons["startPractice"].waitForExistence(timeout: 10))
+    app.buttons["startPractice"].tap()
+    XCTAssertTrue(app.buttons["previewStart"].waitForExistence(timeout: 5))
+    app.buttons["previewStart"].tap()
+    let editor = app.descendants(matching: .any).matching(identifier: "answerEditor").firstMatch
+    XCTAssertTrue(editor.waitForExistence(timeout: 5))
+    editor.tap(); editor.typeText("Leases with a visible expiry.")
+    app.buttons["shareAnswer"].tap()
+    // Out of follow-ups: no dead Retry, a way through instead.
+    XCTAssertTrue(app.staticTexts["That’s every follow-up a free rep gets. Finish to see your feedback."].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.buttons["seePro"].exists)
+    XCTAssertFalse(app.buttons["Retry"].exists)
+    capture("Follow-up limit offers Pro", app)
+    app.buttons["seePro"].tap()
+    XCTAssertTrue(app.descendants(matching: .any)["paywall"].waitForExistence(timeout: 5))
+    app.buttons["paywallDismiss"].tap()
+    XCTAssertTrue(app.descendants(matching: .any)["paywall"].waitForNonExistence(timeout: 5))
+    // Out of nudges: the popup offers Pro too.
+    app.buttons["interviewOptions"].tap()
+    app.buttons["Need a nudge?"].tap()
+    XCTAssertTrue(app.staticTexts["That’s all the nudges a free rep gets. Keep going, or finish for feedback."].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.descendants(matching: .any)["assistancePopup"].buttons["seePro"].exists)
+    capture("Nudge limit offers Pro", app)
   }
 
   func testSingleLineTurnsHaveNoDisclosure() throws {
