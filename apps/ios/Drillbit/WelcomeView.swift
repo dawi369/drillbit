@@ -283,6 +283,10 @@ struct SignInView: View {
   @State private var invite = ""
   @State private var signingIn = false
   private var consented: Bool { AIConsent.shared.granted }
+  /// Which sign-in buttons this build offers (`SIGN_IN_PROVIDERS`). Apple is always offered: App Review requires it
+  /// alongside any other third-party sign-in.
+  private static let providers = Set(((Bundle.main.object(forInfoDictionaryKey: "SignInProviders") as? String) ?? "apple")
+    .split(separator: " ").map(String.init))
   @FocusState private var inviteFocused: Bool
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -343,8 +347,12 @@ struct SignInView: View {
         } else {
           VStack(spacing: 12) {
             Button { authenticate { await model.signIn() } } label: { Label("Sign in with Apple", systemImage: AppIcon.apple.rawValue) }.buttonStyle(PracticeButtonStyle())
-            Button("Continue with Google") { authenticate { await model.signIn(provider: .google) } }.buttonStyle(PracticeButtonStyle(secondary: true))
-            Button("Continue with GitHub") { authenticate { await model.signIn(provider: .github) } }.buttonStyle(PracticeButtonStyle(secondary: true))
+            if Self.providers.contains("google") {
+              Button("Continue with Google") { authenticate { await model.signIn(provider: .google) } }.buttonStyle(PracticeButtonStyle(secondary: true))
+            }
+            if Self.providers.contains("github") {
+              Button("Continue with GitHub") { authenticate { await model.signIn(provider: .github) } }.buttonStyle(PracticeButtonStyle(secondary: true))
+            }
           }
           // Reserve the row so buttons never shift when work starts.
           ProgressView("Signing in…")

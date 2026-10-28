@@ -22,45 +22,30 @@ Verification is reported in three levels, as the release gate in [operations.md]
 
 The privacy policy is a standard template matched to what the app actually does: what's collected, OpenRouter/OpenAI/Clerk/Cloudflare/Apple/Superwall as processors, deletion, no tracking. **It's not legal advice.** Read it at `/privacy` and have someone qualified check it if you sell in the EU or California. If the product changes, update `legal.ts`, `PrivacyInfo.xcprivacy` and the App Privacy answers (section 4) together.
 
-## 1. Production backend (you, about 30 minutes)
+## 1. Production backend: done 28 October except the AI keys
 
-Follow [operations.md → Production environment](operations.md#production-environment--25-october-2026). In short, from `apps/api`:
-
-1. Clerk: create the **production** instance and enable native Sign in with Apple, Google and GitHub. Production Google and GitHub need your own OAuth client IDs, not Clerk's shared ones. Add the `drillbit` JWT template (`aud: "drillbit"`, 60 s). Allowlist `dawi.drillbit://callback`. Put the issuer in `env.production.vars.CLERK_ISSUER`.
-2. `wrangler d1 create drillbit-production` → put the id in `database_id`.
-3. `wrangler d1 migrations apply drillbit-production --remote --env production`
-4. Secrets with `--env production`: `CLERK_SECRET_KEY`, `OPENROUTER_API_KEY` (new key with a spending limit), `OPENAI_API_KEY` (voice), `CREDENTIAL_KEY` (`openssl rand -base64 32`, never the dev one).
-5. `wrangler deploy --env production`
-
-**Check:** `curl https://<prod-host>/health` → 200; `/v1/bootstrap` → 401; `/privacy` and `/support` → 200 and show `support@t23.dev`.
-
-Optional: a custom domain such as `api.drillbit.app` keeps the privacy URL stable if you ever move off `workers.dev`. Add it in Cloudflare → Workers → Domains before setting the URLs below.
-
-## 2. Release build configuration (you, 5 minutes)
-
-`apps/ios/Config/Local.xcconfig` for the App Store archive (write `//` as `/$()/`):
-
-```
-API_BASE_URL = https:/$()/<prod-host>
-CLERK_PUBLISHABLE_KEY = pk_live_…
-PRIVACY_POLICY_URL = https:/$()/<prod-host>/privacy
-SUPERWALL_API_KEY =            # leave empty for launch (see section 5)
-DEVELOPMENT_TEAM = 7M4NDAAP73
-```
-
-Bump `CURRENT_PROJECT_VERSION` in `apps/ios/project.yml` for every upload; `MARKETING_VERSION` stays `2.0.0` for the first public release. Then:
+Clerk production (`clerk.drillbit.t23.dev`, Apple only) and the Worker (`https://api.drillbit.t23.dev`, cron on) are live; details are in [operations.md](operations.md#production-provisioned--28-october-2026). Still needed:
 
 ```sh
-bun run ios:generate
-security unlock-keychain ~/Library/Keychains/login.keychain-db   # only over SSH
-xcodebuild -project apps/ios/Drillbit.xcodeproj -scheme Drillbit -configuration Release \
-  -destination 'generic/platform=iOS' -archivePath /tmp/drillbit-appstore/Drillbit.xcarchive archive
-scripts/export-ios-testflight.sh /tmp/drillbit-appstore/Drillbit.xcarchive scripts/ExportOptions-AppStore.plist /tmp/drillbit-appstore/export
+cd apps/api
+./node_modules/.bin/wrangler secret put OPENROUTER_API_KEY --env production   # new key, $100 monthly limit
+./node_modules/.bin/wrangler secret put OPENAI_API_KEY --env production       # voice
 ```
 
-[`scripts/ExportOptions-AppStore.plist`](../scripts/ExportOptions-AppStore.plist) uploads a build that can be submitted for review. Earlier internal uploads used `testFlightInternalTestingOnly`; builds made that way can't be submitted.
+**Check:** `curl https://api.drillbit.t23.dev/health` → 200. Then on a phone, a first question generates (OpenRouter) and Talk connects (OpenAI).
 
-**Check:** the archive's `Info.plist` has your production `APIBaseURL` and a non-empty `PrivacyPolicyURL`, and the build shows up in TestFlight.
+## 2. Release build: one command
+
+Production values are committed in `apps/ios/Config/Production.xcconfig`, and every Release build uses them. Bump `CURRENT_PROJECT_VERSION` in `apps/ios/project.yml` for each upload (11 is next). `MARKETING_VERSION` stays `2.0.0`. Then, **in your own Terminal** (an agent or SSH shell can't reach the signing key):
+
+```sh
+scripts/release-ios.sh            # archive and verify: production API, pk_live key, privacy URL
+scripts/release-ios.sh --upload   # the same, then upload to App Store Connect
+```
+
+The script stops if the archive doesn't point at production. It exports with [`scripts/ExportOptions-AppStore.plist`](../scripts/ExportOptions-AppStore.plist). Earlier internal uploads used `testFlightInternalTestingOnly`, and builds made that way can't be submitted.
+
+**Check:** the build appears under App Store Connect → TestFlight after processing.
 
 ## 3. Subscriptions in App Store Connect (you)
 
@@ -165,7 +150,7 @@ Don't provide a demo account unless review asks for one: Sign in with Apple crea
 Install the production TestFlight build on an iPhone signed into a **Sandbox** Apple ID (Settings → Developer → Sandbox Apple Account) and go through:
 
 - [ ] Fresh install → intro → setup → AI consent → Sign in with Apple → first question generated
-- [ ] Google and GitHub sign-in through the production Clerk instance
+- [ ] Only Sign in with Apple is offered (Google and GitHub come back once production OAuth apps exist in Clerk)
 - [ ] Answer, follow-up, nudge, Finish → feedback
 - [ ] Voice: microphone prompt, live conversation, back to text with the draft intact; a free account stops at the cap
 - [ ] Use 3 reps → Home waits → See Pro → paywall shows real prices and intro offer → buy weekly → Pro without relaunch

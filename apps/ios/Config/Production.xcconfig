@@ -1,0 +1,9 @@
+// Production values for every Release build. All public: they ship inside the app. Server secrets never go here.
+// Write URLs as https:/$()/host, since xcconfig reads // as a comment.
+API_BASE_URL = https:/$()/api.drillbit.t23.dev
+CLERK_PUBLISHABLE_KEY = pk_live_Y2xlcmsuZHJpbGxiaXQudDIzLmRldiQ
+PRIVACY_POLICY_URL = https:/$()/api.drillbit.t23.dev/privacy
+// Google and GitHub need production OAuth apps in Clerk first; until then production offers Apple only.
+SIGN_IN_PROVIDERS = apple
+// Empty: the native StoreKit paywall. Set a Superwall public key here to switch.
+SUPERWALL_API_KEY =

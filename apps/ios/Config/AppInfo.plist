@@ -48,6 +48,8 @@
 	<string>$(PRIVACY_POLICY_URL)</string>
 	<key>SharedKeychainGroup</key>
 	<string>$(AppIdentifierPrefix)dawi.drillbit.shared</string>
+	<key>SignInProviders</key>
+	<string>$(SIGN_IN_PROVIDERS)</string>
 	<key>SuperwallAPIKey</key>
 	<string>$(SUPERWALL_API_KEY)</string>
 	<key>UIAppFonts</key>

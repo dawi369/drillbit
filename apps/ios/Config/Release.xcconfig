@@ -1,0 +1,3 @@
+// Archive builds: the defaults and your Local.xcconfig (signing team), then the production values on top.
+#include "Defaults.xcconfig"
+#include "Production.xcconfig"

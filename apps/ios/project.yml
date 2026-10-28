@@ -28,7 +28,7 @@ targets:
     sources: [Drillbit, Shared]
     configFiles:
       Debug: Config/Defaults.xcconfig
-      Release: Config/Defaults.xcconfig
+      Release: Config/Release.xcconfig
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dawi.drillbit
@@ -44,6 +44,7 @@ targets:
         ClerkPublishableKey: $(CLERK_PUBLISHABLE_KEY)
         SuperwallAPIKey: $(SUPERWALL_API_KEY)
         PrivacyPolicyURL: $(PRIVACY_POLICY_URL)
+        SignInProviders: $(SIGN_IN_PROVIDERS)
         SharedKeychainGroup: $(AppIdentifierPrefix)dawi.drillbit.shared
         CFBundleURLTypes:
           - CFBundleURLSchemes: [drillbit, dawi.drillbit]
@@ -80,7 +81,7 @@ targets:
     sources: [DrillbitWidget, Shared]
     configFiles:
       Debug: Config/Defaults.xcconfig
-      Release: Config/Defaults.xcconfig
+      Release: Config/Release.xcconfig
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dawi.drillbit.widget

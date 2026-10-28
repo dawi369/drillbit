@@ -59,8 +59,10 @@
   "env": {
     "production": {
       "name": "drillbit-api",
+      // Cloudflare creates the DNS record and certificate; the host stays stable if the Worker ever moves.
+      "routes": [{ "pattern": "api.drillbit.t23.dev", "custom_domain": true }],
       "vars": {
-        "CLERK_ISSUER": "https://REPLACE_WITH_CLERK_PRODUCTION_ISSUER",
+        "CLERK_ISSUER": "https://clerk.drillbit.t23.dev",
         "MODEL_ID": "openai/gpt-6-luna",
         "MANAGED_AI_ENABLED": "true",
         "VOICE_ENABLED": "true",
@@ -87,7 +89,7 @@
         {
           "binding": "DB",
           "database_name": "drillbit-production",
-          "database_id": "REPLACE_WITH_PRODUCTION_D1_ID",
+          "database_id": "d1f14875-7325-48aa-9f07-a71a83baf759",
           "migrations_dir": "migrations"
         }
       ],
