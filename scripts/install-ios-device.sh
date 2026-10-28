@@ -14,7 +14,7 @@ derived=/tmp/drillbit-device
 log=/tmp/drillbit-device.log
 
 xcodegen generate --spec "$root/apps/ios/project.yml" >/dev/null
-echo "Building Release for $device…"
+echo "Building Release for ${device}…"
 xcodebuild -project "$root/apps/ios/Drillbit.xcodeproj" -scheme Drillbit -configuration Release \
   -destination "id=$device" -derivedDataPath "$derived" -allowProvisioningUpdates build >"$log" 2>&1 \
   || { grep -E "error:|errSec" "$log" | head; echo "Build failed; full log: $log" >&2; exit 1; }
