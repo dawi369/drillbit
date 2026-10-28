@@ -84,6 +84,14 @@ import WidgetKit
     progress.recallIntroduced = true
     try? await setFirstUse(progress)
   }
+  /// The completion screen after Finish is developer-only for now; everyone else goes straight back to Home.
+  var showsReflection: Bool { bootstrap?.capabilities?.developerTools == true }
+  /// The first finished rep earns one reminder offer: a popup on Home, or the completion screen for developers.
+  var offersReminder: Bool { firstUse.firstRepID != nil && !firstUse.reminderOffered && !settings.reminderEnabled }
+  var reminderTimeText: String {
+    let minutes = settings.dailyMinutes
+    return Calendar.current.date(from: DateComponents(hour: minutes / 60, minute: minutes % 60))?.formatted(date: .omitted, time: .shortened) ?? "12:30"
+  }
   /// Shown once when a receipt belongs to another account.
   var entitlementNotice: String?
   var isPro: Bool { bootstrap?.account.plan == "pro" || bootstrap?.practice?.freeReps == false }

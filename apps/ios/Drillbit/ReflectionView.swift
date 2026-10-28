@@ -262,10 +262,15 @@ struct ReflectionView: View {
   private var offersReminder: Bool {
     model.firstUse.firstRepID == initial.id && !model.firstUse.reminderOffered && !model.settings.reminderEnabled
   }
-  private var reminderOffer: some View {
-    let minutes = model.settings.dailyMinutes
-    let time = Calendar.current.date(from: DateComponents(hour: minutes / 60, minute: minutes % 60))?.formatted(date: .omitted, time: .shortened) ?? "12:30"
-    return VStack(alignment: .leading, spacing: 12) {
+  private var reminderOffer: some View { ReminderOfferCard(model: model) }
+  private func leave() { model.presented = nil; Task { await model.refresh() } }
+}
+/// "Want a nudge tomorrow?" under the first rep's completion screen (developers); everyone else gets a popup on Home.
+struct ReminderOfferCard: View {
+  var model: AppModel
+  var body: some View {
+    let time = model.reminderTimeText
+    VStack(alignment: .leading, spacing: 12) {
       VStack(alignment: .leading, spacing: 4) {
         Text("Want a nudge tomorrow?").font(.headline)
         Text("Every day at \(time). Change it in Settings.").font(.subheadline).foregroundStyle(AppPalette.secondary)
@@ -283,7 +288,6 @@ struct ReflectionView: View {
     .transition(.opacity)
     .accessibilityIdentifier("reminderOffer")
   }
-  private func leave() { model.presented = nil; Task { await model.refresh() } }
 }
 struct ReflectionContent: View {
   var reflection: Reflection

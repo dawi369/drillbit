@@ -1186,6 +1186,44 @@ final class PracticeUITests: XCTestCase {
     XCTAssertFalse(app.buttons["Ask interviewer"].exists)
   }
 
+  func testCustomersFinishStraightToHomeWithTheReminderOffer() throws {
+    continueAfterFailure = false
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures", "--fixture-onboarding", "--fixture-customer"]
+    app.launch()
+    XCTAssertTrue(app.staticTexts["Quick one. No wrong answers."].waitForExistence(timeout: 10))
+    app.buttons["The database"].tap()
+    for _ in 0..<6 { app.buttons["Continue"].tap() }
+    XCTAssertTrue(app.buttons["Show me my first question"].waitForExistence(timeout: 5))
+    app.buttons["Show me my first question"].tap()
+    XCTAssertTrue(app.buttons["previewStart"].waitForExistence(timeout: 10))
+    app.buttons["previewStart"].tap()
+    let editor = app.descendants(matching: .any).matching(identifier: "answerEditor").firstMatch
+    XCTAssertTrue(editor.waitForExistence(timeout: 5))
+    XCTAssertTrue(app.descendants(matching: .any)["interviewOpener"].waitForExistence(timeout: 6))
+    editor.tap(); editor.typeText("Workers lease jobs and record every attempt.")
+    app.buttons["shareAnswer"].tap()
+    XCTAssertTrue(app.buttons["interviewOptions"].waitForExistence(timeout: 10))
+    app.buttons["interviewOptions"].tap()
+    app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Finish interview'")).firstMatch.tap()
+    XCTAssertTrue(app.descendants(matching: .any)["confirmDialog"].waitForExistence(timeout: 3))
+    capture("Finish dialog", app)
+    app.descendants(matching: .any)["confirmDialog"].buttons["Finish interview"].tap()
+    // No completion screen for customers: Finish lands on Home, and the end of onboarding asks once about a nudge.
+    XCTAssertTrue(app.buttons["todayDone"].waitForExistence(timeout: 10))
+    XCTAssertFalse(app.staticTexts["That’s one in the bag."].exists)
+    let dialog = app.descendants(matching: .any)["confirmDialog"]
+    XCTAssertTrue(dialog.waitForExistence(timeout: 5))
+    XCTAssertTrue(app.staticTexts["Want a nudge tomorrow?"].exists)
+    XCTAssertFalse(app.descendants(matching: .any)["reminderOffer"].exists, "No reminder card on Home")
+    capture("Reminder popup after the first rep", app)
+    dialog.buttons["No thanks"].tap()
+    XCTAssertTrue(dialog.waitForNonExistence(timeout: 5))
+    // Asked once: coming back to Home doesn't ask again.
+    app.tabBars.buttons["Library"].tap(); app.tabBars.buttons["Home"].tap()
+    XCTAssertFalse(dialog.waitForExistence(timeout: 2))
+  }
+
   func testOnboardingStartsWithGuidedFirstQuestion() throws {
     continueAfterFailure = false
     let app = XCUIApplication()

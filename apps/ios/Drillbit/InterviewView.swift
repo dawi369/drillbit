@@ -134,7 +134,11 @@ struct InterviewView: View {
   private var showsDraft: Bool { interview.loaded && !waitingForAnswer && interview.outgoing == nil && !interview.state.wrapUp && exchanges.last?.hasAnswer == false && !acceptedPending }
   var body: some View {
     ZStack {
-      if let finished = interview.finished { ReflectionView(model: model, initial: finished).transition(.opacity) }
+      if let finished = interview.finished {
+        if model.showsReflection { ReflectionView(model: model, initial: finished).transition(.opacity) }
+        // No completion screen: the rep is saved, so the interview simply hands back to Home.
+        else { AppPalette.background.ignoresSafeArea().task { model.presented = nil; await model.refresh() } }
+      }
       else if showingVoiceRoom, let voice = liveVoice {
         voiceRoom(voice).transition(.opacity)
           // Guided's roadmap travels with the interview, spoken or typed.
@@ -149,6 +153,7 @@ struct InterviewView: View {
     .animation(reduceMotion ? nil : DrillbitMotion.page, value: interview.finished != nil)
     .animation(reduceMotion ? nil : DrillbitMotion.page, value: showingVoiceRoom)
     .sensoryFeedback(.impact(weight: .light), trigger: acceptedAnswerID) { _, accepted in accepted != nil }
+    .sensoryFeedback(.success, trigger: interview.finished != nil) { before, now in !before && now && !model.showsReflection }
     .background(AppPalette.background)
     .containerBackground(AppPalette.background, for: .navigation)
     .task {

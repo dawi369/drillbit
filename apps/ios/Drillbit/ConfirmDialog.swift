@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// One choice in a `DrillbitConfirm`. `.primary` is the one we want tapped (gold capsule), `.secondary` the way out
-/// (white text), `.destructive` an irreversible step (red text).
+/// One choice in a `DrillbitConfirm`. `.primary` is the one we want tapped (gold label), `.secondary` the way out
+/// (white label), `.destructive` an irreversible step (red label).
 struct ConfirmAction {
   enum Style { case primary, secondary, destructive }
   let title: String
@@ -47,6 +47,8 @@ private struct DrillbitConfirmModifier: ViewModifier {
   }
 }
 
+/// Drawn to match an iOS alert (glass card, stacked grey capsules); only the label colours differ: gold for the
+/// choice we want, white for the way out, red for anything irreversible.
 private struct ConfirmDialog: View {
   let title: String
   let message: String?
@@ -57,31 +59,31 @@ private struct ConfirmDialog: View {
 
   var body: some View {
     ZStack {
-      Color.black.opacity(visible ? 0.4 : 0).ignoresSafeArea().accessibilityHidden(true)
+      Color.black.opacity(visible ? 0.2 : 0).ignoresSafeArea().accessibilityHidden(true)
       ScrollView {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 20) {
           VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.headline).foregroundStyle(AppPalette.primary)
+            Text(title).font(.headline).foregroundStyle(.primary)
               .accessibilityAddTraits(.isHeader)
             if let message {
-              Text(message).font(.subheadline).foregroundStyle(AppPalette.secondary)
+              Text(message).font(.subheadline).foregroundStyle(.secondary)
             }
           }
           .fixedSize(horizontal: false, vertical: true)
+          .padding(.horizontal, 16).padding(.top, 12)
           VStack(spacing: 8) {
             ForEach(actions.indices, id: \.self) { index in button(actions[index]) }
           }
         }
+        .padding(16)
+        .frame(maxWidth: 320)
+        .glassEffect(.regular, in: .rect(cornerRadius: 32))
         .padding(24)
-        .frame(maxWidth: 360)
-        .background(AppPalette.elevated, in: RoundedRectangle(cornerRadius: 12))
-        .overlay { RoundedRectangle(cornerRadius: 12).stroke(AppPalette.hairline, lineWidth: 0.5) }
-        .padding(24)
-        .frame(maxWidth: .infinity, minHeight: 0)
+        .frame(maxWidth: .infinity)
         .containerRelativeFrame(.vertical, alignment: .center) { length, _ in length }
       }
       .scrollBounceBehavior(.basedOnSize)
-      .scaleEffect(visible || reduceMotion ? 1 : 1.06)
+      .scaleEffect(visible || reduceMotion ? 1 : 1.08)
       .opacity(visible ? 1 : 0)
     }
     .accessibilityElement(children: .contain)
@@ -91,19 +93,16 @@ private struct ConfirmDialog: View {
     .onAppear { withAnimation(reduceMotion ? .easeOut(duration: 0.15) : DrillbitMotion.fast) { visible = true } }
   }
 
-  @ViewBuilder private func button(_ choice: ConfirmAction) -> some View {
-    switch choice.style {
-    case .primary:
-      Button(choice.title) { dismiss(choice) }.buttonStyle(PracticeButtonStyle())
-    case .secondary, .destructive:
-      Button { dismiss(choice) } label: {
-        Text(choice.title).font(.body.weight(.semibold))
-          .foregroundStyle(choice.style == .destructive ? AppPalette.destructive : AppPalette.primary)
-          .frame(maxWidth: .infinity, minHeight: 48)
-          .contentShape(Rectangle())
-      }
-      .buttonStyle(DrillbitPressStyle())
+  private func button(_ choice: ConfirmAction) -> some View {
+    Button { dismiss(choice) } label: {
+      Text(choice.title).font(.body)
+        .foregroundStyle(choice.style == .primary ? AppPalette.accent : choice.style == .destructive ? AppPalette.destructive : AppPalette.primary)
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity, minHeight: 48)
+        .background(Color(uiColor: .tertiarySystemFill), in: Capsule())
+        .contentShape(Capsule())
     }
+    .buttonStyle(DrillbitPressStyle())
   }
 
   private func dismiss(_ choice: ConfirmAction) {

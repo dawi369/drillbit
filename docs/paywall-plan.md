@@ -25,7 +25,13 @@ Renewals, expiry, refunds → App Store Server Notifications v2 → POST /apple/
 ```
 
 - **The server decides.** Every limit is enforced in the Worker (`plans.ts`, `practice-gate.ts`, `voice.ts`); the app only shows what the server says. A hacked app can't unlock Pro.
-- **The paywall** is Apple's `SubscriptionStoreView` with our plan picker: yearly first with "Save N%", weekly with its intro offer. It also carries Restore, Terms and Privacy, which App Review requires. Superwall is wired in but off; leave it off for launch.
+- **The paywall** is Apple's `SubscriptionStoreView` with our own header (Bit, one line, four perks) and plan picker: yearly first with "Save N%", weekly with its intro offer. It also carries Restore, Terms and Privacy, which App Review requires. Everything fits on one screen.
+
+### Why not Superwall or RevenueCat (decided 28 October)
+
+- **RevenueCat paywalls** only run on RevenueCat's purchase and entitlement layer. We already verify Apple's signed transactions on our own server, so adopting it means a second source of truth (or a migration) and a revenue share, all for a paywall template.
+- **Superwall** is already wired in behind an empty `SUPERWALL_API_KEY`. Its value is A/B testing remote paywalls without a release, which needs real traffic to say anything. It also adds a third-party SDK to the privacy label, and a remote paywall that drops a required element is a common review rejection.
+- **So:** ship the native paywall. Revisit Superwall once there are a few hundred paywall views a week to test against; turning it on is a key in `Production.xcconfig` plus dashboard setup (section 5 of app-store-readiness.md).
 - **Plans are per account, not per device.** A subscription restored on a new phone attaches to whoever is signed in; it's refused if another Drillbit account already owns it.
 
 ## 3. What's free and what's Pro

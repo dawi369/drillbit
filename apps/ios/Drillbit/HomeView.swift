@@ -59,6 +59,7 @@ struct HomeView: View {
     }
   }
 
+  @State private var askingReminder = false
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 28) {
@@ -99,6 +100,17 @@ struct HomeView: View {
     }
     .drillbitTabClearance()
     .task(id: model.bootstrap?.account.id) { await model.ensureHomeQuestion() }
+    // The end of onboarding: the first rep is done, so ask once about a daily nudge. Settings has it after that.
+    .task(id: model.offersReminder && !model.showsReflection && model.firstUse.stage == .complete) {
+      guard model.offersReminder, !model.showsReflection, model.firstUse.stage == .complete else { return }
+      try? await Task.sleep(for: .milliseconds(700))
+      if !Task.isCancelled { askingReminder = true }
+    }
+    .drillbitConfirm("Want a nudge tomorrow?", isPresented: $askingReminder,
+                     message: "Every day at \(model.reminderTimeText). Change it in Settings.", actions: [
+      ConfirmAction("Remind me", style: .primary) { Task { await model.answerReminderOffer(true) } },
+      ConfirmAction("No thanks") { Task { await model.answerReminderOffer(false) } },
+    ])
     .drillbitConfirm("Skip this question?", isPresented: Binding(get: { skipping != nil }, set: { if !$0 { skipping = nil } }),
                      message: "It goes to Skipped questions in Library. Your draft stays saved.", actions: [
       ConfirmAction("Skip question", style: .destructive) {

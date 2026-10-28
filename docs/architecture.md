@@ -590,4 +590,8 @@ Correction to “Model and prompt policy” above: managed requests use `deepsee
 
 ## Confirmations — 28 October 2026
 
-Two-choice confirmations (Finish interview, Skip question, the voice gate, Delete account) use `drillbitConfirm` (`ConfirmDialog.swift`), not system alerts: system alerts colour every button with the app tint, so they can't mark which choice is the one we want. The wanted action is a gold `PracticeButtonStyle` capsule; the way out is white text; irreversible steps are red text. It is presented as a full-screen cover without its slide, fades in, is modal for VoiceOver, scrolls at large text sizes, and its first secondary action answers the escape gesture. Single-button notices stay system alerts.
+Two-choice confirmations (Finish interview, Skip question, the voice gate, Delete account) use `drillbitConfirm` (`ConfirmDialog.swift`), not system alerts: system alerts colour every button with the app tint, so they can't mark which choice is the one we want. It is drawn like an iOS alert (glass card, stacked grey capsules) and differs only in label colour: the wanted action gold, the way out white, irreversible steps red. It is presented as a full-screen cover without its slide, fades in, is modal for VoiceOver, scrolls at large text sizes, and its first secondary action answers the escape gesture. Single-button notices stay system alerts.
+
+## Completion without the reflection screen — 28 October 2026
+
+Finishing an interview no longer shows the completion screen to customers: `AppModel.showsReflection` is true only for developer accounts, and everyone else is handed straight back to Home with a success haptic. The server still writes feedback and Recall cards. The first rep ends onboarding, so landing on Home after it asks once, in a popup, whether to turn on a daily reminder (`AppModel.offersReminder`); after that the reminder lives only in Settings. Developers still get the offer on the completion screen.

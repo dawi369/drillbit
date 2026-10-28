@@ -169,12 +169,12 @@ struct NativePaywallSheet: View {
       }
       .toolbar {
         ToolbarItem(placement: .cancellationAction) { Button("Not now") { PlanCoordinator.shared.dismissed() }.accessibilityIdentifier("paywallDismiss") }
-      }
-      .safeAreaInset(edge: .bottom) {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--fixtures") {
-          Button("Simulate purchase") { Task { await PlanCoordinator.shared.fixturePurchase() } }
-            .font(.footnote).accessibilityIdentifier("paywallFixturePurchase")
+          ToolbarItem(placement: .primaryAction) {
+            Button("Simulate") { Task { await PlanCoordinator.shared.fixturePurchase() } }
+              .accessibilityIdentifier("paywallFixturePurchase")
+          }
         }
         #endif
       }
@@ -188,14 +188,10 @@ struct NativePaywallSheet: View {
 
   private var store: some View {
     SubscriptionStoreView(productIDs: PlanCoordinator.productIDs) {
-      VStack(spacing: 8) {
-        Text("Drillbit Pro").font(.title.weight(.semibold))
-        Text(placement == .voiceSession ? "Talk it through whenever you want, for as long as the interview needs." : "Practice as much as you like. Voice any time.")
-          .font(.subheadline).foregroundStyle(AppPalette.secondary).multilineTextAlignment(.center)
-      }
-      .padding(.horizontal, 24)
+      PaywallHeader(placement: placement)
     }
     .subscriptionStoreControlStyle(PlanPicker())
+    .containerBackground(for: .subscriptionStoreFullHeight) { PaywallBackdrop() }
     .storeButton(.visible, for: .restorePurchases)
     .storeButton(.visible, for: .policies)
     // One way out: Not now, which also drops the feature waiting behind the paywall.
@@ -218,6 +214,72 @@ struct NativePaywallSheet: View {
         .accessibilityIdentifier("paywallRetry")
     }
     .accessibilityIdentifier("paywallUnavailable")
+  }
+}
+
+/// The paywall's pitch: Bit, one line that says why now, and what Pro actually changes. Compact, so both plans
+/// and Subscribe stay on screen without scrolling.
+private struct PaywallHeader: View {
+  let placement: PaywallPlacement
+  @State private var glow = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  private static let perks: [(symbol: String, title: String)] = [
+    ("infinity", "More reps, whenever it’s clicking"),
+    ("waveform", "Voice mocks up to 20 minutes"),
+    ("lightbulb", "Every nudge and follow-up"),
+    ("sun.max", "A fresh question waiting each day"),
+  ]
+  var body: some View {
+    VStack(spacing: 16) {
+      ZStack {
+        BitGlow(color: AppPalette.action, opacity: 0.28)
+          .frame(width: 128, height: 128)
+          .scaleEffect(glow ? 1.08 : 0.94)
+          .accessibilityHidden(true)
+        BitView(mood: .happy, greets: true).frame(width: 52, height: 60).accessibilityHidden(true)
+      }
+      .frame(height: 80)
+      VStack(spacing: 4) {
+        Text("Drillbit Pro").font(.caption.weight(.semibold)).foregroundStyle(AppPalette.accent)
+          .textCase(.uppercase).tracking(1.2)
+        Text(placement == .voiceSession ? "Say it out loud, as often as you want." : "Don’t stop at three.")
+          .font(.title2.weight(.semibold)).multilineTextAlignment(.center)
+          .fixedSize(horizontal: false, vertical: true)
+          .accessibilityAddTraits(.isHeader)
+      }
+      VStack(alignment: .leading, spacing: 12) {
+        ForEach(Self.perks, id: \.title) { perk in
+          HStack(spacing: 12) {
+            Image(systemName: perk.symbol)
+              .font(.subheadline.weight(.semibold)).foregroundStyle(AppPalette.accent)
+              .frame(width: 28, height: 28)
+              .background(AppPalette.accentSoft, in: Circle())
+              .accessibilityHidden(true)
+            Text(perk.title).font(.subheadline.weight(.medium))
+              .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+          }
+        }
+      }
+      .frame(maxWidth: 320)
+    }
+    .padding(.horizontal, 24)
+    .frame(maxWidth: 520)
+    .onAppear {
+      guard !reduceMotion else { return }
+      withAnimation(.easeInOut(duration: 3.2).repeatForever(autoreverses: true)) { glow = true }
+    }
+  }
+}
+
+/// A warm wash from the top, so the sheet reads as Drillbit rather than a settings form.
+private struct PaywallBackdrop: View {
+  var body: some View {
+    ZStack(alignment: .top) {
+      AppPalette.background
+      LinearGradient(colors: [AppPalette.action.opacity(0.14), AppPalette.background.opacity(0)], startPoint: .top, endPoint: .center)
+    }
+    .ignoresSafeArea()
   }
 }
 
