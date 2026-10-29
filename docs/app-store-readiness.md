@@ -118,15 +118,14 @@ If you want Superwall at launch instead:
 > • One question at a time, with clear requirements and room to push back
 > • Follow-ups that respond to your reasoning, not a checklist
 > • Live voice that continues the same interview, with your draft intact
-> • Feedback that quotes your own words: one thing that worked, one thing to fix
 > • Recall cards and a library of everything you've practiced
 >
-> Free: 3 questions a day and a taste of voice. Drillbit Pro: practice as much as you like and use voice any time (fair use applies). Pro renews automatically unless you cancel at least 24 hours before the period ends. Manage or cancel in your Apple ID settings.
+> Free: 3 questions a day and a taste of voice. Drillbit Pro: practice as much as you like and use voice most days (fair use applies). Pro renews automatically unless you cancel at least 24 hours before the period ends. Manage or cancel in your Apple Account settings.
 >
 > Drillbit uses third-party AI (OpenRouter and OpenAI) to run interviews. It asks before anything is sent.
 >
 > Terms of Use: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
-> Privacy Policy: https://<prod-host>/privacy
+> Privacy Policy: https://api.drillbit.t23.dev/privacy
 
 Keep "fair use applies" next to "as much as you like": Pro has fair-use caps (30 reps a day; voice 60 minutes a day, 150 a week, 20 a session). Unqualified "unlimited" claims invite a 2.3.1 accuracy rejection.
 
@@ -138,7 +137,7 @@ Keep "fair use applies" next to "as much as you like": Pro has fair-use caps (30
 >
 > Subscriptions: free accounts get 3 questions per day. To reach the paywall, use Settings → See Pro, or finish 3 questions. Restore Purchases is on the paywall (Settings → See Pro).
 >
-> Voice: open a question and tap Talk. Microphone permission is requested then. Free accounts get 3 voice sessions.
+> Voice: open a question and tap Talk, then tap the microphone to unmute. Microphone permission is requested then. Free accounts get 3 voice sessions.
 >
 > Account deletion: Settings → Delete account.
 >
