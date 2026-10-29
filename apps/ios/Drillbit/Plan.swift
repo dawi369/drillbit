@@ -181,7 +181,8 @@ struct NativePaywallSheet: View {
       .toolbar {
         ToolbarItem(placement: .cancellationAction) { Button("Not now") { PlanCoordinator.shared.dismissed() }.accessibilityIdentifier("paywallDismiss") }
         #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("--fixtures") {
+        // Hidden in customer screenshots, which App Store Connect gets as the subscription review image.
+        if ProcessInfo.processInfo.arguments.contains("--fixtures"), !ProcessInfo.processInfo.arguments.contains("--fixture-customer") {
           ToolbarItem(placement: .primaryAction) {
             Button("Simulate") { Task { await PlanCoordinator.shared.fixturePurchase() } }
               .accessibilityIdentifier("paywallFixturePurchase")

@@ -1,3 +1,4 @@
+import StoreKitTest
 import XCTest
 
 /// App Store screenshots: run on a 6.9" iPhone simulator with a 9:41 status bar, then export the attachments.
@@ -69,5 +70,22 @@ final class StoreScreenshots: XCTestCase {
     XCTAssertTrue(app.buttons["library-question-library-completed"].waitForExistence(timeout: 10))
     Thread.sleep(forTimeInterval: 0.8)
     shot("06-library", app)
+  }
+
+  /// The subscription review screenshot App Store Connect asks for: the paywall with real plan options.
+  func testPaywallReviewScreenshot() throws {
+    let store = try SKTestSession(configurationFileNamed: "Drillbit")
+    store.resetToDefaultState(); store.disableDialogs = true; store.clearTransactions()
+    let app = launch(["--fixtures", "--fixture-dashboard", "--fixture-gate"])
+    XCTAssertTrue(app.buttons["seePro"].waitForExistence(timeout: 10))
+    app.buttons["seePro"].tap()
+    // A freshly booted simulator's StoreKit test session can miss the first request; retry as a person would.
+    for _ in 0..<4 where !app.buttons["paywallSubscribe"].waitForExistence(timeout: 5) {
+      if app.buttons["Try again"].exists { app.buttons["Try again"].tap() }
+    }
+    XCTAssertTrue(app.buttons["paywallSubscribe"].exists)
+    XCTAssertFalse(app.buttons["paywallFixturePurchase"].exists, "No debug controls in the review screenshot")
+    Thread.sleep(forTimeInterval: 1.5)
+    shot("review-paywall", app)
   }
 }

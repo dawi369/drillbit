@@ -36,7 +36,7 @@ cd apps/api
 
 ## 2. Release build: one command
 
-Production values are committed in `apps/ios/Config/Production.xcconfig`, and every Release build uses them. Bump `CURRENT_PROJECT_VERSION` in `apps/ios/project.yml` for each upload (12 is next after 1.0 (11)). `MARKETING_VERSION` is `1.0`, matching the version record in App Store Connect; keep them equal. Then, **in your own Terminal** (an agent or SSH shell can't reach the signing key):
+Production values are committed in `apps/ios/Config/Production.xcconfig`, and every Release build uses them. Bump `CURRENT_PROJECT_VERSION` in `apps/ios/project.yml` for each upload (13 is next). `MARKETING_VERSION` is `1.0`, matching the version record in App Store Connect; keep them equal. Then, **in your own Terminal** (an agent or SSH shell can't reach the signing key):
 
 ```sh
 scripts/release-ios.sh            # archive and verify: production API, pk_live key, privacy URL
@@ -128,7 +128,7 @@ If you want Superwall at launch instead:
 > Terms of Use: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
 > Privacy Policy: https://<prod-host>/privacy
 
-Keep "fair use applies" next to "as much as you like": Pro has hidden daily caps (30 reps, 20 voice starts, 20 minutes a session). Unqualified "unlimited" claims invite a 2.3.1 accuracy rejection.
+Keep "fair use applies" next to "as much as you like": Pro has fair-use caps (30 reps a day; voice 60 minutes a day, 150 a week, 20 a session). Unqualified "unlimited" claims invite a 2.3.1 accuracy rejection.
 
 **Screenshots:** iPhone 6.9" (1320 × 2868) is required, and the app is iPhone-only, so there's no iPad set. Six are ready in [`docs/design/app-store/`](design/app-store/): welcome, interview, example, Home, Recall and Library, in that order. They're generated from fixtures as a customer account, so there's no developer tab. To regenerate after UI changes, boot an iPhone 17 Pro Max simulator, run `xcrun simctl status_bar <udid> override --time 9:41 --batteryState charged --batteryLevel 100`, then run `-only-testing:DrillbitUITests/StoreScreenshots` and export the attachments (as `scripts/audit-shots.sh` does). Live voice is the headline feature but isn't in the set: the fixture voice room shows a debug "Simulate speech" link. Take that one on your phone during section 7 (a Pro Max, or scale to 1320 × 2868), mid-conversation with a caption showing. Add short captions in App Store Connect if you want, e.g. "An interviewer who pushes back", "Stuck? Ask for an example", "Recall what you learned".
 
