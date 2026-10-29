@@ -28,6 +28,7 @@
 		3BD72A5C26984A8AD1D37253 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAA02422B05771C6B8DA4D2B /* SettingsView.swift */; };
 		3D0DACC7801A3CCC832A9840 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A7106218805AC5263A12438 /* Persistence.swift */; };
 		3D1A1EB693F960C1596B0D8F /* DrillbitApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAD863FB5DA9BAE45F86B3AB /* DrillbitApp.swift */; };
+		3D5577BDD7DCA1065A504626 /* LiveWalkthrough.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9C0CC02D6FB5471487DDEB7 /* LiveWalkthrough.swift */; };
 		4E43449932FD2F5EE7F94EA3 /* StreamProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185BAB722977AA5EAC231D0 /* StreamProbe.swift */; };
 		5298401BAA9BE8477CDBCFFF /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D561B63C630BDBE5ABC6DF2 /* LibraryView.swift */; };
 		5980E7756037BF8082CA3F81 /* InterviewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66848CC15C0E69172DC285E0 /* InterviewController.swift */; };
@@ -153,6 +154,7 @@
 		9F6AAE6E7C477280E6A8A371 /* OFL-Literata.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "OFL-Literata.txt"; sourceTree = "<group>"; };
 		A193915AEBBE5F30D2A8AECA /* CompanionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionCoordinator.swift; sourceTree = "<group>"; };
 		A8BD0996355C1121C323D9E2 /* BitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitTests.swift; sourceTree = "<group>"; };
+		A9C0CC02D6FB5471487DDEB7 /* LiveWalkthrough.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveWalkthrough.swift; sourceTree = "<group>"; };
 		AD095763BDFB10A241582226 /* ReflectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReflectionView.swift; sourceTree = "<group>"; };
 		AE08B55DBCD760BE95D68FCB /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		B8F2A363927CDF8EB6A14D5C /* InterviewVoiceRoom.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterviewVoiceRoom.swift; sourceTree = "<group>"; };
@@ -308,6 +310,7 @@
 			isa = PBXGroup;
 			children = (
 				C197A270F91EB4CC5F520C1D /* AuditScreenshots.swift */,
+				A9C0CC02D6FB5471487DDEB7 /* LiveWalkthrough.swift */,
 				C8F1C4DE69AF2358015E8EDD /* PracticeUITests.swift */,
 				88E8FF3B4DEF6FBC2AC4EF69 /* StoreScreenshots.swift */,
 				1185BAB722977AA5EAC231D0 /* StreamProbe.swift */,
@@ -503,6 +506,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C65663B45DE7E6FB2F28D848 /* AuditScreenshots.swift in Sources */,
+				3D5577BDD7DCA1065A504626 /* LiveWalkthrough.swift in Sources */,
 				095A54CECC96E78F3BEA8F50 /* PracticeUITests.swift in Sources */,
 				25B42E211757613F3057B1B9 /* StoreScreenshots.swift in Sources */,
 				4E43449932FD2F5EE7F94EA3 /* StreamProbe.swift in Sources */,

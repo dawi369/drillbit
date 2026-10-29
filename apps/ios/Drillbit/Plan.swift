@@ -373,6 +373,8 @@ private struct PaywallCheckout: View {
         .accessibilityIdentifier("paywallRestore")
       if let note { Text(note).font(.footnote).foregroundStyle(AppPalette.secondary).multilineTextAlignment(.center) }
     }
+    // Switching plans swaps the terms and the button label at once; a crossfade overlaps the two prices.
+    .transaction(value: product.id) { $0.animation = nil }
     .animation(DrillbitMotion.fast, value: note)
   }
   private func buy() {

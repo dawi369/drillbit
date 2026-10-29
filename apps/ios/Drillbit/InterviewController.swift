@@ -248,7 +248,7 @@ import UIKit
         if ProcessInfo.processInfo.arguments.contains("--fixture-rep-limit") {
           let help = ["hint", "example"].contains(input.kind)
           throw APIError(code: "free_rep_limit", message: help
-            ? "That’s all the nudges a free rep gets. Keep going, or finish for feedback."
+            ? "That’s all the nudges and examples a free rep gets. Keep going, or finish for feedback."
             : "That’s every follow-up a free rep gets. Finish to see your feedback.", status: 429)
         }
         if ProcessInfo.processInfo.arguments.contains("--fixture-slow-assistance"), ["hint", "example"].contains(input.kind) {

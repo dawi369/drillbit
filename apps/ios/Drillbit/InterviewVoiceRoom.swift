@@ -476,7 +476,8 @@ struct InterviewConversation<Header: View>: View {
                 }
               }
             } else {
-            if turn.kind == "answer" { Text(turn.prompt).font(.headline) }
+            // The first prompt is the question's own markup; show it as text, never as tags.
+            if turn.kind == "answer" { Text(QuestionMarkup.plain(turn.prompt)).font(.headline) }
             Text(turn.kind == "answer" ? "You" : "You · " + turn.kind.capitalized).font(.caption).foregroundStyle(.secondary)
             if !turn.text.isEmpty { Text(turn.text) }
             else { Text(turn.kind == "hint" ? "Give me a nudge" : turn.kind == "example" ? "Show an example" : "Keep going") }

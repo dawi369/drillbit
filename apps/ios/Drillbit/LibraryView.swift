@@ -92,7 +92,12 @@ struct SessionDetailView: View {
         Text(QuestionMarkup.plain(challenge.prompt)).foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
         if let interview = challenge.interview, !interview.turns.isEmpty {
-          NavigationLink { InterviewConversation(state: interview) } label: {
+          NavigationLink {
+            InterviewConversation(state: interview)
+              .background(AppPalette.background)
+              .containerBackground(AppPalette.background, for: .navigation)
+              .navigationTitle("Conversation").navigationBarTitleDisplayMode(.inline)
+          } label: {
             Label("Read the conversation", systemImage: "text.bubble")
               .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
               .contentShape(Rectangle())

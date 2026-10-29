@@ -51,6 +51,6 @@ export async function freeRepLimit(env: Env, account: string, data: { freeRepAt?
   const limit = Number(help ? env.FREE_REP_NUDGES ?? 2 : env.FREE_REP_FOLLOW_UPS ?? 8);
   const used = turns.filter(t => help ? ["hint", "example"].includes(t.kind) : ["answer", "continue", "clarification"].includes(t.kind)).length;
   if (used >= limit) throw new Fault("free_rep_limit", 429, help
-    ? "That’s all the nudges a free rep gets. Keep going, or finish for feedback."
+    ? "That’s all the nudges and examples a free rep gets. Keep going, or finish for feedback."
     : "That’s every follow-up a free rep gets. Finish to see your feedback.");
 }

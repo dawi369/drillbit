@@ -258,6 +258,17 @@ struct QuestionFlow: View {
         }
         guard capturedAccount == model.bootstrap?.account.id else { return }
         if holding { heldQuestion = result } else { question = result }
+      } catch let started as APIError where started.code == "session_started" {
+        // A question is already under way (another device, or a relaunch mid-rep): open it instead of a dead end.
+        guard capturedAccount == model.bootstrap?.account.id else { return }
+        await model.refresh()
+        if let current = model.bootstrap?.challenge, current.lifecycle == "in_progress" {
+          holding = false
+          onStart(current)
+          dismiss()
+          return
+        }
+        failure = started.localizedDescription
       } catch {
         guard capturedAccount == model.bootstrap?.account.id else { return }
         holding = false

@@ -59,7 +59,8 @@ import WidgetKit
     #if DEBUG
     if fixture { return ProcessInfo.processInfo.arguments.contains("--fixture-talk") }
     #endif
-    return practiceMode != "text"
+    // Out of voice for now (a spent free taste): open in text instead of a voice room that can only say no.
+    return practiceMode != "text" && bootstrap?.capabilities?.voice?.available != false
   }
   var firstUse = FirstUseProgress()
 

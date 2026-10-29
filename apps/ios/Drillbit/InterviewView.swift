@@ -558,6 +558,8 @@ struct InterviewView: View {
   /// Runs after the sheet has gone, so its button never changes label mid-dismissal.
   private func resetAssistance() {
     if requestingAssistance, let id = assistanceRequestID { interview.cancelAssistance(id) }
+    // A refused nudge said its piece in the popup; it doesn't linger under the draft afterwards.
+    if assistanceGated { interview.failure = nil; assistanceGated = false }
     assistanceRequestID = nil
     assistanceText = nil
     assistanceError = nil
@@ -805,12 +807,18 @@ struct GuidanceModePicker: View {
   var body: some View {
     List(GuidanceMode.allCases) { style in
       Button { selection = style; onDismiss?() } label: {
+        // Plain text colours: a List button tints its whole label gold otherwise, so nothing reads as selected.
         HStack(spacing:16) {
-          VStack(alignment:.leading,spacing:4) { Text(style.title).foregroundStyle(.primary); Text(style.explanation).font(.subheadline).foregroundStyle(.secondary) }
+          VStack(alignment:.leading,spacing:4) {
+            Text(style.title).font(.body.weight(.medium)).foregroundStyle(AppPalette.primary)
+            Text(style.explanation).font(.subheadline).foregroundStyle(AppPalette.secondary)
+          }
           Spacer()
-          if style == selection { Image(systemName:AppIcon.checkmark.rawValue).foregroundStyle(.primary) }
+          if style == selection { Image(systemName:AppIcon.checkmark.rawValue).font(.body.weight(.semibold)).foregroundStyle(AppPalette.accent) }
         }.padding(.vertical,4)
+        .contentShape(Rectangle())
       }
+        .buttonStyle(.plain)
         .accessibilityAddTraits(style == selection ? .isSelected : [])
     }
     .navigationTitle("Session style")

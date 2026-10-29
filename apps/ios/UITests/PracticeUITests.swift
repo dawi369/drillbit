@@ -1482,7 +1482,7 @@ final class PracticeUITests: XCTestCase {
     // Out of nudges: the popup offers Pro too.
     app.buttons["interviewOptions"].tap()
     app.buttons["Need a nudge?"].tap()
-    XCTAssertTrue(app.staticTexts["That’s all the nudges a free rep gets. Keep going, or finish for feedback."].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.staticTexts["That’s all the nudges and examples a free rep gets. Keep going, or finish for feedback."].waitForExistence(timeout: 5))
     XCTAssertTrue(app.descendants(matching: .any)["assistancePopup"].buttons["seePro"].exists)
     capture("Nudge limit offers Pro", app)
   }

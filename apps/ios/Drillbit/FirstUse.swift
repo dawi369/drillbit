@@ -139,7 +139,7 @@ private struct CoachMarkLayer: View {
           .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
           .offset(x: placement.origin.x, y: placement.origin.y)
           .transition(reduceMotion ? .opacity : .asymmetric(
-            insertion: .scale(scale: 0.96, anchor: UnitPoint(x: placement.pointerX / width, y: placement.edge == .top ? 0 : 1)).combined(with: .opacity),
+            insertion: .scale(scale: 0.96, anchor: UnitPoint(x: placement.pointerX / width, y: placement.edge == .bottom ? 1 : 0)).combined(with: .opacity),
             removal: .opacity))
           .accessibilityIdentifier("coach-" + shown.rawValue)
       }
@@ -153,7 +153,7 @@ private struct CoachMarkLayer: View {
     }
   }
 
-  private func place(_ mark: CoachMark, width: CGFloat, in proxy: GeometryProxy) -> (origin: CGPoint, edge: Edge, pointerX: CGFloat)? {
+  private func place(_ mark: CoachMark, width: CGFloat, in proxy: GeometryProxy) -> (origin: CGPoint, edge: Edge?, pointerX: CGFloat)? {
     let size = proxy.size
     if trailingToolbar && mark == .tools {
       // The trailing toolbar button's centre sits about 38 points in from the edge.
@@ -165,8 +165,12 @@ private struct CoachMarkLayer: View {
     // Prefer above: below a composer is where the keyboard comes up.
     let above = target.minY - 12 - height > 8
     let x = min(max(target.midX - width / 2, 16), size.width - 16 - width)
-    let y = above ? target.minY - 12 - height : target.maxY + 12
-    return (CGPoint(x: x, y: y), above ? .bottom : .top, min(max(target.midX - x, 24), width - 24))
+    let preferred = above ? target.minY - 12 - height : target.maxY + 12
+    // A target scrolled out of view (a long question pushing the composer below the fold) still gets a readable
+    // tip: kept on screen, without a pointer aiming at nothing.
+    let y = min(max(preferred, 8), size.height - height - 8)
+    let visible = target.maxY > 0 && target.minY < size.height && abs(y - preferred) < 1
+    return (CGPoint(x: x, y: y), visible ? (above ? .bottom : .top) : nil, min(max(target.midX - x, 24), width - 24))
   }
 }
 
