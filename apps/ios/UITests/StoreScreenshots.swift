@@ -67,7 +67,7 @@ final class StoreScreenshots: XCTestCase {
     Thread.sleep(forTimeInterval: 0.8)
     shot("05-recall", app)
     app.tabBars.buttons["Library"].tap()
-    XCTAssertTrue(app.buttons["library-question-library-completed"].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.buttons["worthTryAgain"].waitForExistence(timeout: 10))
     Thread.sleep(forTimeInterval: 0.8)
     shot("06-library", app)
   }

@@ -2,7 +2,7 @@ import SwiftUI
 
 struct MemoryView: View {
   var model: AppModel
-  var body: some View { LibraryView(model: model) }
+  var body: some View { LibraryHomeView(model: model) }
 }
 struct SessionRow: View {
   var session: Challenge
@@ -355,7 +355,6 @@ struct LibraryQuestionView: View {
   @State private var preview = false
   @State private var preparing = false
   @State private var started: Challenge?
-  @State private var startCommand = UUID().uuidString
   init(model: AppModel, initial: LibraryQuestion) {
     self.model = model; self.initial = initial
     _detail = State(initialValue: model.libraryDetailSnapshots["library-detail:" + (model.bootstrap?.account.id ?? "") + ":" + initial.id])
@@ -411,23 +410,7 @@ struct LibraryQuestionView: View {
       if let account = model.bootstrap?.account.id { detail = model.libraryDetailSnapshots["library-detail:" + account + ":" + initial.id] ?? detail }
     }
     .sheet(isPresented: $preview, onDismiss: { if let started { model.presented = started; self.started = nil } }) {
-      NavigationStack {
-        ScrollView { VStack(alignment: .leading, spacing: 16) { Text(question.title).font(.title2.weight(.semibold)); QuestionBody(markup: question.prompt).textSelection(.enabled); if let failure { Text(failure).foregroundStyle(.secondary) } }.frame(maxWidth: .infinity, alignment: .leading).padding(24) }
-          .safeAreaInset(edge: .bottom) {
-            Button("Start practice") {
-              Task {
-                busy = true; defer { busy = false }
-                let account = model.bootstrap?.account.id
-                do {
-                  let attempt = try await model.startLibraryQuestion(question, command: startCommand)
-                  guard model.bootstrap?.account.id == account, let account else { return }
-                  _ = try await model.disk.load(account: account, challenge: attempt)
-                  model.bootstrap?.challenge = attempt; started = attempt; preview = false
-                } catch { failure = error.localizedDescription }
-              }
-            }.buttonStyle(PracticeButtonStyle()).disabled(busy).padding(24).background(AppPalette.background)
-          }.navigationTitle("Question preview").navigationBarTitleDisplayMode(.inline).toolbar { Button("Close") { preview = false } }
-      }
+      QuestionRetrySheet(model: model, question: question, onStarted: { started = $0; preview = false }, close: { preview = false })
     }
     .sheet(isPresented: $preparing, onDismiss: { if let started { model.presented = started; self.started = nil } }) {
       QuestionFlow(model: model, recovery: PreparationInput(primaryConceptId: question.primaryConceptId, focus: "System design", kind: "design", difficulty: model.settings.difficulty, engineeringLevel: question.engineeringLevel), onStart: { started = $0 })

@@ -20,6 +20,15 @@ final class AuditScreenshots: XCTestCase {
     return app
   }
 
+  /// Library's developer list of every question, behind the ⋯ menu.
+  private func openAllQuestions(_ app: XCUIApplication) {
+    for _ in 0..<4 where !app.buttons["Library menu"].isHittable { app.swipeDown() }
+    app.buttons["Library menu"].tap()
+    XCTAssertTrue(app.buttons["All questions"].waitForExistence(timeout: 3))
+    app.buttons["All questions"].tap()
+    XCTAssertTrue(app.buttons["library-question-library-completed"].waitForExistence(timeout: 10))
+  }
+
   private func shot(_ name: String, _ app: XCUIApplication) {
     let attachment = XCTAttachment(screenshot: app.screenshot())
     attachment.name = name
@@ -332,13 +341,14 @@ final class AuditScreenshots: XCTestCase {
       shot("d05-recall-card-revealed", app)
     }
     app.tabBars.buttons["Library"].tap()
-    XCTAssertTrue(app.buttons["library-question-library-completed"].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.buttons["worthTryAgain"].waitForExistence(timeout: 10))
     Thread.sleep(forTimeInterval: 0.8)
     shot("d06-library", app)
     app.buttons["Library menu"].tap()
     Thread.sleep(forTimeInterval: 0.5)
     shot("d07-library-menu", app)
     app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9)).tap()
+    openAllQuestions(app)
     app.buttons["library-question-library-completed"].tap()
     Thread.sleep(forTimeInterval: 1)
     shot("d08-library-detail", app)
@@ -347,6 +357,8 @@ final class AuditScreenshots: XCTestCase {
     app.swipeUp()
     shot("d10-library-detail-bottom", app)
     app.navigationBars.buttons.element(boundBy: 0).tap()
+    app.navigationBars.buttons.element(boundBy: 0).tap()
+    app.buttons["Library menu"].tap()
     if app.buttons["Practice evidence"].waitForExistence(timeout: 3) {
       app.buttons["Practice evidence"].tap()
       Thread.sleep(forTimeInterval: 1)
@@ -607,11 +619,14 @@ final class AuditScreenshots: XCTestCase {
     XCTAssertTrue(app.navigationBars["Library"].waitForExistence(timeout: 5))
     Thread.sleep(forTimeInterval: 1)
     shot("g08-library-day-one", app)
+    app.buttons["Library menu"].tap()
     app.buttons["Practice evidence"].tap()
     XCTAssertTrue(app.navigationBars["Practice evidence"].waitForExistence(timeout: 3))
     Thread.sleep(forTimeInterval: 0.6)
     shot("g09-practice-evidence-empty", app)
     app.navigationBars.buttons.element(boundBy: 0).tap()
+    app.buttons["Library menu"].tap()
+    app.buttons["All questions"].tap()
     app.buttons["Filters"].tap()
     XCTAssertTrue(app.navigationBars["Filters"].waitForExistence(timeout: 3))
     Thread.sleep(forTimeInterval: 0.6)
@@ -662,7 +677,7 @@ final class AuditScreenshots: XCTestCase {
     app.navigationBars.buttons["Close"].tap()
     XCTAssertTrue(app.tabBars.buttons["Library"].waitForExistence(timeout: 5))
     app.tabBars.buttons["Library"].tap()
-    XCTAssertTrue(app.buttons["library-question-library-completed"].waitForExistence(timeout: 10))
+    openAllQuestions(app)
     app.buttons["library-question-library-completed"].tap()
     XCTAssertTrue(app.buttons["Practise this concept"].waitForExistence(timeout: 5))
     app.buttons["Practise this concept"].tap()
@@ -697,7 +712,7 @@ final class AuditScreenshots: XCTestCase {
     app = launch(["--fixtures", "--fixture-dashboard", "--fixture-home-rich", "--fixture-evidence"])
     XCTAssertTrue(app.tabBars.buttons["Library"].waitForExistence(timeout: 10))
     app.tabBars.buttons["Library"].tap()
-    XCTAssertTrue(app.buttons["library-question-library-completed"].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.buttons["library-rep-recent"].waitForExistence(timeout: 10))
     Thread.sleep(forTimeInterval: 0.8)
     shot("i04-library", app)
     // The search field sits above the title until the list is pulled down.
@@ -708,8 +723,8 @@ final class AuditScreenshots: XCTestCase {
     Thread.sleep(forTimeInterval: 1)
     shot("i05-library-search", app)
     search.buttons["Clear text"].firstMatch.exists ? search.buttons["Clear text"].firstMatch.tap() : app.swipeDown()
-    if app.buttons["Cancel"].firstMatch.exists { app.buttons["Cancel"].firstMatch.tap() }
-    XCTAssertTrue(app.buttons["library-question-library-completed"].waitForExistence(timeout: 5))
+    for dismiss in ["Cancel", "Close"] where app.navigationBars["Library"].buttons[dismiss].exists { app.navigationBars["Library"].buttons[dismiss].tap() }
+    openAllQuestions(app)
     app.buttons["library-question-library-completed"].tap()
     XCTAssertTrue(app.buttons["Practise this concept"].waitForExistence(timeout: 5))
     Thread.sleep(forTimeInterval: 0.6)

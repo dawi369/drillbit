@@ -54,6 +54,7 @@
 		B81F6A3B13FB0CFA73CFCFED /* InterviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92066D96F6C016361FF268E4 /* InterviewView.swift */; };
 		BA66BF7CF5979DAA6AC4E9C5 /* PracticeEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 153D45AC2868C4FBAF088C71 /* PracticeEvidence.swift */; };
 		BC4FE8728310CCD03149A913 /* InterviewDocumentRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20B8BC792201909C6B627383 /* InterviewDocumentRows.swift */; };
+		BD4605BCD97A69C956FB2F24 /* LibraryHome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78B4C37DAB3D173EEED7DB7B /* LibraryHome.swift */; };
 		C65663B45DE7E6FB2F28D848 /* AuditScreenshots.swift in Sources */ = {isa = PBXBuildFile; fileRef = C197A270F91EB4CC5F520C1D /* AuditScreenshots.swift */; };
 		CDF84DEA3D9A57613120F732 /* GrowingInterviewEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3805DAF1DC8F8A3A0256EBF7 /* GrowingInterviewEditor.swift */; };
 		CEEEB3987FECE2F2B2B61FF0 /* VoiceTranscript.swift in Sources */ = {isa = PBXBuildFile; fileRef = 658B4C2655924F8CC0AE95C3 /* VoiceTranscript.swift */; };
@@ -141,6 +142,7 @@
 		66848CC15C0E69172DC285E0 /* InterviewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterviewController.swift; sourceTree = "<group>"; };
 		6F9D42BA7EF7B514FEACC7F6 /* SetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupView.swift; sourceTree = "<group>"; };
 		7437833C09799CF7937BCDD7 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		78B4C37DAB3D173EEED7DB7B /* LibraryHome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryHome.swift; sourceTree = "<group>"; };
 		7ED772ACFEBFA6EBE9753089 /* ContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContractTests.swift; sourceTree = "<group>"; };
 		8049B9471B01CBFBD8C80764 /* SharedStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedStore.swift; sourceTree = "<group>"; };
 		82CAC54FBF8FD27088584441 /* BitRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitRenderer.swift; sourceTree = "<group>"; };
@@ -243,6 +245,7 @@
 				20B8BC792201909C6B627383 /* InterviewDocumentRows.swift */,
 				92066D96F6C016361FF268E4 /* InterviewView.swift */,
 				B8F2A363927CDF8EB6A14D5C /* InterviewVoiceRoom.swift */,
+				78B4C37DAB3D173EEED7DB7B /* LibraryHome.swift */,
 				4D561B63C630BDBE5ABC6DF2 /* LibraryView.swift */,
 				87BD787A61C3C037E268829C /* LiveVoice.swift */,
 				9A7106218805AC5263A12438 /* Persistence.swift */,
@@ -548,6 +551,7 @@
 				BC4FE8728310CCD03149A913 /* InterviewDocumentRows.swift in Sources */,
 				B81F6A3B13FB0CFA73CFCFED /* InterviewView.swift in Sources */,
 				FF97749DF7D3112F299ECD20 /* InterviewVoiceRoom.swift in Sources */,
+				BD4605BCD97A69C956FB2F24 /* LibraryHome.swift in Sources */,
 				5298401BAA9BE8477CDBCFFF /* LibraryView.swift in Sources */,
 				19BDB2BD78083CFC15FFCF77 /* LiveVoice.swift in Sources */,
 				ADA43CF08FADFB23365A14E8 /* Models.swift in Sources */,

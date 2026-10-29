@@ -185,22 +185,23 @@ final class LiveWalkthrough: XCTestCase {
       _ = tapIfPresent(app.buttons["Done"], timeout: 3)
     }
 
-    // Library: the list, a question, an attempt, the delete question (cancelled).
+    // Library: the glance, an area, Try again's preview, a rep and its delete question (cancelled).
     if tapIfPresent(app.tabBars.buttons["Library"], timeout: 5) {
       Thread.sleep(forTimeInterval: 2); shot("library")
       if tapIfPresent(app.buttons["Library menu"]) { shot("library-menu"); app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9)).tap() }
-      if tapIfPresent(app.buttons["Filters"]) { Thread.sleep(forTimeInterval: 0.8); shot("library-filters"); _ = tapIfPresent(app.buttons["Done"]) }
-      let first = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'library-question-'")).firstMatch
+      let chip = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'libraryArea-' AND NOT identifier == 'libraryArea-All'")).firstMatch
+      if tapIfPresent(chip) { Thread.sleep(forTimeInterval: 0.8); shot("library-area"); chip.tap() }
+      if tapIfPresent(app.buttons["worthTryAgain"]) {
+        Thread.sleep(forTimeInterval: 1.5); shot("library-try-again")
+        _ = tapIfPresent(app.buttons["Close"])
+      }
+      let first = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'library-rep-'")).firstMatch
+      for _ in 0..<4 where first.exists && !first.isHittable { app.swipeUp() }
       if tapIfPresent(first, timeout: 5) {
-        Thread.sleep(forTimeInterval: 1.5); shot("library-question")
-        let attempt = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Finished")).firstMatch
-        for _ in 0..<4 where !(attempt.exists && attempt.isHittable) { app.swipeUp() }
-        if tapIfPresent(attempt) {
-          Thread.sleep(forTimeInterval: 1.5); shot("attempt")
-          app.swipeUp(); shot("attempt-scrolled")
-          if tapIfPresent(app.buttons["attemptConversation"]) { Thread.sleep(forTimeInterval: 1); shot("attempt-conversation"); app.navigationBars.buttons.element(boundBy: 0).tap() }
-          if tapIfPresent(app.buttons["deleteAttempt"]) { shot("delete-dialog"); _ = tapIfPresent(dialog.buttons["Cancel"]) }
-        }
+        Thread.sleep(forTimeInterval: 1.5); shot("attempt")
+        app.swipeUp(); shot("attempt-scrolled")
+        if tapIfPresent(app.buttons["attemptConversation"]) { Thread.sleep(forTimeInterval: 1); shot("attempt-conversation"); app.navigationBars.buttons.element(boundBy: 0).tap() }
+        if tapIfPresent(app.buttons["deleteAttempt"]) { shot("delete-dialog"); _ = tapIfPresent(dialog.buttons["Cancel"]) }
       }
     }
 

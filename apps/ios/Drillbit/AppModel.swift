@@ -1423,8 +1423,15 @@ import WidgetKit
     #endif
     #if DEBUG
     if ProcessInfo.processInfo.arguments.contains("--fixture-dashboard") {
-      let recent = Challenge(difficulty: "easy", id: "recent", lifecycle: "completed", title: "Design a reliable job queue", prompt: "", topic: "Backend", completedAt: "2026-09-09T10:30:00Z")
-      memory = MemoryResponse(statistics: .init(completed: 12, lastSevenDays: 4, asOf: ISO8601DateFormatter().string(from: Date())), sessions: [recent], patterns: [])
+      var recent = Challenge(difficulty: "easy", id: "recent", lifecycle: "completed", title: "Design a reliable job queue", prompt: "", topic: "Backend", completedAt: "2026-09-09T10:30:00Z")
+      recent.ticket = 1
+      // A finished rep of a Library question, with feedback that left something to fix: Library's "Worth another go".
+      var notification = Challenge(questionId: "library-completed", scenario: "Notification service", primaryConceptId: "queues", conceptIds: ["queues", "retry-safety"], engineeringLevel: "senior",
+        id: "library-completed-attempt", lifecycle: "completed", title: "Design notification delivery", prompt: "Design a durable service that handles worker failures and retries.",
+        topic: "System design", completedAt: Date.now.addingTimeInterval(-86_400).ISO8601Format(), session: SessionDraft(answer: "My preserved original reasoning", revision: 1))
+      notification.ticket = 2
+      notification.reflection = Reflection(summary: "Workers kept their jobs through a crash.", worked: ["Accepted work survives a worker crash"], improve: "Say what a retry does when the first delivery already went out.", takeaway: "Durability first, then deduplication.", strengths: ["Durability"], gaps: ["Duplicate delivery"])
+      memory = MemoryResponse(statistics: .init(completed: 12, lastSevenDays: 4, asOf: ISO8601DateFormatter().string(from: Date())), sessions: [notification, recent], patterns: [])
       if ProcessInfo.processInfo.arguments.contains("--fixture-evidence") {
         memory.evidence = [LearningEvidence(conceptId: "queues", observation: "Defined a bounded retry policy.", quote: "Retry at most three times.", signal: "demonstrated", assistance: "unknown", sessionId: "recent", at: "2026-09-09T10:30:00Z")]
       }

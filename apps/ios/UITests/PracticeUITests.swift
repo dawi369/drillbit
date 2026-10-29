@@ -59,16 +59,30 @@ final class PracticeUITests: XCTestCase {
     app.launch()
     XCTAssertTrue(app.tabBars.buttons["Library"].waitForExistence(timeout: 10))
     app.tabBars.buttons["Library"].tap()
-    let question = app.buttons["library-question-library-completed"]
-    XCTAssertTrue(question.waitForExistence(timeout: 10))
+    // At a glance: totals, the areas worked, what's worth another go, then reps as tickets by week.
+    XCTAssertTrue(app.descendants(matching: .any)["worth-library-completed-attempt"].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.staticTexts["12 reps · 4 this week"].exists)
+    XCTAssertTrue(app.buttons["libraryArea-Queues & streams"].exists)
+    XCTAssertTrue(app.staticTexts["Say what a retry does when the first delivery already went out."].exists)
+    XCTAssertTrue(app.staticTexts["THIS WEEK"].exists)
+    app.buttons["Library menu"].tap()
+    XCTAssertTrue(app.buttons["Skipped questions"].waitForExistence(timeout: 3))
     XCTAssertFalse(app.buttons["Practice evidence"].exists)
-    question.tap()
-    XCTAssertTrue(app.buttons["practiseQuestion"].waitForExistence(timeout: 5))
-    XCTAssertFalse(app.buttons["Practise this concept"].exists)
-    capture("Library question for customers", app)
-    let attempt = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Finished")).firstMatch
-    for _ in 0..<6 where !attempt.isHittable { app.swipeUp() }
-    attempt.tap()
+    XCTAssertFalse(app.buttons["All questions"].exists)
+    app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9)).tap()
+    capture("Library for customers", app)
+    // An area chip narrows everything to that area; tapping it again clears it.
+    app.buttons["libraryArea-Queues & streams"].tap()
+    XCTAssertFalse(app.buttons["library-rep-recent"].waitForExistence(timeout: 1))
+    app.buttons["libraryArea-Queues & streams"].tap()
+    XCTAssertTrue(app.buttons["library-rep-recent"].waitForExistence(timeout: 3))
+    app.buttons["worthTryAgain"].tap()
+    XCTAssertTrue(app.navigationBars["Question preview"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.buttons["retryStart"].exists)
+    app.buttons["Close"].tap()
+    let rep = app.buttons["library-rep-library-completed-attempt"]
+    for _ in 0..<6 where !rep.isHittable { app.swipeUp() }
+    rep.tap()
     XCTAssertTrue(app.navigationBars["Attempt"].waitForExistence(timeout: 5))
     XCTAssertFalse(app.staticTexts["No explicit help recorded"].exists)
     XCTAssertFalse(app.staticTexts["Practised with help"].exists)
@@ -389,6 +403,7 @@ final class PracticeUITests: XCTestCase {
     // Leave the shared preference on the app's default, dark.
     appearance.tap(); app.buttons["Dark"].tap(); app.buttons["Done"].tap()
     app.tabBars.buttons["Library"].tap()
+    app.buttons["Library menu"].tap()
     app.buttons["Practice evidence"].tap()
     XCTAssertTrue(app.staticTexts["Defined a bounded retry policy."].waitForExistence(timeout: 5))
     XCTAssertTrue(app.staticTexts["Independence not established"].exists)
@@ -488,20 +503,23 @@ final class PracticeUITests: XCTestCase {
     app.launch()
     let library = app.tabBars.buttons["Library"]
     XCTAssertTrue(library.waitForExistence(timeout: 10)); library.tap()
-    let question = app.buttons["library-question-library-completed"]
-    XCTAssertTrue(question.waitForExistence(timeout: 10))
+    let worth = app.buttons["worthTryAgain"]
+    XCTAssertTrue(worth.waitForExistence(timeout: 10))
     app.tabBars.buttons["Home"].tap(); library.tap()
-    XCTAssertTrue(question.exists)
+    XCTAssertTrue(worth.exists)
     capture("Question library", app)
-    question.tap()
-    // The question itself, one way to practise it again, and nothing about pools or evidence for customers.
-    XCTAssertFalse(app.staticTexts["Original question"].exists)
-    for _ in 0..<10 where !app.buttons["Practise again"].isHittable { app.swipeUp() }
-    XCTAssertTrue(app.buttons["Practise again"].waitForExistence(timeout: 5))
-    app.buttons["Practise again"].tap()
+    // Try again previews the question as it was, and starting it opens a fresh rep.
+    worth.tap()
     XCTAssertTrue(app.navigationBars["Question preview"].waitForExistence(timeout: 5))
     app.buttons["Close"].tap()
+    XCTAssertTrue(app.navigationBars["Question preview"].waitForNonExistence(timeout: 5))
+    // A rep opens straight to what happened on it.
+    let rep = app.buttons["library-rep-library-completed-attempt"]
+    for _ in 0..<10 where !rep.isHittable { app.swipeUp() }
+    rep.tap()
+    XCTAssertTrue(app.navigationBars["Attempt"].waitForExistence(timeout: 5))
     app.navigationBars.buttons.element(boundBy: 0).tap()
+    for _ in 0..<10 where !app.buttons["Library menu"].isHittable { app.swipeDown() }
     app.buttons["Library menu"].tap()
     app.buttons["Skipped questions"].tap()
     let skipped = app.buttons["library-question-library-skipped"]
