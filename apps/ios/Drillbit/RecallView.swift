@@ -360,7 +360,10 @@ struct RecallView: View {
     } else if !model.recallLoaded && !model.fixture {
       ProgressView().frame(maxWidth: .infinity).padding(.vertical, 48).accessibilityLabel("Loading Recall")
     } else if model.recall.cards.isEmpty && session.knownCount + session.againCount == 0 {
-      BitEmptyState(title: "Nothing to recall yet", message: "Finish a rep and the bits worth remembering land here as quick cards.")
+      // Cards come from quotable design calls, so finished reps alone don't guarantee any.
+      BitEmptyState(title: "Nothing to recall yet", message: (model.bootstrap?.todayPlan?.completedTotal ?? 0) > 0
+        ? "Cards come from the design calls you make in a rep. Commit to a few next time and they’ll land here."
+        : "Finish a rep and the bits worth remembering land here as quick cards.")
         .accessibilityIdentifier("recallEmpty")
     } else {
       BitEmptyState(title: "You’re caught up", message: nextDueLine)

@@ -43,7 +43,15 @@ final class LiveWalkthrough: XCTestCase {
     guard editor.waitForExistence(timeout: 20) else { return }
     clearTips(name)
     for _ in 0..<6 where !editor.isHittable { app.swipeUp() }
-    editor.tap(); editor.typeText(text)
+    // Tips arrive on their own timers; a late one swallows the tap, so clear it and try again.
+    for _ in 0..<5 {
+      if app.buttons["coachDone"].exists { app.buttons["coachDone"].tap(); Thread.sleep(forTimeInterval: 1) }
+      editor.tap()
+      if (editor.value(forKey: "hasKeyboardFocus") as? Bool) == true { break }
+      Thread.sleep(forTimeInterval: 1.5)
+    }
+    guard (editor.value(forKey: "hasKeyboardFocus") as? Bool) == true else { shot(name + "-no-focus"); return }
+    editor.typeText(text)
     shot(name + "-typed")
     if tapIfPresent(app.buttons["shareAnswer"]) { waitForReply(); shot(name + "-reply") }
   }
