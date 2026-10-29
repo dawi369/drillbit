@@ -8,6 +8,14 @@ import ClerkKit
 @testable import Drillbit
 #endif
 struct InterviewTests {
+  @Test func milestonesCountRoundTicketsOnly() {
+    #expect(Milestone.line(for: 10) != nil)
+    #expect(Milestone.line(for: 25) != nil)
+    #expect(Milestone.line(for: 50) != nil)
+    #expect(Milestone.line(for: 100) != nil)
+    #expect(Milestone.line(for: 300)?.hasPrefix("300 reps") == true)
+    for ticket in [nil, 1, 9, 11, 75, 150] { #expect(Milestone.line(for: ticket) == nil) }
+  }
   @Test func greetingOnlyFeedbackHasNothingToFix() {
     let hello = Reflection(summary: "We got acquainted; there isn’t a design to reflect on yet.", worked: [], improve: "When you’re ready, pick one piece of the problem to start with.", takeaway: "Start small.", strengths: [], gaps: [])
     #expect(!hello.hasTechnicalWork)

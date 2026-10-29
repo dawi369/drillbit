@@ -1485,6 +1485,16 @@ import WidgetKit
         nextTicket: ProcessInfo.processInfo.arguments.contains("--fixture-dashboard") ? 13 : 1))
     #if DEBUG
     if ProcessInfo.processInfo.arguments.contains("--fixture-dashboard") { bootstrap?.challenge = nil }
+    // Today's rep is ticket No. 010: the first milestone, and a second filled day on the week strip.
+    if ProcessInfo.processInfo.arguments.contains("--fixture-milestone") {
+      var tenth = Challenge(id: "milestone-10", lifecycle: "completed", title: "Rate limiter for a public API", prompt: "Design per-key limits for a public API.",
+                            topic: "System design", completedAt: Date.now.addingTimeInterval(-600).ISO8601Format())
+      tenth.ticket = 10
+      tenth.reflection = Reflection(summary: "", worked: ["Atomic check and decrement"], improve: "Say what happens when Redis is unreachable.", takeaway: "Shared state keeps the limit honest.", strengths: [], gaps: [])
+      memory.sessions.insert(tenth, at: 0)
+      bootstrap?.challenge = nil
+      bootstrap?.todayPlan?.nextTicket = 11
+    }
     if ProcessInfo.processInfo.arguments.contains("--fixture-free-reps") {
       bootstrap?.account.plan = "free"
       bootstrap?.practice = PracticeAccess(plan: "free", freeReps: true, available: true, remaining: 2, limit: 3, resetsAt: Self.fixtureReset)

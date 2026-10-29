@@ -70,6 +70,7 @@
 		EAC2A5859464998CB025529A /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BA600A70A653AC369122638 /* WelcomeView.swift */; };
 		EAEFF3596AD2741C1A97EF7B /* RecallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA7AEA4C9157169D31D8D3B8 /* RecallView.swift */; };
 		ECEC2C8AFBB8086D0EA78BEC /* ContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ED772ACFEBFA6EBE9753089 /* ContractTests.swift */; };
+		EEBBA9182AFC6EBA3AD7CDBE /* HomeProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 078F7E279FD81437551FFBB2 /* HomeProgress.swift */; };
 		EFE8C1C42E2D80F1C5FEA8D4 /* FirstUse.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA47F5B6A6BBF68259182059 /* FirstUse.swift */; };
 		FF97749DF7D3112F299ECD20 /* InterviewVoiceRoom.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8F2A363927CDF8EB6A14D5C /* InterviewVoiceRoom.swift */; };
 /* End PBXBuildFile section */
@@ -116,6 +117,7 @@
 		015AF53243158079689CE24B /* Plan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plan.swift; sourceTree = "<group>"; };
 		01713294F3436278FCEE46B6 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		04CE1C0E2D55B42FFFD0982A /* CompanionPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionPanel.swift; sourceTree = "<group>"; };
+		078F7E279FD81437551FFBB2 /* HomeProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeProgress.swift; sourceTree = "<group>"; };
 		1185BAB722977AA5EAC231D0 /* StreamProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamProbe.swift; sourceTree = "<group>"; };
 		137147215B8FA4CA44DA4451 /* Ticket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ticket.swift; sourceTree = "<group>"; };
 		13F8E4917CAF05B015AA09E0 /* BitRig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitRig.swift; sourceTree = "<group>"; };
@@ -240,6 +242,7 @@
 				BA47F5B6A6BBF68259182059 /* FirstUse.swift */,
 				3805DAF1DC8F8A3A0256EBF7 /* GrowingInterviewEditor.swift */,
 				F7FE2F3D17D6A2010A948002 /* HelpView.swift */,
+				078F7E279FD81437551FFBB2 /* HomeProgress.swift */,
 				4EB6666339982040006AC57A /* HomeView.swift */,
 				66848CC15C0E69172DC285E0 /* InterviewController.swift */,
 				20B8BC792201909C6B627383 /* InterviewDocumentRows.swift */,
@@ -546,6 +549,7 @@
 				EFE8C1C42E2D80F1C5FEA8D4 /* FirstUse.swift in Sources */,
 				CDF84DEA3D9A57613120F732 /* GrowingInterviewEditor.swift in Sources */,
 				0EEA0D0A8C2A9562B674EAB4 /* HelpView.swift in Sources */,
+				EEBBA9182AFC6EBA3AD7CDBE /* HomeProgress.swift in Sources */,
 				DAC50998C02EF3CB03CAF744 /* HomeView.swift in Sources */,
 				5980E7756037BF8082CA3F81 /* InterviewController.swift in Sources */,
 				BC4FE8728310CCD03149A913 /* InterviewDocumentRows.swift in Sources */,

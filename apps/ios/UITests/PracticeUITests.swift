@@ -108,6 +108,24 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.navigationBars["Attempt"].exists)
   }
 
+  func testHomeWeekStripAndMilestone() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures", "--fixture-dashboard", "--fixture-customer", "--fixture-milestone"]
+    app.launch()
+    let week = app.descendants(matching: .any)["homeWeek"]
+    XCTAssertTrue(week.waitForExistence(timeout: 10))
+    XCTAssertTrue(week.label.contains("today"), week.label)
+    // Ticket No. 010 is the first milestone: gold ticket, one line, and a way to share it.
+    XCTAssertTrue(app.staticTexts["milestoneLine"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.staticTexts["Ten reps in. That’s a habit now."].exists)
+    XCTAssertTrue(app.buttons["shareMilestone"].waitForExistence(timeout: 3))
+    Thread.sleep(forTimeInterval: 2)
+    capture("Home milestone", app)
+    app.buttons["shareMilestone"].tap()
+    XCTAssertTrue(app.otherElements["ActivityListView"].waitForExistence(timeout: 5) || app.navigationBars["UIActivityContentView"].waitForExistence(timeout: 2))
+    capture("Milestone share sheet", app)
+  }
+
   func testHomeTicketResumesAndOffersActions() throws {
     let app = XCUIApplication()
     app.launchArguments = ["--fixtures", "--fixture-home-rich", "--fixture-interview-history"]

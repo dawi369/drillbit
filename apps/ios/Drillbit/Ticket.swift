@@ -66,6 +66,8 @@ struct Perforation: View {
 struct Ticket<Content: View, Stub: View>: View {
   /// Off when the caller draws the shadow itself: Home's zoom source clips the ticket, so its shadow lives outside the clip.
   var shadowed = true
+  /// Gold card stock with one sweep of light, for milestone tickets.
+  var foil = false
   @ViewBuilder var content: () -> Content
   @ViewBuilder var stub: () -> Stub
 
@@ -76,8 +78,10 @@ struct Ticket<Content: View, Stub: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
           TicketHalf(perforation: .bottom)
-            .fill(LinearGradient(colors: [AppPalette.ticket, AppPalette.ticketLower], startPoint: .top, endPoint: .bottom))
-            .overlay { TicketHalf(perforation: .bottom).stroke(AppPalette.ticketEdge, lineWidth: 1) }
+            .fill(LinearGradient(colors: foil ? [AppPalette.accentSoft, AppPalette.ticketLower] : [AppPalette.ticket, AppPalette.ticketLower],
+                                 startPoint: foil ? .topLeading : .top, endPoint: foil ? .bottomTrailing : .bottom))
+            .overlay { if foil { FoilSheen().clipShape(TicketHalf(perforation: .bottom)) } }
+            .overlay { TicketHalf(perforation: .bottom).stroke(foil ? AppPalette.accent.opacity(0.5) : AppPalette.ticketEdge, lineWidth: 1) }
         }
       stub()
         .padding(.horizontal, 20).padding(.top, 14).padding(.bottom, 16)

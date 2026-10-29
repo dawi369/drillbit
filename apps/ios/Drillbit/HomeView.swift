@@ -12,6 +12,8 @@ struct HomeView: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.dynamicTypeSize) private var typeSize
   @State private var bitCheers = 0
+  @State private var milestoneImage: Image?
+  @Environment(\.colorScheme) private var colorScheme
   @Namespace private var zoom
 
   private enum Today {
@@ -168,7 +170,22 @@ struct HomeView: View {
             .padding(.bottom, -16)
         }
       }
+      if (model.bootstrap?.todayPlan?.completedTotal ?? 0) > 0 {
+        HomeWeekStrip(days: repDays).padding(.top, 16)
+      }
     }
+    // Today's dot filling is the cue for Bit's hop; a fresh launch that finds it already filled stays still.
+    .onChange(of: model.bootstrap?.todayPlan?.completedToday) { old, new in
+      if let old, let new, old == 0, new > 0 { bitCheers += 1 }
+    }
+  }
+  /// Days this week (and before) with a finished rep, from the same history Home's done ticket reads.
+  private var repDays: Set<Date> {
+    let calendar = Calendar.current
+    var days = Set(model.memory.sessions.filter { !$0.isWarmUp && $0.lifecycle == "completed" }
+      .compactMap { $0.completedAt.flatMap(Date.fromAPI).map(calendar.startOfDay) })
+    if (model.bootstrap?.todayPlan?.completedToday ?? 0) > 0 { days.insert(calendar.startOfDay(for: .now)) }
+    return days
   }
   /// Bit only reflects what Home already says in text.
   private var bitMood: BitMood {
@@ -347,20 +364,43 @@ struct HomeView: View {
     let time = session.completedAt.flatMap(Date.fromAPI)?.formatted(date: .omitted, time: .shortened) ?? ""
     let takeaway = session.reflection?.takeaway ?? "Open it to see how it went."
     let next = model.nextFreeRep
+    let milestone = Milestone.line(for: session.ticket)
     // The ticket opens today's attempt; its stub carries the next move, so nothing hangs underneath.
-    return Ticket {
-      NavigationLink { SessionDetailView(model: model, initial: session) } label: {
-        VStack(alignment: .leading, spacing: 8) {
-          TicketHeader(number: session.ticketLabel(next: nil), detail: "Done \(time)")
-          Text(session.title).font(.title3.weight(.semibold)).foregroundStyle(AppPalette.secondary)
-            .multilineTextAlignment(.leading)
+    return Ticket(foil: milestone != nil) {
+      VStack(alignment: .leading, spacing: 16) {
+        NavigationLink { SessionDetailView(model: model, initial: session) } label: {
+          VStack(alignment: .leading, spacing: 8) {
+            TicketHeader(number: session.ticketLabel(next: nil), detail: "Done \(time)")
+            Text(session.title).font(.title3.weight(.semibold)).foregroundStyle(AppPalette.secondary)
+              .multilineTextAlignment(.leading)
+          }
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .contentShape(Rectangle())
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(Rectangle())
+        .buttonStyle(TicketPressStyle())
+        .accessibilityLabel("\(session.title). \(line ?? takeaway)")
+        .accessibilityIdentifier("todayDone")
+        if let milestone, let ticket = session.ticket {
+          HStack(alignment: .center, spacing: 12) {
+            Text(milestone).font(.headline).foregroundStyle(AppPalette.primary)
+              .fixedSize(horizontal: false, vertical: true)
+              .accessibilityIdentifier("milestoneLine")
+            Spacer(minLength: 8)
+            if let milestoneImage {
+              ShareLink(item: milestoneImage, message: Text("\(milestone) Practising system design on Drillbit."),
+                        preview: SharePreview(String(format: "Drillbit No. %03d", ticket), image: milestoneImage)) {
+                Image(systemName: "square.and.arrow.up").font(.body.weight(.semibold)).foregroundStyle(AppPalette.accent)
+                  .frame(width: 44, height: 44).contentShape(Rectangle())
+              }
+              .accessibilityLabel("Share milestone")
+              .accessibilityIdentifier("shareMilestone")
+            }
+          }
+          .task(id: "\(ticket)|\(colorScheme)") {
+            milestoneImage = MilestoneShareCard.image(ticket: ticket, line: milestone, scheme: colorScheme)
+          }
+        }
       }
-      .buttonStyle(TicketPressStyle())
-      .accessibilityLabel("\(session.title). \(line ?? takeaway)")
-      .accessibilityIdentifier("todayDone")
     } stub: {
       HStack(alignment: .center, spacing: 12) {
         VStack(alignment: .leading, spacing: 4) {
