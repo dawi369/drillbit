@@ -374,6 +374,16 @@ it("preserves engineering level for legacy updates and saves the selected time z
   const fresh = await request("bootstrap", "level-owner");
   expect((await fresh.json() as any).settings).toMatchObject({ engineeringLevel: "principal", timezone: "Asia/Kolkata" });
 });
+it("never lets a replayed setup un-finish onboarding", async () => {
+  const account = await accountFor(bindings, "onboarding-latch");
+  await bindings.DB.prepare("UPDATE accounts SET status='active' WHERE id=?").bind(account.id).run();
+  expect((await (await request("settings", "onboarding-latch", "PUT", { onboardingComplete: false })).json() as any).onboardingComplete).toBe(false);
+  expect((await (await request("settings", "onboarding-latch", "PUT", { onboardingComplete: true })).json() as any).onboardingComplete).toBe(true);
+  // A stale client re-sending setup's plan with onboarding unfinished keeps the account finished.
+  const replay = await request("settings", "onboarding-latch", "PUT", { onboardingComplete: false, dailyMinutes: 600 });
+  expect(await replay.json()).toMatchObject({ onboardingComplete: true, dailyMinutes: 600 });
+  expect((await (await request("bootstrap", "onboarding-latch")).json() as any).settings.onboardingComplete).toBe(true);
+});
 it("counts all completed practice independently of the 100-session page and account", async () => {
   const a = await accountFor(bindings, "dashboard-owner");
   const b = await accountFor(bindings, "dashboard-other");

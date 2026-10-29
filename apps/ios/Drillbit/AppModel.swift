@@ -462,11 +462,15 @@ import WidgetKit
     {
       try? await acceptEpoch(cached)
       await restoreHomeCache(account: account)
+      let skipped = (try? await disk.pendingSkips(account: account)) ?? []
       guard Clerk.shared.user?.id == subject else { launching = false; return }
-      bootstrap = cached
-      if let id = cached.challenge?.id, (try? await disk.pendingSkips(account: account).contains(id)) == true { bootstrap?.challenge = nil }
+      // Settings land in the same step as the account, never after: anything keyed on being signed in must not
+      // see default settings (onboarding unfinished) in between and send a finished user back through setup.
+      var restored = cached
+      if let id = cached.challenge?.id, skipped.contains(id) { restored.challenge = nil }
       settings = pendingSettings?.value ?? cached.settings
-      bootstrap?.settings = settings
+      restored.settings = settings
+      bootstrap = restored
       restoringSession = false
     }
     launching = false
@@ -512,14 +516,16 @@ import WidgetKit
       try await acceptEpoch(result)
       if bootstrap?.account.id != result.account.id { bootstrap = nil }
       await restoreHomeCache(account: result.account.id)
-      guard Clerk.shared.user?.id == subject else { return }
-      bootstrap = result
-      PlanCoordinator.shared.identify(account: result.account.id)
       let queuedSkips = try await disk.pendingSkips(account: result.account.id)
-      if let id = result.challenge?.id, locallySkipped[result.account.id]?.contains(id) == true || queuedSkips.contains(id) { bootstrap?.challenge = nil }
+      guard Clerk.shared.user?.id == subject else { return }
+      // Settings first, then the account, with no suspension between (see launch()).
       if let pendingSettings { settings = pendingSettings.value }
       else if !hadLocalEdits && pendingAtStart == nil && saveGeneration == settingsSaveGeneration && settings == settingsAtStart { settings = result.settings }
-      if pendingSettings != nil || pendingAtStart != nil || saveGeneration != settingsSaveGeneration { bootstrap?.settings = pendingSettings?.value ?? settings }
+      var updated = result
+      if let id = result.challenge?.id, locallySkipped[result.account.id]?.contains(id) == true || queuedSkips.contains(id) { updated.challenge = nil }
+      if pendingSettings != nil || pendingAtStart != nil || saveGeneration != settingsSaveGeneration { updated.settings = pendingSettings?.value ?? settings }
+      bootstrap = updated
+      PlanCoordinator.shared.identify(account: result.account.id)
       syncSettingsInBackground()
       try? await reconcileReminder()
       try SharedStore.setSecret(result.account.id, key: "account")
@@ -1233,6 +1239,8 @@ import WidgetKit
   func completeOnboarding() async {
     guard let account = bootstrap?.account.id, !settings.onboardingComplete else { return }
     settings.onboardingComplete = true
+    // Setup's answers are applied; a kept draft could only replay setup over a finished account.
+    UserDefaults.standard.removeObject(forKey: SetupView.draftKey)
     do { try await saveSettingsLocally() } catch let failure { error = failure.localizedDescription }
     try? await disk.cache(key: "onboarding-v2:" + account, data: Data())
   }
