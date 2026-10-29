@@ -8,6 +8,16 @@ import ClerkKit
 @testable import Drillbit
 #endif
 struct InterviewTests {
+  @Test func greetingOnlyFeedbackHasNothingToFix() {
+    let hello = Reflection(summary: "We got acquainted; there isn’t a design to reflect on yet.", worked: [], improve: "When you’re ready, pick one piece of the problem to start with.", takeaway: "Start small.", strengths: [], gaps: [])
+    #expect(!hello.hasTechnicalWork)
+    #expect(hello.fixLine == nil)
+    #expect(hello.workedLine == nil)
+    let gap = LearningEvidence(conceptId: "queues", observation: "Lost acks redeliver work.", quote: "Delete on finish.", signal: "needs_practice", assistance: "unknown")
+    let real = Reflection(evidence: [gap], summary: "", worked: ["Durable queue"], improve: "Say what a retry does.", takeaway: "", strengths: [], gaps: [])
+    #expect(real.fixLine == "Lost acks redeliver work.")
+    #expect(real.workedLine == "Durable queue")
+  }
   @Test func oneComposerRoutesStandaloneQuestionsWithoutTreatingAnswersAsQuestions() {
     #expect(InterviewComposerIntent.isQuestion("What scale?"))
     #expect(InterviewComposerIntent.isQuestion("  Could we assume a single region?  "))

@@ -84,64 +84,51 @@ struct SessionDetailView: View {
     ScrollView {
       VStack(alignment: .leading, spacing: 24) {
         VStack(alignment: .leading, spacing: 8) {
-          Text(challenge.title).font(.title.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
+          Text(challenge.title).font(.title2.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
             .accessibilityAddTraits(.isHeader)
           let date = (challenge.completedAt ?? challenge.createdAt).flatMap { Date.fromAPI($0) }?.formatted(date: .abbreviated, time: .shortened)
           DrillbitMetadata(text: [date, challenge.levelLabel == "Level not recorded" ? nil : challenge.levelLabel].compactMap { $0 }.joined(separator: " · "))
         }
-        Text(QuestionMarkup.plain(challenge.prompt)).foregroundStyle(.secondary)
-          .fixedSize(horizontal: false, vertical: true)
-        if let interview = challenge.interview, !interview.turns.isEmpty {
-          NavigationLink {
-            InterviewConversation(state: interview)
-              .background(AppPalette.background)
-              .containerBackground(AppPalette.background, for: .navigation)
-              .navigationTitle("Conversation").navigationBarTitleDisplayMode(.inline)
-          } label: {
-            Label("Read the conversation", systemImage: "text.bubble")
-              .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
-              .contentShape(Rectangle())
-          }
-          .accessibilityIdentifier("attemptConversation")
-        }
+        if let reflection = challenge.reflection { AttemptFeedback(reflection: reflection) }
+        if !challenge.prompt.isEmpty { AttemptQuestion(prompt: QuestionMarkup.plain(challenge.prompt)) }
         if let answer = challenge.session?.answer, !answer.isEmpty {
           VStack(alignment: .leading, spacing: 8) {
-            Text("Your answer").font(.headline)
-            Text(answer).textSelection(.enabled)
+            SignalEyebrow(text: "Your answer")
+            Text(answer).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
           }
         }
         if challenge.lifecycle == "completed" {
           Button("Practise again") { preparing = true }.buttonStyle(PracticeButtonStyle())
             .accessibilityIdentifier("practiseAgain")
         }
-        // Feedback and the help trail are still being shaped; developers see them, customers get the attempt itself.
+        // The raw feedback and help trail, for tuning prompts. Customers get the card above.
         if developer {
-          if let reflection = challenge.reflection { ReflectionContent(reflection: reflection) }
-          AssistanceSummary(challenge: challenge)
-          if let help = challenge.help, help.contains(where: { $0.body != nil }) {
-            DisclosureGroup("Help history") {
-              VStack(alignment: .leading, spacing: 16) {
+          DisclosureGroup("Developer details") {
+            VStack(alignment: .leading, spacing: 16) {
+              if let reflection = challenge.reflection { ReflectionContent(reflection: reflection) }
+              AssistanceSummary(challenge: challenge)
+              if let help = challenge.help, help.contains(where: { $0.body != nil }) {
                 ForEach(help.filter { $0.body != nil }) { item in
                   Text(item.title).font(.headline)
                   Text(item.body ?? "").textSelection(.enabled)
                   if let draft = item.suggestedAnswer { Text(draft).textSelection(.enabled) }
                 }
               }
-            }
-          }
-          if let turns = challenge.turns, !turns.isEmpty {
-            DisclosureGroup("Assistance used") {
-              ForEach(turns) { turn in
-                Text(turn.text).frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 8)
+              if let turns = challenge.turns, !turns.isEmpty {
+                ForEach(turns) { turn in Text(turn.text).frame(maxWidth: .infinity, alignment: .leading) }
+              }
+              if challenge.example != nil {
+                NavigationLink("Example answer viewed") { ExampleView(model: model, challenge: challenge) }
               }
             }
+            .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 12)
           }
-          if challenge.example != nil {
-            NavigationLink("Example answer viewed") { ExampleView(model: model, challenge: challenge) }
-          }
+          .foregroundStyle(AppPalette.secondary)
         }
-      }.padding(24)
-    }.background(AppPalette.background).navigationTitle("Attempt").navigationBarTitleDisplayMode(.inline)
+      }
+      .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 40)
+      .frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity)
+    }.background(AppPalette.background).containerBackground(AppPalette.background, for: .navigation).navigationTitle("Attempt").navigationBarTitleDisplayMode(.inline)
       .sheet(isPresented: $preparing, onDismiss: { if let started { model.presented = started; self.started = nil } }) {
         QuestionFlow(model: model, source: challenge, onStart: { started = $0 })
       }
@@ -169,6 +156,58 @@ struct SessionDetailView: View {
         guard !model.fixture, current?.session == nil, initial.session == nil else { return }
         await model.perform { current = try await model.api.send("challenges/" + initial.id) }
       }
+  }
+}
+/// How the rep went, in one card: the takeaway, then one thing that worked and one to fix.
+/// A rep with no design in it just says so, instead of inventing something to fix.
+struct AttemptFeedback: View {
+  let reflection: Reflection
+  var body: some View {
+    let worked = reflection.workedLine, fix = reflection.fixLine
+    let lead = reflection.hasTechnicalWork ? reflection.takeaway : reflection.summary
+    VStack(alignment: .leading, spacing: 16) {
+      if !lead.isEmpty {
+        Text(lead).font(.title3.weight(.semibold)).foregroundStyle(AppPalette.primary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      if let worked { point("What worked", worked) }
+      if let fix { point("What to fix", fix) }
+    }
+    .padding(16)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(AppPalette.ticket, in: RoundedRectangle(cornerRadius: 12))
+    .overlay { RoundedRectangle(cornerRadius: 12).stroke(AppPalette.ticketEdge, lineWidth: 1) }
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("attemptFeedback")
+  }
+  private func point(_ title: String, _ line: String) -> some View {
+    VStack(alignment: .leading, spacing: 4) {
+      SignalEyebrow(text: title)
+      Text(line).foregroundStyle(AppPalette.primary).fixedSize(horizontal: false, vertical: true)
+    }
+    .accessibilityElement(children: .combine)
+  }
+}
+/// The question as it was asked: a few lines, the rest on tap.
+struct AttemptQuestion: View {
+  let prompt: String
+  @State private var expanded = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  private var long: Bool { prompt.count > 160 }
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      SignalEyebrow(text: "The question")
+      Text(prompt).foregroundStyle(AppPalette.primary).textSelection(.enabled)
+        .lineLimit(expanded || !long ? nil : 3).fixedSize(horizontal: false, vertical: true)
+      if long {
+        Button(expanded ? "Show less" : "Show all") {
+          withAnimation(reduceMotion ? nil : DrillbitMotion.reveal) { expanded.toggle() }
+        }
+        .font(.subheadline.weight(.medium)).foregroundStyle(AppPalette.accent)
+        .frame(minHeight: 44)
+        .accessibilityIdentifier("attemptQuestionToggle")
+      }
+    }
   }
 }
 struct AssistanceSummary: View {

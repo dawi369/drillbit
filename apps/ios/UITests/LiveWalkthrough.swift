@@ -200,7 +200,6 @@ final class LiveWalkthrough: XCTestCase {
       if tapIfPresent(first, timeout: 5) {
         Thread.sleep(forTimeInterval: 1.5); shot("attempt")
         app.swipeUp(); shot("attempt-scrolled")
-        if tapIfPresent(app.buttons["attemptConversation"]) { Thread.sleep(forTimeInterval: 1); shot("attempt-conversation"); app.navigationBars.buttons.element(boundBy: 0).tap() }
         if tapIfPresent(app.buttons["deleteAttempt"]) { shot("delete-dialog"); _ = tapIfPresent(dialog.buttons["Cancel"]) }
       }
     }

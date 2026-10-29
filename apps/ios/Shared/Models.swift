@@ -114,6 +114,21 @@ struct Reflection: Codable, Sendable {
   var lesson: Lesson? = nil
   var debrief: Debrief? = nil
 }
+extension Reflection {
+  /// False when the rep had no design in it (a hello, a pause): `improve` is then an invitation to start, not a fix.
+  var hasTechnicalWork: Bool { !worked.isEmpty || !strengths.isEmpty || !gaps.isEmpty || !(evidence ?? []).isEmpty }
+  /// The one thing that worked, from the grounded evidence when there is some.
+  var workedLine: String? {
+    let line = evidence?.first { $0.signal == "demonstrated" }?.observation ?? worked.first
+    return line.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+  }
+  /// The one thing to fix. Nil when there was nothing technical to fix.
+  var fixLine: String? {
+    guard hasTechnicalWork else { return nil }
+    let line = (evidence?.first { $0.signal == "needs_practice" }?.observation ?? improve).trimmingCharacters(in: .whitespacesAndNewlines)
+    return line.isEmpty ? nil : line
+  }
+}
 /// Guided's ending: what the learner worked out, and one thing to try alone.
 struct Lesson: Codable, Sendable {
   var learned: [String]

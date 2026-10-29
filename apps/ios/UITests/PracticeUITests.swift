@@ -86,6 +86,12 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.navigationBars["Attempt"].waitForExistence(timeout: 5))
     XCTAssertFalse(app.staticTexts["No explicit help recorded"].exists)
     XCTAssertFalse(app.staticTexts["Practised with help"].exists)
+    // One feedback card: the takeaway, what worked, what to fix. No conversation link, no developer details.
+    let feedback = app.descendants(matching: .any)["attemptFeedback"]
+    XCTAssertTrue(feedback.exists)
+    XCTAssertTrue(app.staticTexts["Durability first, then deduplication."].exists)
+    XCTAssertFalse(app.buttons["Read the conversation"].exists)
+    XCTAssertFalse(app.buttons["Developer details"].exists)
     capture("Attempt for customers", app)
     // Delete asks in the alert style, centred, not as a popover pointing somewhere odd.
     app.buttons["deleteAttempt"].tap()

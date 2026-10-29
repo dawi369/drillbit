@@ -139,9 +139,7 @@ struct LibraryHomeView: View {
     var picks: [Revisit] = []
     for rep in shown {
       guard let question = rep.questionId, seen.insert(question).inserted else { continue }
-      let gap = rep.reflection?.evidence?.first { $0.signal == "needs_practice" }?.observation
-      let fix = (gap ?? rep.reflection?.improve)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-      guard !fix.isEmpty else { continue }
+      guard let fix = rep.reflection?.fixLine else { continue }
       picks.append(Revisit(rep: rep, fix: fix))
       if picks.count == 3 { break }
     }
