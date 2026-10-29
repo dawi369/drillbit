@@ -184,11 +184,12 @@ struct RecallView: View {
         case .paths: learningPaths
         }
       }
-      .padding(.horizontal, 24).padding(.vertical, 16)
+      .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 40)
       .frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity)
     }
     .background(AppPalette.groupedBackground)
     .navigationTitle("Recall")
+    .navigationSubtitle(selectedPath == nil && session.current != nil ? statusLine : "")
     .animation(reduceMotion ? nil : DrillbitMotion.disclosure, value: session.isRevealed)
     .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: session.current?.id)
     .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: selectedPath)
@@ -219,7 +220,7 @@ struct RecallView: View {
         .transition(.opacity)
       }
       if let card = session.current {
-        status
+        if selectedPath != nil { pathStatus }
         cardView(card)
           .id(card.id)
           .transition(.asymmetric(
@@ -276,61 +277,66 @@ struct RecallView: View {
     .contentShape(Rectangle())
   }
 
-  private var status: some View {
-    if selectedPath != nil {
-      let left = session.remainingCount
-      return Text("\(left) \(left == 1 ? "card" : "cards") left in this set")
-        .font(.headline).accessibilityLabel("\(left) \(left == 1 ? "card" : "cards") left in this set")
-    }
+  private var pathStatus: some View {
+    let left = session.remainingCount
+    return Text("\(left) \(left == 1 ? "card" : "cards") left in this set").font(.headline)
+  }
+
+  /// "2 cards to review · about 1 minute", under the title like Library's totals.
+  private var statusLine: String {
     let due = model.recall.dueCount
     let recommended = min(due, model.bootstrap?.todayPlan?.recommendedRecallCount ?? due)
     let minutes = max(1, Int(ceil(Double(max(recommended, 0)) / 2.0)))
     let cards = "\(due) \(due == 1 ? "card" : "cards") to review"
     let time = "about \(minutes) \(minutes == 1 ? "minute" : "minutes")"
-    let line = due > recommended && recommended > 0 ? "\(cards) · start with \(recommended) · \(time)" : "\(cards) · \(time)"
-    return Text(line).font(.headline).accessibilityLabel(line.replacingOccurrences(of: " · ", with: ", "))
+    return due > recommended && recommended > 0 ? "\(cards) · start with \(recommended) · \(time)" : "\(cards) · \(time)"
   }
 
+  /// The card itself sits on the ticket surface, like Home and Library; its buttons sit below it.
   private func cardView(_ card: RecallCard) -> some View {
     VStack(alignment: .leading, spacing: 20) {
-      // Your own cards say where they came from in one line; path cards say what they cover.
-      if let source = model.recall.cards.first(where: { $0.id == card.id }) {
-        let date = source.sourceCompletedAt.flatMap(Date.fromAPI).map { " · " + $0.formatted(.dateTime.month(.abbreviated).day()) } ?? ""
-        let signal = source.evidence?.signal == "demonstrated" ? " · You nailed this" : source.evidence?.signal == "needs_practice" ? " · Worth another look" : ""
-        DrillbitMetadata(text: "From " + (source.sourceTitle ?? "your interview") + date + signal)
-          .accessibilityIdentifier("recallSource")
-      } else {
-        DrillbitMetadata(text: "\(card.area.rawValue) · \(card.depth.rawValue)")
+      VStack(alignment: .leading, spacing: 16) {
+        // Your own cards say where they came from in one line; path cards say what they cover.
+        if let source = model.recall.cards.first(where: { $0.id == card.id }) {
+          let date = source.sourceCompletedAt.flatMap(Date.fromAPI).map { " · " + $0.formatted(.dateTime.month(.abbreviated).day()) } ?? ""
+          DrillbitMetadata(text: "From " + (source.sourceTitle ?? "your interview") + date)
+            .accessibilityIdentifier("recallSource")
+        } else {
+          DrillbitMetadata(text: "\(card.area.rawValue) · \(card.depth.rawValue)")
+        }
+        Text(card.question)
+          .font(.title2.weight(.semibold)).foregroundStyle(AppPalette.primary)
+          .fixedSize(horizontal: false, vertical: true)
+          .accessibilityIdentifier("recallQuestion")
+        if session.isRevealed {
+          VStack(alignment: .leading, spacing: 16) {
+            Rectangle().fill(AppPalette.ticketEdge).frame(height: 1).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 8) {
+              SignalEyebrow(text: "Answer")
+              Text(card.answer).foregroundStyle(AppPalette.primary)
+                .fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("recallAnswer")
+          }
+          .transition(.opacity.combined(with: .offset(y: reduceMotion ? 0 : 8)))
+        }
       }
-      Text(card.question)
-        .font(.title.weight(.semibold)).tracking(-0.4)
-        .fixedSize(horizontal: false, vertical: true)
-        .accessibilityIdentifier("recallQuestion")
-
-      SignalRule(draws: false)
+      .padding(20)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(AppPalette.ticket, in: RoundedRectangle(cornerRadius: 12))
+      .overlay { RoundedRectangle(cornerRadius: 12).stroke(AppPalette.ticketEdge, lineWidth: 1) }
 
       if session.isRevealed {
-        Group {
-        Divider()
-        VStack(alignment: .leading, spacing: 8) {
-          Text("Answer").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
-          Text(card.answer).font(.body).fixedSize(horizontal: false, vertical: true)
-            .textSelection(.enabled)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("recallAnswer")
-        }
-        .transition(.opacity.combined(with: .offset(y: reduceMotion ? 0 : 8)))
-
         HStack(spacing: 12) {
           Button("Again") { review(card, again: true) }
             .buttonStyle(PracticeButtonStyle(secondary: true))
             .accessibilityIdentifier("recallAgain")
-            .accessibilityHint("Returns this card to the end of the current deck")
+            .accessibilityHint("Brings this card back in a few minutes")
           Button("Got it") { review(card, again: false) }
             .buttonStyle(PracticeButtonStyle())
             .accessibilityIdentifier("recallGotIt")
-            .accessibilityHint("Removes this card from the current deck")
+            .accessibilityHint("Spaces this card out further")
         }
       } else {
         Button("Reveal answer") { revealedAt = Date(); session.reveal() }
@@ -353,15 +359,27 @@ struct RecallView: View {
       }
     } else if !model.recallLoaded && !model.fixture {
       ProgressView().frame(maxWidth: .infinity).padding(.vertical, 48).accessibilityLabel("Loading Recall")
-    } else if model.bootstrap?.todayPlan?.completedTotal == 0 && session.knownCount + session.againCount == 0 {
-      ContentUnavailableView("Your Recall deck", systemImage: AppIcon.recall.rawValue,
-                             description: Text("Finish an interview and the ideas worth keeping land here to revisit."))
+    } else if model.recall.cards.isEmpty && session.knownCount + session.againCount == 0 {
+      BitEmptyState(title: "Nothing to recall yet", message: "Finish a rep and the bits worth remembering land here as quick cards.")
         .accessibilityIdentifier("recallEmpty")
     } else {
-      ContentUnavailableView("You’re caught up", systemImage: AppIcon.recall.rawValue,
-                             description: Text("New cards show up here when they’re ready to revisit."))
+      BitEmptyState(title: "You’re caught up", message: nextDueLine)
         .accessibilityIdentifier("recallCaughtUp")
     }
+  }
+
+  /// When the next card comes back, so caught up isn't a dead end.
+  private var nextDueLine: String {
+    let now = Date()
+    guard let next = model.recall.cards.compactMap({ Date.fromAPI($0.dueAt) }).filter({ $0 > now }).min() else {
+      return "New cards land here after your next rep."
+    }
+    let calendar = Calendar.current
+    let when = calendar.isDateInToday(next) ? "later today"
+      : calendar.isDateInTomorrow(next) ? "tomorrow"
+      : next < now.addingTimeInterval(6 * 86_400) ? "on " + next.formatted(.dateTime.weekday(.wide))
+      : "on " + next.formatted(.dateTime.month(.abbreviated).day())
+    return "Next card’s back \(when)."
   }
 
   private func resetSession() {

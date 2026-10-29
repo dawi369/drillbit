@@ -11,6 +11,7 @@ struct LibraryHomeView: View {
   @State private var started: Challenge?
   @State private var retryFailure: String?
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @Environment(\.dynamicTypeSize) private var typeSize
 
   private var developer: Bool { model.bootstrap?.capabilities?.developerTools == true }
   /// Finished reps, newest first. Warm-ups never counted, so they don't show either.
@@ -29,9 +30,8 @@ struct LibraryHomeView: View {
     ScrollView {
       VStack(alignment: .leading, spacing: 28) {
         if reps.isEmpty {
-          ContentUnavailableView("Your library", systemImage: AppIcon.books.rawValue,
-                                 description: Text("Finished questions land here, with the one thing to carry forward."))
-            .padding(.top, 48)
+          BitEmptyState(title: "Nothing here yet", message: "Finish a rep and it lands here, with the one thing worth fixing next time.")
+            .accessibilityIdentifier("libraryEmpty")
         } else {
           if !areas.isEmpty { areaStrip }
           if !worthAnotherGo.isEmpty { worthSection }
@@ -157,14 +157,17 @@ struct LibraryHomeView: View {
     VStack(alignment: .leading, spacing: 12) {
       if let area = areaLabel(item.rep) { DrillbitMetadata(text: area) }
       Text(item.fix).font(.body.weight(.medium)).foregroundStyle(AppPalette.primary)
-        .lineLimit(4).fixedSize(horizontal: false, vertical: true)
-      HStack(alignment: .center, spacing: 12) {
-        Text(item.rep.title).font(.subheadline).foregroundStyle(AppPalette.secondary).lineLimit(2)
-        Spacer(minLength: 8)
+        .lineLimit(typeSize.isAccessibilitySize ? nil : 4).fixedSize(horizontal: false, vertical: true)
+      // Side by side normally; stacked at accessibility sizes so neither the title nor the button gets squeezed.
+      let row = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12)) : AnyLayout(HStackLayout(alignment: .center, spacing: 12))
+      row {
+        Text(item.rep.title).font(.subheadline).foregroundStyle(AppPalette.secondary)
+          .lineLimit(typeSize.isAccessibilitySize ? nil : 2).fixedSize(horizontal: false, vertical: true)
+        if !typeSize.isAccessibilitySize { Spacer(minLength: 8) }
         Button { openRetry(item.rep) } label: {
           HStack(spacing: 6) {
             if loadingRetry == item.rep.id { ProgressView().controlSize(.small).tint(AppPalette.actionInk) }
-            Text("Try again")
+            Text("Try again").lineLimit(1).fixedSize()
           }
           .font(.subheadline.weight(.semibold)).foregroundStyle(AppPalette.actionInk)
           .padding(.horizontal, 16).frame(minHeight: 36)

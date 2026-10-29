@@ -14,6 +14,7 @@ final class PracticeUITests: XCTestCase {
     XCTAssertFalse(app.buttons["recallAreaPicker"].exists)
     XCTAssertFalse(app.buttons["recallDepthPicker"].exists)
     XCTAssertTrue(app.descendants(matching: .any)["recallEmpty"].exists)
+    capture("Recall day one", app)
     // Developers keep the Map and Paths sections.
     app.buttons["Map"].tap()
     XCTAssertTrue(app.staticTexts["Your system design map"].waitForExistence(timeout: 2))
@@ -44,12 +45,15 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(source.exists && source.label.hasPrefix("From Design a reliable job queue"), source.label)
     XCTAssertFalse(app.staticTexts["One live idea"].exists)
     capture("Recall review", app)
-    for _ in 0..<2 {
+    for index in 0..<2 {
       app.buttons["recallReveal"].tap()
+      if index == 0 { Thread.sleep(forTimeInterval: 0.8); capture("Recall revealed", app) }
       XCTAssertTrue(app.buttons["recallGotIt"].waitForExistence(timeout: 3))
       app.buttons["recallGotIt"].tap()
     }
-    XCTAssertTrue(app.descendants(matching: .any)["recallCaughtUp"].waitForExistence(timeout: 5))
+    let caughtUp = app.descendants(matching: .any)["recallCaughtUp"]
+    XCTAssertTrue(caughtUp.waitForExistence(timeout: 5))
+    XCTAssertTrue(caughtUp.label.contains("Next card’s back tomorrow"), caughtUp.label)
     capture("Recall caught up", app)
   }
 

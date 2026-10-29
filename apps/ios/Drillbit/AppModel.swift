@@ -595,7 +595,11 @@ import WidgetKit
           card("due-2", "backpressure", "What should a queue do when consumers fall behind?",
                "Push back on producers, shed or delay low-priority work, and alert, instead of letting the backlog grow without a bound."),
         ]
-        recall = RecallDeckResponse(cards: cards, dueCount: cards.count); recallLoaded = true; recallFetchedAt = Date(); return
+        // One card already spaced out, so caught up can say when it's back.
+        var later = card("later-1", "caching", "A popular profile expires and 500 requests miss at once. What reaches the database?",
+                         "All 500, unless concurrent misses share one in-flight read and refill the cache from it.")
+        later.dueAt = Date.now.addingTimeInterval(86_400).ISO8601Format()
+        recall = RecallDeckResponse(cards: cards + [later], dueCount: cards.count); recallLoaded = true; recallFetchedAt = Date(); return
       }
       #endif
       recall = RecallDeckResponse(cards: [], dueCount: 0); recallLoaded = true; recallFetchedAt = Date(); return
