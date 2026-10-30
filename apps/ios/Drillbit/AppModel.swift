@@ -97,6 +97,15 @@ import WidgetKit
   /// Shown once when a receipt belongs to another account.
   var entitlementNotice: String?
   var isPro: Bool { bootstrap?.account.plan == "pro" || bootstrap?.practice?.freeReps == false }
+  /// The server just confirmed Pro (with a purchase or restore): unlock now, before the next bootstrap lands.
+  func applyConfirmedPro() {
+    bootstrap?.account.plan = "pro"
+    bootstrap?.practice = PracticeAccess(plan: "pro", freeReps: false, available: true)
+    if var voice = bootstrap?.capabilities?.voice {
+      voice.available = true; voice.plan = "pro"; voice.remaining = nil; voice.limit = nil; voice.reason = nil
+      bootstrap?.capabilities?.voice = voice
+    }
+  }
   /// Every action that starts a rep asks here first; the `practice_rep` placement sits behind a refusal.
   func mayStartRep(swapping current: Challenge? = nil) -> Bool {
     guard let practice = bootstrap?.practice, practice.freeReps else { return true }
@@ -137,6 +146,9 @@ import WidgetKit
   let fixture: Bool
   private var syncTask: Task<Void, Never>?
   private var refreshing = false
+  /// A refresh asked for while one was running: the running one may have read the server before the change that
+  /// prompted this one (a purchase, say), so it runs once more when the first lands.
+  private var refreshAgain = false
   private var monitor = NWPathMonitor()
   private let logger = Logger(subsystem: "dawi.drillbit", category: "application")
   init(container: ModelContainer, baseURL: URL, fixture: Bool, client: APIClient? = nil, monitorNetwork: Bool = true) {
@@ -502,7 +514,11 @@ import WidgetKit
     }
   }
   func refresh() async {
-    guard !fixture, !refreshing, !launching else { return }
+    guard !fixture, !launching else { return }
+    if refreshing { refreshAgain = true; return }
+    defer {
+      if refreshAgain { refreshAgain = false; Task { await refresh() } }
+    }
     let resetGeneration = accountResetGeneration
     let subject = Clerk.shared.user?.id
     let settingsAtStart = settings

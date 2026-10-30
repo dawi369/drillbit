@@ -312,6 +312,10 @@ struct BitGeometry {
   private let seed: Double
   private var last: Date?
   private var time = 0.0, phase = 0.9, orbit = 1.2
+  /// Drives the ambient motion (sway, breath, float, glances, blink gaps). Idle runs it 20% fast so he reads
+  /// alive at a glance; it accumulates, so a mood change alters the pace without jumping the pose.
+  private var ambient = 0.0
+  private static let idlePace = 1.2
   private var mood: BitMood = .idle
   private var glance = CGPoint.zero, glanceIn = 1.5
   private var blinkIn = 2.0, blinkClock = -1.0
@@ -349,20 +353,22 @@ struct BitGeometry {
     self.mood = mood
     let m = mood.target
     time += dt
+    let pace = mood == .idle ? Self.idlePace : 1
+    ambient += dt * pace
 
-    glanceIn -= dt
+    glanceIn -= dt * pace
     if glanceIn <= 0 {
       glanceIn = 1.4 + unit() * 2.6
       let next = unit() < 0.6 ? CGPoint(x: unit() * 1.5 - 0.75, y: unit() * 0.9 - 0.45) : .zero
       if hypot(next.x - glance.x, next.y - glance.y) > 0.6, blinkClock < 0, unit() < 0.6 { blinkClock = 0 }
       glance = next
     }
-    let blink = blinkAmount(dt, enabled: m.blinks)
+    let blink = blinkAmount(dt, gap: dt * pace, enabled: m.blinks)
     let look = m.look ?? glance
 
     self[.lookX].target = look.x
     self[.lookY].target = look.y
-    self[.headX].target = self[.lookX].value * 5 * m.lean + (m.chips ? 0 : sin(time * 0.8 + seed) * 1.4)
+    self[.headX].target = self[.lookX].value * 5 * m.lean + (m.chips ? 0 : sin(ambient * 0.8 + seed) * 1.4)
     self[.tipX].target = self[.headX].value * 0.2
     self[.eyeWidth].target = m.eyeWidth
     self[.leftTop].target = m.left.top
@@ -375,7 +381,7 @@ struct BitGeometry {
     self[.dots].target = m.dots
     self[.sink].target = m.sink
     let anticipation = m.hops && hopIn < 0.16 ? 0.08 : 0
-    self[.squash].target = 1 + m.squash + sin(time * 1.6 + seed - 0.9) * 0.014 - blink * 0.025
+    self[.squash].target = 1 + m.squash + sin(ambient * 1.6 + seed - 0.9) * 0.014 - blink * 0.025
       + self[.mouth].value * 0.025 - anticipation
 
     if m.hops {
@@ -406,7 +412,7 @@ struct BitGeometry {
     pose.tipX = self[.tipX].value
     pose.shake = m.shake * sin(time * 70) * 0.7
     pose.squash = max(0.7, self[.squash].value)
-    pose.lift = sin(time * 1.6 + seed) * m.float + self[.hop].value + self[.sink].value
+    pose.lift = sin(ambient * 1.6 + seed) * m.float + self[.hop].value + self[.sink].value
     pose.eyeWidth = self[.eyeWidth].value
     pose.left = BitEye(top: self[.leftTop].value, bottom: self[.leftBottom].value)
     pose.right = BitEye(top: self[.rightTop].value, bottom: self[.rightBottom].value)
@@ -443,9 +449,10 @@ struct BitGeometry {
     return 0.18 + 0.82 * max(0, sin(t * 12.5 + sin(t * 2.9) * 2.2)) * (0.6 + 0.4 * sin(t * 4.7))
   }
 
-  private func blinkAmount(_ dt: Double, enabled: Bool) -> Double {
+  /// `gap` counts down to the next blink (paced with the ambient motion); `dt` times the blink itself.
+  private func blinkAmount(_ dt: Double, gap: Double, enabled: Bool) -> Double {
     guard enabled else { blinkClock = -1; return 0 }
-    blinkIn -= dt
+    blinkIn -= gap
     if blinkIn <= 0, blinkClock < 0 {
       blinkClock = 0
       blinkIn = unit() < 0.18 ? 0.32 : 2.2 + unit() * 3.4

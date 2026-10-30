@@ -69,7 +69,10 @@ private struct EntitlementReceipt: Decodable { var plan: String }
     for _ in 0..<20 {
       guard presenting == placement else { return }
       if let top = Self.topController(), !top.isBeingDismissed, !top.isBeingPresented, top.transitionCoordinator == nil {
-        let host = UIHostingController(rootView: NativePaywallSheet(placement: placement).tint(AppPalette.accent))
+        // Hosted outside the SwiftUI scene, so scene phase would read as background and freeze Bit; while it's up,
+        // the app is in front.
+        let host = UIHostingController(rootView: NativePaywallSheet(placement: placement).tint(AppPalette.accent)
+          .environment(\.scenePhase, .active))
         host.overrideUserInterfaceStyle = top.traitCollection.userInterfaceStyle
         host.presentationController?.delegate = sheetDelegate
         sheetDelegate.onSwipeDown = { [weak self] in self?.paywallController = nil; self?.dismissed() }
@@ -145,7 +148,8 @@ private struct EntitlementReceipt: Decodable { var plan: String }
   @discardableResult private func upload(_ jws: String) async -> Bool {
     guard let model else { return false }
     do {
-      let _: EntitlementReceipt = try await model.api.send("entitlement", method: "POST", body: EntitlementUpload(signedTransaction: jws))
+      let receipt: EntitlementReceipt = try await model.api.send("entitlement", method: "POST", body: EntitlementUpload(signedTransaction: jws))
+      if receipt.plan == "pro" { model.applyConfirmedPro() }
       return true
     } catch let failure as APIError where failure.code == "entitlement_taken" {
       model.entitlementNotice = failure.message
@@ -156,9 +160,7 @@ private struct EntitlementReceipt: Decodable { var plan: String }
   #if DEBUG
   /// Fixture purchase: flips the local bootstrap to Pro so UI tests can cross the gate offline.
   func fixturePurchase() async {
-    model?.bootstrap?.account.plan = "pro"
-    model?.bootstrap?.practice = PracticeAccess(plan: "pro", freeReps: false, available: true)
-    if var voice = model?.bootstrap?.capabilities?.voice { voice.available = true; voice.plan = "pro"; voice.remaining = nil; voice.limit = nil; voice.reason = nil; model?.bootstrap?.capabilities?.voice = voice }
+    model?.applyConfirmedPro()
     await purchased()
   }
   #endif
@@ -246,12 +248,12 @@ private struct PaywallHeader: View {
     VStack(spacing: 16) {
       ZStack {
         BitGlow(color: AppPalette.action, opacity: 0.28)
-          .frame(width: 128, height: 128)
+          .frame(width: 168, height: 168)
           .scaleEffect(glow ? 1.08 : 0.94)
           .accessibilityHidden(true)
-        BitView(greets: true).frame(width: 52, height: 60).accessibilityHidden(true)
+        BitView(greets: true).frame(width: 80, height: 92).accessibilityHidden(true)
       }
-      .frame(height: 80)
+      .frame(height: 112)
       VStack(spacing: 4) {
         Text("Drillbit Pro").font(.caption.weight(.semibold)).foregroundStyle(AppPalette.accent)
           .textCase(.uppercase).tracking(1.2)
