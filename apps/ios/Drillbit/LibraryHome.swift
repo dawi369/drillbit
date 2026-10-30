@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Library at a glance: what's worth another go, which areas you've worked, and your reps as tickets by week.
-/// Per-question detail and the skipped list stay one tap away; the old filtered list is developer-only.
+/// Each rep opens its Attempt; the skipped list is one tap away in the ⋯ menu.
 struct LibraryHomeView: View {
   var model: AppModel
   @State private var area: String?
@@ -13,7 +13,6 @@ struct LibraryHomeView: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.dynamicTypeSize) private var typeSize
 
-  private var developer: Bool { model.bootstrap?.capabilities?.developerTools == true }
   /// Finished reps, newest first. Warm-ups never counted, so they don't show either.
   private var reps: [Challenge] {
     model.memory.sessions.filter { $0.lifecycle == "completed" && !$0.isWarmUp }
@@ -30,7 +29,7 @@ struct LibraryHomeView: View {
     ScrollView {
       VStack(alignment: .leading, spacing: 28) {
         if reps.isEmpty {
-          BitEmptyState(title: "Nothing here yet", message: "Finish a rep and it lands here, with the one thing worth fixing next time.")
+          EmptyTabState(title: "Nothing here yet", message: "Finish a rep and it lands here, with the one thing worth fixing next time.")
             .accessibilityIdentifier("libraryEmpty")
         } else {
           if !areas.isEmpty { areaStrip }
@@ -45,14 +44,10 @@ struct LibraryHomeView: View {
     .containerBackground(AppPalette.background, for: .navigation)
     .navigationTitle("Library")
     .navigationSubtitle(statsLine ?? "")
-    .searchable(text: $search, prompt: "Search your questions")
+    .modifier(LibrarySearch(text: $search, shown: !reps.isEmpty))
     .toolbar {
       Menu {
         NavigationLink { LibraryView(model: model, skipped: true) } label: { Label("Skipped questions", systemImage: AppIcon.skip.rawValue) }
-        if developer {
-          NavigationLink { LibraryView(model: model) } label: { Label("All questions", systemImage: AppIcon.books.rawValue) }
-          NavigationLink { PracticeEvidenceView(model: model) } label: { Label("Practice evidence", systemImage: "checklist") }
-        }
       } label: { Image(systemName: AppIcon.more.rawValue) }.accessibilityLabel("Library menu")
     }
     .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: area)
@@ -319,5 +314,18 @@ struct QuestionRetrySheet: View {
       .toolbar { Button("Close", action: close) }
     }
     .presentationBackground(AppPalette.background)
+  }
+}
+
+/// Search sits in view under the title whenever there's something to search, and is absent before the first rep.
+private struct LibrarySearch: ViewModifier {
+  @Binding var text: String
+  let shown: Bool
+  func body(content: Content) -> some View {
+    if shown {
+      content.searchable(text: $text, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search your questions")
+    } else {
+      content
+    }
   }
 }

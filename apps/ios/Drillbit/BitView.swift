@@ -76,24 +76,3 @@ struct BitView: View {
   }
   .background(AppPalette.background)
 }
-
-/// An empty tab: Bit idling, what lands here, and when. Library and Recall share it.
-struct BitEmptyState: View {
-  let title: String
-  let message: String
-  var body: some View {
-    VStack(spacing: 20) {
-      BitView().frame(width: 76, height: 84).accessibilityHidden(true)
-      VStack(spacing: 8) {
-        Text(title).font(.title3.weight(.semibold)).foregroundStyle(AppPalette.primary)
-        Text(message).foregroundStyle(AppPalette.secondary)
-      }
-      .multilineTextAlignment(.center)
-      .fixedSize(horizontal: false, vertical: true)
-    }
-    .frame(maxWidth: 320)
-    .frame(maxWidth: .infinity)
-    .padding(.top, 64)
-    .accessibilityElement(children: .combine)
-  }
-}

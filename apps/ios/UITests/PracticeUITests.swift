@@ -412,7 +412,7 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.buttons["liveVoice"].waitForExistence(timeout: 5))
   }
 
-  func testAppearanceAndLearningEvidence() throws {
+  func testAppearancePersistsAndLibraryMenuIsSkippedOnly() throws {
     continueAfterFailure = false
     let app = XCUIApplication()
     app.launchArguments = ["--fixtures", "--fixture-dashboard", "--fixture-evidence"]
@@ -430,12 +430,12 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(appearance.label.contains("Dark"))
     // Leave the shared preference on the app's default, dark.
     appearance.tap(); app.buttons["Dark"].tap(); app.buttons["Done"].tap()
+    // Library's menu is just the skipped list, developers included.
     app.tabBars.buttons["Library"].tap()
     app.buttons["Library menu"].tap()
-    app.buttons["Practice evidence"].tap()
-    XCTAssertTrue(app.staticTexts["Defined a bounded retry policy."].waitForExistence(timeout: 5))
-    XCTAssertTrue(app.staticTexts["Independence not established"].exists)
-    capture("Grounded practice evidence", app)
+    XCTAssertTrue(app.buttons["Skipped questions"].waitForExistence(timeout: 3))
+    XCTAssertFalse(app.buttons["Practice evidence"].exists)
+    XCTAssertFalse(app.buttons["All questions"].exists)
   }
 
   func testAIConsentReadsAtLargestTypeInLight() throws {
@@ -1669,12 +1669,13 @@ final class PracticeUITests: XCTestCase {
     let app = XCUIApplication()
     app.launchArguments = ["--fixtures", "--fixture-signed-out", "--fixture-walkthrough"]
     app.launch()
-    // Page one: why this round matters, then Next.
+    // Page one: why this round matters, then Continue.
     XCTAssertTrue(app.descendants(matching: .any)["separatorHeadline"].waitForExistence(timeout: 8))
     XCTAssertFalse(app.buttons["Get started"].exists)
-    // Bit arrives with the pitch once the loop has lit; the arrow at the foot turns the page.
-    XCTAssertTrue(app.descendants(matching: .any)["separatorBit"].waitForExistence(timeout: 20))
-    Thread.sleep(forTimeInterval: 2)
+    // Bit arrives with the pitch once the loop has lit; only then does Continue rise at the foot.
+    XCTAssertFalse(app.buttons["welcomeNext"].exists)
+    XCTAssertTrue(app.buttons["welcomeNext"].waitForExistence(timeout: 25))
+    Thread.sleep(forTimeInterval: 1)
     capture("Welcome separator", app)
     app.buttons["welcomeNext"].tap()
     // Page two: the promise and an example that plays itself, no buttons to press.

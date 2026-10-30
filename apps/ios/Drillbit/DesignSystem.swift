@@ -833,3 +833,21 @@ struct QuestionAsk<Content: View>: View {
 extension EnvironmentValues {
   @Entry var formatsQuestions = true
 }
+
+/// An empty tab: what lands here, and when. Library and Recall share it.
+struct EmptyTabState: View {
+  let title: String
+  let message: String
+  var body: some View {
+    VStack(spacing: 8) {
+      Text(title).font(.title3.weight(.semibold)).foregroundStyle(AppPalette.primary)
+      Text(message).foregroundStyle(AppPalette.secondary)
+    }
+    .multilineTextAlignment(.center)
+    .fixedSize(horizontal: false, vertical: true)
+    .frame(maxWidth: 320)
+    .frame(maxWidth: .infinity)
+    .padding(.top, 96)
+    .accessibilityElement(children: .combine)
+  }
+}

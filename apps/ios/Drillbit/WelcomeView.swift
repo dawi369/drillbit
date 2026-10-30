@@ -45,10 +45,13 @@ struct WelcomeView: View {
       withAnimation(.easeInOut(duration: 3.2).repeatForever(autoreverses: true)) { glow = true }
     }
     .safeAreaInset(edge: .bottom, spacing: 0) {
-      // Each page's way on fades up once that page has played out: Continue, then Get started.
-      if page == 0 ? storyDone : exampleDone {
-        VStack(spacing: 0) {
-          AppPalette.hairline.frame(height: 1)
+      // Each page's way on fades up once that page has played out: Continue, then Get started. The bar keeps its
+      // place from the start, so the page never shifts when it arrives; it only fades and rises.
+      let ready = page == 0 ? storyDone : exampleDone
+      ZStack {
+        // Holds the bar's height from the start; hidden views take space but can't be seen, tapped or read.
+        Button("Continue") {}.buttonStyle(PracticeButtonStyle()).hidden()
+        if ready {
           Group {
             if page == 0 {
               Button("Continue") { withAnimation(reduceMotion ? nil : DrillbitMotion.page) { page = 1 } }
@@ -58,15 +61,13 @@ struct WelcomeView: View {
             }
           }
           .buttonStyle(PracticeButtonStyle())
-          .frame(maxWidth: 560).padding(.horizontal, 24).padding(.top, 12).padding(.bottom, 8)
-          .frame(maxWidth: .infinity)
+          .transition(reduceMotion ? .opacity : .opacity.combined(with: .offset(y: 12)))
         }
-        .background(AppPalette.background)
-        .transition(.opacity)
       }
+      .frame(maxWidth: 560).padding(.horizontal, 24).padding(.top, 12).padding(.bottom, 8)
+      .frame(maxWidth: .infinity)
+      .animation(reduceMotion ? nil : .easeOut(duration: 0.6), value: ready)
     }
-    .animation(reduceMotion ? nil : DrillbitMotion.page, value: exampleDone)
-    .animation(reduceMotion ? nil : DrillbitMotion.page, value: storyDone)
     .animation(reduceMotion ? nil : DrillbitMotion.page, value: page)
   }
 }
@@ -139,9 +140,11 @@ private struct SeparatorSlide: View {
       try? await Task.sleep(for: .milliseconds(700))
       guard !Task.isCancelled else { return }
       bitIn = true
+      // Bit lands first; once he's settled, Continue rises at the foot, then he cheers.
+      try? await Task.sleep(for: .milliseconds(900))
+      guard !Task.isCancelled else { return }
       done()
-      // Bit lands, takes a beat and cheers; Continue at the foot is the way on.
-      try? await Task.sleep(for: .milliseconds(1400))
+      try? await Task.sleep(for: .milliseconds(500))
       guard !Task.isCancelled else { return }
       cheers += 1
     }
