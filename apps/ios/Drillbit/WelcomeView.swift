@@ -16,7 +16,7 @@ struct WelcomeView: View {
     // Hand-built pager: the page turns only from its own arrow, and nothing clips a page's top edge.
     ZStack {
       if page == 0 {
-        SeparatorSlide(active: true, done: { storyDone = true }, next: { withAnimation(DrillbitMotion.page) { page = 1 } })
+        SeparatorSlide(active: true, done: { storyDone = true })
           .transition(.asymmetric(insertion: .move(edge: .leading), removal: .move(edge: .leading).combined(with: .opacity)))
       } else {
         TasteSlide(active: true) { exampleDone = true }
@@ -45,31 +45,37 @@ struct WelcomeView: View {
       withAnimation(.easeInOut(duration: 3.2).repeatForever(autoreverses: true)) { glow = true }
     }
     .safeAreaInset(edge: .bottom, spacing: 0) {
-      // The way in fades up once the example has made its point.
-      if page == 1, exampleDone {
+      // Each page's way on fades up once that page has played out: Continue, then Get started.
+      if page == 0 ? storyDone : exampleDone {
         VStack(spacing: 0) {
           AppPalette.hairline.frame(height: 1)
-          Button("Get started", action: start)
-            .buttonStyle(PracticeButtonStyle())
-            .frame(maxWidth: 560).padding(.horizontal, 24).padding(.top, 12).padding(.bottom, 8)
-            .frame(maxWidth: .infinity)
-            .accessibilityIdentifier("getStarted")
+          Group {
+            if page == 0 {
+              Button("Continue") { withAnimation(reduceMotion ? nil : DrillbitMotion.page) { page = 1 } }
+                .accessibilityIdentifier("welcomeNext")
+            } else {
+              Button("Get started", action: start).accessibilityIdentifier("getStarted")
+            }
+          }
+          .buttonStyle(PracticeButtonStyle())
+          .frame(maxWidth: 560).padding(.horizontal, 24).padding(.top, 12).padding(.bottom, 8)
+          .frame(maxWidth: .infinity)
         }
         .background(AppPalette.background)
         .transition(.opacity)
       }
     }
     .animation(reduceMotion ? nil : DrillbitMotion.page, value: exampleDone)
+    .animation(reduceMotion ? nil : DrillbitMotion.page, value: storyDone)
     .animation(reduceMotion ? nil : DrillbitMotion.page, value: page)
   }
 }
 
 /// Page one: the round that separates the candidates who get the offer, shown as the loop itself.
-/// Bit arrives at the end with the pitch; tapping him is the way forward.
+/// Bit arrives at the end with the pitch; Continue then fades up at the foot.
 private struct SeparatorSlide: View {
   var active: Bool
   var done: () -> Void
-  var next: () -> Void
   @State private var headlineDone = false
   @State private var lit = 0
   @State private var railDrawn = false
@@ -111,22 +117,6 @@ private struct SeparatorSlide: View {
           loop.opacity(headlineDone ? 1 : 0)
           Spacer(minLength: 36)
           pitch.opacity(bitIn ? 1 : 0).offset(y: bitIn ? 0 : 10)
-          HStack {
-            Spacer()
-            Button(action: next) {
-              HStack(spacing: 4) {
-                Text("Next").font(.subheadline.weight(.medium))
-                Image(systemName: "arrow.right").font(.caption.weight(.bold))
-              }
-              .foregroundStyle(AppPalette.secondary)
-              .padding(.vertical, 8).padding(.leading, 8)
-              .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("welcomeNext")
-          }
-          .padding(.top, 12)
-          .opacity(headlineDone ? 1 : 0)
         }
         .frame(maxWidth: 560, alignment: .topLeading)
         .padding(.horizontal, 24).padding(.top, 48).padding(.bottom, 72)
@@ -150,7 +140,7 @@ private struct SeparatorSlide: View {
       guard !Task.isCancelled else { return }
       bitIn = true
       done()
-      // Bit lands, takes a beat and cheers; the arrow at the foot is the way on.
+      // Bit lands, takes a beat and cheers; Continue at the foot is the way on.
       try? await Task.sleep(for: .milliseconds(1400))
       guard !Task.isCancelled else { return }
       cheers += 1

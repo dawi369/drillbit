@@ -51,6 +51,8 @@ struct RootView: View {
     // Came back mid-way through the first question: the cached state can be stale, so ask the server, and if that
     // question is already under way, go straight back into it rather than offering to write another.
     await model.refresh()
+    // A rep already finished (the app closed during its ending): onboarding is over, never a second first question.
+    if (model.bootstrap?.todayPlan?.completedTotal ?? 0) > 0 { await model.completeOnboarding(); return }
     if let current = model.bootstrap?.challenge, current.lifecycle == "in_progress" {
       await model.open(current)
       return

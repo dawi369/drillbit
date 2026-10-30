@@ -86,7 +86,8 @@ import WidgetKit
     try? await setFirstUse(progress)
   }
   /// The completion screen after Finish is developer-only for now; everyone else goes straight back to Home.
-  var showsReflection: Bool { bootstrap?.capabilities?.developerTools == true }
+  /// The completion screen is parked for everyone: finishing shows the rep-done moment and returns Home.
+  var showsReflection: Bool { false }
   /// The first finished rep earns one reminder offer: a popup on Home, or the completion screen for developers.
   var offersReminder: Bool { firstUse.firstRepID != nil && !firstUse.reminderOffered && !settings.reminderEnabled }
   var reminderTimeText: String {
@@ -1182,7 +1183,9 @@ import WidgetKit
       await sync()
     }
   }
-  func finish(_ challenge: Challenge, answer: String) async throws -> Challenge {
+  /// `completesOnboarding: false` lets the caller end onboarding itself, once its own ending has played: ending it
+  /// here swaps the root from setup to the tabs, which takes the interview (and anything on it) down at once.
+  func finish(_ challenge: Challenge, answer: String, completesOnboarding: Bool = true) async throws -> Challenge {
     try await save(challenge, answer: answer, completing: true)
     await sync()
     if conflict != nil {
@@ -1232,7 +1235,7 @@ import WidgetKit
       if !challenge.isWarmUp { done.firstRepID = challenge.id }
       try? await setFirstUse(done)
     }
-    await completeOnboarding()
+    if completesOnboarding { await completeOnboarding() }
     return completed
   }
   /// Setup stays on screen behind the first rep; Home replaces it only once the rep is over.

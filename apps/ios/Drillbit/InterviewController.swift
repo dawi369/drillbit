@@ -347,7 +347,8 @@ import UIKit
       challenge.interview = state
       // The ending follows the style on screen, even if no turn was sent after a switch.
       challenge.guidanceMode = mode
-      finished = try await model.finish(challenge, answer: answer)
+      // The view ends onboarding after the rep-done moment, so the first rep's moment isn't cut short.
+      finished = try await model.finish(challenge, answer: answer, completesOnboarding: false)
     } catch { failure = error.localizedDescription }
   }
 }

@@ -1079,13 +1079,14 @@ final class PracticeUITests: XCTestCase {
     app.buttons["interviewOptions"].tap()
     app.buttons["Finish interview"].tap()
     app.descendants(matching: .any)["confirmDialog"].buttons["Keep writing"].tap()
-    XCTAssertFalse(app.staticTexts["That’s one in the bag."].exists)
+    XCTAssertFalse(app.descendants(matching: .any)["repDone"].exists)
     app.buttons["interviewOptions"].tap()
     app.buttons["Finish interview"].tap()
     app.descendants(matching: .any)["confirmDialog"].buttons["Finish interview"].tap()
-    XCTAssertTrue(app.staticTexts["That’s one in the bag."].waitForExistence(timeout:5))
+    // The moment shows straight away, then hands back to Home by itself.
+    XCTAssertTrue(app.descendants(matching: .any)["repDone"].waitForExistence(timeout: 1))
+    XCTAssertTrue(app.staticTexts["Well done."].exists)
     capture("Practice completion", app)
-    app.buttons["Done for today"].firstMatch.tap()
     let done = app.buttons["todayDone"]
     XCTAssertTrue(done.waitForExistence(timeout: 5))
     XCTAssertTrue(done.label.contains("Make retries safe before making them automatic."), done.label)
@@ -1177,11 +1178,11 @@ final class PracticeUITests: XCTestCase {
     app.buttons["interviewOptions"].tap()
     app.buttons["Finish interview"].tap()
     app.descendants(matching: .any)["confirmDialog"].buttons["Finish interview"].tap()
-    // Generated feedback is parked for MVP (`ReflectionView.showsFeedback`): the round ends on the plain finish.
-    XCTAssertTrue(app.staticTexts["That’s one in the bag."].waitForExistence(timeout: 8))
+    XCTAssertTrue(app.descendants(matching: .any)["repDone"].waitForExistence(timeout: 3))
     XCTAssertFalse(app.staticTexts["INTERVIEW DEBRIEF"].exists)
     XCTAssertFalse(clock.exists, "The clock stops once the round is over")
     capture("Mock interview finished", app)
+    XCTAssertTrue(app.buttons["todayDone"].waitForExistence(timeout: 8))
   }
 
   func testInterviewStyle() throws {
@@ -1291,9 +1292,10 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.descendants(matching: .any)["confirmDialog"].waitForExistence(timeout: 3))
     capture("Finish dialog", app)
     app.descendants(matching: .any)["confirmDialog"].buttons["Finish interview"].tap()
-    // No completion screen for customers: Finish lands on Home, and the end of onboarding asks once about a nudge.
+    // The rep-done moment, then Home by itself; the end of onboarding asks once about a nudge.
+    XCTAssertTrue(app.descendants(matching: .any)["repDone"].waitForExistence(timeout: 3))
     XCTAssertTrue(app.buttons["todayDone"].waitForExistence(timeout: 10))
-    XCTAssertFalse(app.staticTexts["That’s one in the bag."].exists)
+    XCTAssertFalse(app.buttons["Done for today"].exists)
     let dialog = app.descendants(matching: .any)["confirmDialog"]
     XCTAssertTrue(dialog.waitForExistence(timeout: 5))
     XCTAssertTrue(app.staticTexts["Want a nudge tomorrow?"].exists)
@@ -1373,19 +1375,12 @@ final class PracticeUITests: XCTestCase {
     app.buttons["interviewOptions"].tap()
     app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Finish interview'")).firstMatch.tap()
     app.descendants(matching: .any)["confirmDialog"].buttons["Finish interview"].tap()
-    // Feedback leads with what worked and what to fix, then offers the reminder once.
-    XCTAssertTrue(app.descendants(matching: .any)["feedbackLead"].waitForExistence(timeout: 8))
-    XCTAssertTrue(app.descendants(matching: .any)["reminderOffer"].exists)
-    // MVP: generated feedback is parked; the completion is plain, and the rep still counts on Home.
-    XCTAssertFalse(app.buttons["Review in Recall"].exists)
-    capture("First rep feedback", app)
-    let noThanks = app.buttons["No thanks"]
-    for _ in 0..<4 where !noThanks.isHittable { app.swipeUp() }
-    noThanks.tap()
-    XCTAssertFalse(app.descendants(matching: .any)["reminderOffer"].waitForExistence(timeout: 2))
-    let done = app.buttons["Done for today"].firstMatch
-    for _ in 0..<4 where !done.isHittable { app.swipeUp() }
-    done.tap()
+    // The rep-done moment, then Home by itself, which offers the reminder once.
+    XCTAssertTrue(app.descendants(matching: .any)["repDone"].waitForExistence(timeout: 3))
+    capture("First rep done", app)
+    let nudge = app.descendants(matching: .any)["confirmDialog"]
+    XCTAssertTrue(nudge.waitForExistence(timeout: 10))
+    nudge.buttons["No thanks"].tap()
     // Onboarding ends on Home with the rep already counted; no tab tour.
     XCTAssertTrue(app.buttons["todayDone"].waitForExistence(timeout: 5))
     XCTAssertFalse(app.buttons["firstUseTourNext"].exists)

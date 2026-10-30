@@ -1,5 +1,26 @@
 import SwiftUI
 
+/// The end of a rep: two lines fade in on the interview's background, then Home takes over by itself.
+struct RepDoneMoment: View {
+  @State private var shown = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  var body: some View {
+    VStack(spacing: 8) {
+      Text("Well done.").font(.largeTitle.weight(.semibold)).tracking(-0.8).foregroundStyle(AppPalette.primary)
+      Text("That’s one in the bag.").font(.title3).foregroundStyle(AppPalette.secondary)
+    }
+    .multilineTextAlignment(.center)
+    .padding(.horizontal, 32)
+    .opacity(shown ? 1 : 0)
+    .offset(y: shown || reduceMotion ? 0 : 8)
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .background(AppPalette.background.ignoresSafeArea())
+    .accessibilityElement(children: .combine)
+    .accessibilityIdentifier("repDone")
+    .onAppear { withAnimation(reduceMotion ? nil : .easeOut(duration: 0.3)) { shown = true } }
+  }
+}
+
 struct CompletionHeading: View {
   var warmUp = false
   var mode: GuidanceMode = .coachMe

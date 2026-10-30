@@ -30,6 +30,8 @@ struct InterviewView: View {
   @State private var interview: InterviewController
   @State private var sheet: InterviewSheet?
   @State private var confirmFinish = false
+  /// Set the moment Finish is confirmed: the rep-done moment shows while the save runs underneath.
+  @State private var wrappingUp = false
   @State private var confirmSkip = false
   @State private var reading = InterviewReadingState()
   @State private var arrivingAnswerID: String?
@@ -134,10 +136,9 @@ struct InterviewView: View {
   private var showsDraft: Bool { interview.loaded && !waitingForAnswer && interview.outgoing == nil && !interview.state.wrapUp && exchanges.last?.hasAnswer == false && !acceptedPending }
   var body: some View {
     ZStack {
-      if let finished = interview.finished {
-        if model.showsReflection { ReflectionView(model: model, initial: finished).transition(.opacity) }
-        // No completion screen: the rep is saved, so the interview simply hands back to Home.
-        else { AppPalette.background.ignoresSafeArea().task { model.presented = nil; await model.refresh() } }
+      if wrappingUp || interview.finished != nil {
+        RepDoneMoment().transition(.opacity)
+          .task { await handBack() }
       }
       else if showingVoiceRoom, let voice = liveVoice {
         voiceRoom(voice).transition(.opacity)
@@ -150,10 +151,10 @@ struct InterviewView: View {
       }
       else { workspace.transition(.opacity) }
     }
-    .animation(reduceMotion ? nil : DrillbitMotion.page, value: interview.finished != nil)
+    .animation(reduceMotion ? nil : DrillbitMotion.page, value: wrappingUp || interview.finished != nil)
     .animation(reduceMotion ? nil : DrillbitMotion.page, value: showingVoiceRoom)
     .sensoryFeedback(.impact(weight: .light), trigger: acceptedAnswerID) { _, accepted in accepted != nil }
-    .sensoryFeedback(.success, trigger: interview.finished != nil) { before, now in !before && now && !model.showsReflection }
+    .sensoryFeedback(.success, trigger: wrappingUp)  { before, now in !before && now }
     .background(AppPalette.background)
     .containerBackground(AppPalette.background, for: .navigation)
     .task {
@@ -359,7 +360,7 @@ struct InterviewView: View {
     ])
     .drillbitConfirm("Finish interview?", isPresented: $confirmFinish,
                      message: "Your shared answers and current draft will be saved for review.", actions: [
-      ConfirmAction("Finish interview", style: .primary) { Task { await interview.finish() } },
+      ConfirmAction("Finish interview", style: .primary) { wrappingUp = true; Task { await interview.finish() } },
       ConfirmAction("Keep writing"),
     ])
     .sheet(item: $sheet, onDismiss: resetAssistance) { selection in
@@ -564,6 +565,19 @@ struct InterviewView: View {
     assistanceText = nil
     assistanceError = nil
     requestingAssistance = false
+  }
+  /// Holds the moment long enough to read, then hands back to Home once the rep is saved. A failed save drops
+  /// the moment and leaves the interview open with its error, so nothing is lost.
+  private func handBack() async {
+    let shown = Date()
+    while interview.finished == nil, interview.failure == nil, !Task.isCancelled { try? await Task.sleep(for: .milliseconds(100)) }
+    guard !Task.isCancelled else { return }
+    if interview.finished == nil { wrappingUp = false; return }
+    let hold = (reduceMotion ? 1.2 : 1.8) - Date().timeIntervalSince(shown)
+    if hold > 0 { try? await Task.sleep(for: .seconds(hold)) }
+    model.presented = nil
+    await model.completeOnboarding()
+    await model.refresh()
   }
   private func leaveVoiceRoom() {
     // An opening that hasn't reached `start` yet must not bring the room back once they've left it.

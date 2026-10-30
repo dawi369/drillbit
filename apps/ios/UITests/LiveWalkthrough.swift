@@ -160,13 +160,10 @@ final class LiveWalkthrough: XCTestCase {
           if dialog.waitForExistence(timeout: 3) { shot("finish-dialog"); dialog.buttons["Finish interview"].tap() }
         }
       }
-      Thread.sleep(forTimeInterval: 6)
+      // The rep-done moment shows at once and hands back to Home by itself.
+      if app.descendants(matching: .any)["repDone"].waitForExistence(timeout: 3) { shot("rep-done") }
+      _ = app.buttons["todayDone"].waitForExistence(timeout: 20)
       shot("after-finish")
-      if app.staticTexts["That’s one in the bag."].exists || app.buttons["completionDone"].exists {
-        app.swipeUp(); shot("completion-scrolled")
-        _ = tapIfPresent(app.buttons["reminderOfferAccept"].exists ? app.buttons["No thanks"] : app.buttons["completionDone"], timeout: 2)
-        _ = tapIfPresent(app.buttons["completionDone"], timeout: 2) || tapIfPresent(app.buttons["Done for today"], timeout: 2)
-      }
     }
 
     // Home after the rep, and the one-time reminder question.
@@ -233,9 +230,8 @@ final class LiveWalkthrough: XCTestCase {
           if tapIfPresent(app.buttons["interviewOptions"]),
              tapIfPresent(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Finish interview'")).firstMatch),
              dialog.waitForExistence(timeout: 3) { dialog.buttons["Finish interview"].tap() }
-          Thread.sleep(forTimeInterval: 6); shot("after-finish-2")
-          _ = tapIfPresent(app.buttons["completionDone"], timeout: 3) || tapIfPresent(app.buttons["Done for today"], timeout: 2)
-          Thread.sleep(forTimeInterval: 3); shot("home-final")
+          _ = app.buttons["todayDone"].waitForExistence(timeout: 20); shot("after-finish-2")
+          Thread.sleep(forTimeInterval: 2); shot("home-final")
         }
       }
     }
