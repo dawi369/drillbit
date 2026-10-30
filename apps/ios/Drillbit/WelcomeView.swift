@@ -257,7 +257,7 @@ private struct TasteSlide: View {
             .frame(width: 92, height: 104)
             .anchorPreference(key: BitGlowKey.self, value: .bounds) { $0 }
           RevealText(text: "Grills you like\nthe real one.\nWants you to pass.", font: .system(size: 40, weight: .semibold),
-                     tracking: -1.2, lineSpacing: -2, active: active, delay: 0.4, rate: 29) { headlineDone = true }
+                     tracking: -1.2, lineSpacing: -2, active: active, delay: 0.3, rate: 44) { headlineDone = true }
             .accessibilityAddTraits(.isHeader)
             .accessibilityIdentifier("welcomeHeadline")
           if headlineDone {
@@ -595,17 +595,17 @@ struct GrillExample: View {
     .frame(minHeight: 240, alignment: .top)
     .accessibilityElement(children: .contain)
     .sensoryFeedback(trigger: shown) { _, new in new == 3 ? .warning : new == Self.turns.count ? .success : nil }
-    .task { await show(0, after: 400) }
+    .task { await show(0, after: 300) }
   }
 
   /// The same two-line shape as a turn in a rep: who spoke, then what they said.
   private func row(_ index: Int, _ turn: Turn) -> some View {
     VStack(alignment: .leading, spacing: 4) {
       InterviewRowLabel(text: turn.you ? "You" : "Interviewer")
-      RevealText(text: turn.text, font: .body, caret: !turn.you, rate: turn.you ? 48 : 33) {
+      RevealText(text: turn.text, font: .body, caret: !turn.you, rate: turn.you ? 70 : 50) {
         guard index == shown - 1 else { return }
         if index == Self.turns.count - 1 { cheers += 1; finished() }
-        else { Task { await show(index + 1, after: turn.you ? 700 : 900) } }
+        else { Task { await show(index + 1, after: turn.you ? 450 : 600) } }
       }
     }
   }

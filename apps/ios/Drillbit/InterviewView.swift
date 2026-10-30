@@ -903,9 +903,7 @@ private struct GuidedPathSteps: View {
   let current: Int
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
-      Text("How a strong answer usually goes. You move on as you cover each step.")
-        .font(.footnote).foregroundStyle(AppPalette.secondary)
-        .fixedSize(horizontal: false, vertical: true)
+      // The first-rep tip already explains the path; the popover is just the steps.
       VStack(alignment: .leading, spacing: 4) {
         ForEach(steps.indices, id: \.self) { step in
           HStack(alignment: .top, spacing: 12) {
