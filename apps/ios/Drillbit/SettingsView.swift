@@ -75,13 +75,21 @@ struct SettingsView: View {
         ReminderPermissionRow()
       }
       Section("Plan") {
-        LabeledContent("Plan", value: model.isPro ? "Pro" : "Free").accessibilityIdentifier("planRow")
+        LabeledContent("Plan") {
+          if model.isPro { ProWordmark(sparkle: true) } else { Text("Free") }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("planRow")
         if model.isPro {
           Button("Manage subscription") { showingManageSubscriptions = true }
             .manageSubscriptionsSheet(isPresented: $showingManageSubscriptions)
         } else {
           Text(model.repsLeftLine ?? "3 free reps a day, plus a taste of voice. Pro takes the daily limits off.").font(.footnote).foregroundStyle(.secondary)
-          Button("See Pro") { PlanCoordinator.shared.register(.practiceRep) { await model.refresh() } }.accessibilityIdentifier("settingsSeePro")
+          Button { PlanCoordinator.shared.register(.practiceRep) { await model.refresh() } } label: {
+            HStack(spacing: 4) { Text("See"); ProWordmark(font: .body.weight(.semibold)) }
+          }
+          .accessibilityLabel("See Pro")
+          .accessibilityIdentifier("settingsSeePro")
         }
       }
       Section("Account") {

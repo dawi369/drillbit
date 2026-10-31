@@ -142,3 +142,38 @@ Conversion and usage are guesses until real numbers arrive. Every price and cap 
 | In-rep limits | Out of follow-ups or nudges shows See Pro instead of Retry | `InterviewView` |
 
 Minutes come from the billed seconds the app reports when a session closes. A session that never reports counts as its full cap. A tampered app could under-report, but each session is still bounded by its server-issued cap.
+
+## 9. Simulation — 31 October
+
+`bun scripts/simulate-pricing.ts` simulates a month for a given number of active users and share on Pro. It writes the full tables to `.local/pricing-simulation.md`. Every price, cap, cost and behaviour assumption is a named constant at the top of the script.
+
+**Measured inputs.** These come from production `ai_runs` and 15 synthetic interviews run today.
+- Text rep: about $0.011 free, $0.013 Pro (longer reps). That covers question writing, the interview turns, nudges and feedback, plus a 10% allowance for retries.
+- Voice: $0.051 per open minute.
+- Clerk: free up to 50,000 monthly retained users.
+
+**Per user per month.**
+
+| | Cost | Apple pays out (15% cut, 3% refunds) |
+|---|---|---|
+| Free user (average) | $0.24 | – |
+| Pro, text only / light voice / prepping out loud / heavy | $0.51 / $3.14 / $16.62 / $31.64 | – |
+| Weekly subscriber (5-week average run, first week $1.99) | $11.68 | $24.24 |
+| Yearly subscriber | $6.37 | **$5.50** |
+
+**Monthly net (median)**
+
+| Active users | 1% Pro | 2% | 3% | 5% | 8% | 10% |
+|---|---|---|---|---|---|---|
+| 1,000 | –$162 | –$105 | –$17 | +$104 | +$323 | +$489 |
+| 10,000 | –$1,650 | –$942 | –$129 | +$1,371 | +$3,518 | +$5,045 |
+| 100,000 | –$16,866 | –$9,488 | –$1,975 | +$12,720 | +$34,701 | +$50,673 |
+
+**What it says**
+- **Break-even is about 3.2% of active users on Pro** at any scale, and about 5% below a few hundred users, where the fixed costs dominate.
+- Every 1% above break-even adds about $2,300 a month per 10,000 active users. Free users cost about $2,300 a month per 10,000, which is what that first 3% pays for.
+- **Weekly carries the business; yearly at $79.99 loses a little.** A yearly subscriber keeps $5.50 a month but costs $6.37, because 150 minutes of voice a week is generous for that price. Pushing people towards yearly makes the month worse (–$1,436 at 70% yearly, against –$188 base).
+- **Voice price is the biggest risk:** ±50% swings the 10,000-user, 3% case by about ±$1,800 a month. The Small Business Program is worth about $850 a month at that size.
+- **Easy levers.** Each is an App Store or environment setting, so none needs a release. Yearly at $99.99 (–$18), Pro voice at 100 minutes a week (+$92), no monthly free voice taste (+$173), or both of the first two (+$335). If yearly subscribers sit idle half their months, as many do, yearly roughly breaks even by itself (+$201).
+
+All of this is a model. Conversion, the weekly/yearly split, how long weekly subscribers stay, and voice minutes per subscriber should replace the assumptions as soon as there are real numbers.

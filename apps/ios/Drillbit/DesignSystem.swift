@@ -851,3 +851,52 @@ struct EmptyTabState: View {
     .accessibilityElement(children: .combine)
   }
 }
+
+/// "Pro" set in gold: a warm gradient and one sweep of light when it appears. Reduce Motion keeps the gold, drops the sweep.
+struct ProWordmark: View {
+  var font: Font = .body.weight(.bold)
+  @State private var sweep: CGFloat = -1
+  @Environment(\.colorScheme) private var scheme
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  private var gold: [Color] {
+    scheme == .dark
+      ? [Color(red: 1, green: 0.91, blue: 0.64), Color(red: 1, green: 0.8, blue: 0.4), Color(red: 0.91, green: 0.64, blue: 0.23)]
+      : [Color(red: 0.79, green: 0.54, blue: 0.12), Color(red: 0.6, green: 0.37, blue: 0.07)]
+  }
+  /// A small sparkle before the word, for places where Pro is the point (Settings' plan row).
+  var sparkle = false
+  var body: some View {
+    HStack(spacing: 4) {
+      if sparkle {
+        Image(systemName: "sparkle").font(.caption.weight(.bold))
+          .foregroundStyle(LinearGradient(colors: gold, startPoint: .top, endPoint: .bottom))
+          .accessibilityHidden(true)
+      }
+      word
+    }
+    .shadow(color: Color(red: 1, green: 0.8, blue: 0.4).opacity(scheme == .dark ? 0.35 : 0), radius: 6)
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel("Pro")
+  }
+  private var word: some View {
+    Text("Pro")
+      .font(font)
+      .tracking(0.3)
+      .foregroundStyle(LinearGradient(colors: gold, startPoint: .topLeading, endPoint: .bottomTrailing))
+      .overlay {
+        GeometryReader { proxy in
+          LinearGradient(colors: [.clear, .white.opacity(scheme == .dark ? 0.75 : 0.5), .clear], startPoint: .leading, endPoint: .trailing)
+            .frame(width: proxy.size.width * 0.6)
+            .offset(x: sweep * proxy.size.width * 1.6)
+        }
+        .mask(Text("Pro").font(font).tracking(0.3))
+        .allowsHitTesting(false)
+        .opacity(reduceMotion ? 0 : 1)
+      }
+      .task {
+        guard !reduceMotion else { return }
+        try? await Task.sleep(for: .milliseconds(400))
+        withAnimation(.easeInOut(duration: 1.1)) { sweep = 1 }
+      }
+  }
+}
