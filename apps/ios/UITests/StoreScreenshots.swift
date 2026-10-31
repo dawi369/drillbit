@@ -37,7 +37,7 @@ final class StoreScreenshots: XCTestCase {
 
     app = launch(["--fixtures", "--fixture-home-rich"])
     XCTAssertTrue(app.buttons["startPractice"].waitForExistence(timeout: 10))
-    XCTAssertFalse(app.tabBars.buttons["Bit"].exists, "Customers don't see the developer tab")
+    XCTAssertTrue(app.tabBars.buttons["Bit"].exists, "Everyone sees the Bit tab; it's Pro behind the tap")
     app.buttons["startPractice"].tap()
     XCTAssertTrue(app.buttons["previewStart"].waitForExistence(timeout: 5))
     app.buttons["previewStart"].tap()

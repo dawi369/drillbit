@@ -63,7 +63,15 @@ struct InterviewView: View {
   @AppStorage(CoachMark.tools.storageKey) private var seenToolsTip = false
   @AppStorage(CoachMark.path.storageKey) private var seenPathTip = false
   @State private var showingPathSteps = false
-  private var showsPathBar: Bool { interview.mode == .learnTogether && !(challenge.path ?? []).isEmpty && interview.finished == nil }
+  /// Guided's roadmap as it stands: the interviewer can redraw the steps ahead when the conversation takes another route.
+  private var guidedPath: [String]? { interview.displayState.path ?? challenge.path }
+  private var showsPathBar: Bool { interview.mode == .learnTogether && !(guidedPath ?? []).isEmpty && interview.finished == nil }
+  /// The interviewer's latest reply says the question is answered: offer Finish, and keep the composer for extra questions.
+  private var coveredOffer: Bool {
+    guard !interview.locked, interview.finished == nil, !wrappingUp else { return false }
+    let latest = interview.displayState.turns.last { ["answer", "continue"].contains($0.kind) }
+    return latest?.result?.covered == true && latest?.pending != true
+  }
   /// One tip at a time: the composer before the first reply, then the tools once a follow-up has landed.
   private var coach: CoachMark? {
     guard CoachMark.enabled, sessionRestored, !showingVoiceRoom, sheet == nil, !showingPathSteps, interview.finished == nil, showsDraft else { return nil }
@@ -144,7 +152,7 @@ struct InterviewView: View {
         voiceRoom(voice).transition(.opacity)
           // Guided's roadmap travels with the interview, spoken or typed.
           .safeAreaInset(edge: .top, spacing: 0) {
-            if showsPathBar, let path = challenge.path {
+            if showsPathBar, let path = guidedPath {
               GuidedPathBar(steps: path, current: interview.displayState.guidedStep ?? guidedTurn?.result?.step ?? 0, showingSteps: $showingPathSteps)
             }
           }
@@ -211,9 +219,18 @@ struct InterviewView: View {
                 VStack(alignment: .leading, spacing: 12) {
                   Divider().accessibilityIdentifier("answerDivider")
                   // One line ending in "?" goes to the interviewer as a question, not as your answer.
-                  InterviewRowLabel(text: InterviewComposerIntent.isQuestion(interview.answer) ? "Asking the interviewer" : "Your reply")
-                    .contentTransition(.opacity)
-                    .animation(DrillbitMotion.fast, value: InterviewComposerIntent.isQuestion(interview.answer))
+                  if coveredOffer { coveredBanner.transition(.opacity) }
+                  HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    InterviewRowLabel(text: InterviewComposerIntent.isQuestion(interview.answer) ? "Asking the interviewer" : "Your reply")
+                      .contentTransition(.opacity)
+                      .animation(DrillbitMotion.fast, value: InterviewComposerIntent.isQuestion(interview.answer))
+                    // Names the style, so the tappable answers below read as Guided's, not every interview's.
+                    if interview.mode == .learnTogether {
+                      Text("Guided").font(.subheadline.weight(.semibold)).foregroundStyle(AppPalette.accent)
+                        .fixedSize()
+                        .accessibilityIdentifier("guidedTag")
+                    }
+                  }
                   if let turn = guidedTurn, let choices = turn.result?.choices, !choices.isEmpty, interview.answer.isEmpty, !interview.locked {
                     GuidedChoices(choices: choices) { choice in
                       interview.edit(choice)
@@ -286,7 +303,7 @@ struct InterviewView: View {
     .safeAreaBar(edge: .bottom, spacing: 0) { footer }
     .scrollEdgeEffectStyle(.soft, for: .bottom)
     .safeAreaInset(edge: .top, spacing: 0) {
-      if showsPathBar, let path = challenge.path {
+      if showsPathBar, let path = guidedPath {
         GuidedPathBar(steps: path, current: interview.displayState.guidedStep ?? guidedTurn?.result?.step ?? 0, showingSteps: $showingPathSteps)
           .coachAnchor(.path)
       }
@@ -565,6 +582,26 @@ struct InterviewView: View {
     assistanceText = nil
     assistanceError = nil
     requestingAssistance = false
+  }
+  /// The interviewer thinks the question is answered: finishing is one tap, or keep going with an extra angle.
+  private var coveredBanner: some View {
+    HStack(alignment: .center, spacing: 12) {
+      VStack(alignment: .leading, spacing: 2) {
+        Text("That covers the question").font(.subheadline.weight(.semibold)).foregroundStyle(AppPalette.primary)
+        Text("Finish now, or keep going for extra credit.").font(.footnote).foregroundStyle(AppPalette.secondary)
+      }
+      .fixedSize(horizontal: false, vertical: true)
+      Spacer(minLength: 8)
+      Button { focused = false; confirmFinish = true } label: { StubPill(label: "Finish") }
+        .buttonStyle(TicketPressStyle())
+        .accessibilityLabel("Finish interview")
+        .accessibilityIdentifier("coveredFinish")
+    }
+    .padding(16)
+    .background(AppPalette.ticket, in: RoundedRectangle(cornerRadius: 12))
+    .overlay { RoundedRectangle(cornerRadius: 12).stroke(AppPalette.ticketEdge, lineWidth: 1) }
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("coveredOffer")
   }
   /// Holds the moment long enough to read, then hands back to Home once the rep is saved. A failed save drops
   /// the moment and leaves the interview open with its error, so nothing is lost.

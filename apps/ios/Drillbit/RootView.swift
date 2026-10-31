@@ -31,6 +31,13 @@ struct RootView: View {
     case .signIn, .done: return signedIn ? .setup : .signIn
     }
   }
+  /// The Bit tab is Pro: for everyone else, tapping it opens the Pro screen and the current tab stays put.
+  private var tabSelection: Binding<String> {
+    Binding(get: { selectedTab }, set: { tab in
+      guard tab == "bit", !model.isPro else { selectedTab = tab; return }
+      PlanCoordinator.shared.register(.knowledgeMap) { selectedTab = "bit" }
+    })
+  }
   /// Signing out mid-flow (or a full reset) starts the first run over.
   private func resetFirstRunIfSignedOut() { if !signedIn, FirstRunStage(rawValue: firstRunStage) == .done { firstRunStage = FirstRunStage.welcome.rawValue } }
   private func finishSetup(_ draft: LearningPlanCoordinator.Draft) {
@@ -89,7 +96,7 @@ struct RootView: View {
           NavigationStack { SetupView(model: model, onFinish: finishSetup) }
             .transition(.opacity)
         } else {
-          TabView(selection: $selectedTab) {
+          TabView(selection: tabSelection) {
             Tab("Home", systemImage: AppIcon.home.rawValue, value: "home") {
               NavigationStack {
                 HomeView(model: model, openSettings: { settingsOpen = true })
@@ -105,14 +112,11 @@ struct RootView: View {
                 MemoryView(model: model).drillbitTabClearance()
               }
             }
-            if model.bootstrap?.capabilities?.developerTools == true {
-              // Coming: talk through where you are and where you want to be next.
-              Tab("Bit", image: "BitTab", value: "bit") {
-                NavigationStack {
-                  Color.clear.navigationTitle("Bit")
-                    .containerBackground(AppPalette.background, for: .navigation)
-                    .accessibilityIdentifier("bitTab")
-                }
+            // Pro: the knowledge map. Free accounts get the Pro screen instead of the tab (see tabSelection).
+            Tab("Bit", image: "BitTab", value: "bit") {
+              NavigationStack {
+                KnowledgeMapView(model: model).drillbitTabClearance()
+                  .accessibilityIdentifier("bitTab")
               }
             }
           }

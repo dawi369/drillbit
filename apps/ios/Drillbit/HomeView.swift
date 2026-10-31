@@ -170,9 +170,7 @@ struct HomeView: View {
             .padding(.bottom, -16)
         }
       }
-      if (model.bootstrap?.todayPlan?.completedTotal ?? 0) > 0 {
-        HomeWeekStrip(days: repDays).padding(.top, 16)
-      }
+      HomeWeekStrip(days: repDays).padding(.top, 20)
     }
     // Today's dot filling is the cue for Bit's hop; a fresh launch that finds it already filled stays still.
     .onChange(of: model.bootstrap?.todayPlan?.completedToday) { old, new in

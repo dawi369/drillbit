@@ -8,6 +8,8 @@ final class PracticeUITests: XCTestCase {
     app.launchArguments = ["--fixtures"]
     app.launch()
     XCTAssertTrue(app.tabBars.buttons["Recall"].waitForExistence(timeout: 10))
+    // The week is on Home from day one, before any rep.
+    XCTAssertTrue(app.descendants(matching: .any)["homeWeek"].exists)
     app.tabBars.buttons["Recall"].tap()
     XCTAssertTrue(app.navigationBars["Recall"].waitForExistence(timeout: 3))
     XCTAssertFalse(app.staticTexts["Loading Recall…"].exists)
@@ -106,6 +108,76 @@ final class PracticeUITests: XCTestCase {
     dialog.buttons["Cancel"].tap()
     XCTAssertTrue(dialog.waitForNonExistence(timeout: 3))
     XCTAssertTrue(app.navigationBars["Attempt"].exists)
+  }
+
+  func testGuidedTagRoadmapRedrawAndCoveredFinish() throws {
+    continueAfterFailure = false
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures", "--fixture-onboarding", "--fixture-path-revision", "--fixture-covered"]
+    app.launch()
+    XCTAssertTrue(app.staticTexts["Quick one. No wrong answers."].waitForExistence(timeout: 10))
+    app.buttons["The database"].tap()
+    for _ in 0..<4 { app.buttons["Continue"].tap() }
+    XCTAssertTrue(app.staticTexts["How do you think best?"].waitForExistence(timeout: 5))
+    app.buttons["Typing, at my own pace"].tap()
+    for _ in 0..<2 { app.buttons["Continue"].tap() }
+    app.buttons["Show me my first question"].tap()
+    XCTAssertTrue(app.buttons["previewStart"].waitForExistence(timeout: 10))
+    app.buttons["previewStart"].tap()
+    // Guided names itself beside Your reply, so the tappable answers read as Guided's.
+    XCTAssertTrue(app.staticTexts["guidedTag"].waitForExistence(timeout: 8))
+    let path = app.descendants(matching: .any)["guidedPath"]
+    XCTAssertTrue(path.label.hasSuffix("of 4") || path.label.contains("of 4:"), path.label)
+    let editor = app.descendants(matching: .any).matching(identifier: "answerEditor").firstMatch
+    editor.tap(); editor.typeText("Add a dead-letter queue for jobs that keep failing.")
+    app.buttons["shareAnswer"].tap()
+    // The conversation went another way: the roadmap ahead is redrawn, the done step kept.
+    XCTAssertTrue(app.descendants(matching: .any)["coveredOffer"].waitForExistence(timeout: 10))
+    XCTAssertTrue(path.label.contains("of 3"), path.label)
+    capture("Covered offer and redrawn roadmap", app)
+    // The question is answered: Finish is one tap away, behind the usual confirmation.
+    app.buttons["coveredFinish"].tap()
+    let dialog = app.descendants(matching: .any)["confirmDialog"]
+    XCTAssertTrue(dialog.waitForExistence(timeout: 3))
+    dialog.buttons["Finish interview"].tap()
+    XCTAssertTrue(app.descendants(matching: .any)["repDone"].waitForExistence(timeout: 3))
+  }
+
+  func testBitTabIsProAndMapsWhatYouKnow() throws {
+    continueAfterFailure = false
+    var app = XCUIApplication()
+    app.launchArguments = ["--fixtures", "--fixture-dashboard", "--fixture-customer", "--fixture-free-reps"]
+    app.launch()
+    XCTAssertTrue(app.tabBars.buttons["Bit"].waitForExistence(timeout: 10))
+    app.tabBars.buttons["Bit"].tap()
+    // Free: the tab opens the Pro screen instead, and Home stays put underneath.
+    XCTAssertTrue(app.descendants(matching: .any)["paywall"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.staticTexts["See what you actually know."].exists)
+    capture("Bit tab paywall", app)
+    app.buttons["paywallDismiss"].tap()
+    XCTAssertFalse(app.descendants(matching: .any)["knowledgeMap"].exists)
+    app.terminate()
+
+    app = XCUIApplication()
+    app.launchArguments = ["--fixtures", "--fixture-dashboard", "--fixture-customer", "--fixture-map", "--fixture-pro"]
+    app.launch()
+    XCTAssertTrue(app.tabBars.buttons["Bit"].waitForExistence(timeout: 10))
+    app.tabBars.buttons["Bit"].tap()
+    XCTAssertTrue(app.descendants(matching: .any)["knowledgeMap"].waitForExistence(timeout: 5))
+    // Senior: two of the three senior reps held up.
+    XCTAssertEqual(app.staticTexts["levelEstimate"].label, "Senior")
+    Thread.sleep(forTimeInterval: 1.5)
+    capture("Knowledge map", app)
+    let node = app.buttons["mapNode-caching"]
+    XCTAssertTrue(node.waitForExistence(timeout: 3))
+    for _ in 0..<4 where !node.isHittable { app.swipeUp() }
+    node.tap()
+    XCTAssertTrue(app.descendants(matching: .any)["mapDetail"].waitForExistence(timeout: 3))
+    XCTAssertTrue(app.staticTexts["Concurrent misses share one read."].exists || app.staticTexts["“Concurrent misses share one read.”"].exists)
+    for _ in 0..<4 where !app.buttons["mapPractise"].isHittable { app.swipeUp() }
+    capture("Knowledge map detail", app)
+    app.buttons["mapPractise"].tap()
+    XCTAssertTrue(app.buttons["submitPreparation"].waitForExistence(timeout: 5) || app.navigationBars.firstMatch.waitForExistence(timeout: 3))
   }
 
   func testHomeWeekStripAndMilestone() throws {
@@ -1085,7 +1157,6 @@ final class PracticeUITests: XCTestCase {
     app.descendants(matching: .any)["confirmDialog"].buttons["Finish interview"].tap()
     // The moment shows straight away, then hands back to Home by itself.
     XCTAssertTrue(app.descendants(matching: .any)["repDone"].waitForExistence(timeout: 1))
-    XCTAssertTrue(app.staticTexts["Well done."].exists)
     capture("Practice completion", app)
     let done = app.buttons["todayDone"]
     XCTAssertTrue(done.waitForExistence(timeout: 5))

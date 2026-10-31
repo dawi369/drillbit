@@ -51,7 +51,7 @@ const companion = z.object({
   cycle: z.string(),
 });
 const interview = z.object({
-  guidanceMode: guidanceModeSchema.optional(), style: interviewStyleSchema, prompt: z.string(), wrapUp: z.boolean(), guidedStep: z.number().int().min(0),
+  guidanceMode: guidanceModeSchema.optional(), style: interviewStyleSchema, prompt: z.string(), wrapUp: z.boolean(), guidedStep: z.number().int().min(0), path: z.array(z.string()).optional(),
   turns: z.array(z.object({ id: z.string(), ordinal: z.number().int(), kind: z.enum(["answer","clarification","hint","example","continue","voice"]), prompt: z.string(), text: z.string(), createdAt: z.string(), jobId: z.string(), status: z.string(), error: z.string().nullable().optional(), partial: z.string().nullable().optional(), voice:z.array(voiceFragmentSchema).optional(), result: interviewResultSchema.nullable() })),
 });
 const challenge = challengeSchema.extend({

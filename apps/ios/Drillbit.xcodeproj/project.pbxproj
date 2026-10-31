@@ -25,6 +25,7 @@
 		2C57626CC9CE91B722872E1D /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7437833C09799CF7937BCDD7 /* RootView.swift */; };
 		38084B68C426518EDAE4F208 /* InterviewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44C89C686607D2F20377EADE /* InterviewTests.swift */; };
 		387B66BE5AA3210DD6C8A017 /* CompanionPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04CE1C0E2D55B42FFFD0982A /* CompanionPanel.swift */; };
+		3BA1AA636355B5B70F1AC50B /* KnowledgeMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEB88C95F95BC8B5C6E32099 /* KnowledgeMap.swift */; };
 		3BD72A5C26984A8AD1D37253 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAA02422B05771C6B8DA4D2B /* SettingsView.swift */; };
 		3D0DACC7801A3CCC832A9840 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A7106218805AC5263A12438 /* Persistence.swift */; };
 		3D1A1EB693F960C1596B0D8F /* DrillbitApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAD863FB5DA9BAE45F86B3AB /* DrillbitApp.swift */; };
@@ -171,6 +172,7 @@
 		CCDB9D254A54D86DF356AC77 /* PracticeCompanion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeCompanion.swift; sourceTree = "<group>"; };
 		D48C7CE46F73492E41D2DDDD /* PreparationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreparationView.swift; sourceTree = "<group>"; };
 		DAD863FB5DA9BAE45F86B3AB /* DrillbitApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrillbitApp.swift; sourceTree = "<group>"; };
+		DEB88C95F95BC8B5C6E32099 /* KnowledgeMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KnowledgeMap.swift; sourceTree = "<group>"; };
 		E1126329A3402DB0A44CA474 /* Defaults.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Defaults.xcconfig; sourceTree = "<group>"; };
 		EA7AEA4C9157169D31D8D3B8 /* RecallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecallView.swift; sourceTree = "<group>"; };
 		EF24F5F233F85813B521B540 /* DrillbitUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = DrillbitUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -248,6 +250,7 @@
 				20B8BC792201909C6B627383 /* InterviewDocumentRows.swift */,
 				92066D96F6C016361FF268E4 /* InterviewView.swift */,
 				B8F2A363927CDF8EB6A14D5C /* InterviewVoiceRoom.swift */,
+				DEB88C95F95BC8B5C6E32099 /* KnowledgeMap.swift */,
 				78B4C37DAB3D173EEED7DB7B /* LibraryHome.swift */,
 				4D561B63C630BDBE5ABC6DF2 /* LibraryView.swift */,
 				87BD787A61C3C037E268829C /* LiveVoice.swift */,
@@ -555,6 +558,7 @@
 				BC4FE8728310CCD03149A913 /* InterviewDocumentRows.swift in Sources */,
 				B81F6A3B13FB0CFA73CFCFED /* InterviewView.swift in Sources */,
 				FF97749DF7D3112F299ECD20 /* InterviewVoiceRoom.swift in Sources */,
+				3BA1AA636355B5B70F1AC50B /* KnowledgeMap.swift in Sources */,
 				BD4605BCD97A69C956FB2F24 /* LibraryHome.swift in Sources */,
 				5298401BAA9BE8477CDBCFFF /* LibraryView.swift in Sources */,
 				19BDB2BD78083CFC15FFCF77 /* LiveVoice.swift in Sources */,
@@ -662,7 +666,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 15;
+				CURRENT_PROJECT_VERSION = 16;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -801,7 +805,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 15;
+				CURRENT_PROJECT_VERSION = 16;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;

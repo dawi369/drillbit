@@ -565,6 +565,10 @@ struct InterviewResponse: Codable, Sendable {
   /// Guided only: answers the learner can tap, and the guided-path step this reply works on.
   var choices: [String]? = nil
   var step: Int? = nil
+  /// Guided only: the roadmap redrawn because the conversation took a different route.
+  var path: [String]? = nil
+  /// The question's main ask is answered; the app suggests finishing.
+  var covered: Bool? = nil
 }
 struct InterviewParameter: Codable, Hashable, Sendable {
   var label: String
@@ -598,6 +602,8 @@ struct InterviewState: Codable, Sendable {
   var wrapUp: Bool = false
   /// How far along the roadmap the interview has reached, whichever way the steps were covered.
   var guidedStep: Int? = nil
+  /// Guided's roadmap as it stands now; it can be redrawn mid-interview. Older servers omit it.
+  var path: [String]? = nil
   var turns: [InterviewTurn] = []
 }
 struct InterviewInput: Codable, Sendable {

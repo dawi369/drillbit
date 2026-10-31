@@ -22,7 +22,7 @@ import {
 } from "./domain";
 import { generationRequest } from "./generation";
 import { historicalSnapshot } from "./history";
-import { interviewSchemaFor } from "./interview";
+import { interviewSchemaFor, revisedGuidedPath } from "./interview";
 import { groundReflection } from "./learning";
 import { selectConcept } from "./library";
 import type { Env } from "./platform";
@@ -200,7 +200,10 @@ export async function runJob(env: Env, id: string) {
     });
     const isAnswer = ["answer","continue"].includes(input.action?.kind ?? "");
     if ((isAnswer && output.outcome === "reply") || (!isAnswer && output.outcome !== "reply")) throw new Error("Invalid interview outcome");
+    // A Guided conversation that took a different route redraws the roadmap ahead; the steps already done stay.
+    const revised = isAnswer ? revisedGuidedPath((input.context as any)?.interview?.guidedPath, output.path) : undefined;
     await env.DB.batch([
+      ...(revised ? [env.DB.prepare("UPDATE challenges SET data=json_set(data,'$.path',json(?)) WHERE id=? AND account_id=? AND lifecycle='in_progress'").bind(JSON.stringify(revised), job.challenge_id, job.account_id)] : []),
       env.DB.prepare("UPDATE interview_turns SET result=? WHERE id=? AND job_id=? AND result IS NULL AND EXISTS(SELECT 1 FROM jobs j JOIN challenges c ON c.id=j.challenge_id JOIN accounts a ON a.id=j.account_id WHERE j.id=? AND j.status='running' AND c.lifecycle='in_progress' AND a.status='active')").bind(JSON.stringify(output),input.turnId,id,id),
       env.DB.prepare("UPDATE jobs SET status='completed',updated_at=? WHERE id=? AND status='running' AND EXISTS(SELECT 1 FROM interview_turns WHERE job_id=? AND result IS NOT NULL)").bind(timestamp(),id,id),
     ]);

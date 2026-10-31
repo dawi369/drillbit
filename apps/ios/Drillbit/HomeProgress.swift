@@ -29,7 +29,8 @@ struct HomeWeekStrip: View {
 
   var body: some View {
     let today = calendar.startOfDay(for: .now)
-    HStack(spacing: 12) {
+    // The seven days share the full width, so the week reads as a row across Home rather than a cluster in the corner.
+    HStack(spacing: 0) {
       ForEach(week, id: \.self) { day in
         let done = days.contains(day)
         let isToday = day == today
@@ -41,11 +42,11 @@ struct HomeWeekStrip: View {
             Circle().fill(done ? AppPalette.action : AppPalette.elevated)
             if isToday && !done { Circle().stroke(AppPalette.accent, lineWidth: 1.5) }
           }
-          .frame(width: 12, height: 12)
+          .frame(width: 14, height: 14)
           .scaleEffect(done || reduceMotion ? 1 : 0.84)
           .animation(reduceMotion ? nil : DrillbitMotion.selection, value: done)
         }
-        .frame(minWidth: 20)
+        .frame(maxWidth: .infinity)
       }
     }
     .accessibilityElement(children: .ignore)

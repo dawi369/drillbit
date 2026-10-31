@@ -7086,6 +7086,12 @@
                       "minimum": 0,
                       "maximum": 9007199254740991
                     },
+                    "path": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
                     "turns": {
                       "type": "array",
                       "items": {
@@ -7240,6 +7246,19 @@
                                     "type": "integer",
                                     "minimum": 0,
                                     "maximum": 5
+                                  },
+                                  "path": {
+                                    "minItems": 2,
+                                    "maxItems": 5,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 80
+                                    }
+                                  },
+                                  "covered": {
+                                    "type": "boolean"
                                   },
                                   "curveball": {
                                     "type": "boolean"
@@ -8549,6 +8568,12 @@
                       "minimum": 0,
                       "maximum": 9007199254740991
                     },
+                    "path": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
                     "turns": {
                       "type": "array",
                       "items": {
@@ -8703,6 +8728,19 @@
                                     "type": "integer",
                                     "minimum": 0,
                                     "maximum": 5
+                                  },
+                                  "path": {
+                                    "minItems": 2,
+                                    "maxItems": 5,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 80
+                                    }
+                                  },
+                                  "covered": {
+                                    "type": "boolean"
                                   },
                                   "curveball": {
                                     "type": "boolean"
@@ -11050,6 +11088,12 @@
             "minimum": 0,
             "maximum": 9007199254740991
           },
+          "path": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "turns": {
             "type": "array",
             "items": {
@@ -11204,6 +11248,19 @@
                           "type": "integer",
                           "minimum": 0,
                           "maximum": 5
+                        },
+                        "path": {
+                          "minItems": 2,
+                          "maxItems": 5,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 80
+                          }
+                        },
+                        "covered": {
+                          "type": "boolean"
                         },
                         "curveball": {
                           "type": "boolean"
@@ -11655,6 +11712,12 @@
                 "minimum": 0,
                 "maximum": 9007199254740991
               },
+              "path": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
               "turns": {
                 "type": "array",
                 "items": {
@@ -11809,6 +11872,19 @@
                               "type": "integer",
                               "minimum": 0,
                               "maximum": 5
+                            },
+                            "path": {
+                              "minItems": 2,
+                              "maxItems": 5,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80
+                              }
+                            },
+                            "covered": {
+                              "type": "boolean"
                             },
                             "curveball": {
                               "type": "boolean"
@@ -13612,6 +13688,12 @@
                         "minimum": 0,
                         "maximum": 9007199254740991
                       },
+                      "path": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
                       "turns": {
                         "type": "array",
                         "items": {
@@ -13766,6 +13848,19 @@
                                       "type": "integer",
                                       "minimum": 0,
                                       "maximum": 5
+                                    },
+                                    "path": {
+                                      "minItems": 2,
+                                      "maxItems": 5,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 80
+                                      }
+                                    },
+                                    "covered": {
+                                      "type": "boolean"
                                     },
                                     "curveball": {
                                       "type": "boolean"
@@ -14817,6 +14912,12 @@
                     "minimum": 0,
                     "maximum": 9007199254740991
                   },
+                  "path": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
                   "turns": {
                     "type": "array",
                     "items": {
@@ -14971,6 +15072,19 @@
                                   "type": "integer",
                                   "minimum": 0,
                                   "maximum": 5
+                                },
+                                "path": {
+                                  "minItems": 2,
+                                  "maxItems": 5,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 80
+                                  }
+                                },
+                                "covered": {
+                                  "type": "boolean"
                                 },
                                 "curveball": {
                                   "type": "boolean"
@@ -15955,6 +16069,12 @@
                         "minimum": 0,
                         "maximum": 9007199254740991
                       },
+                      "path": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
                       "turns": {
                         "type": "array",
                         "items": {
@@ -16109,6 +16229,19 @@
                                       "type": "integer",
                                       "minimum": 0,
                                       "maximum": 5
+                                    },
+                                    "path": {
+                                      "minItems": 2,
+                                      "maxItems": 5,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 80
+                                      }
+                                    },
+                                    "covered": {
+                                      "type": "boolean"
                                     },
                                     "curveball": {
                                       "type": "boolean"
@@ -17119,6 +17252,12 @@
                       "minimum": 0,
                       "maximum": 9007199254740991
                     },
+                    "path": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
                     "turns": {
                       "type": "array",
                       "items": {
@@ -17273,6 +17412,19 @@
                                     "type": "integer",
                                     "minimum": 0,
                                     "maximum": 5
+                                  },
+                                  "path": {
+                                    "minItems": 2,
+                                    "maxItems": 5,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 80
+                                    }
+                                  },
+                                  "covered": {
+                                    "type": "boolean"
                                   },
                                   "curveball": {
                                     "type": "boolean"
@@ -18304,6 +18456,12 @@
                       "minimum": 0,
                       "maximum": 9007199254740991
                     },
+                    "path": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
                     "turns": {
                       "type": "array",
                       "items": {
@@ -18458,6 +18616,19 @@
                                     "type": "integer",
                                     "minimum": 0,
                                     "maximum": 5
+                                  },
+                                  "path": {
+                                    "minItems": 2,
+                                    "maxItems": 5,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 80
+                                    }
+                                  },
+                                  "covered": {
+                                    "type": "boolean"
                                   },
                                   "curveball": {
                                     "type": "boolean"
@@ -19406,6 +19577,12 @@
                         "minimum": 0,
                         "maximum": 9007199254740991
                       },
+                      "path": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
                       "turns": {
                         "type": "array",
                         "items": {
@@ -19560,6 +19737,19 @@
                                       "type": "integer",
                                       "minimum": 0,
                                       "maximum": 5
+                                    },
+                                    "path": {
+                                      "minItems": 2,
+                                      "maxItems": 5,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 80
+                                      }
+                                    },
+                                    "covered": {
+                                      "type": "boolean"
                                     },
                                     "curveball": {
                                       "type": "boolean"

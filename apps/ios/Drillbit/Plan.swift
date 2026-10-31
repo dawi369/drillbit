@@ -9,6 +9,7 @@ import SuperwallKit
 enum PaywallPlacement: String {
   case practiceRep = "practice_rep"
   case voiceSession = "voice_session"
+  case knowledgeMap = "knowledge_map"
 }
 
 private struct EntitlementUpload: Encodable { var signedTransaction: String }
@@ -243,6 +244,7 @@ private struct PaywallHeader: View {
     ("waveform", "Voice mocks up to 20 minutes"),
     ("lightbulb", "Every nudge and follow-up"),
     ("sun.max", "A fresh question waiting each day"),
+    ("point.3.filled.connected.trianglepath.dotted", "Your knowledge map and level"),
   ]
   var body: some View {
     VStack(spacing: 16) {
@@ -257,7 +259,8 @@ private struct PaywallHeader: View {
       VStack(spacing: 4) {
         Text("Drillbit Pro").font(.caption.weight(.semibold)).foregroundStyle(AppPalette.accent)
           .textCase(.uppercase).tracking(1.2)
-        Text(placement == .voiceSession ? "Say it out loud, as often as you want." : "Don’t stop at three.")
+        Text(placement == .voiceSession ? "Say it out loud, as often as you want."
+             : placement == .knowledgeMap ? "See what you actually know." : "Don’t stop at three.")
           .font(.title2.weight(.semibold)).multilineTextAlignment(.center)
           .fixedSize(horizontal: false, vertical: true)
           .accessibilityAddTraits(.isHeader)

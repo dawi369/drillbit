@@ -1,13 +1,24 @@
 import SwiftUI
 
 /// The end of a rep: two lines fade in on the interview's background, then Home takes over by itself.
+/// A different pair each time, in the same voice as the "next boss fight" reminder.
 struct RepDoneMoment: View {
+  static let lines: [(title: String, line: String)] = [
+    ("Well done.", "That’s one in the bag."),
+    ("Boss down.", "Loot: one design call you’ll actually remember."),
+    ("GG.", "Respawn tomorrow. Same time, tougher boss."),
+    ("Rep logged.", "Your future interviewer has no idea what’s coming."),
+    ("Shipped.", "Straight to production, zero rollbacks."),
+    ("Achievement unlocked.", "Thought about failure modes on purpose."),
+    ("That’s a wrap.", "The servers stayed up. Mostly thanks to you."),
+  ]
+  @State private var pick = RepDoneMoment.lines.randomElement() ?? RepDoneMoment.lines[0]
   @State private var shown = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   var body: some View {
     VStack(spacing: 8) {
-      Text("Well done.").font(.largeTitle.weight(.semibold)).tracking(-0.8).foregroundStyle(AppPalette.primary)
-      Text("That’s one in the bag.").font(.title3).foregroundStyle(AppPalette.secondary)
+      Text(pick.title).font(.largeTitle.weight(.semibold)).tracking(-0.8).foregroundStyle(AppPalette.primary)
+      Text(pick.line).font(.title3).foregroundStyle(AppPalette.secondary)
     }
     .multilineTextAlignment(.center)
     .padding(.horizontal, 32)

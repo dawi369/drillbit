@@ -308,6 +308,13 @@ import WidgetKit
           }
           fixtureLibraryAttempts[id] = [attempt]
         }
+        #if DEBUG
+        // The whole vocabulary, so the knowledge map draws every area.
+        if ProcessInfo.processInfo.arguments.contains("--fixture-map") {
+          let all: [(String, String, String)] = [("data-modeling", "Data modeling", "Data"), ("indexing", "Indexing & access patterns", "Data"), ("transactions", "Transactions", "Data"), ("consistency", "Consistency", "Data"), ("replication", "Replication", "Data"), ("partitioning", "Partitioning", "Data"), ("api-design", "API design", "Traffic & performance"), ("caching", "Caching", "Traffic & performance"), ("load-balancing", "Load balancing", "Traffic & performance"), ("rate-limiting", "Rate limiting", "Traffic & performance"), ("capacity-planning", "Capacity planning", "Traffic & performance"), ("queues", "Queues & streams", "Async & coordination"), ("retry-safety", "Retry safety & idempotency", "Async & coordination"), ("coordination", "Ordering & coordination", "Async & coordination"), ("scheduling", "Scheduling", "Async & coordination"), ("fault-tolerance", "Fault tolerance & recovery", "Reliability & operations"), ("backpressure", "Overload & backpressure", "Reliability & operations"), ("observability", "Observability", "Reliability & operations"), ("migration", "Deployment & migration", "Reliability & operations"), ("authorization", "Authentication & authorization", "System boundaries"), ("tenant-isolation", "Tenant isolation", "System boundaries"), ("data-lifecycle", "Data lifecycle & privacy", "System boundaries"), ("multi-region", "Multi-region design", "System boundaries"), ("cost-efficiency", "Cost efficiency", "System boundaries")]
+          taxonomy = all.map { PracticeConcept(id: $0.0, label: $0.1, category: $0.2, aliases: [], description: "A core system design decision.") }
+        }
+        #endif
       }
       return
     }
@@ -1476,6 +1483,29 @@ import WidgetKit
       memory = MemoryResponse(evidence: [evidence], statistics: .init(completed: 12, lastSevenDays: 4, asOf: Date().ISO8601Format()), sessions: [source], patterns: [])
       libraryCoverage = [.init(conceptId: "queues", completedAttempts: 3, distinctQuestions: 2)]; libraryCoverageLoaded = true
     }
+    // An active learner for the knowledge map: reps at three levels, grounded feedback, coverage across areas.
+    if ProcessInfo.processInfo.arguments.contains("--fixture-map") {
+      func rep(_ id: String, _ title: String, _ level: String, _ concepts: [String], _ evidence: [(String, String, String)], daysAgo: Double) -> Challenge {
+        var c = Challenge(primaryConceptId: concepts.first, conceptIds: concepts, engineeringLevel: level, id: id, lifecycle: "completed", title: title, prompt: "", topic: "System design",
+                          completedAt: Date.now.addingTimeInterval(-daysAgo * 86_400).ISO8601Format())
+        c.reflection = Reflection(evidence: evidence.map { LearningEvidence(conceptId: $0.0, observation: $0.2, quote: $0.1, signal: $0.2.hasPrefix("Missed") ? "needs_practice" : "demonstrated", assistance: "unknown") },
+                                  summary: "", worked: [], improve: "", takeaway: "", strengths: [], gaps: [])
+        return c
+      }
+      let sessions = [
+        rep("m1", "Rate limiter for a public API", "senior", ["rate-limiting", "caching"], [("rate-limiting", "Token bucket per key in Redis, checked atomically.", "Shared, atomic state keeps the limit honest across servers.")], daysAgo: 1),
+        rep("m2", "Charge a card exactly once", "mid", ["retry-safety", "transactions"], [("retry-safety", "Reuse the same idempotency key on retry.", "A stable key lets a retry find the original charge."), ("transactions", "Mark paid and save the charge id together.", "Missed that both writes must commit in one transaction.")], daysAgo: 2),
+        rep("m3", "Design a reliable job queue", "mid", ["queues", "fault-tolerance"], [("queues", "Ack only after the work is written.", "Late acks keep accepted work through a crash.")], daysAgo: 4),
+        rep("m4", "Chat presence at scale", "senior", ["fault-tolerance", "replication"], [("fault-tolerance", "Presence expires on a 70 second TTL.", "Missed that the TTL overshoots the freshness target.")], daysAgo: 6),
+        rep("m5", "Feed for a social app", "senior", ["data-modeling", "caching"], [("data-modeling", "Fan out on write, except for huge accounts.", "Picks the write path by follower count.")], daysAgo: 9),
+        rep("m6", "Profile cache that survives expiry", "junior", ["caching", "backpressure"], [("caching", "Concurrent misses share one read.", "Collapses a stampede into one database read.")], daysAgo: 12),
+      ]
+      memory = MemoryResponse(statistics: .init(completed: sessions.count, lastSevenDays: 4, asOf: Date().ISO8601Format()), sessions: sessions, patterns: [])
+      libraryCoverage = [("caching", 3), ("rate-limiting", 1), ("retry-safety", 1), ("transactions", 1), ("queues", 1), ("fault-tolerance", 2), ("replication", 1), ("data-modeling", 1), ("backpressure", 1), ("api-design", 1)]
+        .map { .init(conceptId: $0.0, completedAttempts: $0.1, distinctQuestions: $0.1) }
+      libraryCoverageLoaded = true
+      bootstrap?.todayPlan?.completedTotal = sessions.count
+    }
     if ProcessInfo.processInfo.arguments.contains("--fixture-interview-history") {
       challenge.lifecycle = "in_progress"
       var current = challenge.prompt
@@ -1522,6 +1552,7 @@ import WidgetKit
       bootstrap?.challenge = nil
       bootstrap?.todayPlan?.nextTicket = 11
     }
+    if ProcessInfo.processInfo.arguments.contains("--fixture-pro") { applyConfirmedPro() }
     if ProcessInfo.processInfo.arguments.contains("--fixture-free-reps") {
       bootstrap?.account.plan = "free"
       bootstrap?.practice = PracticeAccess(plan: "free", freeReps: true, available: true, remaining: 2, limit: 3, resetsAt: Self.fixtureReset)

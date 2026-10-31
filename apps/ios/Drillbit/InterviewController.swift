@@ -267,7 +267,22 @@ import UIKit
           if isAnswer, mode == .learnTogether {
             result.choices = ["Store a done marker per job", "Make the work itself idempotent", "Not sure, show me"]
             result.step = min(state.turns.filter { $0.kind == "answer" }.count, 3)
+            #if DEBUG
+            // The conversation went somewhere the roadmap didn't plan: the steps ahead are redrawn, the done ones kept.
+            if ProcessInfo.processInfo.arguments.contains("--fixture-path-revision") {
+              // Like the server: the steps before the current one are kept (at least the first, for the fixture's opener).
+              let done = Array((state.path ?? challenge.path ?? []).prefix(max(result.step ?? 0, 1)))
+              result.path = done + ["Add a dead-letter queue", "Alert on a growing backlog"]
+              state.path = result.path
+            }
+            #endif
           }
+          #if DEBUG
+          if isAnswer, ProcessInfo.processInfo.arguments.contains("--fixture-covered") {
+            result.text = "That covers it: retries are safe and accepted work survives a crash. Want to finish, or push on one extra angle, like poison messages?"
+            result.covered = true
+          }
+          #endif
           do {
             state.turns.append(InterviewTurn(id: operation.command, ordinal: state.turns.count, kind: input.kind, prompt: state.prompt, text: input.text, createdAt: Date().ISO8601Format(), jobId: operation.command, status: "running"))
             outgoing = nil

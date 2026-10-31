@@ -13,6 +13,11 @@ const INTERVIEW_MODEL=managedModel('interview'), FEEDBACK_MODEL=managedModel('su
 const question={title:'Rate limiting for a public API',prompt:'Design rate limiting for a public API used by third-party developers. Explain where limits are enforced, how a client learns it is limited, and what happens during a traffic spike.',constraints:['Limits are per API key.','Several API servers sit behind one load balancer.'],engineeringLevel:'mid',conceptIds:['rate-limiting','caching','fault-tolerance','api-design'],opener:'Let’s start simple: where would you put the limit, and why there?'};
 /** Four kinds of people: a solid mid-level, a hand-wavy beginner, a nervous one who asks for help, and one who disagrees. */
 const candidates:{name:string;turns:{kind:string;text:string}[]}[]=[
+ {name:'detour',turns:[
+  {kind:'answer',text:'I’d enforce it at the gateway, with one shared counter per API key in Redis.'},
+  {kind:'answer',text:'Honestly the part I actually care about is billing: free, pro and enterprise tiers with monthly quotas, overage charges, and showing customers their usage on a dashboard.'},
+  {kind:'answer',text:'Yeah, let’s go with that. Monthly quota per tier, and overage billed per thousand requests.'},
+ ]},
  {name:'solid',turns:[
   {kind:'answer',text:'I’d enforce at the API gateway, in front of the servers, so every server sees the same decision. Token bucket per API key, say 100 requests per second with a burst of 200, stored in Redis so all gateway instances share counts.'},
   {kind:'answer',text:'When they’re limited they get a 429 with Retry-After and X-RateLimit-Remaining headers so SDKs can back off instead of hammering. The bucket refills continuously, so a short wait usually clears it.'},
@@ -52,8 +57,10 @@ await Promise.all(modes.map(async guidanceMode=>{
  for(const candidate of candidates){
   if(process.env.EVAL_CANDIDATE && candidate.name!==process.env.EVAL_CANDIDATE) continue;
   const turns:any[]=[]; const log:any[]=[]; let cost=0; let prompt=question.prompt;
+  // Guided runs carry a roadmap, as production does, so step tracking and redraws can be read in the output.
+  let path=['Decide where limits are enforced','Pick the limiting algorithm','Tell clients they are limited','Survive a traffic spike']; let reached=0;
   for(const step of candidate.turns){
-   const interview={guidanceMode,style:'standard',prompt,turns};
+   const interview={guidanceMode,style:'standard',prompt,turns,...(guidanceMode==='learn_together'?{guidedPath:{steps:path,current:reached}}:{})};
    const context={question,interview,historicalSnapshot:{scope:'synthetic empty history',attempts:[]},action:{kind:step.kind,text:step.text}};
    const started=performance.now();
    let outcome:any;
@@ -62,7 +69,9 @@ await Promise.all(modes.map(async guidanceMode=>{
     const {raw,usage,finish}=await call(INTERVIEW_MODEL,messagesFor('interview',context),schema,interviewReasoning(context),2400);
     cost+=usage?.cost??0;
     outcome=parseInterviewModelResult(context,interviewSchemaFor(step.kind),JSON.parse(raw));
-    log.push({you:`${step.kind}: ${step.text}`,interviewer:outcome.text,outcome:outcome.outcome,ms:Math.round(performance.now()-started),finish});
+    log.push({you:`${step.kind}: ${step.text}`,interviewer:outcome.text,outcome:outcome.outcome,covered:outcome.covered??false,...(outcome.path?{path:outcome.path}:{}),...(outcome.step!==undefined?{step:outcome.step}:{}),ms:Math.round(performance.now()-started),finish});
+    if(outcome.step!==undefined) reached=Math.max(reached,outcome.step);
+    if(outcome.path){ const kept=path.slice(0,reached); path=[...kept,...outcome.path.slice(kept.length)].slice(0,5); }
    }catch(error){ log.push({you:`${step.kind}: ${step.text}`,invalid:String(error).slice(0,200)}); continue; }
    turns.push({kind:step.kind,prompt,text:step.text,result:outcome});
    // Follow-ups move the question on; replies, nudges and examples leave it where it was.

@@ -29,6 +29,10 @@ export const interviewResultSchema = z.object({
   // Guided only: suggested answers the learner can tap, and the guided-path step this reply works on.
   choices: z.array(z.string().trim().min(1).max(80)).max(3).optional(),
   step: z.number().int().min(0).max(5).optional(),
+  // Guided only: the roadmap revised because the conversation took a different route. Done steps are kept server-side.
+  path: z.array(z.string().trim().min(1).max(80)).min(2).max(5).optional(),
+  // The question's main ask is answered: the app suggests finishing, and the reply offers an extra angle.
+  covered: z.boolean().optional(),
   // Mock only: this reply changed one requirement mid-round; a round gets exactly one.
   curveball: z.boolean().optional(),
 });
@@ -62,6 +66,14 @@ export function guidedPathFor(data: any, guidanceMode: string | undefined, turns
   return guidanceMode === "learn_together" && Array.isArray(data.path) ? { steps: data.path as string[], current: guidedStepFor(data, turns) } : undefined;
 }
 export function normalizeInterviewResult(output: z.infer<typeof interviewResultSchema>) { return output; }
+/** A revised guided roadmap, with the steps already done kept exactly as they were; undefined when nothing usable changed. */
+export function revisedGuidedPath(previous: { steps: string[]; current: number } | undefined, proposed: string[] | undefined): string[] | undefined {
+  if (!previous || !proposed) return undefined;
+  const done = previous.steps.slice(0, Math.min(previous.current, previous.steps.length));
+  const next = [...done, ...proposed.slice(done.length)].slice(0, 5);
+  if (next.length < 2 || next.length <= done.length || JSON.stringify(next) === JSON.stringify(previous.steps)) return undefined;
+  return next;
+}
 export async function interviewFor(env: Env, account: string, id: string) {
   const [challenge, rows, fragments] = await Promise.all([
     ownedChallenge(env, account, id),
@@ -73,7 +85,8 @@ export async function interviewFor(env: Env, account: string, id: string) {
   const last = turns.filter(t => ["answer", "continue"].includes(t.kind) && t.result).at(-1);
   return { guidanceMode: guidanceMode(data.guidanceMode), style: interviewStyleSchema.catch("standard").parse(data.interviewStyle),
     prompt: last?.result?.outcome === "follow_up" ? last.result.text : last?.prompt ?? data.prompt,
-    wrapUp: last?.result?.outcome === "wrap_up", guidedStep: guidedStepFor(data, turns), turns };
+    wrapUp: last?.result?.outcome === "wrap_up", guidedStep: guidedStepFor(data, turns),
+    path: guidanceMode(data.guidanceMode) === "learn_together" && Array.isArray(data.path) ? data.path as string[] : undefined, turns };
 }
 export async function requestInterview(env: Env, account: string, id: string, command: string, raw: unknown, runImmediately?: (id: string) => void) {
   const input = interviewInputSchema.parse(raw);
