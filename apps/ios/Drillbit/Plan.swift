@@ -276,7 +276,7 @@ private struct PaywallHeader: View {
     ("point.3.filled.connected.trianglepath.dotted", "Your knowledge map and level"),
   ]
   var body: some View {
-    VStack(spacing: 16) {
+    VStack(spacing: 12) {
       ZStack {
         BitGlow(color: AppPalette.action, opacity: 0.28)
           .frame(width: 168, height: 168)
@@ -284,7 +284,7 @@ private struct PaywallHeader: View {
           .accessibilityHidden(true)
         BitView(greets: true).frame(width: 80, height: 92).accessibilityHidden(true)
       }
-      .frame(height: 112)
+      .frame(height: 96)
       VStack(spacing: 4) {
         Text("Drillbit Pro").font(.caption.weight(.semibold)).foregroundStyle(AppPalette.accent)
           .textCase(.uppercase).tracking(1.2)
@@ -294,8 +294,13 @@ private struct PaywallHeader: View {
           .font(.title2.weight(.semibold)).multilineTextAlignment(.center)
           .fixedSize(horizontal: false, vertical: true)
           .accessibilityAddTraits(.isHeader)
+        // What it's worth next to the thing it's for, not what it costs us.
+        Text("Less than an hour of what the offer pays.")
+          .font(.subheadline).foregroundStyle(AppPalette.secondary).multilineTextAlignment(.center)
+          .fixedSize(horizontal: false, vertical: true)
+          .accessibilityIdentifier("paywallValue")
       }
-      VStack(alignment: .leading, spacing: 12) {
+      VStack(alignment: .leading, spacing: 9) {
         ForEach(Self.perks, id: \.title) { perk in
           HStack(spacing: 12) {
             Image(systemName: perk.symbol)
@@ -406,6 +411,12 @@ private struct PaywallCheckout: View {
       Button("Restore purchases") { restore() }
         .buttonStyle(PracticeButtonStyle(secondary: true)).disabled(working)
         .accessibilityIdentifier("paywallRestore")
+      // Where the money goes, in the maker's note's voice; below the buttons so Subscribe stays on screen.
+      Text("Your subscription keeps Drillbit independent, the voice running and improvements coming. Thank you.")
+        .font(.footnote.italic()).foregroundStyle(AppPalette.secondary)
+        .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+        .padding(.top, 4)
+        .accessibilityIdentifier("paywallThanks")
       if let note { Text(note).font(.footnote).foregroundStyle(AppPalette.secondary).multilineTextAlignment(.center) }
     }
     // Switching plans swaps the terms and the button label at once; a crossfade overlaps the two prices.
