@@ -138,11 +138,15 @@ struct SettingsView: View {
       if model.bootstrap?.capabilities?.developerTools == true || model.fixture {
         DeveloperSettingsSection(model: model, appearance: $appearance, dismiss: { dismiss() })
       }
-      Section("Legal") {
+      Section {
         Link("Terms of Use", destination: LegalLinks.terms).accessibilityIdentifier("settingsTerms")
         if let privacy = LegalLinks.privacy {
           Link("Privacy Policy", destination: privacy).accessibilityIdentifier("settingsPrivacy")
         }
+      } header: {
+        Text("Legal")
+      } footer: {
+        MakersNoteFooter().padding(.top, 16)
       }
     }.navigationTitle("Settings")
       .toolbar {

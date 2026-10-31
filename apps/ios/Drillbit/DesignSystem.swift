@@ -900,3 +900,62 @@ struct ProWordmark: View {
       }
   }
 }
+
+/// Who made this and for whom. Shown while the Pro plans load and at the foot of Settings.
+enum MakersNote {
+  static let line = "Made by one developer in Europe."
+  static let love = "Built with love for everyone finding tech hard right now."
+}
+
+/// The maker's note as its own quiet screen: Bit idling, the wordmark, two lines. Fills the Pro sheet while it loads.
+struct MakersNoteCard: View {
+  @State private var shown = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  var body: some View {
+    VStack(spacing: 20) {
+      BitView().frame(width: 64, height: 72).accessibilityHidden(true)
+      VStack(spacing: 12) {
+        Text("Drillbit").font(.custom("Literata", size: 34, relativeTo: .largeTitle).weight(.medium)).foregroundStyle(AppPalette.primary)
+        VStack(spacing: 4) {
+          Text(MakersNote.line)
+          Text(MakersNote.love)
+        }
+        .font(.body).foregroundStyle(AppPalette.secondary)
+        .multilineTextAlignment(.center)
+        .fixedSize(horizontal: false, vertical: true)
+        Image(systemName: "heart.fill").font(.footnote).foregroundStyle(AppPalette.accent).padding(.top, 4)
+          .accessibilityHidden(true)
+      }
+    }
+    .padding(.horizontal, 32)
+    .frame(maxWidth: 420)
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .opacity(shown ? 1 : 0)
+    .offset(y: shown || reduceMotion ? 0 : 8)
+    .onAppear { withAnimation(reduceMotion ? nil : .easeOut(duration: 0.5)) { shown = true } }
+    .accessibilityElement(children: .combine)
+    .accessibilityIdentifier("makersNote")
+  }
+}
+
+/// The same note, small, under the last Settings section.
+struct MakersNoteFooter: View {
+  var body: some View {
+    VStack(spacing: 6) {
+      BitView().frame(width: 28, height: 32).accessibilityHidden(true)
+      Text("Drillbit").font(.custom("Literata", size: 17, relativeTo: .headline).weight(.medium)).foregroundStyle(AppPalette.primary)
+      Text("\(MakersNote.line)\n\(MakersNote.love)")
+        .font(.footnote).foregroundStyle(AppPalette.secondary)
+        .multilineTextAlignment(.center)
+        .fixedSize(horizontal: false, vertical: true)
+      if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String {
+        Text("Version \(version) (\(build))").font(.caption2.monospaced()).foregroundStyle(.tertiary).padding(.top, 4)
+      }
+    }
+    .frame(maxWidth: .infinity)
+    .padding(.vertical, 24)
+    .accessibilityElement(children: .combine)
+    .accessibilityIdentifier("makersFooter")
+  }
+}

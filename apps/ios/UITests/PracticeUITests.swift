@@ -152,7 +152,9 @@ final class PracticeUITests: XCTestCase {
     app.tabBars.buttons["Bit"].tap()
     // Free: the tab opens the Pro screen instead, and Home stays put underneath.
     XCTAssertTrue(app.descendants(matching: .any)["paywall"].waitForExistence(timeout: 5))
-    XCTAssertTrue(app.staticTexts["See what you actually know."].exists)
+    // The maker's note shows first while the plans load, then the pitch.
+    XCTAssertTrue(app.descendants(matching: .any)["makersNote"].exists || app.staticTexts["See what you actually know."].exists)
+    XCTAssertTrue(app.staticTexts["See what you actually know."].waitForExistence(timeout: 10))
     capture("Bit tab paywall", app)
     app.buttons["paywallDismiss"].tap()
     XCTAssertFalse(app.descendants(matching: .any)["knowledgeMap"].exists)
@@ -197,7 +199,7 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.staticTexts["That’s your free reps. Pro keeps them coming."].waitForExistence(timeout: 5))
     app.buttons["settingsSeePro"].tap()
     XCTAssertTrue(app.descendants(matching: .any)["paywall"].waitForExistence(timeout: 5))
-    XCTAssertTrue(app.staticTexts["Keep the reps coming."].exists)
+    XCTAssertTrue(app.staticTexts["Keep the reps coming."].waitForExistence(timeout: 10))
     XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Save 75%")).firstMatch.waitForExistence(timeout: 10))
     capture("Paywall after the free reps", app)
   }

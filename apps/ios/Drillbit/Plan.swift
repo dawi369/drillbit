@@ -177,12 +177,30 @@ struct NativePaywallSheet: View {
   private enum Availability { case checking, ready, missing }
   @State private var availability = Availability.checking
   @State private var attempt = 0
+  /// The maker's note shows while the plans load; the first time, long enough to read.
+  @AppStorage("paywall.makersNoteSeen") private var noteSeen = false
+  /// The note stays over the store until the plans have drawn underneath, so StoreKit's own spinner never shows.
+  @State private var noteUp = true
+  /// Follows `noteUp` a beat later: the note fades out first, then the plans fade in, never both at once.
+  @State private var storeShown = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
     NavigationStack {
-      Group {
-        if availability == .missing { unavailable } else { store }
+      ZStack {
+        if availability == .missing {
+          unavailable.transition(.opacity)
+        } else {
+          // Rendered from the start, hidden, so it loads its plans while the note is up.
+          store.opacity(storeShown ? 1 : 0).accessibilityHidden(!storeShown)
+        }
+        if noteUp {
+          MakersNoteCard().background(PaywallBackdrop()).transition(.opacity)
+        }
       }
+      .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: noteUp)
+      .animation(reduceMotion ? nil : .easeIn(duration: 0.35), value: storeShown)
+      .animation(reduceMotion ? nil : .easeInOut(duration: 0.45), value: availability)
       .toolbar {
         ToolbarItem(placement: .cancellationAction) { Button("Not now") { PlanCoordinator.shared.dismissed() }.accessibilityIdentifier("paywallDismiss") }
         #if DEBUG
@@ -198,8 +216,17 @@ struct NativePaywallSheet: View {
     }
     .accessibilityIdentifier("paywall")
     .task(id: attempt) {
+      let started = Date()
       let found = (try? await Product.products(for: PlanCoordinator.productIDs)) ?? []
+      // A first look holds the note long enough to read; after that it's only as long as loading takes.
       availability = found.isEmpty ? .missing : .ready
+      // The store draws its plans from the products it just cached; give it a moment before lifting the note.
+      let hold = max(noteSeen ? 0 : 1.8 - Date().timeIntervalSince(started), found.isEmpty ? 0 : 0.6)
+      if hold > 0 { try? await Task.sleep(for: .seconds(hold)) }
+      noteSeen = true
+      noteUp = false
+      if !reduceMotion { try? await Task.sleep(for: .milliseconds(280)) }
+      storeShown = true
     }
   }
 
@@ -227,7 +254,7 @@ struct NativePaywallSheet: View {
     } description: {
       Text("The App Store didn’t send the plans over. Check your connection, then give it another go.")
     } actions: {
-      Button("Try again") { availability = .checking; attempt += 1 }
+      Button("Try again") { availability = .checking; noteUp = true; storeShown = false; attempt += 1 }
         .buttonStyle(PracticeButtonStyle()).frame(maxWidth: 240)
         .accessibilityIdentifier("paywallRetry")
     }

@@ -9,6 +9,7 @@ struct KnowledgeMapView: View {
   @State private var flow: QuestionFlowEntry?
   @State private var started: Challenge?
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @Environment(\.dynamicTypeSize) private var typeSize
 
   var body: some View {
     let nodes = KnowledgeNode.build(model: model)
@@ -54,7 +55,9 @@ struct KnowledgeMapView: View {
     let reps = model.bootstrap?.todayPlan?.completedTotal ?? model.memory.statistics?.completed ?? 0
     let explored = nodes.filter { $0.state != .unexplored }.count
     let strong = nodes.filter { $0.state == .strong }.count
-    return HStack(spacing: 12) {
+    // Three across normally; stacked at accessibility sizes so the numbers and labels read in full.
+    let row = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 12)) : AnyLayout(HStackLayout(spacing: 12))
+    return row {
       statTile(value: "\(reps)", label: reps == 1 ? "rep" : "reps")
       statTile(value: "\(explored)/\(nodes.count)", label: "areas explored")
       statTile(value: "\(strong)", label: strong == 1 ? "decision held up" : "decisions held up")
@@ -75,11 +78,12 @@ struct KnowledgeMapView: View {
   }
 
   private var legend: some View {
-    HStack(spacing: 16) {
-      legendItem(.strong, "Held up")
-      legendItem(.revisit, "Revisit")
-      legendItem(.practised, "Practised")
-      legendItem(.unexplored, "Not yet")
+    ViewThatFits(in: .horizontal) {
+      HStack(spacing: 16) { legendItems }
+      Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
+        GridRow { legendItem(.strong, "Held up"); legendItem(.revisit, "Revisit") }
+        GridRow { legendItem(.practised, "Practised"); legendItem(.unexplored, "Not yet") }
+      }
     }
     .font(.caption)
     .foregroundStyle(AppPalette.secondary)
@@ -87,8 +91,14 @@ struct KnowledgeMapView: View {
     .accessibilityHidden(true)
   }
 
+  @ViewBuilder private var legendItems: some View {
+    legendItem(.strong, "Held up")
+    legendItem(.revisit, "Revisit")
+    legendItem(.practised, "Practised")
+    legendItem(.unexplored, "Not yet")
+  }
   private func legendItem(_ state: KnowledgeNode.State, _ title: String) -> some View {
-    HStack(spacing: 6) { NodeDot(state: state, size: 10, glow: false); Text(title) }
+    HStack(spacing: 6) { NodeDot(state: state, size: 10, glow: false); Text(title).fixedSize() }
   }
 
   // MARK: Detail
@@ -128,14 +138,19 @@ struct KnowledgeMapView: View {
           SignalEyebrow(text: "Next up")
           ForEach(picks) { node in
             Button { practise(node) } label: {
-              HStack(alignment: .center, spacing: 12) {
-                NodeDot(state: node.state, size: 12, glow: false)
-                VStack(alignment: .leading, spacing: 2) {
-                  Text(node.label).font(.body.weight(.medium)).foregroundStyle(AppPalette.primary)
-                  Text(node.state == .revisit ? "Worth another go" : "Not explored yet").font(.footnote).foregroundStyle(AppPalette.secondary)
+              let row = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12)) : AnyLayout(HStackLayout(alignment: .center, spacing: 12))
+              row {
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                  NodeDot(state: node.state, size: 12, glow: false)
+                  VStack(alignment: .leading, spacing: 2) {
+                    Text(node.label).font(.body.weight(.medium)).foregroundStyle(AppPalette.primary)
+                      .fixedSize(horizontal: false, vertical: true)
+                    Text(node.state == .revisit ? "Worth another go" : "Not explored yet").font(.footnote).foregroundStyle(AppPalette.secondary)
+                      .fixedSize(horizontal: false, vertical: true)
+                  }
                 }
-                Spacer(minLength: 8)
-                StubPill(label: "Practise")
+                if !typeSize.isAccessibilitySize { Spacer(minLength: 8) }
+                StubPill(label: "Practise").fixedSize()
               }
               .padding(16)
               .background(AppPalette.ticket, in: RoundedRectangle(cornerRadius: 12))
@@ -233,6 +248,7 @@ struct LevelEstimate {
 private struct LevelCard: View {
   let estimate: LevelEstimate
   let target: String
+  @Environment(\.dynamicTypeSize) private var typeSize
   var body: some View {
     let ladder = LevelEstimate.ladder
     let current = estimate.level.flatMap { level in ladder.firstIndex { $0.0 == level } }
@@ -252,10 +268,13 @@ private struct LevelCard: View {
               if index == goal { Circle().stroke(AppPalette.primary, lineWidth: 1.5).frame(width: 14, height: 14) }
             }
             .frame(height: 14)
-            Text(ladder[index].1.replacingOccurrences(of: "-level", with: ""))
-              .font(.caption2.weight(index == current ? .semibold : .regular))
-              .foregroundStyle(index == current ? AppPalette.primary : AppPalette.secondary)
-              .lineLimit(1).minimumScaleFactor(0.8)
+            // At accessibility sizes six labels can't share a row; the level is named in full above.
+            if !typeSize.isAccessibilitySize {
+              Text(ladder[index].1.replacingOccurrences(of: "-level", with: ""))
+                .font(.caption2.weight(index == current ? .semibold : .regular))
+                .foregroundStyle(index == current ? AppPalette.primary : AppPalette.secondary)
+                .lineLimit(1).minimumScaleFactor(0.8)
+            }
           }
           .frame(maxWidth: .infinity)
           .padding(.horizontal, 2)
@@ -387,6 +406,8 @@ private struct ConstellationMap: View {
       }
     }
     .aspectRatio(1, contentMode: .fit)
+    // A diagram: its labels stop growing past XXL so they fit their spots; each dot speaks its full name.
+    .dynamicTypeSize(...DynamicTypeSize.xxLarge)
     .background(AppPalette.ticket.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
     .overlay { RoundedRectangle(cornerRadius: 12).stroke(AppPalette.ticketEdge, lineWidth: 1) }
   }

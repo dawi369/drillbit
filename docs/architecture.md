@@ -640,3 +640,7 @@ A synthetic run of `scripts/evaluate-flow.ts` (12 interviews: three modes × fou
   - **Stats.** Reps, areas explored and decisions that held up.
   - **The map.** A constellation over the canonical vocabulary, with Bit at the centre and a hub per category. A concept is gold where its latest evidence is demonstrated, ringed where it's worth revisiting, solid where practised and dim where not yet explored. Tap a concept for its latest quote and Practise this.
   - **Next up.** Up to three areas: revisits first, then unexplored core areas.
+
+## Maker's note, Pro polish — 31 October 2026
+
+The Pro sheet opens on a maker's note (`MakersNoteCard`): Bit idling, "Drillbit" in Literata, "Made by one developer in Europe. Built with love for everyone finding tech hard right now." and a small gold heart. The plans load underneath, hidden. The first time, the note stays at least 1.8 seconds (`paywall.makersNoteSeen`); after that only until the plans are ready, plus 0.6 s for the store to draw, so StoreKit's "Loading Subscription" spinner never shows. The note fades out, then the plans fade in, never both at once. The same note, small, with the version and build, is the footer of Settings' last section (`MakersNoteFooter`). At accessibility text sizes the knowledge map stacks its stat tiles and Next up rows, drops the six level labels (the level is named above) and wraps its legend. The map diagram's labels stop growing at XXL, and every dot reads its full name aloud.
