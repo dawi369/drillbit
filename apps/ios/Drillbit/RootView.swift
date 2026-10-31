@@ -173,7 +173,7 @@ struct RootView: View {
       NavigationStack {
         ScrollView {
           VStack(alignment: .leading, spacing: 16) {
-            Text("The answer changed on another device. Your local draft is still stored.")
+            Text("You changed this on another device too. Your draft here is still saved.")
             Text("Cloud answer").font(.headline)
             Text(challenge.session?.answer ?? "No answer").textSelection(.enabled)
             Button("Use cloud answer") { Task { await model.resolveConflict(keepLocal: false) } }
@@ -183,7 +183,7 @@ struct RootView: View {
                 Task { await model.resolveConflict(keepLocal: true) }
               }
             } else {
-              Text("This session is already complete. Copy your local draft before replacing it.")
+              Text("This one’s already finished. Copy your draft here before you replace it.")
                 .foregroundStyle(.secondary)
             }
             LocalRecoveryView(model: model, challenge: challenge)

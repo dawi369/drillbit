@@ -62,7 +62,7 @@ struct HistoryView: View {
           search.isEmpty || $0.title.localizedCaseInsensitiveContains(search)
         }
       }
-      failure = "Showing cached sessions. Connect to load more."
+      failure = "You’re offline, so this is what’s saved on your phone."
     }
   }
 }
@@ -219,7 +219,7 @@ struct AssistanceSummary: View {
         : (challenge.help ?? []).contains(where: { $0.body != nil })
           || (challenge.interview?.turns ?? []).contains(where: { ["hint", "example"].contains($0.kind) })
           || !(challenge.turns ?? []).isEmpty || challenge.example != nil
-          ? "Practised with help" : "No explicit help recorded"
+          ? "Practised with help" : "No help used"
     )
     .font(.footnote).foregroundStyle(.secondary)
   }
@@ -276,7 +276,7 @@ struct LibraryView: View {
         }
       }
       if questions.isEmpty && loadedIdentity == identity && !loading && failure == nil {
-        ContentUnavailableView(skipped ? "No skipped questions" : "Your question library", systemImage: AppIcon.books.rawValue, description: Text(skipped ? "Questions you skip will be kept here." : "Completed questions and repeat attempts will appear here."))
+        ContentUnavailableView(skipped ? "No skipped questions" : "Your question library", systemImage: AppIcon.books.rawValue, description: Text(skipped ? "Skip a question and it waits here for later." : "Finished questions land here, retries too."))
       }
       ForEach(questions) { question in
         VStack(alignment: .leading, spacing: 8) {
@@ -380,7 +380,7 @@ struct LibraryView: View {
       try await model.disk.cache(key: key, data: JSONEncoder().encode(snapshot))
     } catch is CancellationError {} catch {
       guard requestID == request, captured == identity, model.bootstrap?.account.id == account else { return }
-      failure = "Couldn’t refresh. Saved results may be incomplete."
+      failure = "Couldn’t refresh, so a few recent results may be missing."
     }
   }
 }
@@ -471,7 +471,7 @@ struct LibraryQuestionView: View {
       try await model.disk.cache(key: key, data: JSONEncoder().encode(response))
     } catch {
       guard model.bootstrap?.account.id == account, !Task.isCancelled else { return }
-      failure = "Couldn’t refresh. Showing saved details if available."
+      failure = "Couldn’t refresh, so this is the saved copy."
     }
   }
 }

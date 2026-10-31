@@ -429,7 +429,7 @@ struct RecallView: View {
 
   private var skillMap: some View {
     VStack(alignment: .leading, spacing: 16) {
-      DrillbitSectionHeader(title: "Your system design map", eyebrow: "Evidence, not scores")
+      DrillbitSectionHeader(title: "Your system design map", eyebrow: "From your reps")
       ForEach(groupedConcepts, id: \.0) { category, concepts in
         VStack(alignment: .leading, spacing: 0) {
           SignalEyebrow(text: category).padding(.bottom, 8)
@@ -459,7 +459,7 @@ struct RecallView: View {
   }
 
   private func mapStatus(concept: PracticeConcept, coverage: CoverageResponse.Entry?, evidence: LearningEvidence?) -> String {
-    if let evidence { return evidence.signal == "demonstrated" ? "Demonstrated in your latest evidence" : "Worth revisiting" }
+    if let evidence { return evidence.signal == "demonstrated" ? "You showed this in a recent rep" : "Worth revisiting" }
     guard let count = coverage?.completedAttempts, count > 0 else {
       return concept.description ?? "A core system design decision."
     }
@@ -469,7 +469,7 @@ struct RecallView: View {
   private var learningPaths: some View {
     VStack(alignment: .leading, spacing: 16) {
       DrillbitSectionHeader(title: "Choose a path", eyebrow: "Focused sets")
-      Text("Short general-knowledge sets. They don’t change your personal Recall.")
+      Text("Short warm-up sets. Your own cards stay as they are.")
         .font(.subheadline).foregroundStyle(.secondary)
       VStack(spacing: 0) {
         ForEach(paths) { path in

@@ -65,7 +65,7 @@ private let streamLog = Logger(subsystem: "dawi.drillbit", category: "stream")
     guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
       throw APIError(
         code: "coach_failed",
-        message: "Coaching is unavailable. Check your connection and AI access.",
+        message: "Couldn’t reach the interviewer. Check your connection and AI settings.",
         status: (response as? HTTPURLResponse)?.statusCode ?? 0)
     }
     var event = ""
@@ -81,7 +81,7 @@ private let streamLog = Logger(subsystem: "dawi.drillbit", category: "stream")
           if event == "completed" { completed = true }
           if event == "failed" {
             throw APIError(
-              code: "interrupted", message: value.message ?? "Coaching was interrupted.", status: 0)
+              code: "interrupted", message: value.message ?? "The reply got cut off.", status: 0)
           }
         }
         event = ""
@@ -95,7 +95,7 @@ private let streamLog = Logger(subsystem: "dawi.drillbit", category: "stream")
     if !completed {
       throw APIError(
         code: "interrupted",
-        message: "Coaching was interrupted. The partial response is not saved.", status: 0)
+        message: "The reply got cut off, so the half-finished part wasn’t saved.", status: 0)
     }
   }
   func interviewStream(id: String, turn: String, onSnapshot: @MainActor (InterviewStreamSnapshot) -> Void) async throws {
@@ -139,7 +139,7 @@ private let streamLog = Logger(subsystem: "dawi.drillbit", category: "stream")
       let error = try? JSONDecoder().decode(ErrorEnvelope.self, from: data)
       throw APIError(
         code: error?.error.code ?? "request_failed",
-        message: error?.error.message ?? "The request could not finish.", status: http.statusCode)
+        message: error?.error.message ?? "That didn’t go through. Try again.", status: http.statusCode)
     }
   }
 }

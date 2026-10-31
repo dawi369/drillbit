@@ -90,7 +90,7 @@ final class PracticeUITests: XCTestCase {
     for _ in 0..<6 where !rep.isHittable { app.swipeUp() }
     rep.tap()
     XCTAssertTrue(app.navigationBars["Attempt"].waitForExistence(timeout: 5))
-    XCTAssertFalse(app.staticTexts["No explicit help recorded"].exists)
+    XCTAssertFalse(app.staticTexts["No help used"].exists)
     XCTAssertFalse(app.staticTexts["Practised with help"].exists)
     // One feedback card: the takeaway, what worked, what to fix. No conversation link, no developer details.
     let feedback = app.descendants(matching: .any)["attemptFeedback"]
@@ -765,7 +765,7 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.buttons["startPractice"].waitForExistence(timeout: 10))
     app.buttons["startPractice"].tap()
     app.buttons["previewStart"].tap()
-    XCTAssertTrue(app.staticTexts["Could not start. Try again."].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.staticTexts["Couldn’t start that one. Try again."].waitForExistence(timeout: 5))
     XCTAssertTrue(app.navigationBars["Question preview"].exists)
     XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "answerEditor").firstMatch.exists)
     app.buttons["Choose another question"].tap()

@@ -116,7 +116,7 @@ private struct VoiceOutbox: Codable {
       guard generation == epoch, interview.currentAccount, interview.acceptsVoiceInput else { return }
       if !interview.model.fixture {
         guard AVAudioApplication.shared.recordPermission == .granted else {
-          throw APIError(code:"microphone_denied",message:"Microphone access is required for live voice.",status:0)
+          throw APIError(code:"microphone_denied",message:"Voice needs your mic. Turn it on in Settings, or keep typing.",status:0)
         }
       }
       let id = UUID().uuidString
@@ -134,12 +134,12 @@ private struct VoiceOutbox: Codable {
         return
       }
       interruptedObserver = NotificationCenter.default.addObserver(forName:AVAudioSession.interruptionNotification,object:nil,queue:.main) { [weak self] _ in
-        Task { @MainActor in self?.interrupt("Voice paused by an audio interruption. You can start it again.") }
+        Task { @MainActor in self?.interrupt("Something else grabbed the audio, so voice paused. Start it again when you’re ready.") }
       }
       routeObserver = NotificationCenter.default.addObserver(forName:AVAudioSession.routeChangeNotification,object:nil,queue:.main) { [weak self] note in
         let reason = note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt
         if reason == AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue {
-          Task { @MainActor in self?.interrupt("Your audio device disconnected. Voice has stopped.") }
+          Task { @MainActor in self?.interrupt("Your audio device dropped out, so voice stopped.") }
         }
         // WebRTC reapplies its own session settings when its audio unit starts; that can put the call back on the
         // earpiece. With nothing external attached, the interview belongs on the loudspeaker.
@@ -168,7 +168,7 @@ private struct VoiceOutbox: Codable {
       } else { offer = try await link.offer() }
       guard generation == epoch else { link.close(); return }
       link.onEvent = { [weak self] data in self?.enqueue(data,epoch:epoch) }
-      link.onFailure = { [weak self] in self?.interrupt("Voice disconnected. Your transcript is preserved.") }
+      link.onFailure = { [weak self] in self?.interrupt("Voice dropped. Everything you said is saved.") }
       let result: VoiceConnection = try await interview.model.api.send("challenges/\(interview.challenge.id)/voice",method:"POST",body:VoiceStart(sdp:offer,revision:draft.revision,guidanceMode:interview.mode,practiceProfile:interview.model.settings.practiceProfile),command:id)
       guard generation == epoch else { link.close(); abandon(id); return }
       if let seconds = result.sessionSeconds { sessionLimit = TimeInterval(seconds) }
@@ -181,7 +181,7 @@ private struct VoiceOutbox: Codable {
       Task { [weak self] in
         try? await Task.sleep(for:.seconds(10))
         guard let self, self.generation == epoch, self.phase == .connecting else { return }
-        self.interrupt("Voice could not finish connecting. Try again.")
+        self.interrupt("Voice didn’t finish connecting. Try again.")
       }
       present([],id:id)
       let limit = sessionLimit
@@ -521,7 +521,7 @@ private struct VoiceOutbox: Codable {
     let offer:RTCSessionDescription = try await withCheckedThrowingContinuation { c in pc.offer(for:RTCMediaConstraints(mandatoryConstraints:["OfferToReceiveAudio":"true"],optionalConstraints:nil)) { s,e in if let s { c.resume(returning:s) } else { c.resume(throwing:e ?? NSError(domain:"Voice",code:2)) } } }
     try await withCheckedThrowingContinuation { (c:CheckedContinuation<Void,Error>) in pc.setLocalDescription(offer) { e in if let e { c.resume(throwing:e) } else { c.resume() } } }
     for _ in 0..<100 { if pc.iceGatheringState == .complete { break }; try await Task.sleep(for:.milliseconds(50)) }
-    guard pc.iceGatheringState == .complete,let sdp=pc.localDescription?.sdp else { throw NSError(domain:"Voice",code:3,userInfo:[NSLocalizedDescriptionKey:"Couldn’t establish an audio connection."]) }
+    guard pc.iceGatheringState == .complete,let sdp=pc.localDescription?.sdp else { throw NSError(domain:"Voice",code:3,userInfo:[NSLocalizedDescriptionKey:"Couldn’t connect the audio."]) }
     return sdp
   }
   func answer(_ sdp:String) async throws {

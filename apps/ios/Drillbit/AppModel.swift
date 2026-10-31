@@ -200,7 +200,7 @@ import WidgetKit
     catch {
       guard bootstrap?.account.id == account else { return }
       dismissedHomeRevisits.remove(item.id)
-      self.error = "Couldn’t save that dismissal. Please try again."
+      self.error = "Couldn’t save that. Try again?"
     }
   }
 
@@ -904,7 +904,7 @@ import WidgetKit
   }
   func generateForPreview(_ preparation: PreparationInput? = nil, onDraft: (@MainActor (QuestionDraft) -> Void)? = nil) async throws -> Challenge {
     guard !busy, let account = bootstrap?.account.id else {
-      throw APIError(code: "busy", message: "A question is already being prepared.", status: 409)
+      throw APIError(code: "busy", message: "Already writing one. Hang tight.", status: 409)
     }
     // The first rep is a counted Guided question from the saved plan; its one swap replaces the ready question.
     let firstRep = firstUse.stage == .firstRep
@@ -925,13 +925,13 @@ import WidgetKit
       syncSettingsInBackground()
       await settingsSyncTask?.value
       guard bootstrap?.account.id == account else { throw CancellationError() }
-      guard pendingSettings == nil else { throw APIError(code: "settings_pending", message: "Your plan is saved on this device. Connect to prepare your first question.", status: 0) }
+      guard pendingSettings == nil else { throw APIError(code: "settings_pending", message: "Your plan’s saved on this phone. Get online and your first question will be ready.", status: 0) }
     }
     if !fixture {
       await sync()
       guard bootstrap?.account.id == account else { throw CancellationError() }
       guard try await disk.pendingSkips(account: account).isEmpty else {
-        throw APIError(code: "skip_pending", message: "Your skip is saved. The next question will be prepared shortly.", status: 0)
+        throw APIError(code: "skip_pending", message: "Skipped. A new question is on its way.", status: 0)
       }
     }
     preparationFailure = nil
@@ -948,7 +948,7 @@ import WidgetKit
       guard bootstrap?.account.id == account else { throw CancellationError() }
       #if DEBUG
       if ProcessInfo.processInfo.arguments.contains("--fixture-generation-failure") {
-        throw APIError(code: "generation_failed", message: "Question preparation failed. Your previous question is safe.", status: 503)
+        throw APIError(code: "generation_failed", message: "Our end tripped up. Anything you were working on is still here.", status: 503)
       }
       #endif
       let replaced = bootstrap?.challenge.flatMap { $0.id == preparation?.replaceId ? $0 : nil }
@@ -998,7 +998,7 @@ import WidgetKit
     }
     guard bootstrap?.account.id == account else { throw CancellationError() }
     if try await !disk.pending(account: account).isEmpty {
-      throw APIError(code: "practice_pending", message: "Couldn’t prepare a new question right now. Try again shortly.", status: 0)
+      throw APIError(code: "practice_pending", message: "Couldn’t write a new question. Give it a minute and try again.", status: 0)
     }
     let result: GenerationResponse
     do { result = try await api.send("challenges", method: "POST", body: preparation, command: UUID().uuidString) }
@@ -1027,7 +1027,7 @@ import WidgetKit
       if !streamed { try await waitForJob(id) }
       guard bootstrap?.account.id == account else { throw CancellationError() }
       if let delivered { challenge = delivered } else { challenge = try await api.send("challenges/" + id) }
-    } else { throw APIError(code: "missing_question", message: "The question is not available yet. Check Home shortly.", status: 0) }
+    } else { throw APIError(code: "missing_question", message: "Still writing that one. Check Home in a minute.", status: 0) }
     guard bootstrap?.account.id == account else { throw CancellationError() }
     bootstrap?.challenge = challenge
     if let bootstrap { try await disk.cache(key: "bootstrap:" + account, data: JSONEncoder().encode(bootstrap)) }
@@ -1046,12 +1046,12 @@ import WidgetKit
       if job.status == "completed" { return }
       if job.status == "failed" || job.status == "cancelled" {
         throw APIError(
-          code: "job_failed", message: job.error ?? "The operation stopped. Try again.", status: 0)
+          code: "job_failed", message: job.error ?? "That stopped partway. Try again.", status: 0)
       }
       try await Task.sleep(for: .milliseconds(Date().timeIntervalSince(started) < 10 ? 500 : 1500))
     }
     throw APIError(
-      code: "job_pending", message: "Still preparing. You can leave and return later.", status: 0)
+      code: "job_pending", message: "Still writing it. Feel free to wander off, it’ll be here.", status: 0)
   }
   func open(_ challenge: Challenge) async {
     await perform { presented = try await openForPreview(challenge) }
@@ -1072,13 +1072,13 @@ import WidgetKit
     if loaded.lifecycle == "ready" {
       #if DEBUG
       if fixture && ProcessInfo.processInfo.arguments.contains("--fixture-start-failure") {
-        throw APIError(code: "start_failed", message: "Could not start. Try again.", status: 503)
+        throw APIError(code: "start_failed", message: "Couldn’t start that one. Try again.", status: 503)
       }
       #endif
       if !fixture { loaded = try await api.send("challenges/\(challenge.id)/start", method: "POST") }
       else { loaded.lifecycle = "in_progress"; loaded.startedAt = Date().ISO8601Format() }
     }
-    guard loaded.isActive else { throw APIError(code: "inactive", message: "This session is no longer available to start.", status: 409) }
+    guard loaded.isActive else { throw APIError(code: "inactive", message: "This one can’t be started any more.", status: 409) }
     guard bootstrap?.account.id == account else { throw CancellationError() }
     bootstrap?.challenge = loaded
     return loaded
@@ -1360,7 +1360,7 @@ import WidgetKit
     try await saveSettingsLocally()
     await settingsSyncTask?.value
     if pendingSettings != nil {
-      throw APIError(code: "settings_pending", message: "Your settings are kept on this device. Connect and retry to continue setup.", status: 0)
+      throw APIError(code: "settings_pending", message: "Your answers are saved on this phone. Get online and try again to finish setup.", status: 0)
     }
     try? await reconcileReminder(requestPermission: true)
   }
@@ -1378,12 +1378,12 @@ import WidgetKit
     }
     guard authorization == .authorized || authorization == .provisional else {
       center.removePendingNotificationRequests(withIdentifiers: ["daily-practice"])
-      if requestPermission { throw APIError(code: "notifications_denied", message: "Your practice time is saved. Enable notifications for Drillbit in iPhone Settings to receive reminders.", status: 0) }
+      if requestPermission { throw APIError(code: "notifications_denied", message: "Your practice time is saved. Turn on notifications for Drillbit in iPhone Settings and the reminders will come through.", status: 0) }
       return
     }
     let content = UNMutableNotificationContent()
     content.title = "Your next boss fight"
-    content.body = "A few minutes of interview drilling? Those technical rounds don't pass themselves you know ;)."
+    content.body = "Today’s question is waiting. A few minutes, one good design call."
     content.userInfo = ["route": "home"]
     try await center.add(UNNotificationRequest(identifier: "daily-practice", content: content,
       trigger: UNCalendarNotificationTrigger(dateMatching: reminderComponents(minutes: settings.dailyMinutes, timezone: settings.timezone), repeats: true)))
@@ -1411,7 +1411,7 @@ import WidgetKit
     if (hasPendingWrites || pendingSettings != nil) && !discard {
       throw APIError(
         code: "unsynced",
-        message: "Some edits have not synced. Try again online, or explicitly discard local edits.",
+        message: "A few edits haven’t synced yet. Get online and try again, or discard them.",
         status: 0)
     }
     if !fixture {

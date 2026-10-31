@@ -220,13 +220,13 @@ import UIKit
     }
     let promptID = state.turns.last(where: { ["answer", "continue"].contains($0.kind) && $0.result != nil })?.id ?? "original"
     guard loaded, !locked, failedTurn == nil, !state.wrapUp, event.promptID == promptID else {
-      throw APIError(code: "voice_turn_not_ready", message: "Wait for the current interview turn to finish.", status: 0)
+      throw APIError(code: "voice_turn_not_ready", message: "Hang on, the interviewer’s still replying.", status: 0)
     }
     guard !event.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-      throw APIError(code: "empty_voice_turn", message: "The transcript is empty.", status: 0)
+      throw APIError(code: "empty_voice_turn", message: "Nothing to send yet. Say something first.", status: 0)
     }
     guard answer.isEmpty || answer == event.text else {
-      throw APIError(code: "existing_draft", message: "Share or clear the written draft before starting a voice answer.", status: 0)
+      throw APIError(code: "existing_draft", message: "Send or clear what you’ve typed before switching to voice.", status: 0)
     }
     edit(event.text)
     await submit("answer", command: event.id)

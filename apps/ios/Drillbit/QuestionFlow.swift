@@ -52,7 +52,7 @@ struct QuestionFlow: View {
   private var previewNote: String? {
     let guided = (question?.guidanceMode ?? draft?.guidanceMode) == .learnTogether
     guard guided, failure == nil else { return nil }
-    return "Guided practice helps you structure the approach."
+    return "Guided, so you and the interviewer build it up one step at a time."
   }
   /// Bit shows up only while the question is being written, then gets out of the way.
   private var writing: Bool { question == nil && failure == nil }

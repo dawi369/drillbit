@@ -13,7 +13,7 @@ struct PracticeEvidenceView: View {
   var body: some View {
     SignalList {
       Section {
-        Text("Feedback from your latest 100 sessions, linked to your answers. Counts track practice, not mastery.")
+        Text("What your last 100 sessions showed, each linked to the answer behind it. Counts show how often you practised, so read them as a rough guide.")
           .foregroundStyle(.secondary)
       }
       if concepts.isEmpty {
@@ -26,15 +26,15 @@ struct PracticeEvidenceView: View {
         Section(concept.label) {
           if let coverage { LabeledContent("Completed attempts", value: String(coverage.completedAttempts)) }
           if observations.isEmpty {
-            Text("No recorded evidence yet").foregroundStyle(.secondary)
+            Text("Nothing recorded yet").foregroundStyle(.secondary)
           }
           ForEach(observations) { evidence in
             VStack(alignment: .leading, spacing: 8) {
-              Text(evidence.signal == "demonstrated" ? "Demonstrated in practice" : "Worth practising")
+              Text(evidence.signal == "demonstrated" ? "Shown in practice" : "Worth practising")
                 .font(.subheadline.weight(.medium))
               Text(evidence.observation)
               Text("“\(evidence.quote)”").foregroundStyle(.secondary).textSelection(.enabled)
-              Text(evidence.assistance == "assisted" ? "Assistance was available" : "Independence not established")
+              Text(evidence.assistance == "assisted" ? "Help was on hand" : "Not tried solo yet")
                 .font(.caption).foregroundStyle(.secondary)
               if let id = evidence.sessionId, let session = model.memory.sessions.first(where: { $0.id == id }) {
                 NavigationLink("View session") { SessionDetailView(model: model, initial: session) }
@@ -62,7 +62,7 @@ struct PracticeExportView: View {
   @State private var failure: String?
   var body: some View {
     SignalList {
-      Text("Export your questions, answers, conversations, feedback and practice settings as JSON. Provider keys and sign-in credentials are excluded.")
+      Text("Take everything you’ve done here with you as JSON: questions, answers, conversations, feedback and settings. Your keys and sign-in details stay out of it.")
       Button(working ? "Preparing export…" : "Export practice data") {
         Task {
           working = true; failure = nil
@@ -70,7 +70,7 @@ struct PracticeExportView: View {
           let account = model.bootstrap?.account.id
           do {
             await model.sync()
-            guard !model.hasPendingWrites else { throw APIError(code: "pending_writes", message: "Recent changes are still being saved. Try exporting again shortly.", status: 0) }
+            guard !model.hasPendingWrites else { throw APIError(code: "pending_writes", message: "Still saving your latest changes. Try the export again in a moment.", status: 0) }
             var pages: [[String: Any]] = []
             var cursor: String?
             repeat {

@@ -63,7 +63,7 @@ struct SettingsView: View {
               reminderPermissionPending = false
               if !granted && model.settings.reminderEnabled {
                 model.settings.reminderEnabled = false
-                model.error = "Enable notifications for Drillbit in iPhone Settings to receive reminders."
+                model.error = "Turn on notifications for Drillbit in iPhone Settings and the reminders will come through."
               }
             }
           }
@@ -109,8 +109,8 @@ struct SettingsView: View {
           }
         }
         // Dialogs attach to their buttons so iOS presents them from the tapped row.
-        .confirmationDialog("Some local edits have not synced", isPresented: $discarding) {
-          Button("Discard local edits and sign out", role: .destructive) {
+        .confirmationDialog("A few edits haven’t synced yet", isPresented: $discarding) {
+          Button("Discard them and sign out", role: .destructive) {
             Task {
               await model.perform {
                 try await model.signOut(discard: true)
@@ -375,7 +375,7 @@ struct AIAccessView: View {
       }
       Section {
         Text(
-          "Your key is encrypted on Drillbit's servers so daily preparation can work while the app is closed. A rejected key never falls back to included AI. Removing it switches you back to Included AI."
+          "Your key is encrypted on Drillbit’s servers so daily preparation can work while the app is closed. A rejected key never falls back to included AI. Removing it switches you back to Included AI."
         ).font(.footnote).foregroundStyle(.secondary)
       }
     }.navigationTitle("LLM provider")
@@ -441,7 +441,7 @@ struct PracticeProfileView: View {
         TextField("Be direct, use examples, challenge my assumptions. Pirate voice welcome…", text: field(\.preferences), axis: .vertical).lineLimit(3...6)
           .accessibilityLabel("Your preferences").accessibilityIdentifier("practicePreferences")
       } header: { Text("What works for you?") } footer: {
-        Text("Goals and background inform practice questions. Preferences shape your interviewer in text and voice. Save with Done in Settings; restart voice to apply changes to an active session.")
+        Text("Your goals and background shape the questions. Preferences shape how your interviewer talks, in text and in voice. Tap Done to save; a voice session that’s already running picks them up next time.")
       }
       Section {
         Button("Reset personalization", role: .destructive) { model.settings.practiceProfile = PracticeProfile() }

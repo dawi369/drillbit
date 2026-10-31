@@ -37,7 +37,7 @@ struct SetupView: View {
   static let situations = [
     Option(id: "studying", title: "Still studying", detail: "CS degree, courses, side projects", symbol: "graduationcap"),
     Option(id: "bootcamp", title: "Bootcamp or self-taught", detail: "I can build things, the theory is patchy", symbol: "book"),
-    Option(id: "firstjob", title: "On the job", detail: "Tickets, yes. Designing a whole system, no", symbol: "laptopcomputer"),
+    Option(id: "firstjob", title: "On the job", detail: "Tickets, yes. Whole systems, not yet", symbol: "laptopcomputer"),
     Option(id: "interviewing", title: "Interviews are happening", detail: "And system design rounds scare me", symbol: "calendar.badge.clock"),
   ]
   static let levels = [
@@ -52,7 +52,7 @@ struct SetupView: View {
     Option(id: "stay_sharp", title: "Stay sharp", detail: "A rep now and then so it sticks", symbol: "flame"),
   ]
   static let modes = [
-    Option(id: "voice", title: "Talking it out", detail: "Like the real interview. The interviewer talks back", symbol: "waveform"),
+    Option(id: "voice", title: "Talking it out", detail: "Out loud. The interviewer talks back", symbol: "waveform"),
     Option(id: "text", title: "Typing, at my own pace", detail: "Think first, then write it down", symbol: "keyboard"),
     Option(id: "mix", title: "Depends on the day", detail: "Both count. Switch any time", symbol: "arrow.left.arrow.right"),
   ]
@@ -415,7 +415,7 @@ private struct ChoiceCards: View {
               .background(on ? AppPalette.action : AppPalette.inset, in: Circle())
             VStack(alignment: .leading, spacing: 2) {
               Text(option.title).font(.subheadline.weight(.semibold)).foregroundStyle(AppPalette.primary)
-              Text(option.detail).font(.caption).foregroundStyle(AppPalette.secondary).lineLimit(1)
+              Text(option.detail).font(.caption).foregroundStyle(AppPalette.secondary).lineLimit(2)
             }
             .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 8)
@@ -452,7 +452,7 @@ private struct PlanTicket: View {
           TicketHeader(number: "Your plan", detail: Date.now.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)))
           Text(SetupView.planHeadline(level: draft.level)).font(.title3.weight(.semibold)).tracking(-0.3)
           VStack(alignment: .leading, spacing: 8) {
-            row("map", "Start with", areas.isEmpty ? "Whatever you’re weakest at. Drillbit picks." : areas.map(\.title).joined(separator: " and "))
+            row("map", "Start with", areas.isEmpty ? "Whatever you’re weakest at. Drillbit picks." : areas.enumerated().map { $0.offset == 0 ? $0.element.title : $0.element.title.lowercased() }.joined(separator: ", then "))
             row("mic", "Practice", SetupView.modes.first { $0.id == draft.mode }?.title ?? "Talking it out")
             row("clock", "Pace", "\(draft.minutes) min · about \(SetupView.repsPerWeek(minutes: draft.minutes)) reps a week")
             if draft.objective == "interview", let date = draft.targetDate {

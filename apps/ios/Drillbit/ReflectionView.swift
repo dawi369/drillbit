@@ -5,7 +5,7 @@ import SwiftUI
 struct RepDoneMoment: View {
   static let lines: [(title: String, line: String)] = [
     ("Well done.", "That’s one in the bag."),
-    ("Boss down.", "Loot: one design call you’ll actually remember."),
+    ("Boss down.", "Loot: one design call that’ll stick."),
     ("GG.", "Respawn tomorrow. Same time, tougher boss."),
     ("Rep logged.", "Your future interviewer has no idea what’s coming."),
     ("Shipped.", "Straight to production, zero rollbacks."),
@@ -214,12 +214,12 @@ struct ReflectionView: View {
           if let retryFailure { Text(retryFailure).font(.subheadline).foregroundStyle(AppPalette.destructive) }
         } else {
           if model.hasPendingWrites && !model.fixture {
-            Text("Saved on this device. Your answer will sync when connected.").foregroundStyle(.secondary)
+            Text("Saved on your phone. It’ll sync when you’re back online.").foregroundStyle(.secondary)
           } else if waitingForFeedback {
-            LoadingStatus("Your answer is saved. Feedback is being prepared.")
+            LoadingStatus("Saved. Your feedback’s on its way.")
               .accessibilityLabel("Preparing feedback")
           } else {
-            Text(warmUp ? "Your warm-up is done. Feedback will show up here in a moment." : "Your practice is complete. Feedback will appear here and in your library when it’s ready.").foregroundStyle(.secondary)
+            Text(warmUp ? "Warm-up done. Feedback shows up here in a moment." : "All done. Feedback lands here and in Library when it’s ready.").foregroundStyle(.secondary)
           }
           if !waitingForFeedback { Button("Check feedback") { feedbackCheck += 1 }.frame(minHeight: 44) }
           if let job = model.bootstrap?.jobs.first(where: { $0.challengeId == initial.id && $0.kind == "summarize" && $0.status == "failed" }) {
@@ -417,7 +417,7 @@ struct ExampleView: View {
         } else if loading {
           LoadingStatus("Preparing an example")
         } else {
-          Text("See one possible answer. Your own answer will stay unchanged.")
+          Text("One way to answer it. Yours stays as you wrote it.")
           Button("Reveal example") {
             Task {
               loading = true

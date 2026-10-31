@@ -371,12 +371,12 @@ struct InterviewView: View {
       }
     }
     .drillbitConfirm("Skip this question?", isPresented: $confirmSkip,
-                     message: "End this interview without a review and return to Home.", actions: [
+                     message: "No feedback this time. It goes to Skipped questions in Library, with your draft.", actions: [
       ConfirmAction("Skip question", style: .destructive) { Task { await model.skip(challenge.id, answer: interview.answer) } },
       ConfirmAction("Keep practising"),
     ])
     .drillbitConfirm("Finish interview?", isPresented: $confirmFinish,
-                     message: "Your shared answers and current draft will be saved for review.", actions: [
+                     message: "We’ll save what you’ve said and your draft, then show you how it went.", actions: [
       ConfirmAction("Finish interview", style: .primary) { wrappingUp = true; Task { await interview.finish() } },
       ConfirmAction("Keep writing"),
     ])
@@ -408,11 +408,15 @@ struct InterviewView: View {
         .frame(maxHeight: 240)
         .transition(.opacity)
       } else if requestingAssistance {
-        ProgressView()
-          .controlSize(.small)
-          .frame(maxWidth: .infinity, minHeight: 44)
-          .accessibilityLabel("Preparing \(assistanceTitle.lowercased())")
-          .accessibilityIdentifier("assistanceLoading")
+        HStack(spacing: 8) {
+          ProgressView().controlSize(.small)
+          Text(assistanceTitle == "Example" ? "Writing one up…" : "Thinking of a good one…")
+            .font(.subheadline).foregroundStyle(AppPalette.secondary)
+        }
+        .frame(maxWidth: .infinity, minHeight: 44)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Preparing \(assistanceTitle.lowercased())")
+        .accessibilityIdentifier("assistanceLoading")
       } else {
         if assistanceGated, let assistanceError {
           ProNudge(message: assistanceError, placement: .practiceRep) { sheet = nil }
@@ -526,7 +530,7 @@ struct InterviewView: View {
         guard interview.currentAccount, phase == .active, entry == voiceEntry else { return }
         guard allowed else {
           voicePermissionNeedsSettings = true
-          voiceExplanation = "Allow microphone access to use live voice."
+          voiceExplanation = "Voice needs your mic. Turn it on in Settings, or keep typing."
           return
         }
         voice.prepareIfAllowed()

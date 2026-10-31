@@ -546,7 +546,7 @@ enum GuidanceMode: String, CaseIterable, Codable, Identifiable, Sendable {
   } }
   var explanation: String { switch self {
     case .learnTogether: "Work through an approach together, with examples along the way."
-    case .coachMe: "Take the lead. Get useful pointers when you’re stuck or missing something."
+    case .coachMe: "Take the lead. You get a pointer when you’re stuck or miss something."
     case .mockInterview: "Put your approach to the test. Save the coaching for the debrief."
   } }
 }
