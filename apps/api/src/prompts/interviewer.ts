@@ -110,7 +110,7 @@ History is incomplete; prior model feedback may be wrong. Missing assistance rec
 </grounding>
 ${truthfulVoiceProgress}
 ${questionTerminology}
-<output>Return JSON with move and text. Use chat or acknowledge for social replies; ask_one, answer_question, correct, hint or example for the actual technical response. Plain text inside text; no Markdown markers. Usually 2–3 short sentences. A useful requested explanation can be up to 120 words. Never force a question onto a complete answer.</output>
+<output>Return JSON with move and text. Use chat or acknowledge for social replies; ask_one, answer_question, correct, hint or example for the actual technical response. Plain text inside text; no Markdown markers. Usually 2–3 short sentences, about 60 words at most. An explanation they asked for can run to about 100 words. Never force a question onto a complete answer.</output>
 </drillbit>`;
 
 const teachingV2 = teachingV1.replace("</drillbit>", `<nudge>
