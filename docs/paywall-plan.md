@@ -43,6 +43,7 @@ Renewals, expiry, refunds → App Store Server Notifications v2 → POST /apple/
 | Voice | First 3 sessions, 3 min each, then one every 30 days | Unlimited*, fair use 60 min a day and 150 a week, up to 20 min a session |
 | Feedback, Recall, Library | ✓ | ✓ |
 | Daily question prepared for you | – | ✓ |
+| Knowledge map and level estimate (Bit tab) | – | ✓ |
 
 \* "Unlimited" is never shown with a number; hitting a fair-use cap says "that's a lot for one day, back tomorrow".
 
@@ -55,6 +56,7 @@ Renewals, expiry, refunds → App Store Server Notifications v2 → POST /apple/
 3. **Voice, once the free sessions are used:** a dialog with **See Pro** (gold) and Keep typing.
 4. **Settings → Plan → See Pro**, any time.
 5. **Inside a free rep:** running out of follow-ups or nudges shows See Pro instead of a dead Retry. That's the moment someone is most engaged.
+6. **The Bit tab:** it's visible to everyone; on Free, tapping it opens the Pro screen ("See what you actually know.") and leaves you on your current tab.
 
 There's no paywall at launch or during onboarding, and no nagging. Upgrades are offered only where a limit actually stopped someone.
 

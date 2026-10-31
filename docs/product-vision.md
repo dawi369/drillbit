@@ -18,11 +18,12 @@ This document is direction. [Architecture](architecture.md) records what is buil
 - A quiet practice room: easy to enter, undemanding while thinking, useful when stuck, clear about what happened.
 - Generated text stays out of the answer until deliberately adopted, with a preview, a revision check and undo.
 - Feedback is one strength and one gap, each quoted from the person's own words. No readiness percentage, generic praise or proficiency diagnosis from one attempt. If the answer is too thin to judge, say what's missing.
+- Across many reps, Pro may show a working-level estimate (Intern to Principal) on the Bit tab's knowledge map. It comes only from grounded feedback over several reps, waits until there is enough to go on, says what it's based on, and is labelled an estimate from your reps, not a hiring call. It is never a percentage, and feedback on a single rep still never diagnoses level.
 - Finishing freezes the answer and the assistance cutoff together. Late AI results can't change it, and AI or network failure never invalidates completed practice.
 - History states what help was used (hints, an example, an AI draft), never an "AI-written percentage".
 - Dynamic Type changes layout instead of shrinking text. VoiceOver announces state changes, not streamed tokens. Every voice function has a text equivalent.
 
-**Out:** streak guilt, compulsory timers, live scoring, decorative dashboards, XP and levels, mandatory résumé upload, a questionnaire before each question, an executable coding IDE, and animation standing in for thinking. Motion reports real state.
+**Out:** streak guilt, compulsory timers, live scoring, decorative dashboards, XP and game levels (the engineering-level estimate above is evidence, not a reward), mandatory résumé upload, a questionnaire before each question, an executable coding IDE, and animation standing in for thinking. Motion reports real state.
 
 **Bit**, the mascot, appears around practice, never inside it: Welcome, setup, the question preview and arriving feedback. It stays off sign-in, the answer workspace and the voice room, and its moods reflect real state. See [architecture](architecture.md#bit-the-mascot--2-october-2026).
 
