@@ -55,7 +55,7 @@ The paywall reads everything from the products, so nothing in code changes with 
 2. Subscription group **Drillbit Pro** with:
    - `dawi.drillbit.pro.yearly`: 1 year.
    - `dawi.drillbit.pro.weekly`: **$7.99** a week, with an introductory offer of 1 week at **$1.99**, pay as you go.
-   - `dawi.drillbit.pro.yearly`: **$79.99** a year. The paywall shows "Save 80%" and "$6.67 a month"; `Config/Drillbit.storekit` uses the same prices for the simulator.
+   - `dawi.drillbit.pro.yearly`: **$99.99** a year (raised from $79.99 on 31 October). The paywall shows "Save 75%" and "$8.33 a month"; `Config/Drillbit.storekit` uses the same prices for the simulator. If yearly is already set at $79.99 in App Store Connect, change it under Subscription Prices before submitting.
    - Prices and caps are explained in [paywall-plan.md](paywall-plan.md).
 3. For each product: display name, description (e.g. "Unlimited reps and voice, billed weekly."), and a **review screenshot** of the paywall. Take it on the device with the TestFlight build (section 7): the simulator fixture paywall shows a debug-only "Simulate purchase" button.
 4. **The first subscription has to be submitted with an app version.** On the 1.0 version page, under *In-App Purchases and Subscriptions*, add both products before you press Submit. Otherwise they stay "Ready to Submit" and the reviewer sees an empty paywall.

@@ -311,3 +311,7 @@ Additive migration `0016_voice_waived.sql` adds `voice_sessions.waived`. A sessi
 ### Voice minute caps and monthly taste — 28 October 2026
 
 `PRO_VOICE_MINUTES_PER_DAY=60` and `PRO_VOICE_MINUTES_PER_WEEK=150` (rolling 7 days) replace sessions as Pro's real voice limit; `PRO_VOICE_STARTS_PER_DAY` stays as a start-abuse guard. `FREE_VOICE_TASTE_DAYS=30`. No migration. Development Worker `35d7278d-eda7-4411-ba89-5567396a20df`, production `9b408a8f-52b3-4b8c-bc7b-dca008656b9a`; health 200, production bootstrap 401. The app ends voice after three minutes without speech. App Store Connect prices to set: weekly $7.99 with a $1.99 first week, yearly $79.99.
+
+### Two lifetime free reps, Pro voice 100 minutes a week — 31 October 2026
+
+Production sets `FREE_REPS_LIFETIME=2`: a free account gets two reps in total, never refilled. The first is onboarding's, the second comes after exploring the app; then the paywall. Unset, the daily `FREE_REPS_PER_DAY` allowance applies as before (development keeps the gate off). Bootstrap's `practice` then has `lifetime: true`, `resetsAt: null` and, once spent, `nextFreeRepAt: null`. Migration `0017_spent_free_reps` records the free-rep stamp of a deleted challenge, so deleting a finished rep never hands it back. The developer practice reset clears it. `PRO_VOICE_MINUTES_PER_WEEK` is now 100. Applied to development and production; development Worker `8dc3c3e6-006a-4eaa-a9a8-6f7a63a302fa`, production `bd61663d-cf24-4a13-9a72-5dcbb6df5d98`. Free accounts that already used two or more reps see the paywall straight away.

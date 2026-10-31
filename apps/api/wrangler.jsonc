@@ -72,6 +72,8 @@
         "OPEN_SIGNUP": "true",
         "SUPPORT_EMAIL": "support@t23.dev",
         "FREE_REPS_PER_DAY": "3",
+        // Two free reps in total, then Pro (31 Oct): the first is onboarding, the second comes after exploring the app.
+        "FREE_REPS_LIFETIME": "2",
         "FREE_VOICE_LIFETIME": "3",
         "FREE_VOICE_TASTE_DAYS": "30",
         "FREE_VOICE_SESSION_MINUTES": "3",
@@ -79,7 +81,7 @@
         "PRO_VOICE_STARTS_PER_DAY": "20",
         "PRO_VOICE_SESSION_MINUTES": "20",
         "PRO_VOICE_MINUTES_PER_DAY": "60",
-        "PRO_VOICE_MINUTES_PER_WEEK": "150",
+        "PRO_VOICE_MINUTES_PER_WEEK": "100",
         "APPLE_BUNDLE_ID": "dawi.drillbit",
         // No APPLE_ENVIRONMENT here: App Review buys with sandbox accounts against this Worker, and pinning
         // Production would reject the reviewer's purchase. Each entitlement row records its environment instead.

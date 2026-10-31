@@ -112,7 +112,20 @@ import WidgetKit
     if let current, current.freeRepAt != nil, current.swapped != true { return true }
     return practice.available
   }
-  /// When a spent free rep comes back; nil while practice is open.
+  /// Free reps are used up for now (daily) or for good (lifetime).
+  var freeRepsSpent: Bool {
+    guard let practice = bootstrap?.practice else { return false }
+    return practice.freeReps && !practice.available
+  }
+  var lifetimeFreeReps: Bool { bootstrap?.practice?.lifetime == true }
+  /// What Home and the end of a rep say once free reps are spent; nil while practice is open.
+  var freeRepsLine: String? {
+    guard freeRepsSpent else { return nil }
+    if let next = nextFreeRep { return Self.freeRepLine(next) }
+    return Self.lifetimeSpentLine
+  }
+  static let lifetimeSpentLine = "That’s your free reps. Pro keeps them coming."
+  /// When a spent free rep comes back; nil while practice is open, and for lifetime reps that never come back.
   var nextFreeRep: Date? {
     guard let practice = bootstrap?.practice, practice.freeReps, !practice.available else { return nil }
     return practice.nextFreeRepAt.flatMap(Date.fromAPI)
@@ -124,10 +137,10 @@ import WidgetKit
     let when = calendar.isDateInToday(date) ? "later today, at \(date.formatted(style))" : calendar.isDateInTomorrow(date) ? "tomorrow at \(date.formatted(style))" : date.formatted(.dateTime.weekday(.wide).locale(locale))
     return "That’s today’s free reps. More land \(when)."
   }
-  /// "2 of 3 free reps left today", or nil on Pro.
+  /// "2 of 3 free reps left today" (or "1 of 2 free reps left" when they're lifetime), or nil on Pro.
   var repsLeftLine: String? {
     guard let practice = bootstrap?.practice, practice.freeReps, let remaining = practice.remaining, let limit = practice.limit, remaining > 0 else { return nil }
-    return "\(remaining) of \(limit) free reps left today"
+    return "\(remaining) of \(limit) free reps left" + (practice.lifetime == true ? "" : " today")
   }
   static var fixtureReset: String { var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(identifier: "UTC")!; return c.startOfDay(for: Date().addingTimeInterval(86_400)).ISO8601Format() }
   var error: String?
@@ -1553,6 +1566,11 @@ import WidgetKit
       bootstrap?.todayPlan?.nextTicket = 11
     }
     if ProcessInfo.processInfo.arguments.contains("--fixture-pro") { applyConfirmedPro() }
+    // Production's model: two free reps in total, both spent; nothing comes back at midnight.
+    if ProcessInfo.processInfo.arguments.contains("--fixture-lifetime-spent") {
+      bootstrap?.account.plan = "free"
+      bootstrap?.practice = PracticeAccess(plan: "free", freeReps: true, available: false, nextFreeRepAt: nil, remaining: 0, limit: 2, resetsAt: nil, lifetime: true)
+    }
     if ProcessInfo.processInfo.arguments.contains("--fixture-free-reps") {
       bootstrap?.account.plan = "free"
       bootstrap?.practice = PracticeAccess(plan: "free", freeReps: true, available: true, remaining: 2, limit: 3, resetsAt: Self.fixtureReset)

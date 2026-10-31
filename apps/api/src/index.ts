@@ -237,6 +237,7 @@ app.delete("/v1/developer/practice", async (c) => {
   const resetSettings = settingsSchema.parse({});
   await c.env.DB.batch([
     c.env.DB.prepare("DELETE FROM challenges WHERE account_id=?").bind(account),
+    c.env.DB.prepare("DELETE FROM spent_free_reps WHERE account_id=?").bind(account),
     c.env.DB.prepare("DELETE FROM questions WHERE account_id=?").bind(account),
     c.env.DB.prepare("DELETE FROM jobs WHERE account_id=? AND kind!='delete_account'").bind(account),
     c.env.DB.prepare("DELETE FROM ai_runs WHERE account_id=?").bind(account),
@@ -378,7 +379,7 @@ app.post("/v1/challenges", async (c) => {
   const plan = await planFor(c.env, a);
   const freeRep = plan === "pro" ? {} : swap ? { freeRepAt: replaced!.freeRepAt, swapped: true } : { freeRepAt: timestamp() };
   const unless = "freeRepAt" in freeRep && !swap ? freeRepTaken(c.env, a) : undefined;
-  if (unless && await c.env.DB.prepare("SELECT 1 WHERE " + unless.sql).bind(...unless.binds).first()) throw practiceGateFault();
+  if (unless && await c.env.DB.prepare("SELECT 1 WHERE " + unless.sql).bind(...unless.binds).first()) throw practiceGateFault(c.env);
   await consumeUsage(c.env, a, "generate", limits(c.env, plan).generationsPerDay);
   const job = await createJob(c.env, a, id, "generate", null, {
     ...preparation,
@@ -393,7 +394,7 @@ app.post("/v1/challenges", async (c) => {
       ...(preparation.engineeringLevel ? { engineeringLevel: preparation.engineeringLevel } : preparation.difficulty ? { engineeringLevel: levelForDifficulty(preparation.difficulty) } : {}),
     },
   }, inline(c), unless);
-  if (!job) throw practiceGateFault();
+  if (!job) throw practiceGateFault(c.env);
   return c.json(job, 202);
 });
 app.put("/v1/challenges/:id/companion", async (c) =>
@@ -618,14 +619,14 @@ app.post("/v1/jobs/:id/retry", async (c) => {
   const input = parseJSON<{ freeRepAt?: string; swapped?: boolean }>(old.input);
   // A retried preparation is a fresh rep; the failed one never counted.
   const unless = old.kind === "generate" && await onFreeReps(c.env, a) ? freeRepTaken(c.env, a) : undefined;
-  if (unless && await c.env.DB.prepare("SELECT 1 WHERE " + unless.sql).bind(...unless.binds).first()) throw practiceGateFault();
+  if (unless && await c.env.DB.prepare("SELECT 1 WHERE " + unless.sql).bind(...unless.binds).first()) throw practiceGateFault(c.env);
   await consumeUsage(c.env, a, old.kind, old.kind === "summarize" ? 20 : 10);
   const { swapped: _swapped, ...rest } = input;
   const job = await createJob(c.env, a, id, old.kind, old.challenge_id, {
     ...(unless ? { ...rest, freeRepAt: timestamp() } : input),
     settings: await settingsFor(c.env, a),
   }, undefined, unless);
-  if (!job) throw practiceGateFault();
+  if (!job) throw practiceGateFault(c.env);
   await c.env.DB.prepare(
     "UPDATE jobs SET status='cancelled' WHERE id=? AND status='failed'",
   )
@@ -722,9 +723,11 @@ app.delete("/v1/challenges/:id", async (c) => {
   const id = c.req.param("id"),
     a = c.get("account").id;
   await ownedChallenge(c.env, a, id);
-  await c.env.DB.prepare("DELETE FROM challenges WHERE id=? AND account_id=?")
-    .bind(id, a)
-    .run();
+  await c.env.DB.batch([
+    // A free rep stays spent after its question is deleted.
+    c.env.DB.prepare("INSERT OR IGNORE INTO spent_free_reps(account_id,stamp) SELECT account_id,json_extract(data,'$.freeRepAt') FROM challenges WHERE id=? AND account_id=? AND json_extract(data,'$.freeRepAt') IS NOT NULL").bind(id, a),
+    c.env.DB.prepare("DELETE FROM challenges WHERE id=? AND account_id=?").bind(id, a),
+  ]);
   return c.json({ ok: true });
 });
 app.put("/v1/credential", async (c) => {

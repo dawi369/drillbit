@@ -296,10 +296,12 @@ struct PracticeAccess: Codable, Sendable, Equatable {
   var freeReps: Bool
   var available: Bool
   var nextFreeRepAt: String?
-  /// Today's free reps; absent on Pro.
+  /// Today's free reps (or, with `lifetime`, all of them); absent on Pro.
   var remaining: Int? = nil
   var limit: Int? = nil
   var resetsAt: String? = nil
+  /// Free reps are a fixed number in total that never come back, rather than a daily allowance.
+  var lifetime: Bool? = nil
 }
 struct TodayPlan: Codable, Sendable, Equatable {
   var state: String

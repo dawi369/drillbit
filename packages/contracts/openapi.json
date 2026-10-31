@@ -13510,7 +13510,13 @@
                 "maximum": 9007199254740991
               },
               "resetsAt": {
-                "type": "string"
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "lifetime": {
+                "type": "boolean"
               }
             },
             "required": [

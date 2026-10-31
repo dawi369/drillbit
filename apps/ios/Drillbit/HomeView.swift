@@ -21,7 +21,8 @@ struct HomeView: View {
     case question(Challenge)
     case failed(String)
     case done(Challenge)
-    case waiting(Date)
+    /// Free reps are spent; the date they come back, or nil when they don't (lifetime).
+    case waiting(Date?)
     case empty
   }
   private var preparing: Bool {
@@ -40,7 +41,7 @@ struct HomeView: View {
     if let challenge = model.bootstrap?.challenge { return .question(challenge) }
     if let failure = model.preparationFailure { return .failed(failure) }
     if let session = todaysSession { return .done(session) }
-    if let next = model.nextFreeRep { return .waiting(next) }
+    if model.freeRepsSpent { return .waiting(model.nextFreeRep) }
     return .empty
   }
   /// Changes when the ticket switches state, never while a title streams or jobs poll.
@@ -283,12 +284,18 @@ struct HomeView: View {
       Ticket {
         VStack(alignment: .leading, spacing: 12) {
           TicketHeader(number: nextNumber, detail: shortDate)
-          Text(AppModel.freeRepLine(next)).font(.title2.weight(.semibold)).tracking(-0.4)
+          Text(next.map { AppModel.freeRepLine($0) } ?? AppModel.lifetimeSpentLine).font(.title2.weight(.semibold)).tracking(-0.4)
             .fixedSize(horizontal: false, vertical: true)
-          ProNudge(message: "Recall and Library are still open in the meantime. Pro skips the wait.", placement: .practiceRep) { await model.refresh() }
+          ProNudge(message: next == nil ? "Your reps stay in Library and Recall. Pro gets you practising again." : "Recall and Library are still open in the meantime. Pro skips the wait.",
+                   placement: .practiceRep) { await model.refresh() }
         }
       } stub: {
-        stubText(title: "Free reps", note: "Three a day, on the house")
+        if next == nil {
+          let limit = model.bootstrap?.practice?.limit ?? 2
+          stubText(title: "Free reps", note: "\(limit == 2 ? "Two" : String(limit)) to try it, on the house")
+        } else {
+          stubText(title: "Free reps", note: "Three a day, on the house")
+        }
       }
       .accessibilityElement(children: .combine)
       .accessibilityIdentifier("freeRepWaiting")
@@ -361,7 +368,7 @@ struct HomeView: View {
     let guided = (session.reflection?.guidanceMode ?? session.guidanceMode) == .learnTogether
     let time = session.completedAt.flatMap(Date.fromAPI)?.formatted(date: .omitted, time: .shortened) ?? ""
     let takeaway = session.reflection?.takeaway ?? "Open it to see how it went."
-    let next = model.nextFreeRep
+    let spentLine = model.freeRepsLine
     let milestone = Milestone.line(for: session.ticket)
     // The ticket opens today's attempt; its stub carries the next move, so nothing hangs underneath.
     return Ticket(foil: milestone != nil) {
@@ -409,14 +416,14 @@ struct HomeView: View {
             Text(guided ? "Worked out together" : "One thing to carry forward").font(.subheadline.weight(.medium)).foregroundStyle(AppPalette.secondary)
             Text(takeaway).font(.body).fixedSize(horizontal: false, vertical: true)
           }
-          if let next {
-            Text(AppModel.freeRepLine(next)).font(.footnote).foregroundStyle(AppPalette.secondary)
+          if let spentLine {
+            Text(spentLine).font(.footnote).foregroundStyle(AppPalette.secondary)
               .fixedSize(horizontal: false, vertical: true)
               .accessibilityIdentifier("freeRepNotice")
           }
         }
         Spacer(minLength: 8)
-        if next != nil {
+        if spentLine != nil {
           Button { PlanCoordinator.shared.register(.practiceRep) { await model.refresh() } } label: { StubPill(label: "See Pro") }
             .buttonStyle(TicketPressStyle())
             .accessibilityLabel("See Pro")

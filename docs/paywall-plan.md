@@ -38,9 +38,9 @@ Renewals, expiry, refunds → App Store Server Notifications v2 → POST /apple/
 
 | | Free | Pro |
 |---|---|---|
-| Questions (reps) | 3 a day (resets at UTC midnight) | Unlimited*, fair-use 30 a day |
+| Questions (reps) | **2 in total** (since 31 Oct; was 3 a day) | Unlimited*, fair-use 30 a day |
 | Inside a rep | 8 follow-ups, 2 nudges or examples | Unlimited |
-| Voice | First 3 sessions, 3 min each, then one every 30 days | Unlimited*, fair use 60 min a day and 150 a week, up to 20 min a session |
+| Voice | First 3 sessions, 3 min each, then one every 30 days | Unlimited*, fair use 60 min a day and **100 a week** (was 150), up to 20 min a session |
 | Feedback, Recall, Library | ✓ | ✓ |
 | Daily question prepared for you | – | ✓ |
 | Knowledge map and level estimate (Bit tab) | – | ✓ |
@@ -177,3 +177,23 @@ Minutes come from the billed seconds the app reports when a session closes. A se
 - **Easy levers.** Each is an App Store or environment setting, so none needs a release. Yearly at $99.99 (–$18), Pro voice at 100 minutes a week (+$92), no monthly free voice taste (+$173), or both of the first two (+$335). If yearly subscribers sit idle half their months, as many do, yearly roughly breaks even by itself (+$201).
 
 All of this is a model. Conversion, the weekly/yearly split, how long weekly subscribers stay, and voice minutes per subscriber should replace the assumptions as soon as there are real numbers.
+
+## 10. Decided 31 October: two free reps, then Pro
+
+| | Decision | Where |
+|---|---|---|
+| Free | **Two reps in total**, never refilled: onboarding's first, a second after exploring the app, then the paywall. Library and Recall stay open. | `FREE_REPS_LIFETIME=2` (production) |
+| Entry offer | Keep the $1.99 first week (no free trial) | App Store Connect |
+| Yearly | **$99.99** ("Save 75%", $8.33 a month) | App Store Connect (yours); `Config/Drillbit.storekit` matches |
+| Pro voice | **100 minutes a week**, 60 a day | `PRO_VOICE_MINUTES_PER_WEEK=100` |
+
+Why: subscription benchmarks (RevenueCat, State of Subscription Apps 2025) put download-to-paid at day 35 around **10–12% for hard paywalls against about 2% for freemium**, with one-year retention about the same (27% against 28%). Drillbit sells itself only after a rep or two, so the paywall waits until then rather than standing in front of everything. Each free person now costs about two text reps plus the voice intro, a few cents up to about $0.25, once, rather than every month.
+
+Rough month one per 1,000 downloads, using the simulation's unit economics. A Pro subscriber nets about $7.45 a month after Apple and AI costs at the old prices, and **$9.05 at the new ones**. Yearly now earns its keep: it keeps $6.87 a month against $5.73 in costs, where it used to keep $5.50 against $6.37.
+
+| | Paying | Cost of non-payers | Net |
+|---|---|---|---|
+| Freemium, 3 a day (before) | ~22 | ~500 active free users × $0.24 = –$120 | ≈ +$45 |
+| Two free reps, then Pro (new prices) | ~100 (assumes 10%, the benchmark's lower end) | ~900 people × up to $0.25, once = –$225 at most | ≈ +$680 |
+
+Watch: download-to-paid by day 35 (target 8% or more), App Store rating (paywalls can draw one-star reviews; the first rep has to land), and how many people finish rep two.

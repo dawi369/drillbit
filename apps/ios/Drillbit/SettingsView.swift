@@ -84,7 +84,8 @@ struct SettingsView: View {
           Button("Manage subscription") { showingManageSubscriptions = true }
             .manageSubscriptionsSheet(isPresented: $showingManageSubscriptions)
         } else {
-          Text(model.repsLeftLine ?? "3 free reps a day, plus a taste of voice. Pro takes the daily limits off.").font(.footnote).foregroundStyle(.secondary)
+          Text(model.repsLeftLine ?? (model.lifetimeFreeReps ? (model.freeRepsSpent ? AppModel.lifetimeSpentLine : "Two free reps to try it, plus a taste of voice. Pro keeps you practising.")
+                                                              : "3 free reps a day, plus a taste of voice. Pro takes the daily limits off.")).font(.footnote).foregroundStyle(.secondary)
           Button { PlanCoordinator.shared.register(.practiceRep) { await model.refresh() } } label: {
             HStack(spacing: 4) { Text("See"); ProWordmark(font: .body.weight(.semibold)) }
           }

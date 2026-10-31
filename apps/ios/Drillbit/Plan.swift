@@ -32,6 +32,8 @@ private struct EntitlementReceipt: Decodable { var plan: String }
   private var pendingFeature: (() async -> Void)?
   private var updates: Task<Void, Never>?
   private weak var model: AppModel?
+  /// Free reps are a few in total (production), so the paywall shouldn't promise "three a day".
+  var lifetimeFreeReps: Bool { model?.lifetimeFreeReps == true }
 
   func configure(apiKey: String) {
     #if canImport(SuperwallKit)
@@ -260,7 +262,8 @@ private struct PaywallHeader: View {
         Text("Drillbit Pro").font(.caption.weight(.semibold)).foregroundStyle(AppPalette.accent)
           .textCase(.uppercase).tracking(1.2)
         Text(placement == .voiceSession ? "Say it out loud, as often as you want."
-             : placement == .knowledgeMap ? "See what you actually know." : "Don’t stop at three.")
+             : placement == .knowledgeMap ? "See what you actually know."
+             : PlanCoordinator.shared.lifetimeFreeReps ? "Keep the reps coming." : "Don’t stop at three.")
           .font(.title2.weight(.semibold)).multilineTextAlignment(.center)
           .fixedSize(horizontal: false, vertical: true)
           .accessibilityAddTraits(.isHeader)

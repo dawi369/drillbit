@@ -12,7 +12,8 @@ struct PlanPricingTests {
     // 39.99 against 52 × 6.99 = 363.48 saves 88.99%: the badge says 88, never 89.
     #expect(PlanPricing.yearlySaving(yearly: Decimal(string: "39.99")!, weekly: Decimal(string: "6.99")!) == 88)
     #expect(PlanPricing.yearlySaving(yearly: 100, weekly: 2.5) == 23)
-    // Launch prices: 79.99 against 52 × 7.99 = 415.48 saves 80.75%.
+    // Launch prices: 99.99 against 52 × 7.99 = 415.48 saves 75.93%.
+    #expect(PlanPricing.yearlySaving(yearly: Decimal(string: "99.99")!, weekly: Decimal(string: "7.99")!) == 75)
     #expect(PlanPricing.yearlySaving(yearly: Decimal(string: "79.99")!, weekly: Decimal(string: "7.99")!) == 80)
   }
   @Test func noBadgeWithoutASaving() {

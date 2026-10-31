@@ -6,7 +6,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 
 // ── What we charge (App Store Connect; matches Config/Drillbit.storekit) ──────────────────────────────
-const PRICE = { weekly: 7.99, weeklyIntro: 1.99, yearly: 79.99 };
+const PRICE = { weekly: 7.99, weeklyIntro: 1.99, yearly: 99.99 };
 const APPLE_CUT = 0.15; // Small Business Program; 0.30 without it
 const REFUNDS_AND_FAILED_RENEWALS = 0.03;
 
@@ -29,7 +29,7 @@ const clerk = (mau: number) => { const retained = mau * 0.6; return retained <= 
 
 // ── Limits (production wrangler vars) ──────────────────────────────────────────────────────────────────
 const FREE = { repsPerDay: 3, introVoiceSessions: 3, sessionMinutes: 3, tasteEveryDays: 30, followUpsPerRep: 8, nudgesPerRep: 2 };
-const PRO = { voiceMinutesPerWeek: 150, voiceMinutesPerDay: 60 };
+const PRO = { voiceMinutesPerWeek: 100, voiceMinutesPerDay: 60 };
 const PRO_MONTHLY_VOICE_CAP = Math.min(PRO.voiceMinutesPerWeek * 4.33, PRO.voiceMinutesPerDay * 30);
 
 // ── How people behave (assumptions; the sensitivity table varies the ones that matter) ────────────────

@@ -28,6 +28,8 @@ export interface Env {
   FREE_REP_FOLLOW_UPS?: string;
   FREE_REP_NUDGES?: string;
   FREE_REPS_PER_DAY?: string;
+  /** When set, free accounts get this many reps in total instead of a daily allowance. */
+  FREE_REPS_LIFETIME?: string;
   FREE_VOICE_LIFETIME?: string;
   FREE_VOICE_TASTE_DAYS?: string;
   FREE_VOICE_SESSION_MINUTES?: string;

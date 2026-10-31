@@ -180,6 +180,28 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.buttons["submitPreparation"].waitForExistence(timeout: 5) || app.navigationBars.firstMatch.waitForExistence(timeout: 3))
   }
 
+  func testLifetimeFreeRepsSpentOfferPro() throws {
+    let store = try SKTestSession(configurationFileNamed: "Drillbit")
+    store.resetToDefaultState(); store.disableDialogs = true; store.clearTransactions()
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures", "--fixture-dashboard", "--fixture-customer", "--fixture-lifetime-spent"]
+    app.launch()
+    // Both free reps are spent for good: no "back tomorrow", just Pro.
+    let waiting = app.descendants(matching: .any)["freeRepWaiting"]
+    XCTAssertTrue(waiting.waitForExistence(timeout: 10))
+    XCTAssertTrue(waiting.label.contains("That’s your free reps. Pro keeps them coming."), waiting.label)
+    XCTAssertFalse(waiting.label.contains("tomorrow"), waiting.label)
+    XCTAssertTrue(waiting.label.contains("Two to try it"), waiting.label)
+    capture("Lifetime free reps spent", app)
+    app.buttons["Settings"].tap()
+    XCTAssertTrue(app.staticTexts["That’s your free reps. Pro keeps them coming."].waitForExistence(timeout: 5))
+    app.buttons["settingsSeePro"].tap()
+    XCTAssertTrue(app.descendants(matching: .any)["paywall"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.staticTexts["Keep the reps coming."].exists)
+    XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Save 75%")).firstMatch.waitForExistence(timeout: 10))
+    capture("Paywall after the free reps", app)
+  }
+
   func testHomeWeekStripAndMilestone() throws {
     let app = XCUIApplication()
     app.launchArguments = ["--fixtures", "--fixture-dashboard", "--fixture-customer", "--fixture-milestone"]
@@ -1474,10 +1496,10 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.buttons["seePro"].exists)
     app.buttons["seePro"].tap()
     XCTAssertTrue(app.descendants(matching: .any)["paywall"].waitForExistence(timeout: 5))
-    // Every figure comes from the products: 79.99 a year against 52 × 7.99 saves 80%, and the weekly intro shows.
+    // Every figure comes from the products: 99.99 a year against 52 × 7.99 saves 75%, and the weekly intro shows.
     let option = { (text: String) in app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch }
-    XCTAssertTrue(option("Save 80%").waitForExistence(timeout: 10))
-    XCTAssertTrue(option("$6.67 a month").exists)
+    XCTAssertTrue(option("Save 75%").waitForExistence(timeout: 10))
+    XCTAssertTrue(option("$8.33 a month").exists)
     XCTAssertTrue(option("Try a week for $1.99, then $7.99 a week").exists)
     // What App Review checks on a subscription paywall: terms, renewal terms, restore and a way out.
     XCTAssertTrue(option("Terms of Service").exists)

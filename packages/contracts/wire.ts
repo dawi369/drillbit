@@ -201,7 +201,7 @@ export const wire = {
     todayPlan: todayPlan.optional(),
     queuedNext: queuedNext.nullable().optional(),
     // freeReps is false on Pro (gate off, allowlist or entitlement). remaining/limit/resetsAt describe today's free reps.
-    practice: z.object({ plan: z.enum(["free", "pro"]).optional(), freeReps: z.boolean(), available: z.boolean(), nextFreeRepAt: z.string().nullable(), remaining: z.number().int().optional(), limit: z.number().int().optional(), resetsAt: z.string().optional() }).optional(),
+    practice: z.object({ plan: z.enum(["free", "pro"]).optional(), freeReps: z.boolean(), available: z.boolean(), nextFreeRepAt: z.string().nullable(), remaining: z.number().int().optional(), limit: z.number().int().optional(), resetsAt: z.string().nullable().optional(), lifetime: z.boolean().optional() }).optional(),
     challenge: challenge.nullable(),
     jobs: z.array(job),
     credential: z.object({ suffix: z.string(), model: z.string().nullable() }).nullable(),

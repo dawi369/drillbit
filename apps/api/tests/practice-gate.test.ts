@@ -206,3 +206,25 @@ it("caps follow-ups and nudges inside a free rep only", async () => {
   await expect(freeRepLimit(bindings, id, data, "answer", turns("answer", 30))).resolves.toBeUndefined();
   expect(await access((await bindings.DB.prepare("SELECT subject FROM accounts WHERE id=?").bind(id).first<{ subject: string }>())!.subject)).toMatchObject({ plan: "pro", freeReps: false });
 });
+
+it("gives lifetime free reps that never refill and stay spent when their question is deleted", async () => {
+  const { subject, id } = await person();
+  bindings.FREE_REPS_LIFETIME = "2";
+  try {
+    expect(await access(subject)).toMatchObject({ plan: "free", freeReps: true, available: true, remaining: 2, limit: 2, resetsAt: null, lifetime: true });
+    // Two reps from days ago still count: lifetime reps don't come back at midnight.
+    for (let i = 0; i < 2; i++) {
+      const at = new Date(Date.now() - (3 + i) * 86_400_000).toISOString();
+      await bindings.DB.prepare("INSERT INTO challenges(id,account_id,lifecycle,data,created_at,available_at,completed_at) VALUES(?,?,'completed',?,?,?,?)")
+        .bind(`lifetime-${id}-${i}`, id, JSON.stringify({ title: "Queue", prompt: "Design a reliable job queue for email.", topic: "System design", freeRepAt: at }), at, at, at).run();
+    }
+    expect(await access(subject)).toMatchObject({ available: false, remaining: 0, nextFreeRepAt: null, lifetime: true });
+    const blocked = await prepare(subject);
+    expect(blocked.status).toBe(402);
+    expect(await blocked.json()).toMatchObject({ error: { code: "practice_gate", message: "That’s your free reps. Go Pro to keep practising." } });
+    // Deleting a finished free rep doesn't hand it back.
+    expect((await request(`challenges/lifetime-${id}-0`, subject, "DELETE")).status).toBe(200);
+    expect(await access(subject)).toMatchObject({ available: false, remaining: 0 });
+    expect((await prepare(subject)).status).toBe(402);
+  } finally { bindings.FREE_REPS_LIFETIME = undefined; }
+});

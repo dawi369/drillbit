@@ -25,6 +25,8 @@ export function limits(env: Env, plan: Plan) {
     }
     : {
       repsPerDay: n(env.FREE_REPS_PER_DAY, 3),
+      // A taste, then Pro: this many reps in total, never refilled. Unset keeps the daily allowance above.
+      repsLifetime: Number(env.FREE_REPS_LIFETIME) > 0 ? Number(env.FREE_REPS_LIFETIME) : undefined,
       // Failed and refunded preparations also count here, so this sits above the rep allowance.
       generationsPerDay: 10,
       voiceStartsPerDay: n(env.FREE_VOICE_LIFETIME, 3),
