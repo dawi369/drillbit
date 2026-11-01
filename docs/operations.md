@@ -352,9 +352,9 @@ A Debug build with the DSN, launched with `--sentry-test-feedback`, delivered a 
 
 Bug reports appear in Sentry under User Feedback, or with `sentry issue list t23/drillbit-ios --query "issue.category:feedback"`.
 
-### Feedback screen and paywall views — 1 November 2026 (not deployed)
+### Feedback screen and paywall views — 1 November 2026
 
-The app now records each paywall presentation, which needs migration `0019_paywall_views.sql` and the matching Worker. Neither is deployed yet. Before shipping a build with this change, from `apps/api`:
+The app now records each paywall presentation, which needs migration `0019_paywall_views.sql` and the matching Worker. Both are applied and deployed: development `245f92b4-aed0-4acf-bedb-d5766fd7691b`, production `4ad6ad3a-91ec-491c-988f-bc9283468e23`. Health returns 200 and an unauthenticated `POST /v1/paywall/view` returns 401 in both. The commands, run from `apps/api` (not the repo root):
 
 ```sh
 ./node_modules/.bin/wrangler d1 migrations apply drillbit-development --remote
