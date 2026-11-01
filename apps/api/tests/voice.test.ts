@@ -8,6 +8,8 @@ import type {Env} from '../src/platform';
 const e={...env,VOICE_ENABLED:'true',OPENAI_API_KEY:'test',MANAGED_AI_ENABLED:'true',OPENROUTER_API_KEY:'test',JOBS:{create:async()=>({id:'test'})}} as unknown as Env;
 beforeAll(()=>initializeDatabase(e.DB));
 async function fixture(){const account=await accountFor(e,crypto.randomUUID()),id=crypto.randomUUID();await e.DB.prepare("UPDATE accounts SET status='active' WHERE id=?").bind(account.id).run();await e.DB.prepare("INSERT INTO challenges(id,account_id,lifecycle,data,created_at,available_at) VALUES(?,?,'in_progress',?,'now','now')").bind(id,account.id,JSON.stringify({title:'Queue',prompt:'Design a job queue',topic:'System design'})).run();await e.DB.prepare("INSERT INTO sessions(challenge_id,answer,revision,updated_at) VALUES(?,'Unfinished typed answer',2,'now')").bind(id).run();return {a:account.id,id};}
+/** A fresh provider answer for every start, for tests that start several sessions under one mock. */
+function connections(){return vi.spyOn(globalThis,'fetch').mockImplementation(async()=>new Response(JSON.stringify({session:{id:'live_test'},transport:{sdp:'answer'}}),{status:201}));}
 function connection(){return vi.spyOn(globalThis,'fetch').mockResolvedValue(new Response(JSON.stringify({session:{id:'live_test'},transport:{sdp:'answer'}}),{status:201}));}
 const fragment={id:'event1',sequence:0,speaker:'user',text:'Use a durable queue.',startMs:0,endMs:1000};
 it('reserves one paid voice session, rejects competing starts and preserves drafts',async()=>{const {a,id}=await fixture(),mock=connection();try{const outcomes=await Promise.allSettled([startVoice(e,a,id,crypto.randomUUID(),{sdp:'offer',revision:2}),startVoice(e,a,id,crypto.randomUUID(),{sdp:'offer',revision:2})]);expect(outcomes.filter(r=>r.status==='fulfilled')).toHaveLength(1);expect(mock).toHaveBeenCalledTimes(1);const d=await detail(e,a,id);expect(d.session).toMatchObject({answer:'Unfinished typed answer',revision:2});await expect(requestInterview(e,a,id,crypto.randomUUID(),{kind:'hint',revision:2})).rejects.toMatchObject({code:'voice_active'});await expect(complete(e,a,id,crypto.randomUUID(),'answer',2,await settingsFor(e,a))).rejects.toMatchObject({code:'voice_active'});}finally{mock.mockRestore();}});
@@ -17,7 +19,8 @@ it('failed configuration performs no paid startup',async()=>{const {a,id}=await 
 it('closed sessions cannot delegate new paid work',async()=>{const {a,id}=await fixture(),cmd=crypto.randomUUID(),mock=connection();try{await startVoice(e,a,id,cmd,{sdp:'offer',revision:2});await voiceEvents(e,a,id,cmd,{fragments:[],closed:true,finalized:false});await expect(delegateVoice(e,a,id,cmd,{id:'d1'})).rejects.toMatchObject({code:'inactive'});expect(mock).toHaveBeenCalledTimes(1);}finally{mock.mockRestore();}});
 it('does not activate a session if the question was skipped during provider startup',async()=>{const {a,id}=await fixture(),cmd=crypto.randomUUID();const mock=vi.spyOn(globalThis,'fetch').mockImplementation(async()=>{await e.DB.prepare("UPDATE challenges SET lifecycle='skipped' WHERE id=?").bind(id).run();return new Response(JSON.stringify({session:{id:'live_late'},transport:{sdp:'answer'}}));});try{await expect(startVoice(e,a,id,cmd,{sdp:'offer',revision:2})).rejects.toMatchObject({code:'inactive'});const row=await e.DB.prepare('SELECT status FROM voice_sessions WHERE id=?').bind(cmd).first<any>();expect(row.status).toBe('uncertain');}finally{mock.mockRestore();}});
 
-const free={...e,PRACTICE_GATE:'true'} as Env;
+// The monthly taste is off in production; these tests pin it on where they exercise it.
+const free={...e,PRACTICE_GATE:'true',FREE_VOICE_TASTE_DAYS:'30'} as Env;
 const day=()=>new Date().toISOString().slice(0,10);
 /** Past sessions that reached the provider; the free allowance counts these. */
 async function spentSessions(account:string,challenge:string,n:number,agoDays=0){
@@ -167,28 +170,33 @@ it('pins locally supplied profile into the actual live session instructions',asy
  }finally{mock.mockRestore();}
 });
 
-it('a session counts only once the user speaks: a silent confirmed close is free, and refunds once', async()=>{
+it('a session counts once the user speaks: two silent confirmed closes a day are free, and each refunds once', async()=>{
  const {a,id}=await fixture(), usage=async()=>(await e.DB.prepare("SELECT count FROM usage WHERE account_id=? AND day=? AND kind='voice_start'").bind(a,day()).first<any>())?.count ?? 0;
  const start=async()=>{const cmd=crypto.randomUUID(),mock=connection();try{await startVoice(free,a,id,cmd,{sdp:'offer',revision:2});}finally{mock.mockRestore();}return cmd;};
- // Peek and leave without a word: nothing spent, however many times, even with a duplicated close.
- for(let i=0;i<4;i++){
+ // Peek and leave without a word: nothing spent, twice a day, even with a duplicated close.
+ for(let i=0;i<2;i++){
   const cmd=await start();
   expect(await voiceCapability(free,a)).toMatchObject({remaining:2});
   await Promise.all([voiceEvents(free,a,id,cmd,{fragments:[],closed:true,finalized:true}),voiceEvents(free,a,id,cmd,{fragments:[],closed:true,finalized:true})]);
   expect(await voiceCapability(free,a)).toMatchObject({available:true,remaining:3});
   expect(await usage()).toBe(0);
  }
+ // Silence is billed, so the third silent look counts.
+ const third=await start();
+ await voiceEvents(free,a,id,third,{fragments:[],closed:true,finalized:true});
+ expect(await voiceCapability(free,a)).toMatchObject({remaining:2});
+ expect(await usage()).toBe(1);
  // The interviewer talking alone doesn't count; the user's first words do.
  const spoke=await start();
  await voiceEvents(free,a,id,spoke,{fragments:[{...fragment,id:'s1',speaker:'assistant'},{...fragment,id:'s2',sequence:1}]});
  await voiceEvents(free,a,id,spoke,{fragments:[],closed:true,finalized:true});
- expect(await voiceCapability(free,a)).toMatchObject({remaining:2});
- expect(await usage()).toBe(1);
+ expect(await voiceCapability(free,a)).toMatchObject({remaining:1});
+ expect(await usage()).toBe(2);
  // An unconfirmed close might still have speech in flight, so it keeps counting.
  const lost=await start();
  await voiceEvents(free,a,id,lost,{fragments:[],closed:true,finalized:false});
- expect(await voiceCapability(free,a)).toMatchObject({remaining:1});
- expect(await usage()).toBe(2);
+ expect(await voiceCapability(free,a)).toMatchObject({remaining:0});
+ expect(await usage()).toBe(3);
 });
 
 
@@ -232,4 +240,52 @@ it('Pro voice is metered in minutes: today, the rolling week, and the next sessi
   const trimmed=await startVoice({...pro,PRO_VOICE_MINUTES_PER_DAY:'5'} as Env,third.a,third.id,crypto.randomUUID(),{sdp:'offer',revision:2});
   expect(trimmed.sessionSeconds).toBe(300);
  } finally { mock.mockRestore(); }
+});
+
+it('free voice with the monthly taste off: the three intro sessions are all there is', async()=>{
+ const {a,id}=await fixture(), off={...free,FREE_VOICE_TASTE_DAYS:'0'} as Env;
+ expect(await voiceCapability(off,a)).toMatchObject({available:true,remaining:3,limit:3,kind:'intro'});
+ await spentSessions(a,id,3,40);
+ expect(await voiceCapability(off,a)).toMatchObject({available:false,plan:'free',remaining:0,limit:3,kind:'intro',reason:'That’s your free voice sessions. Pro has voice any time.'});
+ expect(await voiceCapability(off,a)).not.toHaveProperty('resetsAt');
+ await expect(startVoice(off,a,id,crypto.randomUUID(),{sdp:'offer',revision:2})).rejects.toMatchObject({code:'voice_gate',status:402});
+});
+
+it('only two silent sessions a day are free; after that a silent session counts', async()=>{
+ const {a,id}=await fixture(), mock=connections(), ids:string[]=[];
+ try {
+  for(let i=0;i<3;i++){
+   const cmd=crypto.randomUUID(); ids.push(cmd);
+   await startVoice(e,a,id,cmd,{sdp:'offer',revision:2});
+   await voiceEvents(e,a,id,cmd,{fragments:[],closed:true,finalized:true,usageSeconds:170});
+  }
+ } finally { mock.mockRestore(); }
+ const rows=await e.DB.prepare("SELECT id,waived FROM voice_sessions WHERE account_id=? ORDER BY created_at").bind(a).all<{id:string;waived:number}>();
+ expect(rows.results.map(r=>r.waived)).toEqual([1,1,0]);
+ expect((await e.DB.prepare("SELECT count FROM usage WHERE account_id=? AND day=? AND kind='voice_start'").bind(a,day()).first<{count:number}>())!.count).toBe(1);
+ // A repeated close for an already-counted session doesn't flip it.
+ await voiceEvents(e,a,id,ids[2],{fragments:[],closed:true,finalized:true,usageSeconds:170});
+ expect((await e.DB.prepare("SELECT waived FROM voice_sessions WHERE id=?").bind(ids[2]).first<{waived:number}>())!.waived).toBe(0);
+});
+
+it('counts at least the time from start to close, never more than the session cap', async()=>{
+ const {a,id}=await fixture(), mock=connections(), sessions:string[]=[];
+ try { for(let i=0;i<3;i++){ const cmd=crypto.randomUUID(); sessions.push(cmd); await startVoice(e,a,id,cmd,{sdp:'offer',revision:2}); await e.DB.prepare("UPDATE voice_sessions SET status='uncertain' WHERE id=?").bind(cmd).run(); } }
+ finally { mock.mockRestore(); }
+ const shift=async(sid:string,agoSeconds:number)=>{const at=Date.now()-agoSeconds*1000;await e.DB.prepare("UPDATE voice_sessions SET status='active',created_at=?,expires_at=? WHERE id=?").bind(new Date(at).toISOString(),new Date(at+(20*60+30)*1000).toISOString(),sid).run();};
+ const said=(n:number)=>({...fragment,id:'said'+n});
+ const used=async(sid:string)=>(await e.DB.prepare("SELECT usage_seconds u FROM voice_sessions WHERE id=?").bind(sid).first<{u:number}>())!.u;
+ // Ten minutes open, one second reported: ten minutes count.
+ await shift(sessions[0],600);
+ await voiceEvents(e,a,id,sessions[0],{fragments:[said(0)],closed:true,finalized:true,usageSeconds:1});
+ expect(await used(sessions[0])).toBeGreaterThanOrEqual(599);
+ expect(await used(sessions[0])).toBeLessThan(610);
+ // A close long after the end counts the cap, not the hours in between.
+ await shift(sessions[1],7200);
+ await voiceEvents(e,a,id,sessions[1],{fragments:[said(1)],closed:true,finalized:true,usageSeconds:1});
+ expect(await used(sessions[1])).toBeCloseTo(1200,0);
+ // An honest report above the elapsed time stands.
+ await shift(sessions[2],30);
+ await voiceEvents(e,a,id,sessions[2],{fragments:[said(2)],closed:true,finalized:true,usageSeconds:90});
+ expect(await used(sessions[2])).toBe(90);
 });

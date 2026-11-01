@@ -243,12 +243,12 @@ struct VoiceCapability: Codable, Sendable {
     guard let date = Date.fromAPI(checkedAt) else { return false }
     return (0..<60).contains(now.timeIntervalSince(date))
   }
-  /// What a free account sees under Start: the intro count, the weekly taste, or when it's back. Nothing on Pro.
+  /// What a free account sees under Start: the intro count, the taste (if the server offers one), or when it's back. Nothing on Pro.
   func allowanceLine(timeZone: TimeZone = .current, locale: Locale = .current, now: Date = Date()) -> String? {
     guard let remaining, let limit else { return nil }
     if kind == "taste" {
-      if remaining > 0 { return "Your free voice session this week is ready." }
-      guard let back = resetsAt.flatMap(Date.fromAPI) else { return "Your free voice session comes back next week." }
+      if remaining > 0 { return "Your free voice session is ready." }
+      guard let back = resetsAt.flatMap(Date.fromAPI) else { return "Your free voice session comes back soon. Pro has it any time." }
       var calendar = Calendar(identifier: .gregorian)
       calendar.timeZone = timeZone
       var style = Date.FormatStyle(date: .omitted, time: .omitted, locale: locale).weekday(.wide)
@@ -259,7 +259,7 @@ struct VoiceCapability: Codable, Sendable {
     }
     switch remaining {
     case 0: return nil
-    case 1: return "Last free voice session. After this, one a week."
+    case 1: return "Last free voice session. Make it count."
     case limit: return "\(limit) free voice sessions to start."
     default: return "\(remaining) of \(limit) free voice sessions left."
     }

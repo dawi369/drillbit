@@ -137,7 +137,7 @@ Keep "fair use applies" next to "as much as you like": Pro has fair-use caps (10
 >
 > Subscriptions: free accounts get two questions in total. To reach the paywall, use Settings → See Pro, or finish two questions. Restore Purchases is on the paywall (Settings → See Pro).
 >
-> Voice: open a question and tap Talk, then tap the microphone to unmute. Microphone permission is requested then. Free accounts get 3 voice sessions.
+> Voice: open a question and tap Talk, then tap the microphone to unmute. Microphone permission is requested then. Free accounts get 3 short voice sessions.
 >
 > Account deletion: Settings → Delete account.
 >
@@ -175,7 +175,7 @@ Version 1.0 → choose the build → attach both subscriptions → add the revie
 ## Known limits (documented, not blockers)
 
 - AI consent is stored on the device, not the account. A new device or reinstall asks again, even when the sign-in session survives; that's deliberate.
-- Voice sessions can't be closed from the server; the client deadline and event rejection bound cost to the session cap.
+- Voice sessions can't be closed from the server; the client deadline and event rejection bound cost to the session cap. A close counts at least the time since start, but a modified app that closes early while keeping the provider connection open isn't caught (paywall-plan.md section 14).
 - A refund or revocation takes effect when Apple's notification arrives; until then the user keeps Pro.
 
 ## Test evidence

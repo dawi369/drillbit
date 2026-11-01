@@ -32,6 +32,7 @@ async function sessionFor(env:Env, account:string, challenge:string, id:string) 
  if(!s) throw new Fault('not_found',404,'Voice session not found.');
  return s;
 }
+const VOICE_FREE_LOOKS_PER_DAY = 2;
 // A start that never produced a provider session costs nothing, so it doesn't count.
 async function refundVoiceStart(env: Env, account: string, day: string) {
  await env.DB.prepare("UPDATE usage SET count=count-1 WHERE account_id=? AND day=? AND kind='voice_start' AND count>0").bind(account, day).run();
@@ -81,6 +82,8 @@ export async function voiceCapability(env: Env, account: string) {
   const remaining = caps.voiceFreeLifetime - used;
   return { available: true, plan, checkedAt, sessionSeconds, remaining, limit: caps.voiceFreeLifetime, kind: 'intro' as const };
  }
+ if (!caps.voiceTasteDays)
+  return { available: false, plan, reason: 'That’s your free voice sessions. Pro has voice any time.', checkedAt, sessionSeconds, remaining: 0, limit: caps.voiceFreeLifetime, kind: 'intro' as const };
  const nextAt = history?.last ? new Date(Date.parse(history.last) + caps.voiceTasteDays * 86_400_000).toISOString() : checkedAt;
  if (nextAt > checkedAt)
   return { available: false, plan, reason: `Your next free voice session comes back ${comesBack(nextAt, checkedAt)}. Pro has it any time.`, checkedAt, sessionSeconds, remaining: 0, limit: 1, resetsAt: nextAt, kind: 'taste' as const };
@@ -157,12 +160,16 @@ export async function voiceEvents(env:Env,account:string,challenge:string,id:str
   const saved=await env.DB.prepare('SELECT * FROM voice_fragments WHERE session_id=? AND id=?').bind(id,f.id).first<any>();
   if(!saved||saved.text!==f.text||saved.sequence!==f.sequence||saved.speaker!==f.speaker||saved.start_ms!==f.startMs||saved.end_ms!==f.endMs)throw new Fault('voice_event_conflict',409,'The transcript changed or the interview ended before saving.');
  }
- if(input.closed) await env.DB.prepare("UPDATE voice_sessions SET status=?,finalized=MAX(finalized,?),usage_seconds=MAX(COALESCE(usage_seconds,0),?) WHERE id=? AND account_id=?").bind(input.finalized?'closed':'uncertain',input.finalized?1:0,input.usageSeconds??0,id,account).run();
+ // The app reports billed seconds, but never less than the time from start to this close (up to the session's cap)
+ // is counted, so an under-report can't stretch the daily and weekly minutes.
+ if(input.closed) await env.DB.prepare("UPDATE voice_sessions SET status=?,finalized=MAX(finalized,?),usage_seconds=MAX(COALESCE(usage_seconds,0),?,MAX(0,MIN((julianday(?)-julianday(created_at))*86400,(julianday(expires_at)-julianday(created_at))*86400-30))) WHERE id=? AND account_id=?").bind(input.finalized?'closed':'uncertain',input.finalized?1:0,input.usageSeconds??0,timestamp(),id,account).run();
  // A confirmed close before the user said a word is a free look: it gives the start back, so switching between voice
- // and text costs nothing. Unconfirmed closes still count, since more speech could yet arrive.
+ // and text costs nothing. Unconfirmed closes still count, since more speech could yet arrive. Silence is billed, so
+ // only VOICE_FREE_LOOKS_PER_DAY looks a day are free; after that a silent session counts like any other.
  if(input.closed&&input.finalized){
-  const waived=await env.DB.prepare("UPDATE voice_sessions SET waived=1 WHERE id=? AND account_id=? AND waived=0 AND status='closed' AND provider_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM voice_fragments WHERE session_id=? AND speaker='user')").bind(id,account,id).run();
-  if(waived.meta.changes) await refundVoiceStart(env,account,String(s.created_at).slice(0,10));
+  const day=String(s.created_at).slice(0,10);
+  const waived=await env.DB.prepare("UPDATE voice_sessions SET waived=1 WHERE id=? AND account_id=? AND waived=0 AND status='closed' AND provider_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM voice_fragments WHERE session_id=? AND speaker='user') AND (SELECT COUNT(*) FROM voice_sessions WHERE account_id=? AND waived=1 AND substr(created_at,1,10)=?)<?").bind(id,account,id,account,day,VOICE_FREE_LOOKS_PER_DAY).run();
+  if(waived.meta.changes) await refundVoiceStart(env,account,day);
  }
  return {accepted:input.fragments.map(f=>f.id)};
 }

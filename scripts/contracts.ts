@@ -259,7 +259,7 @@ for (const [method, path, summary, schema] of operations) {
       "429": { description: "Usage limit reached", content: json("Error") },
       ...(["post challenges", "post jobs/{id}/retry", "post questions/{id}/start", "post challenges/{id}/retry-moment/{turn}"].includes(method + " " + path)
         ? {
-          "402": { description: "Free rep already used; code practice_gate. Bootstrap practice.nextFreeRepAt says when it returns. A free rep skipped or swapped away before its second message doesn't count.", content: json("Error") },
+          "402": { description: "Free rep already used; code practice_gate. Bootstrap practice.nextFreeRepAt says when it returns. A free rep skipped or swapped away before the user's first message doesn't count.", content: json("Error") },
         }
         : {}),
       // Retrying a failed preparation finishes a rep already started, so it isn't checked.

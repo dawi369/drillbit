@@ -129,9 +129,9 @@ struct InterviewTests {
     var two = intro; two.remaining = 2
     #expect(two.allowanceLine(locale: locale) == "2 of 3 free voice sessions left.")
     var last = intro; last.remaining = 1
-    #expect(last.allowanceLine(locale: locale) == "Last free voice session. After this, one a week.")
+    #expect(last.allowanceLine(locale: locale) == "Last free voice session. Make it count.")
     let taste = VoiceCapability(available: true, plan: "free", checkedAt: "2026-09-12T10:00:00.000Z", sessionSeconds: 180, remaining: 1, limit: 1, kind: "taste")
-    #expect(taste.allowanceLine(locale: locale) == "Your free voice session this week is ready.")
+    #expect(taste.allowanceLine(locale: locale) == "Your free voice session is ready.")
     let now = Date.fromAPI("2026-09-12T10:00:00.000Z")!
     var waiting = taste; waiting.available = false; waiting.remaining = 0; waiting.resetsAt = "2026-09-17T09:00:00.000Z"
     #expect(waiting.allowanceLine(timeZone: TimeZone(identifier: "Europe/Oslo")!, locale: locale, now: now) == "Your free voice session comes back Thursday. Pro has it any time.")

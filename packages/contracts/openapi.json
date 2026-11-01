@@ -1684,7 +1684,7 @@
             }
           },
           "402": {
-            "description": "Free rep already used; code practice_gate. Bootstrap practice.nextFreeRepAt says when it returns. A free rep skipped or swapped away before its second message doesn't count.",
+            "description": "Free rep already used; code practice_gate. Bootstrap practice.nextFreeRepAt says when it returns. A free rep skipped or swapped away before the user's first message doesn't count.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2220,7 +2220,7 @@
             }
           },
           "402": {
-            "description": "Free rep already used; code practice_gate. Bootstrap practice.nextFreeRepAt says when it returns. A free rep skipped or swapped away before its second message doesn't count.",
+            "description": "Free rep already used; code practice_gate. Bootstrap practice.nextFreeRepAt says when it returns. A free rep skipped or swapped away before the user's first message doesn't count.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3365,7 +3365,7 @@
             }
           },
           "402": {
-            "description": "Free rep already used; code practice_gate. Bootstrap practice.nextFreeRepAt says when it returns. A free rep skipped or swapped away before its second message doesn't count.",
+            "description": "Free rep already used; code practice_gate. Bootstrap practice.nextFreeRepAt says when it returns. A free rep skipped or swapped away before the user's first message doesn't count.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5170,7 +5170,7 @@
             }
           },
           "402": {
-            "description": "Free rep already used; code practice_gate. Bootstrap practice.nextFreeRepAt says when it returns. A free rep skipped or swapped away before its second message doesn't count.",
+            "description": "Free rep already used; code practice_gate. Bootstrap practice.nextFreeRepAt says when it returns. A free rep skipped or swapped away before the user's first message doesn't count.",
             "content": {
               "application/json": {
                 "schema": {

@@ -253,27 +253,23 @@ async function messages(account: string, challenge: string, typed: number, spoke
 }
 const skip = (subject: string, challenge: string) => request(`challenges/${challenge}/skip`, subject, "POST");
 
-it("gives a free rep back when it's skipped before its second message, typed or spoken", async () => {
+it("gives a free rep back only when it's skipped before the user's first message, typed or spoken", async () => {
   const { subject, id } = await person();
   bindings.FREE_REPS_LIFETIME = "2";
   try {
     const untouched = await readyQuestion(id, { freeRepAt: new Date(Date.now() - 4000).toISOString() });
     expect((await access(subject)).remaining).toBe(1);
     expect((await skip(subject, untouched)).status).toBe(200);
-    const oneLine = await readyQuestion(id, { freeRepAt: new Date(Date.now() - 3000).toISOString() });
-    await messages(id, oneLine, 1);
-    expect((await access(subject)).remaining).toBe(1);
-    expect((await skip(subject, oneLine)).status).toBe(200);
     expect(await access(subject)).toMatchObject({ available: true, remaining: 2 });
 
-    // Two messages make it a rep, even skipped: one typed and one spoken here.
-    const used = await readyQuestion(id, { freeRepAt: new Date(Date.now() - 2000).toISOString() });
-    await messages(id, used, 1, 1);
-    await skip(subject, used);
+    // One typed message already earned an interviewer reply, so the rep is spent even skipped.
+    const oneLine = await readyQuestion(id, { freeRepAt: new Date(Date.now() - 3000).toISOString() });
+    await messages(id, oneLine, 1);
+    await skip(subject, oneLine);
     expect((await access(subject)).remaining).toBe(1);
-    // Speaking alone counts each utterance.
+    // So is one spoken utterance; the interviewer talking alone doesn't count.
     const spoken = await readyQuestion(id, { freeRepAt: new Date(Date.now() - 1000).toISOString() });
-    await messages(id, spoken, 0, 2);
+    await messages(id, spoken, 0, 1);
     await skip(subject, spoken);
     expect((await access(subject)).remaining).toBe(0);
     expect((await prepare(subject)).status).toBe(402);

@@ -20,14 +20,15 @@ const rep = (turns: number, help: number) => (COST.question + turns * COST.turn 
 const FIXED_PER_MONTH = 99 / 12 + 5; // Apple Developer, Cloudflare Workers Paid. Clerk is free below 50,000 retained users.
 
 // ── Limits (production wrangler vars) ────────────────────────────────────────────────────────────────────
-const FREE = { reps: 2, turns: 8, help: 2, introSessions: 3, sessionMinutes: 3, tastesPerYear: 11 };
+const FREE = { reps: 2, turns: 8, help: 2, introSessions: 3, sessionMinutes: 3, tastesPerYear: 0 };
 // repsPerDay counts reps practised (second message sent); question writing has its own guard of 20 a day.
 const PRO = { repsPerDay: 10, sessionMinutes: 20, minutesPerDay: 60, minutesPerWeek: 75 };
 // A rolling 7-day cap allows up to five full weeks' worth inside a 30-day month (100 min on days 1, 8, 15, 22, 29).
 const PRO_MAX_MINUTES_30_DAYS = 5 * PRO.minutesPerWeek;
 
 // ── Expected behaviour (assumptions until real numbers arrive) ───────────────────────────────────────────
-// tasteReturners: non-payers who come back for the 3-minute voice taste every 30 days, through the first year.
+// tasteReturners: non-payers who come back for the 3-minute voice taste every 30 days, through the first year
+// (production turned the taste off on 1 November: FREE_VOICE_TASTE_DAYS=0, so FREE.tastesPerYear is 0).
 const FUNNEL = { rep1: 0.6, rep2: 0.35, triesVoice: 0.4, freeVoiceMinutes: 5, unopenedQuestion: 0.15, tasteReturners: 0.05 };
 // Pro usage per month by segment. A "mock" is about 20 minutes of voice (one session at the cap).
 const SEGMENT = {

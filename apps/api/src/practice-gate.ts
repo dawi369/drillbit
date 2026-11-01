@@ -8,13 +8,16 @@ export async function onFreeReps(env: Env, account: string) {
 }
 
 /**
- * When a rep became practice: the time of the user's second message, typed (answer or question) or spoken (each
- * utterance; it takes its voice session's start time). NULL until then. `c` is the challenges alias around it.
+ * The time of the user's `n`th message (1-based) on a rep, typed (answer or question) or spoken (each utterance; it
+ * takes its voice session's start time). NULL until then. `c` is the challenges alias around it.
  */
-export const practisedAt = (c: string) =>
-  `(SELECT ts FROM (SELECT t.created_at ts,t.ordinal o,0 s FROM interview_turns t WHERE t.challenge_id=${c}.id AND t.kind IN ('answer','clarification') UNION ALL SELECT t.created_at,t.ordinal,f.sequence FROM voice_fragments f JOIN interview_turns t ON t.id=f.session_id WHERE t.challenge_id=${c}.id AND f.speaker='user') ORDER BY o,s LIMIT 1 OFFSET 1)`;
-/** A rep skipped, or swapped away, before its second message was never used, so it doesn't count. */
-export const abandonedUnused = (c: string) => `(${c}.lifecycle IN ('skipped','expired') AND ${practisedAt(c)} IS NULL)`;
+const userMessageAt = (c: string, n: number) =>
+  `(SELECT ts FROM (SELECT t.created_at ts,t.ordinal o,0 s FROM interview_turns t WHERE t.challenge_id=${c}.id AND t.kind IN ('answer','clarification') UNION ALL SELECT t.created_at,t.ordinal,f.sequence FROM voice_fragments f JOIN interview_turns t ON t.id=f.session_id WHERE t.challenge_id=${c}.id AND f.speaker='user') ORDER BY o,s LIMIT 1 OFFSET ${n - 1})`;
+/** When a rep became practice for Pro's daily count: its second message. */
+export const practisedAt = (c: string) => userMessageAt(c, 2);
+/** A free rep skipped, or swapped away, before the user said anything was never used, so it doesn't count. One
+ * message already earned an interviewer reply, so from then on the rep is spent. */
+export const abandonedUnused = (c: string) => `(${c}.lifecycle IN ('skipped','expired') AND ${userMessageAt(c, 1)} IS NULL)`;
 
 /** Reps spent since `since`: questions prepared as free reps (unless abandoned unused), preparations still running,
  * and reps whose question was later deleted. A swap shares its stamp, so it counts once. */

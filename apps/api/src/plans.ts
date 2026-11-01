@@ -37,7 +37,8 @@ export function limits(env: Env, plan: Plan) {
       voiceSecondsPerWeek: Infinity,
       voiceReasoningPerDay: 40,
       voiceFreeLifetime: n(env.FREE_VOICE_LIFETIME, 3),
-      voiceTasteDays: n(env.FREE_VOICE_TASTE_DAYS, 30),
+      // 0 turns the taste off: the intro sessions are all the free voice there is.
+      voiceTasteDays: env.FREE_VOICE_TASTE_DAYS === "0" ? 0 : n(env.FREE_VOICE_TASTE_DAYS, 30),
       dailyQuestion: false,
     };
 }

@@ -261,3 +261,19 @@ Findings, ranked:
 4. **The free monthly taste** is the only free cost without an end.
 5. **The refund rule** lets a free user take one interviewer reply per question, then skip, up to ten times a day.
 6. **Smaller items:** cap the intro week's voice at 20 minutes (+$1.48 per subscriber); price EU/UK and large student markets for their actual proceeds and buying power; enrol in the Small Business Program (worth about $8 per subscriber).
+
+## 14. Decided 1 November, after the review
+
+| | Decision | Where |
+|---|---|---|
+| Free voice | **The 3 intro sessions only.** The monthly taste is off: after the intro sessions, voice is Pro. | `FREE_VOICE_TASTE_DAYS=0` (0 turns it off) |
+| Free refunds | A free rep comes back only if it's skipped or swapped away **before the user's first message**. One message already earned an interviewer reply. | `abandonedUnused` in `practice-gate.ts` |
+| Silent voice | **Two silent sessions a day are free**, and each refunds its start. After that a silent session counts like any other, because silence is billed. | `VOICE_FREE_LOOKS_PER_DAY` in `voice.ts` |
+| Voice minutes | A close counts **at least the time from start to close**, up to the session's cap, whatever the app reports. | `voiceEvents` in `voice.ts` |
+| Weekly plan | **Kept** ($7.99, first week $1.99), against the reviewers' advice. See below. | App Store Connect |
+
+**Weekly, kept.** Apple allows weekly plans and intro prices, and plenty of top-grossing apps use them. Apple is the merchant of record and handles cancellation, refunds and renewal notices, which covers most of what the EU and UK subscription rules ask of the seller (not legal advice). The real risks are App Review's price-display rules and refund requests or one-star reviews from people surprised by the renewal. The paywall already leads with the full weekly price, and the intro reads "Try a week for $1.99, then $7.99 a week". Watch the refund rate and review mentions of "charged" in the first weeks. If either climbs, add a monthly plan next to weekly, which needs no migration.
+
+With these changes (VAT included, no free taste), the expected 6% gives **+$1,254 per 1,000 downloads at Apple 15% and +$787 at 30%**. Break-even is 0.3% and 0.5%; it's 2.2% and 3.3% if every non-payer used every free voice minute.
+
+**Known limit.** The server can't end a provider voice session. A modified app could close early in Drillbit's records and keep talking to the provider. Each start is still bounded by the provider's own session length and by 20 starts a day. Closing this needs a server-side hang-up or a provider-enforced session length, if the provider offers one.

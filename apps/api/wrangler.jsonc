@@ -20,7 +20,7 @@
     "SUPPORT_EMAIL": "support@t23.dev",
     "FREE_REPS_PER_DAY": "3",
     "FREE_VOICE_LIFETIME": "3",
-    "FREE_VOICE_TASTE_DAYS": "30",
+    "FREE_VOICE_TASTE_DAYS": "0",
     "FREE_VOICE_SESSION_MINUTES": "3",
     // Reps practised (second message sent) per UTC day, and questions written per day, rerolls included.
     "PRO_REPS_PER_DAY": "10",
@@ -77,7 +77,7 @@
         // Two free reps in total, then Pro (31 Oct): the first is onboarding, the second comes after exploring the app.
         "FREE_REPS_LIFETIME": "2",
         "FREE_VOICE_LIFETIME": "3",
-        "FREE_VOICE_TASTE_DAYS": "30",
+        "FREE_VOICE_TASTE_DAYS": "0",
         "FREE_VOICE_SESSION_MINUTES": "3",
         // Reps practised (second message sent) per UTC day, and questions written per day, rerolls included.
         "PRO_REPS_PER_DAY": "10",
