@@ -83,6 +83,7 @@ Match `apps/ios/Drillbit/PrivacyInfo.xcprivacy`. Tracking: **No**. For every typ
 | Diagnostics | Crash Data | Sentry crash reports. **Linked: No** |
 | Diagnostics | Performance Data | Sentry app-hang reports. **Linked: No** |
 | Diagnostics | Other Diagnostic Data | Device model, OS and app version on Sentry reports. **Linked: No** |
+| User Content | Customer Support | Bug reports typed in Settings → Feedback, sent to Sentry. **Linked: No** |
 
 Privacy Policy URL: `https://<prod-host>/privacy`.
 

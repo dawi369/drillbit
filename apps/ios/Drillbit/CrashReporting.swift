@@ -39,6 +39,8 @@ enum CrashReporting {
         return event
       }
     }
+    // An empty user stops the SDK filling in its per-install id on reports that skip beforeSend (bug reports).
+    SentrySDK.configureScope { scope in scope.setUser(User()) }
   }
 
   /// System and network breadcrumbs only; taps and console lines can carry on-screen or practice text.
@@ -56,6 +58,14 @@ enum CrashReporting {
   static func sendTest() -> Bool {
     guard SentrySDK.isEnabled else { return false }
     SentrySDK.capture(message: "Test report from Settings → Developer")
+    return true
+  }
+
+  /// Settings → Feedback → Report a bug. Not tied to any error and no screenshot; false when Sentry is off.
+  static func sendBugReport(_ report: String, doing: String) -> Bool {
+    guard SentrySDK.isEnabled else { return false }
+    let message = doing.isEmpty ? report : "\(report)\n\nWhat I was doing: \(doing)"
+    SentrySDK.capture(feedback: SentryFeedback(message: String(message.prefix(4000)), name: nil, email: nil, source: .custom))
     return true
   }
 

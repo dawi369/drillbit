@@ -638,6 +638,33 @@ final class AuditScreenshots: XCTestCase {
     shot("o06-voice-note-too-short", app)
   }
 
+  /// Settings → Feedback → Report a bug: type it, send it (fixtures don't reach Sentry), thank-you.
+  func testWalkP_BugReport() throws {
+    continueAfterFailure = false
+    let app = launch(["--fixtures", "--fixture-settings"])
+    XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 10))
+    let row = app.buttons["settingsBugReport"]
+    for _ in 0..<8 where !row.exists || !row.isHittable { app.swipeUp() }
+    Thread.sleep(forTimeInterval: 0.6)
+    shot("p01-settings-feedback", app)
+    row.tap()
+    let what = app.textViews["bugReportWhat"].exists ? app.textViews["bugReportWhat"] : app.textFields["bugReportWhat"]
+    XCTAssertTrue(what.waitForExistence(timeout: 3))
+    XCTAssertFalse(app.buttons["bugReportSend"].isEnabled)
+    Thread.sleep(forTimeInterval: 0.8)
+    shot("p02-bug-report", app)
+    what.tap()
+    what.typeText("Tapped Finish and the sheet closed without feedback.")
+    let doing = app.textViews["bugReportDoing"].exists ? app.textViews["bugReportDoing"] : app.textFields["bugReportDoing"]
+    doing.tap()
+    doing.typeText("Mock interview, in text")
+    shot("p03-bug-report-filled", app)
+    app.buttons["bugReportSend"].tap()
+    XCTAssertTrue(app.staticTexts["Got it. Thank you."].waitForExistence(timeout: 3))
+    Thread.sleep(forTimeInterval: 0.8)
+    shot("p04-bug-report-sent", app)
+  }
+
   // MARK: Finish pass — the first two weeks, as far as fixtures reach.
 
   /// Day 2: a thin answer. Day 3: resume yesterday's draft, finish, then try to prepare another question while one is open.

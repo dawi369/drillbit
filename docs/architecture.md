@@ -680,5 +680,10 @@ Two Sentry projects in the t23 org (EU data region): `drillbit-ios` and `drillbi
   - The DSN is the `SENTRY_DSN` secret, and `SENTRY_ENVIRONMENT` tags the environment. Without the DSN (tests, local dev) Sentry is off.
   - Tests pre-bundle `@sentry/cloudflare` (`deps.optimizer.ssr` in `vitest.config.ts`). Loaded module by module, it overwhelms the test pool's module server.
 - **Sentry project settings:** IP scrubbing, the default data scrubber, and a relay rule removing `$user.geo`.
+- **Bug reports.** Settings → Feedback → "Report a bug" (`BugReportView`) sends Sentry user feedback: "What went wrong?" plus an optional "What were you doing?", capped at 4,000 characters, with source `custom`.
+  - Reports are deliberately not tied to any error or crash, carry no screenshot, and have no name or email.
+  - Feedback skips `beforeSend`, so `CrashReporting.start` sets an empty scope user. Without it the SDK would fill in its per-install id. The relay rule removes the location.
+  - The App Privacy answers list Customer Support, not linked. Debug builds accept `--sentry-test-feedback`.
+  - If Sentry is off in a build, the form says it can't send. Fixtures act as if it went through.
 
 `bun scripts/metrics.ts [--days N] [--sandbox] [--development]` prints the launch numbers from D1 as aggregates only: the funnel, day-35 conversion, plan mix, weekly intro drop-off, voice minutes per plan (median, p90, max), refunds, free silent sessions, cap hits, AI cost and voice notes.

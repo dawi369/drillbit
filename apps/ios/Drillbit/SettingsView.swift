@@ -11,6 +11,7 @@ struct SettingsView: View {
   @State private var saving = false
   @State private var reminderPermissionPending = false
   @State private var recordingVoiceNote = false
+  @State private var reportingBug = false
   @AppStorage("appearance") private var appearance = "dark"
   private var time: Binding<Date> {
     Binding(
@@ -140,6 +141,11 @@ struct SettingsView: View {
         DeveloperSettingsSection(model: model, appearance: $appearance, dismiss: { dismiss() })
       }
       Section {
+        Button { reportingBug = true } label: {
+          Label("Report a bug", systemImage: "ladybug")
+        }
+        .accessibilityIdentifier("settingsBugReport")
+        .sheet(isPresented: $reportingBug) { BugReportView(model: model) }
         Button { recordingVoiceNote = true } label: {
           Label("Send me a voice note", systemImage: "waveform")
         }
@@ -148,7 +154,7 @@ struct SettingsView: View {
       } header: {
         Text("Feedback")
       } footer: {
-        Text("Tell me what’s broken or what you’d love. Voice only, two minutes, straight to the person building this.")
+        Text("Something broken? Write it up. Want to tell me how it feels? Send a voice note. Both go straight to the person building this.")
       }
       Section {
         Link("Terms of Use", destination: LegalLinks.terms).accessibilityIdentifier("settingsTerms")

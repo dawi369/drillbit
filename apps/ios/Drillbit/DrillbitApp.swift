@@ -61,6 +61,9 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
       #if DEBUG
         // Proves a build with a DSN reports, without signing in: launch with --sentry-test-event.
         if ProcessInfo.processInfo.arguments.contains("--sentry-test-event") { _ = CrashReporting.sendTest() }
+        if ProcessInfo.processInfo.arguments.contains("--sentry-test-feedback") {
+          _ = CrashReporting.sendBugReport("Test bug report from a launch argument", doing: "Checking what Sentry stores")
+        }
       #endif
       let appModel = AppModel(
         container: container,
