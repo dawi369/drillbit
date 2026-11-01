@@ -32,6 +32,8 @@ struct InterviewView: View {
   @State private var confirmFinish = false
   /// Set the moment Finish is confirmed: the rep-done moment shows while the save runs underneath.
   @State private var wrappingUp = false
+  /// After the rep-done moment: the feedback for the finished rep.
+  @State private var showingFeedback = false
   @State private var confirmSkip = false
   @State private var reading = InterviewReadingState()
   @State private var arrivingAnswerID: String?
@@ -144,7 +146,11 @@ struct InterviewView: View {
   private var showsDraft: Bool { interview.loaded && !waitingForAnswer && interview.outgoing == nil && !interview.state.wrapUp && exchanges.last?.hasAnswer == false && !acceptedPending }
   var body: some View {
     ZStack {
-      if wrappingUp || interview.finished != nil {
+      if showingFeedback, let finished = interview.finished {
+        ReflectionView(model: model, initial: finished, onLeave: { exit in leftFeedback(exit, finished) })
+          .transition(.opacity)
+      }
+      else if wrappingUp || interview.finished != nil {
         RepDoneMoment().transition(.opacity)
           .task { await handBack() }
       }
@@ -160,6 +166,7 @@ struct InterviewView: View {
       else { workspace.transition(.opacity) }
     }
     .animation(reduceMotion ? nil : DrillbitMotion.page, value: wrappingUp || interview.finished != nil)
+    .animation(reduceMotion ? nil : DrillbitMotion.page, value: showingFeedback)
     .animation(reduceMotion ? nil : DrillbitMotion.page, value: showingVoiceRoom)
     .sensoryFeedback(.impact(weight: .light), trigger: acceptedAnswerID) { _, accepted in accepted != nil }
     .sensoryFeedback(.success, trigger: wrappingUp)  { before, now in !before && now }
@@ -607,7 +614,7 @@ struct InterviewView: View {
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("coveredOffer")
   }
-  /// Holds the moment long enough to read, then hands back to Home once the rep is saved. A failed save drops
+  /// Holds the moment long enough to read, then shows the rep's feedback once it's saved. A failed save drops
   /// the moment and leaves the interview open with its error, so nothing is lost.
   private func handBack() async {
     let shown = Date()
@@ -616,9 +623,17 @@ struct InterviewView: View {
     if interview.finished == nil { wrappingUp = false; return }
     let hold = (reduceMotion ? 1.2 : 1.8) - Date().timeIntervalSince(shown)
     if hold > 0 { try? await Task.sleep(for: .seconds(hold)) }
-    model.presented = nil
-    await model.completeOnboarding()
-    await model.refresh()
+    // Rep counts and the free-rep line under the feedback come from a fresh bootstrap. It runs on its own
+    // task: showing the feedback removes the moment, which cancels this one.
+    Task { await model.refresh() }
+    showingFeedback = true
+  }
+  /// Out of the feedback: onboarding ends here (not mid-screen), and a first free rep may be followed by Pro.
+  private func leftFeedback(_ exit: ReflectionExit, _ finished: Challenge) {
+    Task {
+      await model.completeOnboarding()
+      if exit != .newRep { await model.offerProAfterFirstRep(finished) }
+    }
   }
   private func leaveVoiceRoom() {
     // An opening that hasn't reached `start` yet must not bring the room back once they've left it.

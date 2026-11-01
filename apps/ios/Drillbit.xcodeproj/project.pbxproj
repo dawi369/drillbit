@@ -22,6 +22,7 @@
 		22EAA8C50206081D7F3562EA /* Literata.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 366045A34DEB9127B61D057D /* Literata.ttf */; };
 		25B42E211757613F3057B1B9 /* StoreScreenshots.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88E8FF3B4DEF6FBC2AC4EF69 /* StoreScreenshots.swift */; };
 		2657C9E9ADBD72C612B2A458 /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F9D42BA7EF7B514FEACC7F6 /* SetupView.swift */; };
+		270C5C16578703F9ECA76590 /* Milestone.swift in Sources */ = {isa = PBXBuildFile; fileRef = F94688D7E4DFDC73EF7F298E /* Milestone.swift */; };
 		2BCD05DC191DB1D3AC6E50FD /* SharedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8049B9471B01CBFBD8C80764 /* SharedStore.swift */; };
 		2C57626CC9CE91B722872E1D /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7437833C09799CF7937BCDD7 /* RootView.swift */; };
 		38084B68C426518EDAE4F208 /* InterviewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44C89C686607D2F20377EADE /* InterviewTests.swift */; };
@@ -184,6 +185,7 @@
 		EF24F5F233F85813B521B540 /* DrillbitUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = DrillbitUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F69DED8C37D39A2D21CC2A84 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F7FE2F3D17D6A2010A948002 /* HelpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpView.swift; sourceTree = "<group>"; };
+		F94688D7E4DFDC73EF7F298E /* Milestone.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Milestone.swift; sourceTree = "<group>"; };
 		F9624E6CA36440EB607B8DDD /* VoiceNoteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceNoteView.swift; sourceTree = "<group>"; };
 		FD1F1245F3B3C8AA845AD3BA /* PlanPricing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanPricing.swift; sourceTree = "<group>"; };
 		FDE151C29EEC1990D2C7E840 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
@@ -264,6 +266,7 @@
 				78B4C37DAB3D173EEED7DB7B /* LibraryHome.swift */,
 				4D561B63C630BDBE5ABC6DF2 /* LibraryView.swift */,
 				87BD787A61C3C037E268829C /* LiveVoice.swift */,
+				F94688D7E4DFDC73EF7F298E /* Milestone.swift */,
 				9A7106218805AC5263A12438 /* Persistence.swift */,
 				015AF53243158079689CE24B /* Plan.swift */,
 				CCDB9D254A54D86DF356AC77 /* PracticeCompanion.swift */,
@@ -577,6 +580,7 @@
 				BD4605BCD97A69C956FB2F24 /* LibraryHome.swift in Sources */,
 				5298401BAA9BE8477CDBCFFF /* LibraryView.swift in Sources */,
 				19BDB2BD78083CFC15FFCF77 /* LiveVoice.swift in Sources */,
+				270C5C16578703F9ECA76590 /* Milestone.swift in Sources */,
 				ADA43CF08FADFB23365A14E8 /* Models.swift in Sources */,
 				3D0DACC7801A3CCC832A9840 /* Persistence.swift in Sources */,
 				9BF823A35BDAA8B8E137FD8F /* Plan.swift in Sources */,

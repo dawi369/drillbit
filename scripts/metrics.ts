@@ -43,7 +43,9 @@ const funnel = (from: string, to: string, within?: string) => `SELECT COUNT(*) s
   SUM(${paid("a", within)}) paid
   FROM accounts a WHERE a.status='active' AND a.created_at>='${from}' AND a.created_at<'${to}'`;
 
-const [recent, mature, plans, intro, voice, refunds, waived, limits, ai, notes] = run([
+// Paywall views arrived with migration 0019; before it's applied the rest of the report still runs.
+const hasPaywallViews = run(["SELECT COUNT(*) n FROM sqlite_master WHERE type='table' AND name='paywall_views'"])[0][0]?.n === 1;
+const [recent, mature, plans, intro, voice, refunds, waived, limits, ai, notes, paywall = [], paywallTotal = []] = run([
   funnel(since, iso(0)),
   funnel(matureFrom, matureTo, "35"),
   `SELECT product_id, status, COUNT(*) n FROM entitlements WHERE environment IN (${environments}) GROUP BY product_id, status ORDER BY product_id, status`,
@@ -57,6 +59,10 @@ const [recent, mature, plans, intro, voice, refunds, waived, limits, ai, notes] 
   `SELECT kind, COUNT(*) days_at_cap FROM usage WHERE day>='${since.slice(0, 10)}' AND ((kind='generate' AND count>=10) OR (kind='voice_start' AND count>=20) OR (kind='voice_note' AND count>=5)) GROUP BY kind`,
   `SELECT kind, COUNT(*) runs, ROUND(SUM(cost),4) cost FROM ai_runs WHERE created_at>='${since}' GROUP BY kind ORDER BY cost DESC`,
   `SELECT COUNT(*) n, ROUND(SUM(duration_seconds)/60.0,1) minutes FROM voice_notes WHERE created_at>='${since}'`,
+  // Who saw the paywall where, and how many of them bought after their first view there.
+  ...(hasPaywallViews ? [`SELECT p.placement, COUNT(*) accounts, SUM(EXISTS(SELECT 1 FROM entitlements e WHERE e.account_id=p.account_id AND e.environment IN (${environments}) AND e.created_at>=p.first)) paid
+   FROM (SELECT account_id, placement, MIN(created_at) first FROM paywall_views WHERE created_at>='${since}' GROUP BY account_id, placement) p GROUP BY p.placement ORDER BY accounts DESC`,
+  `SELECT COUNT(DISTINCT account_id) accounts, COUNT(*) views FROM paywall_views WHERE created_at>='${since}'`] : []),
 ]);
 
 const pct = (part: unknown, whole: unknown) => Number(whole) ? `${((100 * Number(part)) / Number(whole)).toFixed(1)}%` : "–";
@@ -71,6 +77,10 @@ for (const [label, rows, note] of [[`signed up in the last ${days} days`, recent
   const r = rows[0] ?? {};
   console.log(`  ${label}: ${n(r.signups)} · first rep ${n(r.rep1)} (${pct(r.rep1, r.signups)}) · both free reps ${n(r.rep2)} (${pct(r.rep2, r.signups)}) · ${note} ${n(r.paid)} (${pct(r.paid, r.signups)})`);
 }
+
+if (!hasPaywallViews) console.log("\nPaywall: not counted yet (apply migration 0019_paywall_views)");
+else console.log(`\nPaywall: ${n(paywallTotal[0]?.accounts)} accounts saw it, ${n(paywallTotal[0]?.views)} views`);
+for (const r of paywall) console.log(`  ${String(r.placement).padEnd(14)} ${String(n(r.accounts)).padStart(5)} accounts · bought after ${n(r.paid)} (${pct(r.paid, r.accounts)})`);
 
 console.log("\nPlans");
 if (!plans.length) console.log("  no purchases yet");

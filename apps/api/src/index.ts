@@ -45,6 +45,7 @@ import {
 import { concepts } from "./taxonomy";
 import { delegateVoice, startVoice, voiceCapability, voiceEvents } from "./voice";
 import { privacyPolicy, supportPage } from "./legal";
+import { recordPaywallView } from "./paywall";
 import { PracticeWorkflow as PracticeWorkflowBase } from "./jobs";
 import { instrumentWorkflowWithSentry, withSentry } from "@sentry/cloudflare";
 import { reportFailure, sentryOptions } from "./monitoring";
@@ -855,6 +856,10 @@ app.post(VOICE_NOTE_PATH, async (c) => {
   await c.env.DB.prepare("INSERT OR IGNORE INTO voice_notes(id,account_id,audio,duration_seconds,app_version,created_at) VALUES(?,?,?,?,?,?)")
     .bind(id, a, audio, input.durationSeconds, input.appVersion ?? null, now).run();
   return c.json(note({ id, created_at: now, duration_seconds: input.durationSeconds }), 201);
+});
+app.post("/v1/paywall/view", async (c) => {
+  await recordPaywallView(c.env, c.get("account").id, await c.req.json());
+  return c.json({ ok: true }, 201);
 });
 app.post("/v1/devices", async (c) => {
   const token = uuid() + uuid(),

@@ -37,6 +37,15 @@ final class AuditScreenshots: XCTestCase {
     add(attachment)
   }
 
+  /// Finish ends on the rep's feedback; Done for today goes Home.
+  private func leaveFeedback(_ app: XCUIApplication, _ name: String? = nil) {
+    let done = app.buttons["completionDone"]
+    XCTAssertTrue(done.waitForExistence(timeout: 8))
+    if let name { Thread.sleep(forTimeInterval: 0.8); shot(name, app) }
+    for _ in 0..<8 where !done.isHittable { app.swipeUp() }
+    done.tap()
+  }
+
   private func editor(_ app: XCUIApplication) -> XCUIElement {
     app.descendants(matching: .any).matching(identifier: "answerEditor").firstMatch
   }
@@ -133,6 +142,7 @@ final class AuditScreenshots: XCTestCase {
     XCTAssertTrue(app.descendants(matching: .any)["repDone"].waitForExistence(timeout: 3))
     Thread.sleep(forTimeInterval: 0.6)
     shot("a19-rep-done", app)
+    leaveFeedback(app, "a19b-first-feedback")
     let nudge = app.descendants(matching: .any)["confirmDialog"]
     XCTAssertTrue(nudge.waitForExistence(timeout: 10))
     shot("a20-reminder-offer", app)
@@ -167,6 +177,7 @@ final class AuditScreenshots: XCTestCase {
     XCTAssertTrue(app.descendants(matching: .any)["repDone"].waitForExistence(timeout: 3))
     Thread.sleep(forTimeInterval: 0.6)
     shot("a19-rep-done", app)
+    leaveFeedback(app, "a19b-first-feedback")
     let nudge = app.descendants(matching: .any)["confirmDialog"]
     XCTAssertTrue(nudge.waitForExistence(timeout: 10))
     shot("a20-reminder-offer", app)
@@ -224,6 +235,7 @@ final class AuditScreenshots: XCTestCase {
     XCTAssertTrue(app.descendants(matching: .any)["repDone"].waitForExistence(timeout: 3))
     Thread.sleep(forTimeInterval: 0.6)
     shot("b17-rep-done", app)
+    leaveFeedback(app, "b18-feedback")
     XCTAssertTrue(app.buttons["todayDone"].waitForExistence(timeout: 5))
     Thread.sleep(forTimeInterval: 1.5)
     shot("b19-home-done", app)
@@ -257,10 +269,12 @@ final class AuditScreenshots: XCTestCase {
     app.buttons["interviewOptions"].tap()
     app.buttons["Finish interview"].tap()
     app.descendants(matching: .any)["confirmDialog"].buttons["Finish interview"].tap()
-    // The round ends on the rep-done moment, then Home.
+    // The round ends on the rep-done moment, then the debrief, then Home.
     XCTAssertTrue(app.descendants(matching: .any)["repDone"].waitForExistence(timeout: 3))
     Thread.sleep(forTimeInterval: 0.6)
     shot("c05-mock-finished", app)
+    XCTAssertTrue(app.descendants(matching: .any)["debrief"].waitForExistence(timeout: 8))
+    leaveFeedback(app, "c06-mock-debrief")
     XCTAssertTrue(app.buttons["todayDone"].waitForExistence(timeout: 8))
     app.terminate()
 
@@ -497,6 +511,7 @@ final class AuditScreenshots: XCTestCase {
     XCTAssertTrue(app.descendants(matching: .any)["repDone"].waitForExistence(timeout: 3))
     Thread.sleep(forTimeInterval: 0.6)
     shot("e17-rep-done", app)
+    leaveFeedback(app, "e18-feedback")
     XCTAssertTrue(app.buttons["todayDone"].waitForExistence(timeout: 5))
     Thread.sleep(forTimeInterval: 1.5)
     shot("e19-home-done", app)
@@ -686,6 +701,7 @@ final class AuditScreenshots: XCTestCase {
     app.descendants(matching: .any)["confirmDialog"].buttons["Finish interview"].tap()
     XCTAssertTrue(app.descendants(matching: .any)["repDone"].waitForExistence(timeout: 3))
     shot("h02-thin-answer-done", app)
+    leaveFeedback(app, "h03-thin-answer-feedback")
     XCTAssertTrue(app.buttons["todayDone"].waitForExistence(timeout: 8))
     app.terminate()
 
@@ -781,7 +797,7 @@ final class AuditScreenshots: XCTestCase {
   /// The core rep at the largest accessibility size and in light mode: layout changes, nothing clips.
   func testWalkK_LargestTypeAndLight() throws {
     continueAfterFailure = false
-    var app = launch(["--fixtures", "--fixture-home-rich", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
+    var app = launch(["--fixtures", "--fixture-home-rich", "--fixture-lifetime-one-left", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
     let start = app.buttons["startPractice"]
     XCTAssertTrue(start.waitForExistence(timeout: 10))
     Thread.sleep(forTimeInterval: 1)
@@ -813,6 +829,13 @@ final class AuditScreenshots: XCTestCase {
     XCTAssertTrue(app.descendants(matching: .any)["repDone"].waitForExistence(timeout: 3))
     Thread.sleep(forTimeInterval: 0.6)
     shot("k06-rep-done-axxxl", app)
+    leaveFeedback(app, "k07-feedback-axxxl")
+    // One free rep left: Pro is offered once, and Not now stays reachable at the largest size.
+    XCTAssertTrue(app.descendants(matching: .any)["paywall"].waitForExistence(timeout: 8))
+    Thread.sleep(forTimeInterval: 1.5)
+    shot("k08-first-rep-offer-axxxl", app)
+    XCTAssertTrue(app.buttons["paywallDismiss"].isHittable)
+    app.buttons["paywallDismiss"].tap()
     XCTAssertTrue(app.buttons["todayDone"].waitForExistence(timeout: 8))
     app.terminate()
 
@@ -846,6 +869,7 @@ final class AuditScreenshots: XCTestCase {
     XCTAssertTrue(app.descendants(matching: .any)["repDone"].waitForExistence(timeout: 3))
     Thread.sleep(forTimeInterval: 0.6)
     shot("k11-rep-done-light", app)
+    leaveFeedback(app, "k12-feedback-light")
     XCTAssertTrue(app.buttons["todayDone"].waitForExistence(timeout: 5))
     Thread.sleep(forTimeInterval: 1)
     shot("k12-home-done-light", app)
@@ -876,6 +900,7 @@ final class AuditScreenshots: XCTestCase {
     app.descendants(matching: .any)["confirmDialog"].buttons["Finish interview"].tap()
     XCTAssertTrue(app.descendants(matching: .any)["repDone"].waitForExistence(timeout: 3))
     shot("l03-rep-done-reduce-motion", app)
+    leaveFeedback(app, "l04-feedback-reduce-motion")
     XCTAssertTrue(app.buttons["todayDone"].waitForExistence(timeout: 8))
   }
 

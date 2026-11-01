@@ -594,6 +594,8 @@ Two-choice confirmations (Finish interview, Skip question, the voice gate, Delet
 
 ## Completion without the reflection screen — 28 October 2026
 
+*Superseded on 1 November: everyone sees the feedback again. See "Feedback after every rep" below.*
+
 Finishing an interview no longer shows the completion screen to customers: `AppModel.showsReflection` is true only for developer accounts, and everyone else is handed straight back to Home with a success haptic. The server still writes feedback and Recall cards. The first rep ends onboarding, so landing on Home after it asks once, in a popup, whether to turn on a daily reminder (`AppModel.offersReminder`); after that the reminder lives only in Settings. Developers still get the offer on the completion screen.
 
 ## Library at a glance — 29 October 2026
@@ -687,3 +689,16 @@ Two Sentry projects in the t23 org (EU data region): `drillbit-ios` and `drillbi
   - If Sentry is off in a build, the form says it can't send. Fixtures act as if it went through.
 
 `bun scripts/metrics.ts [--days N] [--sandbox] [--development]` prints the launch numbers from D1 as aggregates only: the funnel, day-35 conversion, plan mix, weekly intro drop-off, voice minutes per plan (median, p90, max), refunds, free silent sessions, cap hits, AI cost and voice notes.
+
+## Feedback after every rep, the first-rep offer and the review prompt — 1 November 2026
+
+Finish goes: the rep-done moment, then `ReflectionView` for everyone, then Home. `showsReflection` is gone. The feedback screen keeps one way out that's always there, "Done for today" (`completionDone`). It has at most one secondary action, "Retry the tricky moment" or "Practise this next", and the free-rep notice when reps are used up.
+
+- **What it shows.** The lead is what worked and what to fix, quoting the person's own words when evidence allows. Mocks show the verdict, its reason, a plain note per area (no Strong/Mixed/Weak column) and a "Next round" line. The rest sits under "More from this rep". There's no eyebrow over the title.
+- **When feedback is late.** "Saved. Your feedback's on its way." while it's written, then "Still writing it…" after 15 seconds. The screen polls for 90 seconds and refreshes every 8th poll, so a failed summarize job shows "Feedback didn't come through this time. Your rep is saved." with Try again. Offline and failed states never block Done. A skip never reaches this screen.
+- **Review prompt.** `requestReview` 1.5 seconds after a finished rep's feedback loads, at most once per app version (`reviewRequestedVersion`). Never for warm-ups or fixtures. iOS decides whether it actually shows.
+- **Soft paywall, once.** `AppModel.offerProAfterFirstRep` runs when the person leaves the feedback (not on a "Practise this next" exit). It opens the native paywall with placement `first_rep` and the headline "Your next rep's still on us." only when the account is on lifetime free reps with one left, the rep was completed and not a warm-up, and the account hasn't seen it before on this device (`proOfferedAfterFirstRep:<account>`, cleared with the device's onboarding state). Pro accounts never see it.
+- **Reminder.** The Home reminder popup is still the one place the reminder is offered. `reminderHeldBack` keeps it from stacking on the paywall; going to the background clears it, so it asks on the next visit.
+- **Paywall views.** Each native presentation posts `POST /v1/paywall/view` with its placement (`paywall_views`, migration `0019`; placement and time only, deleted with the account, at most 50 a day). `scripts/metrics.ts` reports views by placement and tolerates the table being missing.
+- **Price line.** The yearly plan reads "$99.99 a year, so $1.92 a week" (`PlanPricing.weekly(fromYearly:)`, ÷52), to compare like with like against the weekly plan.
+

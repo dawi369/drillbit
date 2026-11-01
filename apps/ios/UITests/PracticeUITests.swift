@@ -1179,12 +1179,20 @@ final class PracticeUITests: XCTestCase {
     app.buttons["interviewOptions"].tap()
     app.buttons["Finish interview"].tap()
     app.descendants(matching: .any)["confirmDialog"].buttons["Finish interview"].tap()
-    // The moment shows straight away, then hands back to Home by itself.
+    // The moment shows straight away, then the feedback: one thing that worked, one to fix, one way out.
     XCTAssertTrue(app.descendants(matching: .any)["repDone"].waitForExistence(timeout: 1))
     capture("Practice completion", app)
+    XCTAssertTrue(app.descendants(matching: .any)["feedbackLead"].waitForExistence(timeout: 8))
+    XCTAssertTrue(app.staticTexts["What worked".uppercased()].exists || app.staticTexts["What worked"].exists)
+    XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH '“'")).firstMatch.exists, "Quotes the person's own words")
+    XCTAssertFalse(app.buttons["Review in Recall"].exists)
+    XCTAssertFalse(app.buttons["Check feedback"].exists)
+    capture("Practice feedback", app)
+    leaveFeedback(app)
     let done = app.buttons["todayDone"]
     XCTAssertTrue(done.waitForExistence(timeout: 5))
-    XCTAssertTrue(done.label.contains("Make retries safe before making them automatic."), done.label)
+    // The ticket carries the person's own line from the feedback.
+    XCTAssertTrue(done.label.contains("I need to handle duplicate effects."), done.label)
     XCTAssertTrue(app.buttons["oneMore"].exists)
     XCTAssertFalse(app.alerts["Drillbit"].exists)
     capture("Home after practice", app)
@@ -1274,9 +1282,14 @@ final class PracticeUITests: XCTestCase {
     app.buttons["Finish interview"].tap()
     app.descendants(matching: .any)["confirmDialog"].buttons["Finish interview"].tap()
     XCTAssertTrue(app.descendants(matching: .any)["repDone"].waitForExistence(timeout: 3))
-    XCTAssertFalse(app.staticTexts["INTERVIEW DEBRIEF"].exists)
     XCTAssertFalse(clock.exists, "The clock stops once the round is over")
     capture("Mock interview finished", app)
+    // The debrief says how the round went and what to do next round, with a note per part: no scorecard.
+    XCTAssertTrue(app.descendants(matching: .any)["debrief"].waitForExistence(timeout: 8))
+    XCTAssertTrue(app.staticTexts["Borderline. Could go either way."].exists)
+    for rating in ["Strong", "Mixed", "Weak"] { XCTAssertFalse(app.staticTexts[rating].exists, "No \(rating) rating") }
+    capture("Mock interview debrief", app)
+    leaveFeedback(app)
     XCTAssertTrue(app.buttons["todayDone"].waitForExistence(timeout: 8))
   }
 
@@ -1364,7 +1377,7 @@ final class PracticeUITests: XCTestCase {
     XCTAssertFalse(app.buttons["Ask interviewer"].exists)
   }
 
-  func testCustomersFinishStraightToHomeWithTheReminderOffer() throws {
+  func testCustomersSeeFeedbackThenHomeWithTheReminderOffer() throws {
     continueAfterFailure = false
     let app = XCUIApplication()
     app.launchArguments = ["--fixtures", "--fixture-onboarding", "--fixture-customer"]
@@ -1387,8 +1400,10 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.descendants(matching: .any)["confirmDialog"].waitForExistence(timeout: 3))
     capture("Finish dialog", app)
     app.descendants(matching: .any)["confirmDialog"].buttons["Finish interview"].tap()
-    // The rep-done moment, then Home by itself; the end of onboarding asks once about a nudge.
+    // The rep-done moment, then the feedback, then Home; the end of onboarding asks once about a nudge.
     XCTAssertTrue(app.descendants(matching: .any)["repDone"].waitForExistence(timeout: 3))
+    capture("First rep feedback", app)
+    leaveFeedback(app)
     XCTAssertTrue(app.buttons["todayDone"].waitForExistence(timeout: 10))
     XCTAssertFalse(app.buttons["Done for today"].exists)
     let dialog = app.descendants(matching: .any)["confirmDialog"]
@@ -1470,9 +1485,10 @@ final class PracticeUITests: XCTestCase {
     app.buttons["interviewOptions"].tap()
     app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Finish interview'")).firstMatch.tap()
     app.descendants(matching: .any)["confirmDialog"].buttons["Finish interview"].tap()
-    // The rep-done moment, then Home by itself, which offers the reminder once.
+    // The rep-done moment, then the feedback, then Home, which offers the reminder once.
     XCTAssertTrue(app.descendants(matching: .any)["repDone"].waitForExistence(timeout: 3))
     capture("First rep done", app)
+    leaveFeedback(app)
     let nudge = app.descendants(matching: .any)["confirmDialog"]
     XCTAssertTrue(nudge.waitForExistence(timeout: 10))
     nudge.buttons["No thanks"].tap()
@@ -1501,7 +1517,7 @@ final class PracticeUITests: XCTestCase {
     // Every figure comes from the products: 99.99 a year against 52 × 7.99 saves 75%, and the weekly intro shows.
     let option = { (text: String) in app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch }
     XCTAssertTrue(option("Save 75%").waitForExistence(timeout: 10))
-    XCTAssertTrue(option("$8.33 a month").exists)
+    XCTAssertTrue(option("$1.92 a week").exists)
     XCTAssertTrue(option("Try a week for $1.99, then $7.99 a week").exists)
     // What App Review checks on a subscription paywall: terms, renewal terms, restore and a way out.
     XCTAssertTrue(option("Terms of Service").exists)
@@ -1802,6 +1818,119 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.buttons["Sign in with Apple"].waitForExistence(timeout: 5))
     XCTAssertFalse(app.descendants(matching: .any)["aiDisclosure"].exists)
     capture("Sign in after setup", app)
+  }
+
+  /// Finish ends on the rep's feedback; Done for today is always there and goes Home.
+  private func leaveFeedback(_ app: XCUIApplication) {
+    let done = app.buttons["completionDone"]
+    XCTAssertTrue(done.waitForExistence(timeout: 8))
+    for _ in 0..<8 where !done.isHittable { app.swipeUp() }
+    done.tap()
+  }
+
+  /// Onboarding as a customer, up to the first rep's Finish being confirmed.
+  private func finishFirstRep(_ arguments: [String]) -> XCUIApplication {
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures", "--fixture-onboarding", "--fixture-customer"] + arguments
+    app.launch()
+    XCTAssertTrue(app.staticTexts["Quick one. No wrong answers."].waitForExistence(timeout: 10))
+    app.buttons["The database"].tap()
+    for _ in 0..<6 { app.buttons["Continue"].tap() }
+    XCTAssertTrue(app.buttons["Show me my first question"].waitForExistence(timeout: 5))
+    app.buttons["Show me my first question"].tap()
+    XCTAssertTrue(app.buttons["previewStart"].waitForExistence(timeout: 10))
+    app.buttons["previewStart"].tap()
+    let editor = app.descendants(matching: .any).matching(identifier: "answerEditor").firstMatch
+    XCTAssertTrue(editor.waitForExistence(timeout: 5))
+    XCTAssertTrue(app.descendants(matching: .any)["interviewOpener"].waitForExistence(timeout: 6))
+    editor.tap(); editor.typeText("Workers lease jobs and record every attempt.")
+    app.buttons["shareAnswer"].tap()
+    XCTAssertTrue(app.buttons["interviewOptions"].waitForExistence(timeout: 10))
+    app.buttons["interviewOptions"].tap()
+    app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Finish interview'")).firstMatch.tap()
+    app.descendants(matching: .any)["confirmDialog"].buttons["Finish interview"].tap()
+    XCTAssertTrue(app.descendants(matching: .any)["repDone"].waitForExistence(timeout: 3))
+    return app
+  }
+
+  func testFirstFreeRepOffersProOnceWhileRepTwoIsFree() throws {
+    continueAfterFailure = false
+    let app = finishFirstRep(["--fixture-lifetime"])
+    XCTAssertTrue(app.descendants(matching: .any)["feedbackLead"].waitForExistence(timeout: 8))
+    // No Pro on the feedback itself: it waits until they leave it.
+    XCTAssertFalse(app.descendants(matching: .any)["paywall"].exists)
+    leaveFeedback(app)
+    XCTAssertTrue(app.descendants(matching: .any)["paywall"].waitForExistence(timeout: 8))
+    XCTAssertTrue(app.staticTexts["Your next rep’s still on us."].waitForExistence(timeout: 10))
+    capture("Pro after the first rep", app)
+    app.buttons["paywallDismiss"].tap()
+    // Not now: Home, with rep two still free, and no reminder stacked on top of the paywall.
+    XCTAssertTrue(app.buttons["todayDone"].waitForExistence(timeout: 8))
+    XCTAssertTrue(app.buttons["oneMore"].waitForExistence(timeout: 5))
+    XCTAssertFalse(app.descendants(matching: .any)["confirmDialog"].waitForExistence(timeout: 3))
+    // Rep two: its feedback leads straight Home. The offer was once.
+    app.buttons["oneMore"].tap()
+    XCTAssertTrue(app.buttons["submitPreparation"].waitForExistence(timeout: 5))
+    app.buttons["submitPreparation"].tap()
+    XCTAssertTrue(app.buttons["previewStart"].waitForExistence(timeout: 10))
+    app.buttons["previewStart"].tap()
+    let editor = app.descendants(matching: .any).matching(identifier: "answerEditor").firstMatch
+    XCTAssertTrue(editor.waitForExistence(timeout: 8))
+    editor.tap(); editor.typeText("Retries carry a stable key.")
+    app.buttons["shareAnswer"].tap()
+    XCTAssertTrue(app.buttons["interviewOptions"].waitForExistence(timeout: 10))
+    app.buttons["interviewOptions"].tap()
+    app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Finish interview'")).firstMatch.tap()
+    app.descendants(matching: .any)["confirmDialog"].buttons["Finish interview"].tap()
+    leaveFeedback(app)
+    XCTAssertTrue(app.buttons["todayDone"].waitForExistence(timeout: 8))
+    XCTAssertFalse(app.descendants(matching: .any)["paywall"].waitForExistence(timeout: 3))
+    XCTAssertTrue(app.buttons["seePro"].exists, "Both free reps used: Home points at Pro")
+  }
+
+  func testProAccountsGetNoOfferAfterTheirFirstRep() throws {
+    continueAfterFailure = false
+    let app = finishFirstRep(["--fixture-pro"])
+    leaveFeedback(app)
+    XCTAssertTrue(app.buttons["todayDone"].waitForExistence(timeout: 8))
+    XCTAssertFalse(app.descendants(matching: .any)["paywall"].waitForExistence(timeout: 3))
+    // Without the offer, the reminder asks as usual.
+    XCTAssertTrue(app.staticTexts["Want a nudge tomorrow?"].waitForExistence(timeout: 5))
+  }
+
+  func testSkippingAFreeRepNeverOffersPro() throws {
+    continueAfterFailure = false
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures", "--fixture-customer", "--fixture-lifetime-one-left"]
+    app.launch()
+    XCTAssertTrue(app.buttons["startPractice"].waitForExistence(timeout: 10))
+    app.buttons["startPractice"].tap()
+    app.buttons["previewStart"].tap()
+    let editor = app.descendants(matching: .any).matching(identifier: "answerEditor").firstMatch
+    XCTAssertTrue(editor.waitForExistence(timeout: 5))
+    app.buttons["interviewOptions"].tap()
+    app.buttons["Skip question"].tap()
+    app.descendants(matching: .any)["confirmDialog"].buttons["Skip question"].tap()
+    XCTAssertTrue(app.buttons["homeSettings"].waitForExistence(timeout: 5))
+    XCTAssertFalse(app.descendants(matching: .any)["reflection"].exists)
+    XCTAssertFalse(app.descendants(matching: .any)["paywall"].waitForExistence(timeout: 3))
+  }
+
+  func testFeedbackThatFailsOrIsSlowNeverTrapsTheRep() throws {
+    continueAfterFailure = false
+    var app = finishFirstRep(["--fixture-feedback-failed"])
+    XCTAssertTrue(app.staticTexts["Feedback didn’t come through this time. Your rep is saved."].waitForExistence(timeout: 8))
+    XCTAssertTrue(app.buttons["retryFeedback"].exists)
+    capture("Feedback failed", app)
+    leaveFeedback(app)
+    XCTAssertTrue(app.buttons["todayDone"].waitForExistence(timeout: 8))
+    app.terminate()
+    app = finishFirstRep(["--fixture-feedback-pending"])
+    XCTAssertTrue(app.descendants(matching: .any)["Preparing feedback"].waitForExistence(timeout: 8)
+      || app.staticTexts["Saved. Your feedback’s on its way."].waitForExistence(timeout: 2))
+    capture("Feedback on its way", app)
+    leaveFeedback(app)
+    XCTAssertTrue(app.buttons["todayDone"].waitForExistence(timeout: 8))
   }
 
   private func capture(_ name: String, _ app: XCUIApplication) {

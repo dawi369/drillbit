@@ -10,6 +10,8 @@ enum PaywallPlacement: String {
   case practiceRep = "practice_rep"
   case voiceSession = "voice_session"
   case knowledgeMap = "knowledge_map"
+  /// Offered once after a first free rep's feedback, while the second rep is still free.
+  case firstRep = "first_rep"
 }
 
 private struct EntitlementUpload: Encodable { var signedTransaction: String }
@@ -81,6 +83,8 @@ private struct EntitlementReceipt: Decodable { var plan: String }
         sheetDelegate.onSwipeDown = { [weak self] in self?.paywallController = nil; self?.dismissed() }
         paywallController = host
         top.present(host, animated: true)
+        // Counted once it's really on screen; never awaited, so a slow or failed count can't hold the paywall up.
+        Task { await model?.recordPaywallView(placement) }
         return
       }
       try? await Task.sleep(for: .milliseconds(100))
@@ -290,6 +294,7 @@ private struct PaywallHeader: View {
           .textCase(.uppercase).tracking(1.2)
         Text(placement == .voiceSession ? "Say it out loud, as often as you want."
              : placement == .knowledgeMap ? "See what you actually know."
+             : placement == .firstRep ? "Your next rep’s still on us."
              : PlanCoordinator.shared.lifetimeFreeReps ? "Keep the reps coming." : "Don’t stop at three.")
           .font(.title2.weight(.semibold)).multilineTextAlignment(.center)
           .fixedSize(horizontal: false, vertical: true)
@@ -479,8 +484,9 @@ private struct PlanOptionLabel: View {
 
   private var detail: String {
     if period == .year {
-      let monthly = PlanPricing.monthly(fromYearly: product.price).formatted(format)
-      return "\(product.displayPrice) a year, so \(monthly) a month"
+      // The billed price leads (App Review 3.1.2); the per-week figure only puts it next to the weekly plan.
+      let perWeek = PlanPricing.weekly(fromYearly: product.price).formatted(format)
+      return "\(product.displayPrice) a year, so \(perWeek) a week"
     }
     if let offer, offer.paymentMode != .freeTrial, offer.period.unit == .week, offer.period.value * offer.periodCount == 1 {
       return "Try a week for \(offer.displayPrice), then \(product.displayPrice) a week"

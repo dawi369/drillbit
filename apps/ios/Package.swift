@@ -11,6 +11,6 @@ let package = Package(
         "Config", "Drillbit/Assets.xcassets", "Drillbit/Resources", "Drillbit/PrivacyInfo.xcprivacy", "Tests", "DrillbitWidget", "Drillbit.xcodeproj",
         "project.yml", "build", "Shared/SharedStore.swift", "Drillbit/APIClient.swift",
         "Drillbit/AppModel.swift", "Drillbit/DrillbitApp.swift",
-      ], sources: ["Shared/Models.swift", "Shared/PlanPricing.swift", "Shared/VoiceTranscript.swift", "Drillbit/Persistence.swift", "Drillbit/CompanionCoordinator.swift", "Drillbit/BitRig.swift"]),
+      ], sources: ["Shared/Models.swift", "Shared/PlanPricing.swift", "Shared/VoiceTranscript.swift", "Drillbit/Persistence.swift", "Drillbit/CompanionCoordinator.swift", "Drillbit/BitRig.swift", "Drillbit/Milestone.swift"]),
     .testTarget(name: "DrillbitCoreTests", dependencies: ["DrillbitCore"], path: "Tests"),
   ])

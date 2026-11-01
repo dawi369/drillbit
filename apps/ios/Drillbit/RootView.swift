@@ -154,6 +154,8 @@ struct RootView: View {
       if phase == .active {
         Task { await model.refresh(); await model.ensureHomeQuestion() }
       } else if phase == .background {
+        // A reminder held back behind the first-rep Pro offer waits for this: the next visit to Home asks.
+        model.reminderHeldBack = false
         if !model.fixture { BackgroundRefresh.schedule() }
         Task { await model.sync() }
       }

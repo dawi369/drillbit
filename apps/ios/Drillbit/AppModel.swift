@@ -79,17 +79,41 @@ import WidgetKit
     settings.reminderEnabled = true
     do { try await saveSettingsLocally(); try await reconcileReminder() } catch let failure { error = failure.localizedDescription }
   }
+  /// After the first free rep's feedback, Pro is offered once while the second rep is still free. An offer, never a
+  /// gate: Not now goes Home with rep two untouched, and the server's limits don't change. Once per account on this
+  /// device; a reinstall may show it again. Starting another rep from the feedback skips it.
+  func offerProAfterFirstRep(_ finished: Challenge) async {
+    guard let account = bootstrap?.account.id, !finished.isWarmUp, finished.lifecycle == "completed",
+      bootstrap?.practice?.freeReps == true, lifetimeFreeReps, bootstrap?.practice?.remaining == 1 else { return }
+    // Fixtures share one account id across runs, so they remember the offer for this launch only.
+    if fixture {
+      guard proOfferedThisLaunch.insert(account).inserted else { return }
+    } else {
+      let key = Self.proOfferedKey + account
+      guard !UserDefaults.standard.bool(forKey: key) else { return }
+      UserDefaults.standard.set(true, forKey: key)
+    }
+    reminderHeldBack = true
+    PlanCoordinator.shared.register(.firstRep) { [weak self] in await self?.refresh() }
+  }
+  static let proOfferedKey = "proOfferedAfterFirstRep:"
+  private var proOfferedThisLaunch: Set<String> = []
+  /// One native paywall presentation, for the launch numbers: placement and time only. Failures are dropped.
+  func recordPaywallView(_ placement: PaywallPlacement) async {
+    guard !fixture, bootstrap?.account.status == "active" else { return }
+    let _: [String: Bool]? = try? await api.send("paywall/view", method: "POST", body: ["placement": placement.rawValue])
+  }
   func markRecallIntroduced() async {
     guard !firstUse.recallIntroduced else { return }
     var progress = firstUse
     progress.recallIntroduced = true
     try? await setFirstUse(progress)
   }
-  /// The completion screen after Finish is developer-only for now; everyone else goes straight back to Home.
-  /// The completion screen is parked for everyone: finishing shows the rep-done moment and returns Home.
-  var showsReflection: Bool { false }
-  /// The first finished rep earns one reminder offer: a popup on Home, or the completion screen for developers.
+  /// The first finished rep earns one reminder offer: a popup on Home once they're back from the feedback.
   var offersReminder: Bool { firstUse.firstRepID != nil && !firstUse.reminderOffered && !settings.reminderEnabled }
+  /// Set while Pro was just offered after a first rep, so the reminder waits for the next visit to Home instead
+  /// of stacking on top. Cleared when the app goes to the background.
+  var reminderHeldBack = false
   var reminderTimeText: String {
     let minutes = settings.dailyMinutes
     return Calendar.current.date(from: DateComponents(hour: minutes / 60, minute: minutes % 60))?.formatted(date: .omitted, time: .shortened) ?? "12:30"
@@ -778,6 +802,7 @@ import WidgetKit
     let defaults = UserDefaults.standard
     defaults.removeObject(forKey: "walkthroughVersion")
     defaults.removeObject(forKey: "practiceMode")
+    for key in defaults.dictionaryRepresentation().keys where key.hasPrefix(proOfferedKey) { defaults.removeObject(forKey: key) }
     defaults.removeObject(forKey: "firstRun.stage")
     defaults.removeObject(forKey: SetupView.draftKey)
     for mark in CoachMark.allCases { defaults.removeObject(forKey: mark.storageKey) }
@@ -1000,7 +1025,15 @@ import WidgetKit
         guard bootstrap?.account.id == account else { throw CancellationError() }
       }
       bootstrap?.challenge = challenge
-      if bootstrap?.practice?.freeReps == true, replaced?.freeRepAt == nil { bootstrap?.practice?.available = false }
+      if bootstrap?.practice?.freeReps == true, replaced?.freeRepAt == nil {
+        // Lifetime reps count down like production; the daily fixtures model one rep a day.
+        if lifetimeFreeReps, let remaining = bootstrap?.practice?.remaining {
+          bootstrap?.practice?.remaining = max(remaining - 1, 0)
+          bootstrap?.practice?.available = remaining > 1
+        } else {
+          bootstrap?.practice?.available = false
+        }
+      }
       return challenge
     }
     guard bootstrap?.account.id == account else { throw CancellationError() }
@@ -1246,6 +1279,21 @@ import WidgetKit
         improve: "Explain what happens when work finishes but its acknowledgement is lost.",
         takeaway: "Make retries safe before making them automatic.",
         strengths: ["Queue durability"], gaps: ["Retry safety"])
+      // The feedback quotes the person, as the real one does: the first sentence of what they last said.
+      let said = challenge.interview?.turns.last(where: { $0.kind == "answer" })?.text ?? answer
+      if let first = said.split(separator: ".").first?.trimmingCharacters(in: .whitespacesAndNewlines), first.count > 3 {
+        completed.reflection?.evidence = [LearningEvidence(
+          conceptId: "queues-streams", observation: "Durable records mean a crashed worker’s job gets picked up again, not lost.",
+          quote: first + ".", signal: "demonstrated", assistance: "independent")]
+      }
+      #if DEBUG
+      // The two states feedback can be in when it isn't there yet: still writing, or given up.
+      if ProcessInfo.processInfo.arguments.contains("--fixture-feedback-pending") { completed.reflection = nil }
+      if ProcessInfo.processInfo.arguments.contains("--fixture-feedback-failed") {
+        completed.reflection = nil
+        bootstrap?.jobs.append(Job(id: "fixture-summarize", kind: "summarize", status: "failed", error: "The operation could not finish.", challengeId: challenge.id))
+      }
+      #endif
       switch challenge.guidanceMode {
       case .learnTogether:
         completed.reflection?.guidanceMode = .learnTogether
@@ -1577,6 +1625,16 @@ import WidgetKit
     if ProcessInfo.processInfo.arguments.contains("--fixture-lifetime-spent") {
       bootstrap?.account.plan = "free"
       bootstrap?.practice = PracticeAccess(plan: "free", freeReps: true, available: false, nextFreeRepAt: nil, remaining: 0, limit: 2, resetsAt: nil, lifetime: true)
+    }
+    // Production's model for a new account: two lifetime free reps, none used.
+    if ProcessInfo.processInfo.arguments.contains("--fixture-lifetime") {
+      bootstrap?.account.plan = "free"
+      bootstrap?.practice = PracticeAccess(plan: "free", freeReps: true, available: true, nextFreeRepAt: nil, remaining: 2, limit: 2, resetsAt: nil, lifetime: true)
+    }
+    // Production's model after the first rep was prepared: one of two lifetime free reps left.
+    if ProcessInfo.processInfo.arguments.contains("--fixture-lifetime-one-left") {
+      bootstrap?.account.plan = "free"
+      bootstrap?.practice = PracticeAccess(plan: "free", freeReps: true, available: true, nextFreeRepAt: nil, remaining: 1, limit: 2, resetsAt: nil, lifetime: true)
     }
     if ProcessInfo.processInfo.arguments.contains("--fixture-free-reps") {
       bootstrap?.account.plan = "free"

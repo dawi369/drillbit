@@ -38,9 +38,9 @@ Renewals, expiry, refunds → App Store Server Notifications v2 → POST /apple/
 
 | | Free | Pro |
 |---|---|---|
-| Questions (reps) | **2 in total** (since 31 Oct; was 3 a day). A rep skipped or swapped away before its 2nd message comes back. | Unlimited*, fair use 10 practised reps a day (since 1 Nov; was 30 questions written) |
+| Questions (reps) | **2 in total** (since 31 Oct; was 3 a day). A rep skipped or swapped away before the first message comes back. | Unlimited*, fair use 10 practised reps a day (since 1 Nov; was 30 questions written) |
 | Inside a rep | 8 follow-ups, 2 nudges or examples | Unlimited |
-| Voice | First 3 sessions, 3 min each, then one every 30 days | Unlimited*, fair use 60 min a day and **75 a week** (since 1 Nov; was 100, before that 150), up to 20 min a session |
+| Voice | First 3 sessions, 3 min each (the monthly taste is off since 1 Nov) | Unlimited*, fair use 60 min a day and **75 a week** (since 1 Nov; was 100, before that 150), up to 20 min a session |
 | Feedback, Recall, Library | ✓ | ✓ |
 | Daily question prepared for you | – | ✓ |
 | Knowledge map and level estimate (Bit tab) | – | ✓ |
@@ -52,13 +52,16 @@ Renewals, expiry, refunds → App Store Server Notifications v2 → POST /apple/
 ## 4. When we ask people to upgrade
 
 1. **Home, once today's free reps are used:** "That's today's free reps… See Pro".
-2. **Feedback screen after the last free rep of the day:** the same line with See Pro.
+2. **Feedback screen after the last free rep:** the same line with See Pro.
+7. **Once, after the first free rep's feedback** (since 1 Nov): leaving the feedback opens Pro with "Your next rep's still on us." Not now goes Home, where rep two is still free. It shows once per account (remembered on the device), only for a completed, non-warm-up rep while one lifetime rep is left, and never after a skip. The reminder offer waits until the next visit so the two never stack. Placement `first_rep`.
 3. **Voice, once the free sessions are used:** a dialog with **See Pro** (gold) and Keep typing.
 4. **Settings → Plan → See Pro**, any time.
 5. **Inside a free rep:** running out of follow-ups or nudges shows See Pro instead of a dead Retry. That's the moment someone is most engaged.
 6. **The Bit tab:** it's visible to everyone; on Free, tapping it opens the Pro screen ("See what you actually know.") and leaves you on your current tab.
 
-There's no paywall at launch or during onboarding, and no nagging. Upgrades are offered only where a limit actually stopped someone.
+There's no paywall at launch or during onboarding, and no nagging. Apart from the one soft offer after the first rep, upgrades appear only where a limit actually stopped someone.
+
+Every native paywall presentation is recorded with its placement and time only (`POST /v1/paywall/view`, table `paywall_views`, at most 50 a day per account), so `scripts/metrics.ts` can show views and conversion by placement.
 
 ## 5. What it costs us
 

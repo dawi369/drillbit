@@ -161,6 +161,7 @@ export const wire = {
   // Base64 of an AAC .m4a recording, two minutes at most.
   VoiceNoteInput: z.object({ audio: z.string(), durationSeconds: z.number(), appVersion: z.string().optional() }),
   VoiceNote: voiceNote,
+  PaywallViewInput: z.object({ placement: z.enum(["practice_rep", "voice_session", "knowledge_map", "first_rep"]) }),
   Coverage:z.object({concepts:z.array(z.object({conceptId,completedAttempts:z.number().int(),distinctQuestions:z.number().int(),lastPractised:z.string().nullable()}))}),
   RecallCard:recallCard,
   RecallDeck:z.object({cards:z.array(recallCard),dueCount:z.number().int()}),

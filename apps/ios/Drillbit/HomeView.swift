@@ -103,8 +103,8 @@ struct HomeView: View {
     .drillbitTabClearance()
     .task(id: model.bootstrap?.account.id) { await model.ensureHomeQuestion() }
     // The end of onboarding: the first rep is done, so ask once about a daily nudge. Settings has it after that.
-    .task(id: model.offersReminder && !model.showsReflection && model.firstUse.stage == .complete) {
-      guard model.offersReminder, !model.showsReflection, model.firstUse.stage == .complete else { return }
+    .task(id: model.offersReminder && !model.reminderHeldBack && model.firstUse.stage == .complete) {
+      guard model.offersReminder, !model.reminderHeldBack, model.firstUse.stage == .complete else { return }
       try? await Task.sleep(for: .milliseconds(700))
       if !Task.isCancelled { askingReminder = true }
     }

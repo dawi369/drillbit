@@ -11,5 +11,6 @@ enum PlanPricing {
     let whole = Int(NSDecimalNumber(decimal: (1 - yearly / year) * 100).doubleValue.rounded(.down))
     return whole > 0 ? whole : nil
   }
-  static func monthly(fromYearly yearly: Decimal) -> Decimal { yearly / 12 }
+  /// The yearly price spread over 52 weeks, so it reads next to the weekly plan in the same unit.
+  static func weekly(fromYearly yearly: Decimal) -> Decimal { yearly / 52 }
 }

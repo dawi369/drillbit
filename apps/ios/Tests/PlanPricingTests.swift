@@ -22,7 +22,10 @@ struct PlanPricingTests {
     #expect(PlanPricing.yearlySaving(yearly: Decimal(string: "51.99")!, weekly: 1) == nil, "Under one percent rounds to nothing")
     #expect(PlanPricing.yearlySaving(yearly: 10, weekly: 0) == nil)
   }
-  @Test func monthlyFromYearly() {
-    #expect(PlanPricing.monthly(fromYearly: 120) == 10)
+  @Test func weeklyFromYearly() {
+    #expect(PlanPricing.weekly(fromYearly: 104) == 2)
+    // Launch price: 99.99 a year is 1.9229 a week, shown as $1.92.
+    let launch = PlanPricing.weekly(fromYearly: Decimal(string: "99.99")!)
+    #expect(launch.formatted(.currency(code: "USD").locale(Locale(identifier: "en_US"))) == "$1.92")
   }
 }

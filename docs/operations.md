@@ -351,3 +351,16 @@ Settings → Feedback → "Report a bug" sends Sentry user feedback to `t23/dril
 A Debug build with the DSN, launched with `--sentry-test-feedback`, delivered a report with the message, source `custom`, no linked event, no name or email, an empty user and no location. The first attempt carried the SDK's per-install id; an empty scope user fixed that. The test issues are resolved.
 
 Bug reports appear in Sentry under User Feedback, or with `sentry issue list t23/drillbit-ios --query "issue.category:feedback"`.
+
+### Feedback screen and paywall views — 1 November 2026 (not deployed)
+
+The app now records each paywall presentation, which needs migration `0019_paywall_views.sql` and the matching Worker. Neither is deployed yet. Before shipping a build with this change, from `apps/api`:
+
+```sh
+./node_modules/.bin/wrangler d1 migrations apply drillbit-development --remote
+./node_modules/.bin/wrangler deploy
+./node_modules/.bin/wrangler d1 migrations apply drillbit-production --remote --env production
+./node_modules/.bin/wrangler deploy --env production
+```
+
+The migration is additive. An older app never calls the new route, and a newer app talking to an older Worker gets a 404 that it ignores, so either order is safe. `scripts/metrics.ts` skips the paywall section until the table exists.

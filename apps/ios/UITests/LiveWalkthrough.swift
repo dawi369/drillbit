@@ -162,6 +162,9 @@ final class LiveWalkthrough: XCTestCase {
       }
       // The rep-done moment shows at once and hands back to Home by itself.
       if app.descendants(matching: .any)["repDone"].waitForExistence(timeout: 3) { shot("rep-done") }
+      // Then the feedback, written live; Done for today goes Home.
+      if app.descendants(matching: .any)["feedbackLead"].waitForExistence(timeout: 90) { shot("feedback") }
+      if app.buttons["completionDone"].waitForExistence(timeout: 5) { app.buttons["completionDone"].tap() }
       _ = app.buttons["todayDone"].waitForExistence(timeout: 20)
       shot("after-finish")
     }
@@ -230,6 +233,7 @@ final class LiveWalkthrough: XCTestCase {
           if tapIfPresent(app.buttons["interviewOptions"]),
              tapIfPresent(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Finish interview'")).firstMatch),
              dialog.waitForExistence(timeout: 3) { dialog.buttons["Finish interview"].tap() }
+          if app.buttons["completionDone"].waitForExistence(timeout: 20) { shot("feedback-2"); app.buttons["completionDone"].tap() }
           _ = app.buttons["todayDone"].waitForExistence(timeout: 20); shot("after-finish-2")
           Thread.sleep(forTimeInterval: 2); shot("home-final")
         }
