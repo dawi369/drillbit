@@ -343,3 +343,11 @@ Checked:
 Not yet seen live: a real Worker 5xx or job failure, and a crash from a Release build. The Worker report path is covered by unit tests only.
 
 Triage: `sentry issue list t23/drillbit-api` or `t23/drillbit-ios`. Crash stacks need the build's dSYMs: `scripts/release-ios.sh` uploads them when `SENTRY_AUTH_TOKEN` is set.
+
+### Bug reports — 1 November 2026
+
+Settings → Feedback → "Report a bug" sends Sentry user feedback to `t23/drillbit-ios`. The privacy policy now covers it. Workers redeployed: development `0b7bb336-1b9a-4e6a-bd36-6c6821f741b0`, production `7febd034-88bb-4b24-91c5-75b04284eedb`.
+
+A Debug build with the DSN, launched with `--sentry-test-feedback`, delivered a report with the message, source `custom`, no linked event, no name or email, an empty user and no location. The first attempt carried the SDK's per-install id; an empty scope user fixed that. The test issues are resolved.
+
+Bug reports appear in Sentry under User Feedback, or with `sentry issue list t23/drillbit-ios --query "issue.category:feedback"`.
