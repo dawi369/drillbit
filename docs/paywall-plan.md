@@ -197,3 +197,31 @@ Rough month one per 1,000 downloads, using the simulation's unit economics. A Pr
 | Two free reps, then Pro (new prices) | ~100 (assumes 10%, the benchmark's lower end) | ~900 people × up to $0.25, once = –$225 at most | ≈ +$680 |
 
 Watch: download-to-paid by day 35 (target 8% or more), App Store rating (paywalls can draw one-star reviews; the first rep has to land), and how many people finish rep two.
+
+## 11. Launch economics — 1 November
+
+`bun scripts/launch-economics.ts` works per cohort of downloads, because free users now cost money once rather than every month. Section 9's free-user figures model the older 3-a-day freemium. The script uses expected values, no randomness; every assumption is a named constant at the top, and the full tables go to `.local/launch-economics.md`. Unit costs are the 31 October measurements. Production had one day of traffic, so **usage, conversion and retention are assumptions**.
+
+**What the caps allow.** A free download costs **$0.07** on average and **$0.49 at most**, once: two capped reps plus 9 intro voice minutes. A Pro user costs at most **$7.34 a week**, which is 30 reps a day plus 100 voice minutes; the rolling week allows up to $35 in a 30-day month. Voice at the weekly cap ($5.10) fits inside a full-price week ($6.59 kept). It doesn't fit inside yearly: $6.87 a month kept, against $22 a month for someone who sits on the cap every week.
+
+**Expected use.** Assumed Pro months: text only 25 reps, $0.27; light 45 voice minutes, $2.51; prepping about three 20-minute mocks a week (280 minutes), $14.45; heavy, on the cap, $22.30. Weekly buyers are mid-prep, so they average **$9.21 a month**. Yearly buyers are idle about a third of their months and average **$3.85**. In the first year a new weekly buyer nets **$15.47** over about five weeks (45% stop after the $1.99 week), a yearly buyer nets **$36.23**, and the blend at 35% yearly is **$22.74**.
+
+**Conversion scenarios, per 1,000 downloads.** "Expected" is 6% download-to-paid by day 35. RevenueCat's 2025 benchmarks put hard paywalls at about 10–12% and freemium at about 2%; two free reps sits between them, and education apps run below average.
+
+| Download-to-paid | Paying | First-year net per 1,000 downloads | Month 12 at 1,000 downloads a month |
+|---|---|---|---|
+| 1% (very low) | 10 | +$158 | +$144 |
+| 3% (low) | 30 | +$614 | +$600 |
+| **6% (expected)** | 60 | **+$1,298** | **+$1,285** |
+| 10% (high) | 100 | +$2,210 | +$2,197 |
+| 15% (very high) | 150 | +$3,351 | +$3,338 |
+
+Break-even is **0.3%** of downloads, or 2.1% if every non-payer used up the free voice intro. Year-two yearly renewals aren't counted. The month-12 column is before income tax and your own time.
+
+**What moves it.**
+- Without the Small Business Program, Apple keeps 30% and the blend drops to $14.55. Enrol before the first sale.
+- Voice costing 50% more brings it to $11.31.
+- If a third of every segment became heavy voice users, yearly would turn negative (–$5.93) and the blend would be $5.49. If everyone were heavy, the business would lose money at any conversion rate.
+- Weekly buyers staying 14 full weeks instead of 7 brings the blend to $33.90.
+
+**The one real risk is yearly subscribers who use voice heavily.** If real data shows yearly voice minutes averaging above about 150 a month, give yearly its own weekly voice cap (an environment variable) or raise the yearly price. Replace the assumptions with real numbers as soon as they exist: download-to-paid by day 35, the weekly/yearly split, how many stop after the $1.99 week, and voice minutes per subscriber-month by plan.
