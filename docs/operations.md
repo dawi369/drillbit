@@ -334,7 +334,7 @@ Not yet verified: a real voice note from a phone, and the "Good day's work." Hom
 
 Projects `t23/drillbit-ios` and `t23/drillbit-api` (EU, `de.sentry.io`). They were created with the `SENTRY_AUTH_TOKEN` org token, because the personal login can't create projects in t23. IP scrubbing, the default data scrubber and a `$user.geo` removal rule are on for both. The `SENTRY_DSN` Worker secret is set in development and production. `SENTRY_ENVIRONMENT` is a var.
 
-Workers deployed: development `3b3331b3-2f0b-4492-954c-899a9cc1fd21`, production `ec25ab61-89d5-4702-8b26-5b52c04c4607`. The bundle is 474 KiB gzipped. `/health` and `/privacy` return 200, and unauthenticated `/v1/bootstrap` returns 401.
+Workers deployed: development `3b3331b3-2f0b-4492-954c-899a9cc1fd21`, production `ec25ab61-89d5-4702-8b26-5b52c04c4607`. They were redeployed with Sentry named in the privacy policy as development `7ebf95c8-e852-40da-a6d0-72db29b49181` and production `f7b7d371-0440-4a54-b178-436fff507685`. The bundle is 474 KiB gzipped. `/health` and `/privacy` return 200, and unauthenticated `/v1/bootstrap` returns 401.
 
 Checked:
 - Test events from `sentry-cli send-event` reached both projects, and were resolved.
