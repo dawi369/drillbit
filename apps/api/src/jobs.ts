@@ -25,6 +25,7 @@ import { historicalSnapshot } from "./history";
 import { interviewSchemaFor, revisedGuidedPath } from "./interview";
 import { groundReflection } from "./learning";
 import { selectConcept } from "./library";
+import { reportFailure } from "./monitoring";
 import type { Env } from "./platform";
 import { normalizeQuestionMarkup, plainQuestion } from "./prompts/formatting";
 import { guidanceMode } from "./prompts/teaching";
@@ -312,10 +313,17 @@ export async function runJob(env: Env, id: string) {
     ).bind(now, id),
   ]);
 }
+/** A job that gave up for good is worth a report, unless the person cancelled it. */
+async function reportJobFailure(env: Env, id: string, error: unknown, kind?: string) {
+  if (error instanceof Error && /^(interview|request)_cancelled$/.test(error.message)) return;
+  kind ??= (await env.DB.prepare("SELECT kind FROM jobs WHERE id=?").bind(id).first<{ kind: string }>())?.kind;
+  reportFailure(error, { job: kind ?? "unknown" });
+}
 export async function runJobSafely(env: Env, id: string) {
   try {
     await runJob(env, id);
-  } catch {
+  } catch (error) {
+    await reportJobFailure(env, id, error);
     await env.DB.prepare(
       "UPDATE jobs SET status='failed',error='The operation could not finish. Retry when connected.',updated_at=? WHERE id=? AND status NOT IN ('completed','cancelled')",
     ).bind(timestamp(), id).run();
@@ -353,7 +361,8 @@ export class PracticeWorkflow extends WorkflowEntrypoint<
         },
         () => runJob(this.env, event.payload.jobId),
       );
-    } catch {
+    } catch (error) {
+      await reportJobFailure(this.env, event.payload.jobId, error);
       await this.env.DB.prepare(
         "UPDATE jobs SET status='failed',error='The operation could not finish. Retry when connected.',updated_at=? WHERE id=? AND status NOT IN ('completed','cancelled')",
       )

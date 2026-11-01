@@ -7,3 +7,5 @@ PRIVACY_POLICY_URL = https:/$()/api.drillbit.t23.dev/privacy
 SIGN_IN_PROVIDERS = apple
 // Empty: the native StoreKit paywall. Set a Superwall public key here to switch.
 SUPERWALL_API_KEY =
+// Sentry t23/drillbit-ios (EU). A DSN is a public client key; it only lets the app send reports.
+SENTRY_DSN = https:/$()/c7b580a0c9c0138b3f00089b72797121@o4511155346472960.ingest.de.sentry.io/4512357869682768

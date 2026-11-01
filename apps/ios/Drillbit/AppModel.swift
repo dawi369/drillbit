@@ -405,6 +405,7 @@ import WidgetKit
     do { try await action() } catch is CancellationError {} catch let error as URLError where error.code == .cancelled {} catch {
       self.error = error.localizedDescription
       logger.error("Operation failed; details shown in UI")
+      CrashReporting.reportUnexpected(error, operation: "perform")
     }
   }
   /// Hydrate authenticated account data locally before publishing Home.

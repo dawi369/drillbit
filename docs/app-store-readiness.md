@@ -70,7 +70,7 @@ What the paywall already does for Guideline 3.1.2 (no work needed; listed so you
 
 ## 4. App Privacy ("nutrition label") answers
 
-Match `apps/ios/Drillbit/PrivacyInfo.xcprivacy`. Tracking: **No**. For every type below: *Linked to the user: Yes*, *Used for tracking: No*, *Purpose: App Functionality*.
+Match `apps/ios/Drillbit/PrivacyInfo.xcprivacy`. Tracking: **No**. For every type below: *Linked to the user: Yes* (except the Diagnostics rows, which are not linked), *Used for tracking: No*, *Purpose: App Functionality*.
 
 | Category | Type | Why |
 | --- | --- | --- |
@@ -80,6 +80,9 @@ Match `apps/ios/Drillbit/PrivacyInfo.xcprivacy`. Tracking: **No**. For every typ
 | User Content | Other User Content | Answers, transcripts, learning plan |
 | Purchases | Purchase History | Subscription verification |
 | Usage Data | Product Interaction | Rep and voice counts for plan limits |
+| Diagnostics | Crash Data | Sentry crash reports. **Linked: No** |
+| Diagnostics | Performance Data | Sentry app-hang reports. **Linked: No** |
+| Diagnostics | Other Diagnostic Data | Device model, OS and app version on Sentry reports. **Linked: No** |
 
 Privacy Policy URL: `https://<prod-host>/privacy`.
 

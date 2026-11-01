@@ -45,6 +45,7 @@
 		841482E9982EA21DA42B92E3 /* Ticket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 137147215B8FA4CA44DA4451 /* Ticket.swift */; };
 		868D112482709522C36A981D /* PracticeWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF83E5C54AF9B2C1262CAB8 /* PracticeWorkspace.swift */; };
 		8D4370BA4D4B112FDA7560A6 /* PracticeCompanion.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCDB9D254A54D86DF356AC77 /* PracticeCompanion.swift */; };
+		8D79D5B698FE4F8F349DE454 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = 854AB446D919855E973F6039 /* Sentry */; };
 		8FE983BB1C9DB26C639077DF /* ConfirmDialog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EF172C9FCF994285F13C65A /* ConfirmDialog.swift */; };
 		90F6ED92CF56317BB044798C /* WebRTC in Frameworks */ = {isa = PBXBuildFile; productRef = F2CD5EB14F805EA1C27B2674 /* WebRTC */; };
 		98976F6C3CDB3840953CD676 /* ReflectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD095763BDFB10A241582226 /* ReflectionView.swift */; };
@@ -57,6 +58,7 @@
 		BA66BF7CF5979DAA6AC4E9C5 /* PracticeEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 153D45AC2868C4FBAF088C71 /* PracticeEvidence.swift */; };
 		BC4FE8728310CCD03149A913 /* InterviewDocumentRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20B8BC792201909C6B627383 /* InterviewDocumentRows.swift */; };
 		BD4605BCD97A69C956FB2F24 /* LibraryHome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78B4C37DAB3D173EEED7DB7B /* LibraryHome.swift */; };
+		C389D9083365D9C3CA9F95DA /* CrashReporting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2ABF2B14406DFD620FBD914F /* CrashReporting.swift */; };
 		C65663B45DE7E6FB2F28D848 /* AuditScreenshots.swift in Sources */ = {isa = PBXBuildFile; fileRef = C197A270F91EB4CC5F520C1D /* AuditScreenshots.swift */; };
 		CDF84DEA3D9A57613120F732 /* GrowingInterviewEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3805DAF1DC8F8A3A0256EBF7 /* GrowingInterviewEditor.swift */; };
 		CEEEB3987FECE2F2B2B61FF0 /* VoiceTranscript.swift in Sources */ = {isa = PBXBuildFile; fileRef = 658B4C2655924F8CC0AE95C3 /* VoiceTranscript.swift */; };
@@ -131,6 +133,7 @@
 		1BA600A70A653AC369122638 /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
 		1DCB42472B027EF8556E83E2 /* AppDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDiagnostics.swift; sourceTree = "<group>"; };
 		20B8BC792201909C6B627383 /* InterviewDocumentRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterviewDocumentRows.swift; sourceTree = "<group>"; };
+		2ABF2B14406DFD620FBD914F /* CrashReporting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrashReporting.swift; sourceTree = "<group>"; };
 		3304113E3A0EC6040CBB22E4 /* Drillbit.storekit */ = {isa = PBXFileReference; path = Drillbit.storekit; sourceTree = "<group>"; };
 		366045A34DEB9127B61D057D /* Literata.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Literata.ttf; sourceTree = "<group>"; };
 		3805DAF1DC8F8A3A0256EBF7 /* GrowingInterviewEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrowingInterviewEditor.swift; sourceTree = "<group>"; };
@@ -192,6 +195,7 @@
 				90F6ED92CF56317BB044798C /* WebRTC in Frameworks */,
 				60C8FC1C39DFF81C6C1F19A8 /* ClerkKit in Frameworks */,
 				7B6A96CC518B000450D6AEEB /* SuperwallKit in Frameworks */,
+				8D79D5B698FE4F8F349DE454 /* Sentry in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -241,6 +245,7 @@
 				A193915AEBBE5F30D2A8AECA /* CompanionCoordinator.swift */,
 				04CE1C0E2D55B42FFFD0982A /* CompanionPanel.swift */,
 				9EF172C9FCF994285F13C65A /* ConfirmDialog.swift */,
+				2ABF2B14406DFD620FBD914F /* CrashReporting.swift */,
 				FDE151C29EEC1990D2C7E840 /* DesignSystem.swift */,
 				DAD863FB5DA9BAE45F86B3AB /* DrillbitApp.swift */,
 				BA47F5B6A6BBF68259182059 /* FirstUse.swift */,
@@ -365,6 +370,7 @@
 				F2CD5EB14F805EA1C27B2674 /* WebRTC */,
 				D0E2F449415E69EBA68ED8CD /* ClerkKit */,
 				0D0EC2EEC55E12E65A2CEE74 /* SuperwallKit */,
+				854AB446D919855E973F6039 /* Sentry */,
 			);
 			productName = Drillbit;
 			productReference = 4C0456C5AFA3D9C114B4F80D /* Drillbit.app */;
@@ -451,6 +457,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				45836B15F0D4DBA12F3BE30E /* XCRemoteSwiftPackageReference "clerk-ios" */,
+				CA72DF2A89A8004CC44636D1 /* XCRemoteSwiftPackageReference "sentry-cocoa" */,
 				7CB05E84346C4092CEEE7969 /* XCRemoteSwiftPackageReference "Superwall-iOS" */,
 				47C0540B540455126F4759BA /* XCRemoteSwiftPackageReference "WebRTC" */,
 			);
@@ -550,6 +557,7 @@
 				70BF4744A694732D3FFBCDBC /* CompanionCoordinator.swift in Sources */,
 				387B66BE5AA3210DD6C8A017 /* CompanionPanel.swift in Sources */,
 				8FE983BB1C9DB26C639077DF /* ConfirmDialog.swift in Sources */,
+				C389D9083365D9C3CA9F95DA /* CrashReporting.swift in Sources */,
 				B60776186F24C169754719F2 /* DesignSystem.swift in Sources */,
 				3D1A1EB693F960C1596B0D8F /* DrillbitApp.swift in Sources */,
 				EFE8C1C42E2D80F1C5FEA8D4 /* FirstUse.swift in Sources */,
@@ -962,6 +970,14 @@
 				minimumVersion = 4.17.0;
 			};
 		};
+		CA72DF2A89A8004CC44636D1 /* XCRemoteSwiftPackageReference "sentry-cocoa" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/getsentry/sentry-cocoa.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 9.32.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -969,6 +985,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 7CB05E84346C4092CEEE7969 /* XCRemoteSwiftPackageReference "Superwall-iOS" */;
 			productName = SuperwallKit;
+		};
+		854AB446D919855E973F6039 /* Sentry */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CA72DF2A89A8004CC44636D1 /* XCRemoteSwiftPackageReference "sentry-cocoa" */;
+			productName = Sentry;
 		};
 		D0E2F449415E69EBA68ED8CD /* ClerkKit */ = {
 			isa = XCSwiftPackageProductDependency;

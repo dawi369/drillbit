@@ -46,6 +46,8 @@
 	<string>Talk with your practice interviewer using live voice, or record a voice note to the developer from Settings.</string>
 	<key>PrivacyPolicyURL</key>
 	<string>$(PRIVACY_POLICY_URL)</string>
+	<key>SentryDSN</key>
+	<string>$(SENTRY_DSN)</string>
 	<key>SharedKeychainGroup</key>
 	<string>$(AppIdentifierPrefix)dawi.drillbit.shared</string>
 	<key>SignInProviders</key>

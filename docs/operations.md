@@ -329,3 +329,17 @@ The deploy carries:
 On both Workers, `/health` and `/privacy` return 200 and unauthenticated `/v1/bootstrap` and `/v1/feedback/voice` return 401. Download notes with `bun scripts/voice-notes.ts`.
 
 Not yet verified: a real voice note from a phone, and the "Good day's work." Home state in a release build.
+
+### Sentry — 1 November 2026
+
+Projects `t23/drillbit-ios` and `t23/drillbit-api` (EU, `de.sentry.io`). They were created with the `SENTRY_AUTH_TOKEN` org token, because the personal login can't create projects in t23. IP scrubbing, the default data scrubber and a `$user.geo` removal rule are on for both. The `SENTRY_DSN` Worker secret is set in development and production. `SENTRY_ENVIRONMENT` is a var.
+
+Workers deployed: development `3b3331b3-2f0b-4492-954c-899a9cc1fd21`, production `ec25ab61-89d5-4702-8b26-5b52c04c4607`. The bundle is 474 KiB gzipped. `/health` and `/privacy` return 200, and unauthenticated `/v1/bootstrap` returns 401.
+
+Checked:
+- Test events from `sentry-cli send-event` reached both projects, and were resolved.
+- A Debug build with the DSN, launched with `--sentry-test-event`, reported to `drillbit-ios` with no user, IP, location or breadcrumbs. The location was gone once the geo rule and `infer_ip` were in place.
+
+Not yet seen live: a real Worker 5xx or job failure, and a crash from a Release build. The Worker report path is covered by unit tests only.
+
+Triage: `sentry issue list t23/drillbit-api` or `t23/drillbit-ios`. Crash stacks need the build's dSYMs: `scripts/release-ios.sh` uploads them when `SENTRY_AUTH_TOKEN` is set.

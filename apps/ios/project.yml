@@ -21,6 +21,9 @@ packages:
   SuperwallKit:
     url: https://github.com/superwall/Superwall-iOS.git
     from: 4.17.0
+  Sentry:
+    url: https://github.com/getsentry/sentry-cocoa.git
+    from: 9.32.0
 targets:
   Drillbit:
     type: application
@@ -44,6 +47,7 @@ targets:
         ClerkPublishableKey: $(CLERK_PUBLISHABLE_KEY)
         SuperwallAPIKey: $(SUPERWALL_API_KEY)
         PrivacyPolicyURL: $(PRIVACY_POLICY_URL)
+        SentryDSN: $(SENTRY_DSN)
         SignInProviders: $(SIGN_IN_PROVIDERS)
         SharedKeychainGroup: $(AppIdentifierPrefix)dawi.drillbit.shared
         CFBundleURLTypes:
@@ -74,6 +78,8 @@ targets:
       - package: Clerk
         product: ClerkKit
       - package: SuperwallKit
+      - package: Sentry
+        product: Sentry
       - target: DrillbitWidget
   DrillbitWidget:
     type: app-extension

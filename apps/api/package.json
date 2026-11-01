@@ -12,6 +12,7 @@
   "dependencies": {
     "@js-temporal/polyfill": "^0.5.1",
     "@peculiar/x509": "^2.1.0",
+    "@sentry/cloudflare": "^11.9.0",
     "hono": "^4.9.0",
     "jose": "^6.0.0",
     "reflect-metadata": "^0.2.2",

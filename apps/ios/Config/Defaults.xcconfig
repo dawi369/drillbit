@@ -4,6 +4,8 @@ CLERK_PUBLISHABLE_KEY =
 SUPERWALL_API_KEY =
 // Public privacy policy page, required for the App Store build. Write it as https:/$()/host/path: xcconfig reads // as a comment.
 PRIVACY_POLICY_URL =
+// Crash and error reports (Sentry t23/drillbit-ios). Empty means off; Release builds get it from Production.xcconfig.
+SENTRY_DSN =
 // Sign-in buttons, space separated: apple google github. Production narrows this in Production.xcconfig.
 SIGN_IN_PROVIDERS = apple google github
 #include? "Local.xcconfig"

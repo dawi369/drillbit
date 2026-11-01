@@ -184,6 +184,7 @@ private struct DeveloperSettingsSection: View {
   @State private var confirming: Reset?
   @State private var switchingPlan = false
   @State private var coachReplayed = false
+  @State private var reportSent: Bool?
   enum Reset: String, Identifiable { case practice, everything, reinvite; var id: String { rawValue } }
 
   var body: some View {
@@ -223,6 +224,10 @@ private struct DeveloperSettingsSection: View {
         coachReplayed = true
       }
       .disabled(coachReplayed)
+      Button(reportSent == nil ? "Send a test report to Sentry" : reportSent == true ? "Sent. Check t23/drillbit-ios" : "Sentry is off in this build") {
+        reportSent = CrashReporting.sendTest()
+      }
+      .disabled(reportSent != nil)
       resetButton("Replay onboarding questions", .practice)
       resetButton("Back to the invite screen", .reinvite)
       resetButton("Reset Drillbit", .everything, role: .destructive)

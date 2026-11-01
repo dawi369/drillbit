@@ -35,18 +35,29 @@ xcodebuild -project "$root/apps/ios/Drillbit.xcodeproj" -scheme Drillbit -config
 plist="$archive/Products/Applications/Drillbit.app/Info.plist"
 read_key() { /usr/libexec/PlistBuddy -c "Print :$1" "$plist" 2>/dev/null || true; }
 api=$(read_key APIBaseURL); clerk=$(read_key ClerkPublishableKey); privacy=$(read_key PrivacyPolicyURL)
-providers=$(read_key SignInProviders); shipped="$(read_key CFBundleShortVersionString) ($(read_key CFBundleVersion))"
+providers=$(read_key SignInProviders); sentry=$(read_key SentryDSN); shipped="$(read_key CFBundleShortVersionString) ($(read_key CFBundleVersion))"
 echo "  version   $shipped"
 echo "  api       $api"
 echo "  clerk     ${clerk:0:12}…"
 echo "  privacy   $privacy"
 echo "  sign-in   $providers"
+echo "  sentry    ${sentry:0:24}…"
 fail=false
 [ "$api" = "https://api.drillbit.t23.dev" ] || { echo "error: APIBaseURL isn't production" >&2; fail=true; }
 [[ "$clerk" == pk_live_* ]] || { echo "error: Clerk key isn't a pk_live_ key" >&2; fail=true; }
 [[ "$privacy" == https://* ]] || { echo "error: no privacy policy URL" >&2; fail=true; }
+[[ "$sentry" == https://*ingest*sentry.io/* ]] || { echo "error: no Sentry DSN, so crashes wouldn't be reported" >&2; fail=true; }
 $fail && exit 1
 echo "Archive verified: $archive"
+
+# Readable crash stacks: Sentry needs this build's dSYMs. Uses SENTRY_AUTH_TOKEN (sentry-cli) when it's set.
+if command -v sentry-cli >/dev/null && [ -n "${SENTRY_AUTH_TOKEN:-}" ]; then
+  sentry-cli debug-files upload --org t23 --project drillbit-ios "$archive/dSYMs" >"$out/sentry-dsyms.log" 2>&1 \
+    && echo "Uploaded dSYMs to Sentry (t23/drillbit-ios)." \
+    || echo "warning: dSYM upload to Sentry failed (see $out/sentry-dsyms.log); crash stacks will be unreadable until it's uploaded" >&2
+else
+  echo "warning: dSYMs not uploaded to Sentry; set SENTRY_AUTH_TOKEN, then run: sentry-cli debug-files upload --org t23 --project drillbit-ios \"$archive/dSYMs\"" >&2
+fi
 
 if $upload; then
   echo "Exporting and uploading to App Store Connect…"

@@ -18,6 +18,8 @@
     "VOICE_ENABLED": "true",
     "PRACTICE_GATE": "false",
     "SUPPORT_EMAIL": "support@t23.dev",
+    // Sentry tags events with this; the DSN itself is the SENTRY_DSN secret (unset: reporting off).
+    "SENTRY_ENVIRONMENT": "development",
     "FREE_REPS_PER_DAY": "3",
     "FREE_VOICE_LIFETIME": "3",
     "FREE_VOICE_TASTE_DAYS": "0",
@@ -73,6 +75,8 @@
         "PRACTICE_GATE": "true",
         "OPEN_SIGNUP": "true",
         "SUPPORT_EMAIL": "support@t23.dev",
+        // Sentry tags events with this; the DSN itself is the SENTRY_DSN secret (unset: reporting off).
+        "SENTRY_ENVIRONMENT": "production",
         "FREE_REPS_PER_DAY": "3",
         // Two free reps in total, then Pro (31 Oct): the first is onboarding, the second comes after exploring the app.
         "FREE_REPS_LIFETIME": "2",

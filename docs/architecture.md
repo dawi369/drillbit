@@ -665,3 +665,20 @@ Settings → Feedback → "Send me a voice note" opens `VoiceNoteView`. It recor
 
 `voiceEvents` counts a close at no less than the time from the session's start to the close, up to its cap (`expires_at - created_at - 30 s`). The app's reported seconds still win when they're higher. A confirmed silent close (no user fragment) is waived and refunds its start only while the account has fewer than `VOICE_FREE_LOOKS_PER_DAY` (2) waived sessions that UTC day. `FREE_VOICE_TASTE_DAYS=0` turns the free monthly taste off: after the intro sessions, the capability says "That's your free voice sessions. Pro has voice any time." (`kind: intro`, `remaining: 0`, no `resetsAt`), and the app shows the Pro nudge. The server still can't end a provider session itself; see the known limit in paywall-plan.md section 14.
 
+
+## Error tracking: Sentry — 1 November 2026
+
+Two Sentry projects in the t23 org (EU data region): `drillbit-ios` and `drillbit-api`. Both report only what nobody expected. Expected answers (a 4xx, free reps used, offline, cancellations) are never sent.
+
+- **App** (`CrashReporting.swift`, sentry-cocoa 9). Reports crashes, app hangs, MetricKit diagnostics, server errors (5xx, tagged with the endpoint path with ids replaced by `:id`), responses the app can't decode, and unexpected errors in `AppModel.perform`.
+  - It starts only when the build carries `SentryDSN`. Release builds get it from `Production.xcconfig`; Debug builds have none, and fixtures never start it.
+  - Nothing that identifies the user is sent: no user or install id (session tracking is off), no screenshots, view hierarchy or replay. Breadcrumbs are system and network only, with query strings removed. `sdk.settings.infer_ip = never` stops Sentry from geolocating the connection.
+  - The release script refuses an archive without a DSN, and uploads dSYMs when `SENTRY_AUTH_TOKEN` is set. Settings → Developer → "Send a test report to Sentry" proves a build reports. Debug builds accept `--sentry-test-event`.
+- **Worker** (`monitoring.ts`, @sentry/cloudflare 11). `withSentry` wraps fetch and cron, and `instrumentWorkflowWithSentry` wraps `PracticeWorkflow`. It reports 5xx responses (tagged with the route pattern and code) and jobs that gave up (tagged with the job kind; user cancellations excluded).
+  - `dataCollection` turns off user info, cookies, headers, bodies, query params, AI inputs and outputs, and frame variables.
+  - `scrubEvent` strips request details down to path and method, and removes user, extra and anything quoted in messages. JSON parse errors can quote model output or answers. `scrubbed()` reduces a ZodError to field paths and codes.
+  - The DSN is the `SENTRY_DSN` secret, and `SENTRY_ENVIRONMENT` tags the environment. Without the DSN (tests, local dev) Sentry is off.
+  - Tests pre-bundle `@sentry/cloudflare` (`deps.optimizer.ssr` in `vitest.config.ts`). Loaded module by module, it overwhelms the test pool's module server.
+- **Sentry project settings:** IP scrubbing, the default data scrubber, and a relay rule removing `$user.geo`.
+
+`bun scripts/metrics.ts [--days N] [--sandbox] [--development]` prints the launch numbers from D1 as aggregates only: the funnel, day-35 conversion, plan mix, weekly intro drop-off, voice minutes per plan (median, p90, max), refunds, free silent sessions, cap hits, AI cost and voice notes.

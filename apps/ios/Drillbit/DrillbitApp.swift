@@ -57,7 +57,11 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
       let container = try ModelContainer(
         for: Schema(StoreV1.models), migrationPlan: StoreMigrations.self,
         configurations: configuration)
-      if !fixture { Clerk.configure(publishableKey: key); AppDiagnostics.shared.start() }
+      if !fixture { CrashReporting.start(); Clerk.configure(publishableKey: key); AppDiagnostics.shared.start() }
+      #if DEBUG
+        // Proves a build with a DSN reports, without signing in: launch with --sentry-test-event.
+        if ProcessInfo.processInfo.arguments.contains("--sentry-test-event") { _ = CrashReporting.sendTest() }
+      #endif
       let appModel = AppModel(
         container: container,
         baseURL: URL(string: endpoint) ?? URL(string: "https://example.invalid")!, fixture: fixture)

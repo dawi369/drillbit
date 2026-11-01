@@ -35,6 +35,9 @@ export interface Env {
   FREE_VOICE_SESSION_MINUTES?: string;
   PRO_REPS_PER_DAY?: string;
   PRO_GENERATIONS_PER_DAY?: string;
+  /** Sentry (t23/drillbit-api). A secret; unset means reporting is off. */
+  SENTRY_DSN?: string;
+  SENTRY_ENVIRONMENT?: string;
   PRO_VOICE_STARTS_PER_DAY?: string;
   PRO_VOICE_SESSION_MINUTES?: string;
   PRO_VOICE_MINUTES_PER_DAY?: string;

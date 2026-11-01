@@ -54,6 +54,7 @@ export function privacyPolicy(env: Env) {
 <ul>
 <li><a href="https://clerk.com/legal/privacy">Clerk</a> handles sign-in.</li>
 <li><a href="https://www.cloudflare.com/privacypolicy/">Cloudflare</a> hosts our servers and database.</li>
+<li><a href="https://sentry.io/privacy/">Sentry</a> (EU data region) receives crash and error reports: the app version, device model and operating system, and where the code went wrong. Reports carry no account or device identifier, no location, and none of your answers, conversations or recordings.</li>
 <li>Apple processes purchases and subscriptions.</li>
 <li>If we use <a href="https://superwall.com/privacy">Superwall</a> to show the subscription screen, it receives an anonymous account identifier and paywall interactions.</li>
 </ul>

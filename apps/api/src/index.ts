@@ -45,7 +45,11 @@ import {
 import { concepts } from "./taxonomy";
 import { delegateVoice, startVoice, voiceCapability, voiceEvents } from "./voice";
 import { privacyPolicy, supportPage } from "./legal";
-export { PracticeWorkflow } from "./jobs";
+import { PracticeWorkflow as PracticeWorkflowBase } from "./jobs";
+import { instrumentWorkflowWithSentry, withSentry } from "@sentry/cloudflare";
+import { reportFailure, sentryOptions } from "./monitoring";
+// Workflow failures reach Sentry too; wrangler binds the class by this export name.
+export const PracticeWorkflow = instrumentWorkflowWithSentry(sentryOptions, PracticeWorkflowBase);
 export const app = new Hono<{
   Bindings: Env;
   Variables: { account: Account; requestId: string };
@@ -102,6 +106,10 @@ app.onError((error, c) => {
             500,
             "Something went wrong. Your saved answer is safe.",
           );
+  if (fault.status >= 500) {
+    // The route pattern (never the path with ids) and the code group the reports.
+    reportFailure(error, { route: c.req.routePath, code: fault.code });
+  }
   if (fault.status >= 500)
     console.error(
       JSON.stringify({
@@ -1012,8 +1020,8 @@ app.post("/v1/challenges/:id/coach", async (c) => {
     }
   });
 });
-export default {
+export default withSentry(sentryOptions, {
   fetch: app.fetch,
   scheduled: (_event: ScheduledController, env: Env, ctx: ExecutionContext) =>
     ctx.waitUntil(reconcile(env)),
-};
+} satisfies ExportedHandler<Env>);
