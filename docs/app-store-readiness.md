@@ -1,14 +1,14 @@
 # App Store readiness
 
-Status, 27 October 2026: **the app code is ready for review; the production environment and App Store Connect aren't.** Everything below that says *you* needs an account, a dashboard or a real iPhone. Work through the sections in order. Each one says how to check it's done.
+Status, 1 November 2026: **the app code and the production environment are ready; App Store Connect and the physical-device checklist aren't confirmed.** Everything below that says *you* needs an account, a dashboard or a real iPhone. Work through the sections in order. Each one says how to check it's done.
 
 Verification is reported in three levels, as the release gate in [operations.md](operations.md#release-gate) requires:
 
 | Level | Status |
 | --- | --- |
 | Compiled and tested (simulator, D1) | Done this pass. See [Test evidence](#test-evidence). |
-| Live-service verified | Development Worker only. Production doesn't exist yet. |
-| Physical-device verified | **Not done.** Needs you with a Sandbox tester (section 7). |
+| Live-service verified | Production Worker serving real traffic: on 31 October, D1 recorded completed question, interview, feedback and voice jobs and one Sandbox entitlement (now expired). |
+| Physical-device verified | **Not recorded.** The 31 October production activity suggests a phone signed in and bought in Sandbox, but section 7's checklist hasn't been written up. |
 
 ## What changed in this pass
 
@@ -22,9 +22,9 @@ Verification is reported in three levels, as the release gate in [operations.md]
 
 The privacy policy is a standard template matched to what the app actually does: what's collected, OpenRouter/OpenAI/Clerk/Cloudflare/Apple/Superwall as processors, deletion, no tracking. **It's not legal advice.** Read it at `/privacy` and have someone qualified check it if you sell in the EU or California. If the product changes, update `legal.ts`, `PrivacyInfo.xcprivacy` and the App Privacy answers (section 4) together.
 
-## 1. Production backend: done 28 October except the AI keys
+## 1. Production backend: done
 
-Clerk production (`clerk.drillbit.t23.dev`, Apple only) and the Worker (`https://api.drillbit.t23.dev`, cron on) are live; details are in [operations.md](operations.md#production-provisioned--28-october-2026). Still needed:
+Clerk production (`clerk.drillbit.t23.dev`, Apple only) and the Worker (`https://api.drillbit.t23.dev`, cron on) are live; details are in [operations.md](operations.md#production-provisioned--28-october-2026). Both AI keys are set (`wrangler secret list --env production`, checked 1 November), and production D1 shows completed question, interview, feedback and voice jobs from 31 October. To rotate a key:
 
 ```sh
 cd apps/api
@@ -36,7 +36,7 @@ cd apps/api
 
 ## 2. Release build: one command
 
-Production values are committed in `apps/ios/Config/Production.xcconfig`, and every Release build uses them. Bump `CURRENT_PROJECT_VERSION` in `apps/ios/project.yml` for each upload (13 is next). `MARKETING_VERSION` is `1.0`, matching the version record in App Store Connect; keep them equal. Then, **in your own Terminal** (an agent or SSH shell can't reach the signing key):
+Production values are committed in `apps/ios/Config/Production.xcconfig`, and every Release build uses them. Bump `CURRENT_PROJECT_VERSION` in `apps/ios/project.yml` for each upload. It's 16 on 1 November; use 17 for the next upload unless App Store Connect shows 16 was never uploaded. `MARKETING_VERSION` is `1.0`, matching the version record in App Store Connect; keep them equal. Then, **in your own Terminal** (an agent or SSH shell can't reach the signing key):
 
 ```sh
 scripts/release-ios.sh            # archive and verify: production API, pk_live key, privacy URL
@@ -120,14 +120,14 @@ If you want Superwall at launch instead:
 > • Live voice that continues the same interview, with your draft intact
 > • Recall cards and a library of everything you've practiced
 >
-> Free: 3 questions a day and a taste of voice. Drillbit Pro: practice as much as you like and use voice most days (fair use applies). Pro renews automatically unless you cancel at least 24 hours before the period ends. Manage or cancel in your Apple Account settings.
+> Free: two questions to try it, plus a taste of voice. Drillbit Pro: practice as much as you like and use voice most days (fair use applies). Pro renews automatically unless you cancel at least 24 hours before the period ends. Manage or cancel in your Apple Account settings.
 >
 > Drillbit uses third-party AI (OpenRouter and OpenAI) to run interviews. It asks before anything is sent.
 >
 > Terms of Use: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
 > Privacy Policy: https://api.drillbit.t23.dev/privacy
 
-Keep "fair use applies" next to "as much as you like": Pro has fair-use caps (30 reps a day; voice 60 minutes a day, 150 a week, 20 a session). Unqualified "unlimited" claims invite a 2.3.1 accuracy rejection.
+Keep "fair use applies" next to "as much as you like": Pro has fair-use caps (30 reps a day; voice 60 minutes a day, 100 a week, 20 a session). Unqualified "unlimited" claims invite a 2.3.1 accuracy rejection.
 
 **Screenshots:** iPhone 6.9" (1320 × 2868) is required, and the app is iPhone-only, so there's no iPad set. Six are ready in [`docs/design/app-store/`](design/app-store/): welcome, interview, example, Home, Recall and Library, in that order. They're generated from fixtures as a customer account, so there's no developer tab. To regenerate after UI changes, boot an iPhone 17 Pro Max simulator, run `xcrun simctl status_bar <udid> override --time 9:41 --batteryState charged --batteryLevel 100`, then run `-only-testing:DrillbitUITests/StoreScreenshots` and export the attachments (as `scripts/audit-shots.sh` does). Live voice is the headline feature but isn't in the set: the fixture voice room shows a debug "Simulate speech" link. Take that one on your phone during section 7 (a Pro Max, or scale to 1320 × 2868), mid-conversation with a caption showing. Add short captions in App Store Connect if you want, e.g. "An interviewer who pushes back", "Stuck? Ask for an example", "Recall what you learned".
 
@@ -135,7 +135,7 @@ Keep "fair use applies" next to "as much as you like": Pro has fair-use caps (30
 
 > Sign in with Apple to create an account; no invite or demo code is needed. The first launch shows a short intro and a one-minute setup, then asks permission to use third-party AI (OpenRouter for text, OpenAI for voice) before sign-in.
 >
-> Subscriptions: free accounts get 3 questions per day. To reach the paywall, use Settings → See Pro, or finish 3 questions. Restore Purchases is on the paywall (Settings → See Pro).
+> Subscriptions: free accounts get two questions in total. To reach the paywall, use Settings → See Pro, or finish two questions. Restore Purchases is on the paywall (Settings → See Pro).
 >
 > Voice: open a question and tap Talk, then tap the microphone to unmute. Microphone permission is requested then. Free accounts get 3 voice sessions.
 >
@@ -153,7 +153,7 @@ Install the production build on an iPhone signed into a **Sandbox** Apple ID (Se
 - [ ] Only Sign in with Apple is offered (Google and GitHub come back once production OAuth apps exist in Clerk)
 - [ ] Answer, follow-up, nudge, Finish → feedback
 - [ ] Voice: microphone prompt, live conversation, back to text with the draft intact; a free account stops at the cap
-- [ ] Use 3 reps → Home waits → See Pro → paywall shows real prices and intro offer → buy weekly → Pro without relaunch
+- [ ] Use both free reps → Home shows the paywall nudge → See Pro → paywall shows real prices and intro offer → buy weekly → Pro without relaunch
 - [ ] Delete and reinstall → sign in → See Pro → Restore → Pro
 - [ ] Settings → Manage subscription opens Apple's sheet; cancel there and check that the plan returns to Free after expiry (sandbox weeks last minutes)
 - [ ] `SELECT * FROM entitlements` in production D1 shows the row with `environment = Sandbox`
