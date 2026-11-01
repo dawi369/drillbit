@@ -274,7 +274,7 @@ struct QuestionFlow: View {
         guard capturedAccount == model.bootstrap?.account.id else { return }
         holding = false
         failure = error.localizedDescription
-        model.preparationFailure = error.localizedDescription
+        model.failPreparation(error)
         model.failedPreparation = input
         model.failedPreparationSource = source
         retryInput = input

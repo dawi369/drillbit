@@ -256,7 +256,13 @@ for (const [method, path, summary, schema] of operations) {
       },
       "429": { description: "Usage limit reached", content: json("Error") },
       ...(["post challenges", "post jobs/{id}/retry", "post questions/{id}/start", "post challenges/{id}/retry-moment/{turn}"].includes(method + " " + path)
-        ? { "402": { description: "Free rep already used; code practice_gate. Bootstrap practice.nextFreeRepAt says when it returns.", content: json("Error") } }
+        ? {
+          "402": { description: "Free rep already used; code practice_gate. Bootstrap practice.nextFreeRepAt says when it returns. A free rep skipped or swapped away before its second message doesn't count.", content: json("Error") },
+        }
+        : {}),
+      // Retrying a failed preparation finishes a rep already started, so it isn't checked.
+      ...(["post challenges", "post questions/{id}/start", "post challenges/{id}/retry-moment/{turn}"].includes(method + " " + path)
+        ? { "429": { description: "Usage limit reached; code practice_limit when a Pro account has practised its daily reps (a rep counts from its second message), usage_limit for other fair-use caps.", content: json("Error") } }
         : {}),
     },
   };

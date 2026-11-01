@@ -38,9 +38,9 @@ Renewals, expiry, refunds → App Store Server Notifications v2 → POST /apple/
 
 | | Free | Pro |
 |---|---|---|
-| Questions (reps) | **2 in total** (since 31 Oct; was 3 a day) | Unlimited*, fair-use 30 a day |
+| Questions (reps) | **2 in total** (since 31 Oct; was 3 a day). A rep skipped or swapped away before its 2nd message comes back. | Unlimited*, fair use 10 practised reps a day (since 1 Nov; was 30 questions written) |
 | Inside a rep | 8 follow-ups, 2 nudges or examples | Unlimited |
-| Voice | First 3 sessions, 3 min each, then one every 30 days | Unlimited*, fair use 60 min a day and **100 a week** (was 150), up to 20 min a session |
+| Voice | First 3 sessions, 3 min each, then one every 30 days | Unlimited*, fair use 60 min a day and **75 a week** (since 1 Nov; was 100, before that 150), up to 20 min a session |
 | Feedback, Recall, Library | ✓ | ✓ |
 | Daily question prepared for you | – | ✓ |
 | Knowledge map and level estimate (Bit tab) | – | ✓ |
@@ -202,26 +202,38 @@ Watch: download-to-paid by day 35 (target 8% or more), App Store rating (paywall
 
 `bun scripts/launch-economics.ts` works per cohort of downloads, because free users now cost money once rather than every month. Section 9's free-user figures model the older 3-a-day freemium. The script uses expected values, no randomness; every assumption is a named constant at the top, and the full tables go to `.local/launch-economics.md`. Unit costs are the 31 October measurements. Production had one day of traffic, so **usage, conversion and retention are assumptions**.
 
-**What the caps allow.** A free download costs **$0.07** on average and **$0.49 at most**, once: two capped reps plus 9 intro voice minutes. A Pro user costs at most **$7.34 a week**, which is 30 reps a day plus 100 voice minutes; the rolling week allows up to $35 in a 30-day month. Voice at the weekly cap ($5.10) fits inside a full-price week ($6.59 kept). It doesn't fit inside yearly: $6.87 a month kept, against $22 a month for someone who sits on the cap every week.
+**What the caps allow** (updated for section 12's caps). A free download costs **$0.07** on average and **$0.49 at most**, once: two capped reps plus 9 intro voice minutes. A Pro user costs at most **$4.57 a week**, which is 10 reps a day plus 75 voice minutes; the rolling week allows up to $22 in a 30-day month. Voice at the weekly cap ($3.82) fits inside a full-price week ($6.59 kept). It doesn't fit inside yearly: $6.87 a month kept, against $16.56 a month for someone who sits on the cap every week.
 
-**Expected use.** Assumed Pro months: text only 25 reps, $0.27; light 45 voice minutes, $2.51; prepping about three 20-minute mocks a week (280 minutes), $14.45; heavy, on the cap, $22.30. Weekly buyers are mid-prep, so they average **$9.21 a month**. Yearly buyers are idle about a third of their months and average **$3.85**. In the first year a new weekly buyer nets **$15.47** over about five weeks (45% stop after the $1.99 week), a yearly buyer nets **$36.23**, and the blend at 35% yearly is **$22.74**.
+**Expected use.** Assumed Pro months: text only 25 reps, $0.27; light 45 voice minutes, $2.51; prepping about three 20-minute mocks a week (280 minutes), $14.45; heavy, on the cap (325 minutes), $16.95. Weekly buyers are mid-prep, so they average **$8.41 a month**. Yearly buyers are idle about a third of their months and average **$3.58**. In the first year a new weekly buyer nets **$16.19** over about five weeks (45% stop after the $1.99 week), a yearly buyer nets **$39.44**, and the blend at 35% yearly is **$24.33**.
 
 **Conversion scenarios, per 1,000 downloads.** "Expected" is 6% download-to-paid by day 35. RevenueCat's 2025 benchmarks put hard paywalls at about 10–12% and freemium at about 2%; two free reps sits between them, and education apps run below average.
 
 | Download-to-paid | Paying | First-year net per 1,000 downloads | Month 12 at 1,000 downloads a month |
 |---|---|---|---|
-| 1% (very low) | 10 | +$158 | +$144 |
-| 3% (low) | 30 | +$614 | +$600 |
-| **6% (expected)** | 60 | **+$1,298** | **+$1,285** |
-| 10% (high) | 100 | +$2,210 | +$2,197 |
-| 15% (very high) | 150 | +$3,351 | +$3,338 |
+| 1% (very low) | 10 | +$173 | +$160 |
+| 3% (low) | 30 | +$661 | +$648 |
+| **6% (expected)** | 60 | **+$1,393** | **+$1,380** |
+| 10% (high) | 100 | +$2,369 | +$2,356 |
+| 15% (very high) | 150 | +$3,589 | +$3,576 |
 
-Break-even is **0.3%** of downloads, or 2.1% if every non-payer used up the free voice intro. Year-two yearly renewals aren't counted. The month-12 column is before income tax and your own time.
+Break-even is **0.3%** of downloads, or 2.0% if every non-payer used up the free voice intro. Year-two yearly renewals aren't counted. The month-12 column is before income tax and your own time.
 
 **What moves it.**
-- Without the Small Business Program, Apple keeps 30% and the blend drops to $14.55. Enrol before the first sale.
-- Voice costing 50% more brings it to $11.31.
-- If a third of every segment became heavy voice users, yearly would turn negative (–$5.93) and the blend would be $5.49. If everyone were heavy, the business would lose money at any conversion rate.
-- Weekly buyers staying 14 full weeks instead of 7 brings the blend to $33.90.
+- Without the Small Business Program, Apple keeps 30% and the blend drops to $16.14. Enrol before the first sale.
+- Voice costing 50% more brings it to $13.69.
+- If a third of every segment became heavy voice users, yearly would still earn $10.01 and the blend would be $12.40. At 100 minutes a week, yearly lost $5.93 in this case. If everyone were heavy, the business would still lose money (–$11.83 blended).
+- Weekly buyers staying 14 full weeks instead of 7 brings the blend to $35.95.
 
-**The one real risk is yearly subscribers who use voice heavily.** If real data shows yearly voice minutes averaging above about 150 a month, give yearly its own weekly voice cap (an environment variable) or raise the yearly price. Replace the assumptions with real numbers as soon as they exist: download-to-paid by day 35, the weekly/yearly split, how many stop after the $1.99 week, and voice minutes per subscriber-month by plan.
+**The remaining risk is yearly subscribers who use voice heavily.** If real data shows yearly voice minutes averaging above about 150 a month, give yearly its own weekly voice cap or raise the yearly price. Replace the assumptions with real numbers as soon as they exist: download-to-paid by day 35, the weekly/yearly split, how many stop after the $1.99 week, and voice minutes per subscriber-month by plan.
+
+## 12. Decided 1 November: practised reps, refunds and 75 voice minutes
+
+| | Decision | Where |
+|---|---|---|
+| What a rep is | A rep counts from the user's **second message**: typed answers and questions, or each thing they say in voice. Opening, browsing or rerolling a question isn't a rep. | `practisedAt` in `practice-gate.ts` |
+| Pro reps | **10 practised a day** (UTC). Only starting a new rep checks it, so an open rep always finishes. Swapping a prepared question doesn't count. Developers are counted, never stopped. | `PRO_REPS_PER_DAY=10` |
+| Pro question writing | **20 a day**, rerolls and abandoned questions included: a silent guard, about 4¢ at most | `PRO_GENERATIONS_PER_DAY=20` |
+| Free refunds | A free rep that's **skipped or swapped away before its second message** comes back. Finishing one, even after one message, spends it. Deleting an unused one doesn't record it as spent. Free question writing stays capped at 10 a day. | `abandonedUnused` in `practice-gate.ts` |
+| Pro voice | **75 minutes a week** for everyone, 60 a day, 20 a session: about three 20-minute mocks a week plus some slack | `PRO_VOICE_MINUTES_PER_WEEK=75` |
+
+Hitting the Pro rep cap returns 429 `practice_limit` ("That's 10 reps today, which is plenty. More tomorrow."). Home then shows "Good day's work." with "Back tomorrow" instead of the failure ticket's Review. Text was never the cost, so the rep cap is about fair use and feel; the money is in voice. Section 11's numbers are rerun with these caps. A refunded free rep was used for at most one message, so refunds add well under a cent per download.

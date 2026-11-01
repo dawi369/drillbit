@@ -228,3 +228,141 @@ it("gives lifetime free reps that never refill and stay spent when their questio
     expect((await prepare(subject)).status).toBe(402);
   } finally { bindings.FREE_REPS_LIFETIME = undefined; }
 });
+
+/** User messages on a challenge: typed answers, and spoken utterances in one voice session. */
+async function messages(account: string, challenge: string, typed: number, spoken = 0, at = new Date().toISOString()) {
+  let ordinal = 0;
+  const turn = async (kind: string) => {
+    const id = crypto.randomUUID();
+    await bindings.DB.batch([
+      bindings.DB.prepare("INSERT INTO jobs(id,account_id,challenge_id,kind,status,input,created_at,updated_at) VALUES(?,?,?,'interview','completed','{}',?,?)").bind(id, account, challenge, at, at),
+      bindings.DB.prepare("INSERT INTO interview_turns(id,challenge_id,ordinal,kind,prompt,text,job_id,created_at) VALUES(?,?,?,?,'original','A durable queue.',?,?)").bind(id, challenge, ordinal++, kind, id, at),
+    ]);
+    return id;
+  };
+  for (let i = 0; i < typed; i++) await turn("answer");
+  if (spoken) {
+    const session = await turn("voice");
+    await bindings.DB.prepare("INSERT INTO voice_sessions(id,account_id,challenge_id,provider_id,status,created_at,expires_at,finalized) VALUES(?,?,?,'live','closed',?,?,1)").bind(session, account, challenge, at, at).run();
+    for (let i = 0; i < spoken; i++)
+      await bindings.DB.prepare("INSERT INTO voice_fragments(session_id,id,sequence,speaker,text,start_ms,end_ms) VALUES(?,?,?,?,?,?,?)")
+        .bind(session, `u${i}`, i * 2, "user", "Retries need a key.", i * 1000, i * 1000 + 500).run();
+    // The interviewer talking doesn't make it practice.
+    await bindings.DB.prepare("INSERT INTO voice_fragments(session_id,id,sequence,speaker,text,start_ms,end_ms) VALUES(?,'a0',1,'assistant','Go on.',0,1)").bind(session).run();
+  }
+}
+const skip = (subject: string, challenge: string) => request(`challenges/${challenge}/skip`, subject, "POST");
+
+it("gives a free rep back when it's skipped before its second message, typed or spoken", async () => {
+  const { subject, id } = await person();
+  bindings.FREE_REPS_LIFETIME = "2";
+  try {
+    const untouched = await readyQuestion(id, { freeRepAt: new Date(Date.now() - 4000).toISOString() });
+    expect((await access(subject)).remaining).toBe(1);
+    expect((await skip(subject, untouched)).status).toBe(200);
+    const oneLine = await readyQuestion(id, { freeRepAt: new Date(Date.now() - 3000).toISOString() });
+    await messages(id, oneLine, 1);
+    expect((await access(subject)).remaining).toBe(1);
+    expect((await skip(subject, oneLine)).status).toBe(200);
+    expect(await access(subject)).toMatchObject({ available: true, remaining: 2 });
+
+    // Two messages make it a rep, even skipped: one typed and one spoken here.
+    const used = await readyQuestion(id, { freeRepAt: new Date(Date.now() - 2000).toISOString() });
+    await messages(id, used, 1, 1);
+    await skip(subject, used);
+    expect((await access(subject)).remaining).toBe(1);
+    // Speaking alone counts each utterance.
+    const spoken = await readyQuestion(id, { freeRepAt: new Date(Date.now() - 1000).toISOString() });
+    await messages(id, spoken, 0, 2);
+    await skip(subject, spoken);
+    expect((await access(subject)).remaining).toBe(0);
+    expect((await prepare(subject)).status).toBe(402);
+  } finally { bindings.FREE_REPS_LIFETIME = undefined; }
+});
+
+it("refunds a swapped free rep only when its replacement is abandoned unused too, and never records a deleted unused one", async () => {
+  const { subject, id } = await person();
+  bindings.FREE_REPS_LIFETIME = "1";
+  try {
+    const stamp = new Date().toISOString();
+    const original = await readyQuestion(id, { freeRepAt: stamp });
+    await bindings.DB.prepare("UPDATE challenges SET lifecycle='expired' WHERE id=?").bind(original).run();
+    const swapped = await readyQuestion(id, { freeRepAt: stamp, swapped: true });
+    expect((await access(subject)).remaining).toBe(0);
+    await skip(subject, swapped);
+    expect((await access(subject)).remaining).toBe(1);
+    // Deleting the abandoned question from Library doesn't spend the rep after all.
+    expect((await request("challenges/" + swapped, subject, "DELETE")).status).toBe(200);
+    expect((await access(subject)).remaining).toBe(1);
+    expect((await bindings.DB.prepare("SELECT COUNT(*) n FROM spent_free_reps WHERE account_id=?").bind(id).first<{ n: number }>())!.n).toBe(0);
+    // A finished rep is spent whatever its message count, and stays spent when deleted.
+    const finished = await readyQuestion(id, { freeRepAt: new Date(Date.now() + 1000).toISOString() });
+    await bindings.DB.prepare("UPDATE challenges SET lifecycle='completed' WHERE id=?").bind(finished).run();
+    await request("challenges/" + finished, subject, "DELETE");
+    expect((await access(subject)).remaining).toBe(0);
+  } finally { bindings.FREE_REPS_LIFETIME = undefined; }
+});
+
+/** A Pro account with `practised` reps (two messages each) today. */
+async function proWith(practised: number, at = new Date().toISOString()) {
+  const who = await person();
+  await bindings.DB.prepare("INSERT INTO entitlements(original_transaction_id,account_id,product_id,environment,status,active_until,signed_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)")
+    .bind(crypto.randomUUID(), who.id, "dawi.drillbit.pro.yearly", "Sandbox", "active", new Date(Date.now() + 86_400_000).toISOString(), "now", "now", "now").run();
+  for (let i = 0; i < practised; i++) {
+    const challenge = crypto.randomUUID();
+    await bindings.DB.prepare("INSERT INTO challenges(id,account_id,lifecycle,data,created_at,available_at,completed_at) VALUES(?,?,'completed',?,?,?,?)")
+      .bind(challenge, who.id, JSON.stringify({ title: "Queue", prompt: "Design a reliable job queue for email.", topic: "System design" }), at, at, at).run();
+    await messages(who.id, challenge, 2, 0, at);
+  }
+  return who;
+}
+
+it("stops a Pro account starting an eleventh practised rep today, counting only reps with two messages", async () => {
+  const nine = await proWith(9);
+  // Browsing doesn't count: a question with one message, and a skipped one with none.
+  const browsed = crypto.randomUUID();
+  await bindings.DB.prepare("INSERT INTO challenges(id,account_id,lifecycle,data,created_at,available_at) VALUES(?,?,'skipped','{}',?,?)").bind(browsed, nine.id, new Date().toISOString(), new Date().toISOString()).run();
+  await messages(nine.id, browsed, 1);
+  expect((await prepare(nine.subject)).status).toBe(202);
+
+  const ten = await proWith(10);
+  const blocked = await prepare(ten.subject);
+  expect(blocked.status).toBe(429);
+  expect(await blocked.json()).toMatchObject({ error: { code: "practice_limit", message: "That’s 10 reps today, which is plenty. More tomorrow." } });
+  // Library and moment retries start reps too.
+  const question = crypto.randomUUID();
+  await bindings.DB.prepare("INSERT INTO questions(id,account_id,data,created_at,eligibility_updated_at) VALUES(?,?,?,?,?)")
+    .bind(question, ten.id, JSON.stringify({ title: "Cache", prompt: "Design a read-through cache for profiles.", topic: "System design" }), "now", "now").run();
+  expect((await request("questions/" + question + "/start", ten.subject, "POST", undefined, crypto.randomUUID())).status).toBe(429);
+  // Swapping a question already prepared isn't a new rep.
+  const ready = await readyQuestion(ten.id, {});
+  expect((await prepare(ten.subject, { replaceId: ready })).status).toBe(202);
+  // Developers are counted, never stopped.
+  bindings.DEVELOPER_ACCOUNTS = ten.id;
+  try { await bindings.DB.prepare("DELETE FROM jobs WHERE account_id=? AND kind='generate'").bind(ten.id).run(); await bindings.DB.prepare("DELETE FROM challenges WHERE id=?").bind(ready).run(); expect((await prepare(ten.subject)).status).toBe(202); }
+  finally { bindings.DEVELOPER_ACCOUNTS = undefined; }
+});
+
+it("resets Pro's practised reps at UTC midnight and honours a configured count", async () => {
+  const yesterday = await proWith(10, new Date(Date.now() - 86_400_000).toISOString());
+  expect((await prepare(yesterday.subject)).status).toBe(202);
+  const three = await proWith(3);
+  bindings.PRO_REPS_PER_DAY = "3";
+  try { expect((await prepare(three.subject)).status).toBe(429); }
+  finally { bindings.PRO_REPS_PER_DAY = undefined; }
+});
+
+it("prepares one question when a Pro account races for its last practised rep", async () => {
+  const { subject, id } = await proWith(9);
+  const [a, b] = await Promise.all([prepare(subject), prepare(subject)]);
+  expect([a.status, b.status]).toEqual([202, 202]);
+  expect((await generations(id)).results).toHaveLength(1);
+});
+
+it("caps Pro question writing at 20 a day with its own message", async () => {
+  const { subject, id } = await proWith(0);
+  await bindings.DB.prepare("INSERT INTO usage(account_id,day,kind,count) VALUES(?,?,'generate',20)").bind(id, new Date().toISOString().slice(0, 10)).run();
+  const blocked = await prepare(subject);
+  expect(blocked.status).toBe(429);
+  expect(await blocked.json()).toMatchObject({ error: { code: "usage_limit", message: "That’s a lot of new questions for one day. Practise one you’ve got, or more tomorrow." } });
+});

@@ -265,6 +265,18 @@ struct HomeView: View {
       .accessibilityIdentifier("todayPreparing")
     case .question(let challenge):
       questionTicket(challenge)
+    case .failed(let failure) where model.preparationLimited:
+      Ticket {
+        VStack(alignment: .leading, spacing: 12) {
+          TicketHeader(number: nextNumber, detail: shortDate)
+          Text("Good day’s work.").font(.title2.weight(.semibold))
+          Text(failure).font(.subheadline).foregroundStyle(AppPalette.secondary)
+        }
+      } stub: {
+        stubText(title: "Back tomorrow", note: "Library and Recall are still open")
+      }
+      .accessibilityElement(children: .combine)
+      .accessibilityIdentifier("practiceLimit")
     case .failed(let failure):
       Ticket {
         VStack(alignment: .leading, spacing: 12) {
@@ -350,7 +362,7 @@ struct HomeView: View {
       if challenge.lifecycle == "ready" && model.mayStartRep(swapping: challenge) {
         Button("Regenerate", systemImage: AppIcon.retry.rawValue) { Task {
           do { _ = try await model.generateForPreview(PreparationInput(focus: "System design", kind: "design", difficulty: model.settings.difficulty, engineeringLevel: challenge.engineeringLevel, replaceId: challenge.id)) }
-          catch { model.preparationFailure = error.localizedDescription }
+          catch { model.failPreparation(error) }
         } }
         Button("Choose focus or level", systemImage: AppIcon.preferences.rawValue) { flow = QuestionFlowEntry() }
       }

@@ -148,7 +148,9 @@ import WidgetKit
   var busy = false
   /// The question as it's being written, for Home's ticket; nil when nothing is streaming.
   var preparingDraft: QuestionDraft?
-  var preparationFailure: String?
+  var preparationFailure: String? { didSet { if preparationFailure == nil { preparationLimited = false } } }
+  /// The failure is a daily fair-use limit, not something broken: nothing to review, it lifts tomorrow.
+  private(set) var preparationLimited = false
   var failedPreparation: PreparationInput?
   var failedPreparationSource: Challenge?
   var saveStatus = ""
@@ -826,7 +828,7 @@ import WidgetKit
       guard ProcessInfo.processInfo.arguments.contains("--fixture-auto-question"), bootstrap?.challenge == nil,
         !automaticPreparationAccounts.contains(account.id) else { return }
       automaticPreparationAccounts.insert(account.id)
-      do { _ = try await generateForPreview() } catch { preparationFailure = error.localizedDescription }
+      do { _ = try await generateForPreview() } catch { failPreparation(error) }
       #endif
       return
     }
@@ -884,8 +886,12 @@ import WidgetKit
       // The watch was superseded (background, sign-out, a newer refresh); the job itself is still running.
     } catch let error as URLError where error.code == .cancelled {
     } catch {
-      if bootstrap?.account.id == account.id { preparationFailure = error.localizedDescription }
+      if bootstrap?.account.id == account.id { failPreparation(error) }
     }
+  }
+  func failPreparation(_ error: Error) {
+    preparationFailure = error.localizedDescription
+    preparationLimited = ["practice_limit", "usage_limit"].contains((error as? APIError)?.code)
   }
   func generate(_ preparation: PreparationInput? = nil) async {
     await perform { _ = try await generateForPreview(preparation) }

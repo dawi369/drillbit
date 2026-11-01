@@ -18,7 +18,8 @@ const FIXED_PER_MONTH = 99 / 12 + 5; // Apple Developer, Cloudflare Workers Paid
 
 // ── Limits (production wrangler vars) ────────────────────────────────────────────────────────────────────
 const FREE = { reps: 2, turns: 8, help: 2, introSessions: 3, sessionMinutes: 3 };
-const PRO = { repsPerDay: 30, sessionMinutes: 20, minutesPerDay: 60, minutesPerWeek: 100 };
+// repsPerDay counts reps practised (second message sent); question writing has its own guard of 20 a day.
+const PRO = { repsPerDay: 10, sessionMinutes: 20, minutesPerDay: 60, minutesPerWeek: 75 };
 // A rolling 7-day cap allows up to five full weeks' worth inside a 30-day month (100 min on days 1, 8, 15, 22, 29).
 const PRO_MAX_MINUTES_30_DAYS = 5 * PRO.minutesPerWeek;
 
@@ -30,7 +31,7 @@ const SEGMENT = {
   text: { reps: 25, voice: 0 },
   light: { reps: 20, voice: 45 }, // a mock or two a month
   prepping: { reps: 16, voice: 280 }, // about three mocks a week
-  heavy: { reps: 35, voice: 430 }, // sits on the weekly cap every week
+  heavy: { reps: 35, voice: 325 }, // sits on the weekly cap every week
 };
 type Seg = keyof typeof SEGMENT;
 const MIX: Record<"weekly" | "yearly", Partial<Record<Seg, number>>> = {

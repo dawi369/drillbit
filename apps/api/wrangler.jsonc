@@ -22,11 +22,13 @@
     "FREE_VOICE_LIFETIME": "3",
     "FREE_VOICE_TASTE_DAYS": "30",
     "FREE_VOICE_SESSION_MINUTES": "3",
-    "PRO_REPS_PER_DAY": "30",
+    // Reps practised (second message sent) per UTC day, and questions written per day, rerolls included.
+    "PRO_REPS_PER_DAY": "10",
+    "PRO_GENERATIONS_PER_DAY": "20",
     "PRO_VOICE_STARTS_PER_DAY": "20",
     "PRO_VOICE_SESSION_MINUTES": "20",
     "PRO_VOICE_MINUTES_PER_DAY": "60",
-    "PRO_VOICE_MINUTES_PER_WEEK": "150",
+    "PRO_VOICE_MINUTES_PER_WEEK": "75",
     "APPLE_BUNDLE_ID": "dawi.drillbit",
     "APPLE_PRODUCT_IDS": "dawi.drillbit.pro.weekly,dawi.drillbit.pro.yearly",
     "VOICE_UNLIMITED_ACCOUNTS": "3ded3cde-2d6d-44cf-8fae-cc024232b663",
@@ -77,11 +79,13 @@
         "FREE_VOICE_LIFETIME": "3",
         "FREE_VOICE_TASTE_DAYS": "30",
         "FREE_VOICE_SESSION_MINUTES": "3",
-        "PRO_REPS_PER_DAY": "30",
+        // Reps practised (second message sent) per UTC day, and questions written per day, rerolls included.
+        "PRO_REPS_PER_DAY": "10",
+        "PRO_GENERATIONS_PER_DAY": "20",
         "PRO_VOICE_STARTS_PER_DAY": "20",
         "PRO_VOICE_SESSION_MINUTES": "20",
         "PRO_VOICE_MINUTES_PER_DAY": "60",
-        "PRO_VOICE_MINUTES_PER_WEEK": "100",
+        "PRO_VOICE_MINUTES_PER_WEEK": "75",
         "APPLE_BUNDLE_ID": "dawi.drillbit",
         // No APPLE_ENVIRONMENT here: App Review buys with sandbox accounts against this Worker, and pinning
         // Production would reject the reviewer's purchase. Each entitlement row records its environment instead.

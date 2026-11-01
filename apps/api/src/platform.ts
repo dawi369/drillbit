@@ -34,6 +34,7 @@ export interface Env {
   FREE_VOICE_TASTE_DAYS?: string;
   FREE_VOICE_SESSION_MINUTES?: string;
   PRO_REPS_PER_DAY?: string;
+  PRO_GENERATIONS_PER_DAY?: string;
   PRO_VOICE_STARTS_PER_DAY?: string;
   PRO_VOICE_SESSION_MINUTES?: string;
   PRO_VOICE_MINUTES_PER_DAY?: string;
@@ -121,6 +122,7 @@ export async function consumeUsage(
   account: string,
   kind: string,
   limit: number,
+  message = "Daily usage limit reached. Try again tomorrow.",
 ) {
   // Developer accounts burn through fair-use caps while testing; they are still counted, never stopped.
   const developer = (env.DEVELOPER_ACCOUNTS ?? "").split(",").map(id => id.trim()).filter(Boolean).includes(account);
@@ -133,6 +135,6 @@ export async function consumeUsage(
     throw new Fault(
       "usage_limit",
       429,
-      "Daily usage limit reached. Try again tomorrow.",
+      message,
     );
 }

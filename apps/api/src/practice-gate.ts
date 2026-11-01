@@ -7,11 +7,20 @@ export async function onFreeReps(env: Env, account: string) {
   return (await planFor(env, account)) === "free";
 }
 
-/** Reps spent since `since`: questions prepared as free reps, preparations still running, and reps whose question was
- * later deleted. A swap shares its stamp, so it counts once. */
+/**
+ * When a rep became practice: the time of the user's second message, typed (answer or question) or spoken (each
+ * utterance; it takes its voice session's start time). NULL until then. `c` is the challenges alias around it.
+ */
+export const practisedAt = (c: string) =>
+  `(SELECT ts FROM (SELECT t.created_at ts,t.ordinal o,0 s FROM interview_turns t WHERE t.challenge_id=${c}.id AND t.kind IN ('answer','clarification') UNION ALL SELECT t.created_at,t.ordinal,f.sequence FROM voice_fragments f JOIN interview_turns t ON t.id=f.session_id WHERE t.challenge_id=${c}.id AND f.speaker='user') ORDER BY o,s LIMIT 1 OFFSET 1)`;
+/** A rep skipped, or swapped away, before its second message was never used, so it doesn't count. */
+export const abandonedUnused = (c: string) => `(${c}.lifecycle IN ('skipped','expired') AND ${practisedAt(c)} IS NULL)`;
+
+/** Reps spent since `since`: questions prepared as free reps (unless abandoned unused), preparations still running,
+ * and reps whose question was later deleted. A swap shares its stamp, so it counts once. */
 export function freeRepsSpent(account: string, since = utcDayStart()) {
   return {
-    sql: "(SELECT COUNT(DISTINCT t) FROM (SELECT json_extract(data,'$.freeRepAt') t FROM challenges WHERE account_id=? UNION ALL SELECT json_extract(input,'$.freeRepAt') FROM jobs WHERE account_id=? AND kind='generate' AND status IN ('pending','running') UNION ALL SELECT stamp FROM spent_free_reps WHERE account_id=?) WHERE t>=?)",
+    sql: `(SELECT COUNT(DISTINCT t) FROM (SELECT json_extract(fr.data,'$.freeRepAt') t FROM challenges fr WHERE fr.account_id=? AND NOT ${abandonedUnused("fr")} UNION ALL SELECT json_extract(input,'$.freeRepAt') FROM jobs WHERE account_id=? AND kind='generate' AND status IN ('pending','running') UNION ALL SELECT stamp FROM spent_free_reps WHERE account_id=?) WHERE t>=?)`,
     binds: [account, account, account, since] as unknown[],
   };
 }
@@ -46,9 +55,19 @@ export const practiceGateFault = (env?: Env) => new Fault("practice_gate", 402, 
   ? "That’s your free reps. Go Pro to keep practising."
   : "That’s today’s free reps. More come back tomorrow, or go Pro.");
 
+/** Pro's fair use: reps practised today (second message since UTC midnight). Only starting a new rep checks it, so a
+ * rep already open always finishes; developers are counted, never stopped. */
+export async function assertProRepAvailable(env: Env, account: string, now = timestamp()) {
+  if ((env.DEVELOPER_ACCOUNTS ?? "").split(",").map(id => id.trim()).includes(account)) return;
+  const limit = limits(env, "pro").repsPerDay;
+  const row = await env.DB.prepare(`SELECT COUNT(*) AS n FROM challenges pr WHERE pr.account_id=? AND ${practisedAt("pr")}>=?`)
+    .bind(account, utcDayStart(now)).first<{ n: number }>();
+  if ((row?.n ?? 0) >= limit) throw new Fault("practice_limit", 429, `That’s ${limit} reps today, which is plenty. More tomorrow.`);
+}
+
 /** Starting a rep without a generation (Library, retry) checks first; the one-active-challenge constraint bounds the race. */
-export async function claimFreeRep(env: Env, account: string) {
-  if (!(await onFreeReps(env, account))) return {};
+export async function claimRep(env: Env, account: string) {
+  if (!(await onFreeReps(env, account))) { await assertProRepAvailable(env, account); return {}; }
   const taken = freeRepTaken(env, account);
   if (await env.DB.prepare("SELECT 1 WHERE " + taken.sql).bind(...taken.binds).first()) throw practiceGateFault(env);
   return { freeRepAt: timestamp() };

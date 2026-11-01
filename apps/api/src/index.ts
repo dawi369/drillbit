@@ -22,7 +22,7 @@ import { learningEvidence, recallDeck, retryMoment, reviewRecall, todayPlan } fr
 import { coverage, libraryPage, questionDetail, setEligibility, startQuestion } from "./library";
 import { consumeUsage, encrypt, hash, identity, type Env } from "./platform";
 import { adopt, requestHelp } from "./practice";
-import { freeRepTaken, onFreeReps, practiceAccess, practiceGateFault } from "./practice-gate";
+import { abandonedUnused, assertProRepAvailable, freeRepTaken, onFreeReps, practiceAccess, practiceGateFault } from "./practice-gate";
 import { limits, planFor, planOverride } from "./plans";
 
 const developerPlanSchema = z.object({ plan: z.enum(["free", "pro"]).nullable() });
@@ -380,7 +380,10 @@ app.post("/v1/challenges", async (c) => {
   const freeRep = plan === "pro" ? {} : swap ? { freeRepAt: replaced!.freeRepAt, swapped: true } : { freeRepAt: timestamp() };
   const unless = "freeRepAt" in freeRep && !swap ? freeRepTaken(c.env, a) : undefined;
   if (unless && await c.env.DB.prepare("SELECT 1 WHERE " + unless.sql).bind(...unless.binds).first()) throw practiceGateFault(c.env);
-  await consumeUsage(c.env, a, "generate", limits(c.env, plan).generationsPerDay);
+  // Swapping a question that's already prepared isn't a new rep.
+  if (plan === "pro" && !preparation.replaceId) await assertProRepAvailable(c.env, a);
+  await consumeUsage(c.env, a, "generate", limits(c.env, plan).generationsPerDay,
+    "That’s a lot of new questions for one day. Practise one you’ve got, or more tomorrow.");
   const job = await createJob(c.env, a, id, "generate", null, {
     ...preparation,
     followUp,
@@ -724,8 +727,8 @@ app.delete("/v1/challenges/:id", async (c) => {
     a = c.get("account").id;
   await ownedChallenge(c.env, a, id);
   await c.env.DB.batch([
-    // A free rep stays spent after its question is deleted.
-    c.env.DB.prepare("INSERT OR IGNORE INTO spent_free_reps(account_id,stamp) SELECT account_id,json_extract(data,'$.freeRepAt') FROM challenges WHERE id=? AND account_id=? AND json_extract(data,'$.freeRepAt') IS NOT NULL").bind(id, a),
+    // A free rep stays spent after its question is deleted, unless it was abandoned before it was used.
+    c.env.DB.prepare(`INSERT OR IGNORE INTO spent_free_reps(account_id,stamp) SELECT fr.account_id,json_extract(fr.data,'$.freeRepAt') FROM challenges fr WHERE fr.id=? AND fr.account_id=? AND json_extract(fr.data,'$.freeRepAt') IS NOT NULL AND NOT ${abandonedUnused("fr")}`).bind(id, a),
     c.env.DB.prepare("DELETE FROM challenges WHERE id=? AND account_id=?").bind(id, a),
   ]);
   return c.json({ ok: true });

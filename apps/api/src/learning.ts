@@ -2,7 +2,7 @@ import { Temporal } from "@js-temporal/polyfill";
 import { z } from "zod";
 import { defaultLearningPlan, Fault, reflectionSchema, timestamp, type Settings } from "./domain";
 import type { Env } from "./platform";
-import { claimFreeRep } from "./practice-gate";
+import { claimRep } from "./practice-gate";
 import { isSocialOpening } from "./prompts/interviewer";
 import type { ChallengeRow } from "./store";
 import { activeChallenge, COUNTED, detail, ownedChallenge } from "./store";
@@ -102,7 +102,7 @@ export async function retryMoment(env: Env, account: string, sourceId: string, t
   const turn = await env.DB.prepare("SELECT prompt FROM interview_turns WHERE id=? AND challenge_id=?").bind(turnId,sourceId).first<{prompt:string}>();
   if (!turn) throw new Fault("not_found",404,"Interview moment not found.");
   const { ticket: _ticket, ...original } = JSON.parse(source.data) as Record<string,unknown>;
-  const freeRep = await claimFreeRep(env,account);
+  const freeRep = await claimRep(env,account);
   const now = timestamp();
   const data = { ...original, title: `${String(original.title ?? "Interview").slice(0,148)} · Retry`, prompt: turn.prompt,
     selectionReason: "Retry a moment from a completed interview", startedAt: now, freeRepAt: undefined, swapped: undefined, ...freeRep };

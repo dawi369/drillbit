@@ -11,13 +11,15 @@ export function limits(env: Env, plan: Plan) {
   };
   return plan === "pro"
     ? {
-      repsPerDay: n(env.PRO_REPS_PER_DAY, 30),
-      generationsPerDay: n(env.PRO_REPS_PER_DAY, 30),
+      // Reps practised (second message sent) per UTC day; checked when a new rep starts.
+      repsPerDay: n(env.PRO_REPS_PER_DAY, 10),
+      // Questions written per day, rerolls and abandoned ones included.
+      generationsPerDay: n(env.PRO_GENERATIONS_PER_DAY, 20),
       voiceStartsPerDay: n(env.PRO_VOICE_STARTS_PER_DAY, 20),
       voiceSessionSeconds: n(env.PRO_VOICE_SESSION_MINUTES, 20) * 60,
       // Voice bills per open minute, so Pro's fair use is minutes: a day and a rolling week.
       voiceSecondsPerDay: n(env.PRO_VOICE_MINUTES_PER_DAY, 60) * 60,
-      voiceSecondsPerWeek: n(env.PRO_VOICE_MINUTES_PER_WEEK, 150) * 60,
+      voiceSecondsPerWeek: n(env.PRO_VOICE_MINUTES_PER_WEEK, 75) * 60,
       voiceReasoningPerDay: 400,
       voiceFreeLifetime: Infinity,
       voiceTasteDays: 0,
