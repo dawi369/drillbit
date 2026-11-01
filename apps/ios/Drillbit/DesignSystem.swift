@@ -425,6 +425,29 @@ struct DrillbitSectionHeader: View {
   }
 }
 
+/// The yellow action surface: a faint top light so it reads as something you can press, and in dark
+/// appearance a soft warm glow underneath. Disabled actions go neutral instead of dimming the yellow,
+/// which turns olive on the graphite floor.
+private struct ActionSurface<S: InsettableShape>: ViewModifier {
+  let shape: S
+  let lit: Bool
+  let pressed: Bool
+  @Environment(\.colorScheme) private var colorScheme
+  func body(content: Content) -> some View {
+    content
+      .background(lit ? AppPalette.action : AppPalette.elevated, in: shape)
+      .overlay {
+        if lit {
+          shape.strokeBorder(LinearGradient(colors: [.white.opacity(0.45), .white.opacity(0)], startPoint: .top, endPoint: .center), lineWidth: 1)
+          shape.fill(AppPalette.actionInk.opacity(pressed ? 0.08 : 0))
+        } else {
+          shape.strokeBorder(AppPalette.hairline, lineWidth: 0.5)
+        }
+      }
+      .shadow(color: AppPalette.action.opacity(lit && colorScheme == .dark ? (pressed ? 0.1 : 0.2) : 0), radius: 10, y: 3)
+  }
+}
+
 struct PracticeButtonStyle: ButtonStyle {
   var secondary = false
   @Environment(\.isEnabled) private var isEnabled
@@ -432,20 +455,28 @@ struct PracticeButtonStyle: ButtonStyle {
 
   func makeBody(configuration: Configuration) -> some View {
     let pressed = configuration.isPressed
-    configuration.label
+    let label = configuration.label
       .font(.body.weight(.semibold))
       .multilineTextAlignment(.center)
       .padding(.horizontal, 16).padding(.vertical, 12)
       .frame(maxWidth: .infinity, minHeight: 48)
-      .foregroundStyle(secondary ? AppPalette.accent : AppPalette.actionInk)
-      .background(secondary ? (pressed ? AppPalette.accentSoft : .clear) : AppPalette.action, in: Capsule())
-      .overlay { if !secondary { Capsule().fill(AppPalette.actionInk.opacity(pressed ? 0.08 : 0)) } }
-      .contentShape(Capsule())
-      .scaleEffect(pressed && !reduceMotion ? 0.97 : 1)
-      .opacity(isEnabled ? 1 : 0.45)
-      .animation(DrillbitMotion.press, value: pressed)
-      .animation(DrillbitMotion.fast, value: isEnabled)
-      .hoverEffect(.highlight)
+    Group {
+      if secondary {
+        label
+          .foregroundStyle(AppPalette.accent)
+          .background(pressed ? AppPalette.accentSoft : .clear, in: Capsule())
+          .opacity(isEnabled ? 1 : 0.45)
+      } else {
+        label
+          .foregroundStyle(isEnabled ? AppPalette.actionInk : AppPalette.secondary)
+          .modifier(ActionSurface(shape: Capsule(), lit: isEnabled, pressed: pressed))
+      }
+    }
+    .contentShape(Capsule())
+    .scaleEffect(pressed && !reduceMotion ? 0.97 : 1)
+    .animation(DrillbitMotion.press, value: pressed)
+    .animation(DrillbitMotion.fast, value: isEnabled)
+    .hoverEffect(.highlight)
   }
 }
 
@@ -455,17 +486,24 @@ struct DrillbitIconButtonStyle: ButtonStyle {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   func makeBody(configuration: Configuration) -> some View {
     let pressed = configuration.isPressed
-    configuration.label
-      .frame(width: 48, height: 48)
-      .foregroundStyle(prominent ? AppPalette.actionInk : AppPalette.primary)
-      .background(prominent ? AppPalette.action : pressed ? AppPalette.inset : AppPalette.elevated, in: Circle())
-      .overlay { Circle().fill(AppPalette.actionInk.opacity(prominent && pressed ? 0.1 : 0)) }
-      .overlay { Circle().stroke(prominent ? .clear : AppPalette.hairline, lineWidth: 0.5) }
-      .opacity(isEnabled ? 1 : 0.42)
-      .contentShape(Circle())
-      .scaleEffect(pressed && !reduceMotion ? 0.96 : 1)
-      .animation(DrillbitMotion.press, value: pressed)
-      .animation(DrillbitMotion.fast, value: isEnabled)
+    let label = configuration.label.frame(width: 48, height: 48)
+    Group {
+      if prominent {
+        label
+          .foregroundStyle(isEnabled ? AppPalette.actionInk : AppPalette.secondary)
+          .modifier(ActionSurface(shape: Circle(), lit: isEnabled, pressed: pressed))
+      } else {
+        label
+          .foregroundStyle(AppPalette.primary)
+          .background(pressed ? AppPalette.inset : AppPalette.elevated, in: Circle())
+          .overlay { Circle().stroke(AppPalette.hairline, lineWidth: 0.5) }
+          .opacity(isEnabled ? 1 : 0.42)
+      }
+    }
+    .contentShape(Circle())
+    .scaleEffect(pressed && !reduceMotion ? 0.96 : 1)
+    .animation(DrillbitMotion.press, value: pressed)
+    .animation(DrillbitMotion.fast, value: isEnabled)
   }
 }
 
@@ -905,6 +943,12 @@ struct ProWordmark: View {
 enum MakersNote {
   static let line = "Made by one developer in Europe."
   static let love = "Built with love for everyone finding tech hard right now."
+  /// The sheet's rise plus five words a second: long enough to read both lines once, no longer.
+  static var readingTime: Double {
+    0.4 + Double((line + " " + love).split(separator: " ").count) / 5
+  }
+  /// Later visits: a beat to recognise it, not a flash.
+  static let glanceTime = 1.6
 }
 
 /// The maker's note as its own quiet screen: Bit idling, the wordmark, two lines. Fills the Pro sheet while it loads.

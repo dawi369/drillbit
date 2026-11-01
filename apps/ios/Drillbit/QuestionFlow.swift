@@ -161,6 +161,7 @@ struct QuestionFlow: View {
                   .animation(reduceMotion ? nil : DrillbitMotion.fast, value: starting)
               }.buttonStyle(PracticeButtonStyle())
                 .allowsHitTesting(!starting)
+                .sensoryFeedback(.impact(weight: .light), trigger: starting) { _, now in now }
                 .accessibilityLabel(starting ? "Opening" : title)
                 .accessibilityIdentifier("previewStart")
                 .transition(arrival(1))

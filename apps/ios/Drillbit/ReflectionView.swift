@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The end of a rep: two lines fade in on the interview's background, then Home takes over by itself.
+/// The end of a rep: Bit hops in above two lines on the interview's background, then Home takes over by itself.
 /// A different pair each time, in the same voice as the "next boss fight" reminder.
 struct RepDoneMoment: View {
   static let lines: [(title: String, line: String)] = [
@@ -17,6 +17,7 @@ struct RepDoneMoment: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   var body: some View {
     VStack(spacing: 8) {
+      BitView(mood: .happy, greets: true).frame(height: 88).padding(.bottom, 12)
       Text(pick.title).font(.largeTitle.weight(.semibold)).tracking(-0.8).foregroundStyle(AppPalette.primary)
       Text(pick.line).font(.title3).foregroundStyle(AppPalette.secondary)
     }

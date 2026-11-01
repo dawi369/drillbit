@@ -218,10 +218,10 @@ struct NativePaywallSheet: View {
     .task(id: attempt) {
       let started = Date()
       let found = (try? await Product.products(for: PlanCoordinator.productIDs)) ?? []
-      // A first look holds the note long enough to read; after that it's only as long as loading takes.
+      // A first look holds the note long enough to read; after that, a short beat so it never just flashes.
       availability = found.isEmpty ? .missing : .ready
       // The store draws its plans from the products it just cached; give it a moment before lifting the note.
-      let hold = max(noteSeen ? 0 : 1.8 - Date().timeIntervalSince(started), found.isEmpty ? 0 : 0.6)
+      let hold = max((noteSeen ? MakersNote.glanceTime : MakersNote.readingTime) - Date().timeIntervalSince(started), found.isEmpty ? 0 : 0.6)
       if hold > 0 { try? await Task.sleep(for: .seconds(hold)) }
       noteSeen = true
       noteUp = false
