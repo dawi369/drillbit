@@ -943,12 +943,12 @@ struct ProWordmark: View {
 enum MakersNote {
   static let line = "Made by one developer in Europe."
   static let love = "Built with love for everyone finding tech hard right now."
-  /// The sheet's rise plus five words a second: long enough to read both lines once, no longer.
+  /// The sheet's rise plus four words a second: an unhurried read of both lines, no longer.
   static var readingTime: Double {
-    0.4 + Double((line + " " + love).split(separator: " ").count) / 5
+    0.4 + Double((line + " " + love).split(separator: " ").count) / 4
   }
   /// Later visits: a beat to recognise it, not a flash.
-  static let glanceTime = 1.6
+  static let glanceTime = 2.0
 }
 
 /// The maker's note as its own quiet screen: Bit idling, the wordmark, two lines. Fills the Pro sheet while it loads.
