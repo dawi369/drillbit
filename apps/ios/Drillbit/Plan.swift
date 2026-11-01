@@ -396,8 +396,9 @@ private struct PaywallCheckout: View {
   }
   private var terms: String {
     let period = yearly ? "a year" : "a week"
-    if let intro { return "\(intro.displayPrice) for your first week, then \(product.displayPrice) \(period). Renews until you cancel." }
-    return "\(product.displayPrice) \(period), renews until you cancel. Cancel any time in Settings."
+    // One line: price, period and that it renews. App Review wants the renewal said; cancelling is iOS's job.
+    if let intro { return "First week \(intro.displayPrice), then \(product.displayPrice) \(period). Auto-renews." }
+    return "\(product.displayPrice) \(period). Auto-renews, cancel anytime."
   }
   var body: some View {
     VStack(spacing: 12) {

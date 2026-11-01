@@ -131,14 +131,21 @@ export function groundReflection(raw: unknown, context: any) {
       : t.kind === "answer" ? [{id:t.id as string|undefined,text:t.answer ?? t.text}] : []),
   ].filter((source): source is {id:string|undefined;text:string} => typeof source.text === "string" && source.text.trim().length > 0);
   const answers = sources.map(source => source.text);
-  const socialOnly = answers.length === 0 || answers.every(answer => isSocialOpening(answer)
+  // Nothing typed or said at all reads differently from a hello: one is a quiet rep, the other a warm-up.
+  const silent = answers.length === 0;
+  const socialOnly = silent || answers.every(answer => isSocialOpening(answer)
     || /^(hey!?\s*)?nice to meet you[,!. ]*(this is just practice[.!]?)?$/i.test(answer.trim()));
-  if (socialOnly) return {...result, summary: "We got acquainted; there isn’t a design to reflect on yet.", worked: [],
-    improve: "When you’re ready, pick one piece of the problem to start with.",
-    takeaway: "A small first decision is enough to get going.", strengths: [], gaps: [], evidence: [],
-    nextExercise: "Choose one component in the original question and explain its responsibility.",
+  if (socialOnly) return {...result,
+    summary: silent ? "You left the interviewer on read." : "We got acquainted; there isn’t a design to reflect on yet.",
+    worked: [],
+    improve: silent ? "Next time, type anything. Even a half-baked guess gives you both something to work with."
+      : "When you’re ready, pick one piece of the problem to start with.",
+    takeaway: silent ? "Any first sentence beats a blank page." : "A small first decision is enough to get going.",
+    strengths: [], gaps: [], evidence: [],
+    nextExercise: silent ? "Write one sentence about what the system has to do." : "Choose one component in the original question and explain its responsibility.",
     ...(result.lesson ? { lesson: { learned: [], tryAlone: "Pick one piece of the problem and make a first decision on your own." } } : {}),
-    ...(result.debrief ? { debrief: { verdict: "not_yet" as const, reason: "There wasn’t enough design to judge yet.",
+    ...(result.debrief ? { debrief: { verdict: "not_yet" as const,
+      reason: silent ? "Hard to judge a design that never showed up." : "There wasn’t enough design to judge yet.",
       signals: result.debrief.signals.map(signal => ({ ...signal, rating: "not_shown" as const, note: "" })),
       toPass: "Commit to one concrete design decision and say why." } } : {})};
   result.nextExercise ??= result.improve;

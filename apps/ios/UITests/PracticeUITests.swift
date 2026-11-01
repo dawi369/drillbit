@@ -150,8 +150,11 @@ final class PracticeUITests: XCTestCase {
     app.launch()
     XCTAssertTrue(app.tabBars.buttons["Bit"].waitForExistence(timeout: 10))
     app.tabBars.buttons["Bit"].tap()
-    // Free: the tab opens the Pro screen instead, and Home stays put underneath.
+    // Free: the tab opens the Pro screen instead, and the tab bar never moves off Home.
     XCTAssertTrue(app.descendants(matching: .any)["paywall"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.tabBars.buttons["Home"].isSelected)
+    XCTAssertFalse(app.tabBars.buttons["Bit"].isSelected)
+    XCTAssertFalse(app.descendants(matching: .any)["bitTab"].exists, "The Bit tab's page never loads for free accounts")
     // The maker's note shows first while the plans load, then the pitch.
     XCTAssertTrue(app.descendants(matching: .any)["makersNote"].exists || app.staticTexts["See what you actually know."].exists)
     XCTAssertTrue(app.staticTexts["See what you actually know."].waitForExistence(timeout: 10))
@@ -1521,7 +1524,7 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(option("Try a week for $1.99, then $7.99 a week").exists)
     // What App Review checks on a subscription paywall: terms, renewal terms, restore and a way out.
     XCTAssertTrue(option("Terms of Service").exists)
-    XCTAssertTrue(option("renews until you cancel").exists)
+    XCTAssertTrue(option("Auto-renews").exists)
     XCTAssertTrue(app.buttons["paywallRestore"].exists)
     XCTAssertTrue(app.buttons["paywallSubscribe"].exists)
     // The terms sit above Subscribe with room to breathe, and Restore sits right under it.
@@ -1531,7 +1534,7 @@ final class PracticeUITests: XCTestCase {
     // Choosing weekly turns Subscribe into the intro offer.
     app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "Weekly")).firstMatch.tap()
     XCTAssertTrue(app.buttons["Start for $1.99"].waitForExistence(timeout: 3))
-    XCTAssertTrue(option("$1.99 for your first week, then $7.99 a week").exists)
+    XCTAssertTrue(option("First week $1.99, then $7.99 a week. Auto-renews.").exists)
     XCTAssertTrue(app.buttons["paywallDismiss"].isHittable)
     capture("Paywall from the rep gate", app)
     app.buttons["paywallDismiss"].tap()

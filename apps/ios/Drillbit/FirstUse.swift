@@ -65,10 +65,10 @@ enum CoachMark: String, CaseIterable {
   }
   var message: String {
     switch self {
-    case .voice: "Interviews open out loud, like the real one. Prefer to type? One tap and the same interviewer is in writing."
+    case .voice: "Interviews open out loud, like the real one."
     case .composer: "A rough first take is fine. End a line with “?” to ask the interviewer instead."
-    case .path: "The steps a strong answer usually covers. You move along as you cover them; tap it any time to see the whole path."
-    case .tools: "“Need a nudge?” gets you a hint and “Show an example” shows one. Finish wraps up the round whenever you’re ready."
+    case .path: "The steps a strong answer usually covers. You move along as you cover them."
+    case .tools: "Hints and examples live here, whenever you want one."
     }
   }
   /// The dismiss button's label; the voice tip asks for the one tap it's pointing at.

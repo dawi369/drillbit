@@ -33,6 +33,10 @@ it("grounds quotes in candidate work and never upgrades unknown exposure to inde
   expect(groundReflection(feedback,{...context,help:[]}).evidence?.[0].assistance).toBe("unknown");
   const social=groundReflection(feedback,{...context,session:{answer:"Hi!"}});
   expect(social.evidence).toEqual([]);expect(social.gaps).toEqual([]);expect(social.worked).toEqual([]);
+  expect(social.summary).toContain("got acquainted");
+  // Nothing typed at all is a quiet rep, not a hello, and the feedback says so.
+  const silent=groundReflection(feedback,{...context,session:{answer:"  "},interview:[]});
+  expect(silent.summary).toBe("You left the interviewer on read.");expect(silent.improve).toContain("type anything");expect(silent.evidence).toEqual([]);
   expect(groundReflection(feedback,{...context,question:{conceptIds:["queues"]}}).evidence).toEqual([]);
   expect(groundReflection(feedback,{...context,session:{answer:""},interview:[{kind:"hint",answer:"Use a stable idempotency key"}]}).evidence).toEqual([]);
   const turnGrounded = groundReflection(feedback,{question:{conceptIds:["retry-safety"]},interview:[{id:"learner-turn",kind:"answer",prompt:"How will retries stay safe?",text:"Use a stable idempotency key for each payment."}]});

@@ -56,11 +56,12 @@ struct CompletionHeading: View {
   }
 }
 
-/// Guided's ending: the ideas worked through together, then one attempt without help.
+/// Guided's ending: the ideas worked through together. The next step lives in the actions below, not here.
 struct LessonRecap: View {
   let lesson: Lesson
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
+      SignalEyebrow(text: "Worked out together")
       ForEach(lesson.learned, id: \.self) { idea in
         Label {
           Text(idea).fixedSize(horizontal: false, vertical: true)
@@ -68,11 +69,6 @@ struct LessonRecap: View {
           Image(systemName: "checkmark.circle.fill").foregroundStyle(AppPalette.success)
         }
       }
-      VStack(alignment: .leading, spacing: 4) {
-        Text("Try it solo").font(.headline)
-        Text(lesson.tryAlone).fixedSize(horizontal: false, vertical: true)
-      }
-      .padding(.top, lesson.learned.isEmpty ? 0 : 4)
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("lessonRecap")
@@ -343,7 +339,7 @@ struct ReflectionContent: View {
       }
       if showsEnding {
         if let debrief = reflection.debrief { DebriefCard(debrief: debrief) }
-        if let lesson = reflection.lesson { LessonRecap(lesson: lesson) }
+        if let lesson = reflection.lesson, !lesson.learned.isEmpty { LessonRecap(lesson: lesson) }
       }
       if hasMore {
         DisclosureGroup("More from this rep") {

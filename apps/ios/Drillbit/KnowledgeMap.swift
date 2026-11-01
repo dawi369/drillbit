@@ -56,12 +56,14 @@ struct KnowledgeMapView: View {
     let explored = nodes.filter { $0.state != .unexplored }.count
     let strong = nodes.filter { $0.state == .strong }.count
     // Three across normally; stacked at accessibility sizes so the numbers and labels read in full.
-    let row = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 12)) : AnyLayout(HStackLayout(spacing: 12))
+    // The tiles share one height, so a label that wraps doesn't knock its tile out of line.
+    let row = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 12)) : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
     return row {
       statTile(value: "\(reps)", label: reps == 1 ? "rep" : "reps")
       statTile(value: "\(explored)/\(nodes.count)", label: "areas explored")
       statTile(value: "\(strong)", label: strong == 1 ? "decision held up" : "decisions held up")
     }
+    .fixedSize(horizontal: false, vertical: true)
     .accessibilityElement(children: .combine)
     .accessibilityIdentifier("mapStats")
   }
@@ -72,7 +74,7 @@ struct KnowledgeMapView: View {
       Text(label).font(.footnote).foregroundStyle(AppPalette.secondary).lineLimit(2).fixedSize(horizontal: false, vertical: true)
     }
     .padding(16)
-    .frame(maxWidth: .infinity, minHeight: 88, alignment: .topLeading)
+    .frame(maxWidth: .infinity, minHeight: 88, maxHeight: .infinity, alignment: .topLeading)
     .background(AppPalette.ticket, in: RoundedRectangle(cornerRadius: 12))
     .overlay { RoundedRectangle(cornerRadius: 12).stroke(AppPalette.ticketEdge, lineWidth: 1) }
   }
@@ -248,7 +250,10 @@ struct LevelEstimate {
 private struct LevelCard: View {
   let estimate: LevelEstimate
   let target: String
+  /// The ladder fills up to the estimate on arrival, one step after another.
+  @State private var filled = false
   @Environment(\.dynamicTypeSize) private var typeSize
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   var body: some View {
     let ladder = LevelEstimate.ladder
     let current = estimate.level.flatMap { level in ladder.firstIndex { $0.0 == level } }
@@ -264,7 +269,10 @@ private struct LevelCard: View {
         ForEach(ladder.indices, id: \.self) { index in
           VStack(spacing: 8) {
             ZStack {
-              Capsule().fill(index <= (current ?? -1) ? AppPalette.action : AppPalette.elevated).frame(height: 6)
+              Capsule().fill(AppPalette.elevated).frame(height: 6)
+              Capsule().fill(AppPalette.action).frame(height: 6)
+                .scaleEffect(x: filled && index <= (current ?? -1) ? 1 : 0, anchor: .leading)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.28).delay(0.15 + Double(index) * 0.09), value: filled)
               if index == goal { Circle().stroke(AppPalette.primary, lineWidth: 1.5).frame(width: 14, height: 14) }
             }
             .frame(height: 14)
@@ -290,6 +298,7 @@ private struct LevelCard: View {
     .overlay { RoundedRectangle(cornerRadius: 12).stroke(AppPalette.ticketEdge, lineWidth: 1) }
     .accessibilityElement(children: .combine)
     .accessibilityIdentifier("levelCard")
+    .onAppear { filled = true }
   }
 }
 

@@ -83,6 +83,8 @@ import WidgetKit
   /// gate: Not now goes Home with rep two untouched, and the server's limits don't change. Once per account on this
   /// device; a reinstall may show it again. Starting another rep from the feedback skips it.
   func offerProAfterFirstRep(_ finished: Challenge) async {
+    // The count has to include the rep just finished; a bootstrap from before it was written still says two.
+    if !fixture { await refresh() }
     guard let account = bootstrap?.account.id, !finished.isWarmUp, finished.lifecycle == "completed",
       bootstrap?.practice?.freeReps == true, lifetimeFreeReps, bootstrap?.practice?.remaining == 1 else { return }
     // Fixtures share one account id across runs, so they remember the offer for this launch only.

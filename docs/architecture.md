@@ -702,3 +702,16 @@ Finish goes: the rep-done moment, then `ReflectionView` for everyone, then Home.
 - **Paywall views.** Each native presentation posts `POST /v1/paywall/view` with its placement (`paywall_views`, migration `0019`; placement and time only, deleted with the account, at most 50 a day). `scripts/metrics.ts` reports views by placement and tolerates the table being missing.
 - **Price line.** The yearly plan reads "$99.99 a year, so $1.92 a week" (`PlanPricing.weekly(fromYearly:)`, ÷52), to compare like with like against the weekly plan.
 
+
+## Feedback polish, spoken interviewer, Bit tab gate — 2 November 2026
+
+- **Interviewer prompt `interviewer-teaching-v6`.** Adds `<spoken_form>`: endpoints, payloads, schemas and queries are described in sentences, never as code, JSON, SQL or request listings. A path or field name can sit inside a sentence. v5 stays resolvable for jobs captured before the change.
+- **Empty reps.** `groundReflection` now tells a rep with nothing typed or said ("You left the interviewer on read.", "Next time, type anything…") apart from a hello-only rep ("We got acquainted…").
+- **Guided recap.** "Try it solo" and its line are gone. The recap is a "Worked out together" checklist, shown only when there's something on it; the next step lives in the actions below. `lesson.tryAlone` is still generated and stored.
+- **Practise this next.** One switch, "Aim it at what to fix", with the feedback's fix line under it. It replaces the "Building on your last session" section and its link and Remove button.
+- **Preview.** Guided questions no longer show the "Guided, so you and the interviewer…" note.
+- **Coachmarks.** Voice: "Interviews open out loud, like the real one." Roadmap: "The steps a strong answer usually covers. You move along as you cover them." Tools: "Hints and examples live here, whenever you want one."
+- **Paywall terms.** One line: "$99.99 a year. Auto-renews, cancel anytime." (intro: "First week $1.99, then $7.99 a week. Auto-renews."). The renewal word stays because App Review checks for it next to the purchase button.
+- **Bit tab gate.** `TabBarGate` puts a proxy in front of the `UITabBarController` delegate and refuses the Bit tab for free accounts before it's selected, so the tab bar never moves and the page never loads. Everything else is forwarded to SwiftUI's own delegate. The `tabSelection` binding keeps its check as a fallback.
+- **Bit page.** Stat tiles share one height; the level ladder fills step by step on arrival (static with reduced motion).
+- **First-rep Pro offer.** `offerProAfterFirstRep` refreshes the bootstrap before it decides, so `remaining` includes the rep just finished. Development now uses `FREE_REPS_LIFETIME=2` like production; tests drop it and opt in per case.

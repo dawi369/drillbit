@@ -49,24 +49,17 @@ struct QuestionFlow: View {
   @Environment(\.scenePhase) private var scenePhase
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.dynamicTypeSize) private var typeSize
-  private var previewNote: String? {
-    let guided = (question?.guidanceMode ?? draft?.guidanceMode) == .learnTogether
-    guard guided, failure == nil else { return nil }
-    return "Guided, so you and the interviewer build it up one step at a time."
-  }
   /// Bit shows up only while the question is being written, then gets out of the way.
   private var writing: Bool { question == nil && failure == nil }
   /// Bit fades while still live, then leaves the hierarchy. A removal transition snapshots his per-frame Canvas,
   /// which on device can flash as a black square while it fades.
   @State private var bitMounted = true
   @State private var bitVisible = true
-  /// The note is fixed copy but still written out, so the page reads as one voice.
   private var previewSegments: [StreamSegment] {
     var segments = [
       // The empty title keeps a caret while a question is on its way; after a failure there is nothing to wait for.
       StreamSegment(style: .title, text: AttributedString(QuestionMarkup.plain(question?.title ?? draft?.title ?? "")), placeholder: failure == nil),
     ]
-    if let previewNote { segments.append(StreamSegment(style: .note, text: AttributedString(previewNote), fixed: true)) }
     let blocks = QuestionMarkup.blocks(question?.displayPrompt ?? draft?.prompt ?? "", formatted: model.settings.formatsQuestions)
     for (index, block) in blocks.enumerated() {
       switch block {

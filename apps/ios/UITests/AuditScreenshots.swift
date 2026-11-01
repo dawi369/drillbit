@@ -680,6 +680,52 @@ final class AuditScreenshots: XCTestCase {
     shot("p04-bug-report-sent", app)
   }
 
+  /// The rep's feedback, Practise this next, the paywall's terms and the Bit page.
+  func testWalkQ_FeedbackNextAndBit() throws {
+    continueAfterFailure = false
+    var app = launch(["--fixtures", "--fixture-home-rich", "--fixture-pro"])
+    let start = app.buttons["startPractice"]
+    XCTAssertTrue(start.waitForExistence(timeout: 10))
+    start.tap()
+    XCTAssertTrue(app.buttons["previewStart"].waitForExistence(timeout: 5))
+    app.buttons["previewStart"].tap()
+    XCTAssertTrue(editor(app).waitForExistence(timeout: 5))
+    editor(app).tap()
+    editor(app).typeText("Workers lease jobs and record every attempt.")
+    app.buttons["shareAnswer"].tap()
+    XCTAssertTrue(app.buttons["interviewOptions"].waitForExistence(timeout: 10))
+    app.buttons["interviewOptions"].tap()
+    app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Finish interview'")).firstMatch.tap()
+    app.descendants(matching: .any)["confirmDialog"].buttons["Finish interview"].tap()
+    let next = app.buttons["practiseNext"]
+    XCTAssertTrue(next.waitForExistence(timeout: 10))
+    Thread.sleep(forTimeInterval: 1)
+    shot("q01-feedback", app)
+    next.tap()
+    XCTAssertTrue(app.switches["buildOnLastRep"].waitForExistence(timeout: 5))
+    Thread.sleep(forTimeInterval: 0.8)
+    shot("q02-practise-next", app)
+    app.terminate()
+
+    app = launch(["--fixtures", "--fixture-dashboard", "--fixture-lifetime-spent"])
+    XCTAssertTrue(app.buttons["seePro"].waitForExistence(timeout: 10))
+    app.buttons["seePro"].tap()
+    XCTAssertTrue(app.descendants(matching: .any)["paywallTerms"].waitForExistence(timeout: 15))
+    Thread.sleep(forTimeInterval: 1)
+    shot("q03-paywall-terms", app)
+    app.terminate()
+
+    app = launch(["--fixtures", "--fixture-dashboard", "--fixture-map", "--fixture-pro"])
+    XCTAssertTrue(app.tabBars.buttons["Bit"].waitForExistence(timeout: 10))
+    app.tabBars.buttons["Bit"].tap()
+    XCTAssertTrue(app.descendants(matching: .any)["knowledgeMap"].waitForExistence(timeout: 5))
+    Thread.sleep(forTimeInterval: 2)
+    shot("q04-bit", app)
+    app.swipeUp()
+    Thread.sleep(forTimeInterval: 0.8)
+    shot("q05-bit-scrolled", app)
+  }
+
   // MARK: Finish pass — the first two weeks, as far as fixtures reach.
 
   /// Day 2: a thin answer. Day 3: resume yesterday's draft, finish, then try to prepare another question while one is open.

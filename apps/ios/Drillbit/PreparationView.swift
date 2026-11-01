@@ -25,11 +25,22 @@ struct PreparationView: View {
         }.accessibilityIdentifier("prepareLevel")
 
       }
-      if includeSource, let source, let reflection = source.reflection {
-        Section("Building on your last session") {
-          Text(reflection.improve).font(.subheadline)
-          NavigationLink(source.title) { SessionDetailView(model: model, initial: source) }
-          Button("Remove") { includeSource = false }
+      // A follow-up aims the next question at what the last rep's feedback said to fix. One switch, no detour.
+      if let source, let reflection = source.reflection {
+        let aim = [reflection.improve, reflection.nextExercise ?? ""].first { !$0.isEmpty }
+        Section {
+          Toggle(isOn: $includeSource) {
+            VStack(alignment: .leading, spacing: 4) {
+              Text("Aim it at what to fix")
+              if let aim {
+                Text(aim).font(.subheadline).foregroundStyle(AppPalette.secondary)
+                  .fixedSize(horizontal: false, vertical: true)
+              }
+            }
+          }
+          .tint(AppPalette.accent)
+          .accessibilityHint("The next question picks up from \(source.title).")
+          .accessibilityIdentifier("buildOnLastRep")
         }
       }
       Section {

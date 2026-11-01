@@ -21,6 +21,7 @@
     // Sentry tags events with this; the DSN itself is the SENTRY_DSN secret (unset: reporting off).
     "SENTRY_ENVIRONMENT": "development",
     "FREE_REPS_PER_DAY": "3",
+    "FREE_REPS_LIFETIME": "2",
     "FREE_VOICE_LIFETIME": "3",
     "FREE_VOICE_TASTE_DAYS": "0",
     "FREE_VOICE_SESSION_MINUTES": "3",

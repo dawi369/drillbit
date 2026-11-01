@@ -7,10 +7,10 @@ import { INTERVIEW_PROMPT_VERSION, interviewerPrompt, isSocialOpening, socialOpe
 import { personalizationInstructions } from "./prompts/personalization";
 import { endingPolicy, teachingPolicy } from "./prompts/teaching";
 export type ModelMessage = { role: "system" | "user" | "assistant"; content: string };
-const contextualInterviewVersions = ["interviewer-standard-v4", "interviewer-standard-v5", "interviewer-teaching-v1", "interviewer-teaching-v2", "interviewer-teaching-v3", "interviewer-teaching-v4", "interviewer-teaching-v5"];
-const teachingInterviewVersions = ["interviewer-teaching-v1", "interviewer-teaching-v2", "interviewer-teaching-v3", "interviewer-teaching-v4", "interviewer-teaching-v5"];
+const contextualInterviewVersions = ["interviewer-standard-v4", "interviewer-standard-v5", "interviewer-teaching-v1", "interviewer-teaching-v2", "interviewer-teaching-v3", "interviewer-teaching-v4", "interviewer-teaching-v5", "interviewer-teaching-v6"];
+const teachingInterviewVersions = ["interviewer-teaching-v1", "interviewer-teaching-v2", "interviewer-teaching-v3", "interviewer-teaching-v4", "interviewer-teaching-v5", "interviewer-teaching-v6"];
 /** Editions that return move, parameters and the Guided/Mock fields. */
-const structuredInterviewVersions = ["interviewer-teaching-v4", "interviewer-teaching-v5"];
+const structuredInterviewVersions = ["interviewer-teaching-v4", "interviewer-teaching-v5", "interviewer-teaching-v6"];
 export async function modelAccess(
   env: Env,
   account: string,
