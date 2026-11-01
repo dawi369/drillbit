@@ -43,7 +43,7 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Drillbit’s voice library includes camera support. Drillbit uses audio only and does not request camera access.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Talk with your practice interviewer using live voice.</string>
+	<string>Talk with your practice interviewer using live voice, or record a voice note to the developer from Settings.</string>
 	<key>PrivacyPolicyURL</key>
 	<string>$(PRIVACY_POLICY_URL)</string>
 	<key>SharedKeychainGroup</key>

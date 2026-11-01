@@ -76,7 +76,7 @@ Match `apps/ios/Drillbit/PrivacyInfo.xcprivacy`. Tracking: **No**. For every typ
 | --- | --- | --- |
 | Contact Info | Email Address | Sign in with Apple/Google/GitHub via Clerk |
 | Identifiers | User ID | Account id |
-| User Content | Audio Data | Live voice streams to OpenAI |
+| User Content | Audio Data | Live voice streams to OpenAI; voice notes sent from Settings → Feedback are stored for the developer (App Functionality covers customer support) |
 | User Content | Other User Content | Answers, transcripts, learning plan |
 | Purchases | Purchase History | Subscription verification |
 | Usage Data | Product Interaction | Rep and voice counts for plan limits |

@@ -137,6 +137,7 @@ const challenge = challengeSchema.extend({
     )
     .optional(),
 });
+const voiceNote = z.object({ id: z.string(), createdAt: z.string(), durationSeconds: z.number() });
 const libraryQuestion=z.object({id:z.string(),title:z.string(),prompt:z.string(),scenario:z.string(),engineeringLevel:engineeringLevelSchema,primaryConceptId:conceptId,conceptIds:z.array(conceptId).min(1).max(3),eligible:z.boolean(),eligibilityRevision:z.number().int(),lastActivity:z.string().optional(),attemptCount:z.number().int().optional()});
 const recallCard=z.object({id:z.string(),sourceChallengeId:z.string(),conceptId,question:z.string(),answer:z.string(),dueAt:z.string(),intervalDays:z.number().int(),repetitions:z.number().int(),lapses:z.number().int(),createdAt:z.string(),updatedAt:z.string(),sourceTitle:z.string().optional(),sourceCompletedAt:z.string().optional(),sourceTicket:z.number().int().positive().optional(),evidence:learningEvidenceSchema.optional()});
 const todayPlan=z.object({state:z.enum(["first_session","resume","review_due","question_ready","complete_today","prepare"]),completedTotal:z.number().int().nonnegative(),completedLastSevenDays:z.number().int().nonnegative(),completedToday:z.number().int().nonnegative(),dueRecallCount:z.number().int().nonnegative(),recommendedRecallCount:z.number().int().nonnegative(),estimatedRecallMinutes:z.number().int().nonnegative(),dailyGoalMinutes:z.union([z.literal(5),z.literal(10),z.literal(15),z.literal(20)]),nextTicket:z.number().int().positive().optional()});
@@ -156,7 +157,10 @@ export const wire = {
   EligibilityInput:eligibilityInput,
   SkillObservation:observationSchema,
   LearningEvidence: learningEvidenceSchema.extend({sessionId:z.string(),at:z.string()}),
-  AccountExport: z.object({version:z.number().int(),asOf:z.string(),settings:settingsSchema,sessions:z.array(challenge),questions:z.array(libraryQuestion),nextCursor:z.string().nullable()}),
+  AccountExport: z.object({version:z.number().int(),asOf:z.string(),settings:settingsSchema,sessions:z.array(challenge),questions:z.array(libraryQuestion),voiceNotes:z.array(voiceNote).optional(),nextCursor:z.string().nullable()}),
+  // Base64 of an AAC .m4a recording, two minutes at most.
+  VoiceNoteInput: z.object({ audio: z.string(), durationSeconds: z.number(), appVersion: z.string().optional() }),
+  VoiceNote: voiceNote,
   Coverage:z.object({concepts:z.array(z.object({conceptId,completedAttempts:z.number().int(),distinctQuestions:z.number().int(),lastPractised:z.string().nullable()}))}),
   RecallCard:recallCard,
   RecallDeck:z.object({cards:z.array(recallCard),dueCount:z.number().int()}),

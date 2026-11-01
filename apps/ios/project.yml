@@ -39,7 +39,7 @@ targets:
       properties:
         CFBundleDisplayName: Drillbit
         NSCameraUsageDescription: Drillbit’s voice library includes camera support. Drillbit uses audio only and does not request camera access.
-        NSMicrophoneUsageDescription: Talk with your practice interviewer using live voice.
+        NSMicrophoneUsageDescription: Talk with your practice interviewer using live voice, or record a voice note to the developer from Settings.
         APIBaseURL: $(API_BASE_URL)
         ClerkPublishableKey: $(CLERK_PUBLISHABLE_KEY)
         SuperwallAPIKey: $(SUPERWALL_API_KEY)

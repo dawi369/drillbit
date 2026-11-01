@@ -39,6 +39,7 @@ export function privacyPolicy(env: Env) {
 <li><strong>Practice content.</strong> Your answers, interview conversations, voice transcripts, feedback, practice history, learning plan and settings.</li>
 <li><strong>Voice audio.</strong> When you use live voice, your microphone audio streams to our voice provider to run the conversation. We keep the text transcript, not the audio.</li>
 <li><strong>Purchases.</strong> If you subscribe, Apple sends us a signed record of the subscription (product, transaction identifier, dates and status) so we can unlock Pro. We never see your payment details.</li>
+<li><strong>Voice notes.</strong> If you send one from Settings → Feedback, we keep the recording with your account so the developer can listen to it. It isn't sent to any AI provider, and it's deleted with your account.</li>
 <li><strong>Usage counts.</strong> How many questions and voice sessions you've used, so free and fair-use limits work.</li>
 <li><strong>Your own provider key</strong>, if you add one in Settings. It's stored encrypted and only used for your requests.</li>
 </ul>

@@ -39,7 +39,7 @@ const MIX: Record<"weekly" | "yearly", Partial<Record<Seg, number>>> = {
   yearly: { idle: 0.35, text: 0.25, light: 0.2, prepping: 0.15, heavy: 0.05 }, // bursts across the year
 };
 const BASE = {
-  appleCut: 0.15, // App Store Small Business Program; 0.30 without it
+  appleCut: 0.15, // overridden per table: CUTS below
   yearlyShare: 0.35, // of new subscribers
   introOnly: 0.45, // weekly buyers who cancel after the $1.99 week
   fullWeeks: 7, // full-price weeks for weekly buyers who stay (about 14% weekly churn)
@@ -97,41 +97,47 @@ out("| Pro segment | Reps a month | Voice minutes a month | Cost a month |\n|---
 for (const s of Object.keys(SEGMENT) as Seg[]) out(`| ${s} | ${SEGMENT[s].reps} | ${SEGMENT[s].voice} | ${$(segCost(s, BASE), 2)} |`);
 out(`\nAverage month: weekly subscriber ${$(monthCost("weekly", BASE), 2)}, yearly subscriber ${$(monthCost("yearly", BASE), 2)}.`);
 out(`A download that never pays: ${$(freeExpected(BASE), 3)} expected, ${$(freeWorst, 2)} at most.`);
-const p = payer(BASE);
-out(`\nFirst-year value of one new subscriber (15% cut):`);
-out(`- Weekly: keeps ${$(p.w.revenue, 2)}, costs ${$(p.w.cost, 2)}, **net ${$(p.w.net, 2)}** over about ${p.w.months.toFixed(1)} months`);
-out(`- Yearly: keeps ${$(p.y.revenue, 2)}, costs ${$(p.y.cost, 2)}, **net ${$(p.y.net, 2)}**`);
-out(`- Blended (${BASE.yearlyShare * 100}% yearly): **net ${$(p.net, 2)}** per paying user`);
+// Apple keeps 15% under the Small Business Program (under $1M a year, enrolled) and 30% otherwise; every table shows both.
+const CUTS = [0.15, 0.3] as const;
+const withCut = (cut: number, change: Partial<A> = {}) => ({ ...BASE, ...change, appleCut: cut });
+out(`\nFirst-year value of one new subscriber:\n`);
+out("| | " + CUTS.map(c => `Apple ${c * 100}%: keeps / costs / net`).join(" | ") + " |\n|---|" + CUTS.map(() => "---").join("|") + "|");
+for (const [label, pick] of [["Weekly", "w"], ["Yearly", "y"]] as const)
+  out(`| ${label} | ` + CUTS.map(c => { const q = payer(withCut(c))[pick]; return `${$(q.revenue, 2)} / ${$(q.cost, 2)} / **${$(q.net, 2)}**`; }).join(" | ") + " |");
+out(`| Blended (${BASE.yearlyShare * 100}% yearly) | ` + CUTS.map(c => `**${$(payer(withCut(c)).net, 2)}** net`).join(" | ") + " |");
 
 // ── 3. Conversion scenarios per 1,000 downloads ─────────────────────────────────────────────────────────
 const RATES: [string, number][] = [["Very low", 0.01], ["Low", 0.03], ["Expected", 0.06], ["High", 0.1], ["Very high", 0.15]];
 out("\n## 3. Per 1,000 downloads, first year (download-to-paid by day 35)\n");
-out("| Scenario | Paying | Non-payers' cost | Subscribers' net | Cohort net | Net per download |\n|---|---|---|---|---|---|");
+out("| Scenario | Paying | Non-payers' cost | " + CUTS.map(c => `Cohort net, Apple ${c * 100}%`).join(" | ") + " |\n|---|---|---|" + CUTS.map(() => "---").join("|") + "|");
 for (const [name, r] of RATES) {
-  const payers = 1000 * r, freeCost = (1000 - payers) * freeExpected(BASE), subs = payers * p.net;
-  out(`| ${name} (${r * 100}%) | ${payers} | ${$(-freeCost)} | ${$(subs)} | **${$(subs - freeCost)}** | ${$((subs - freeCost) / 1000, 2)} |`);
+  const payers = 1000 * r, freeCost = (1000 - payers) * freeExpected(BASE);
+  out(`| ${name} (${r * 100}%) | ${payers} | ${$(-freeCost)} | ` + CUTS.map(c => `**${$(payers * payer(withCut(c)).net - freeCost)}**`).join(" | ") + " |");
 }
-out(`\nBreak-even conversion: ${(100 * freeExpected(BASE) / (p.net + freeExpected(BASE))).toFixed(2)}% expected; ${(100 * freeWorst / (p.net + freeWorst)).toFixed(1)}% if every non-payer maxes the free voice intro.`);
+for (const c of CUTS) {
+  const net = payer(withCut(c)).net;
+  out(`\nBreak-even conversion at Apple ${c * 100}%: ${(100 * freeExpected(BASE) / (net + freeExpected(BASE))).toFixed(2)}% expected; ${(100 * freeWorst / (net + freeWorst)).toFixed(1)}% if every non-payer maxes the free voice intro.`);
+}
 
 // ── 4. Monthly picture at a steady download rate ────────────────────────────────────────────────────────
-out("\n## 4. Month 12 at a steady download rate (yearly subscribers have piled up; weekly ones turn over)\n");
-out("| Downloads a month | " + RATES.map(([n, r]) => `${n} (${r * 100}%)`).join(" | ") + " |\n|---|" + RATES.map(() => "---").join("|") + "|");
-for (const d of [300, 1_000, 5_000, 20_000]) {
-  const cells = RATES.map(([, r]) => {
-    const newPay = d * r;
-    // Each month's cohort contributes its weekly value once and its yearly value spread over 12 months; after 12 months both are steady.
-    const weekly = newPay * (1 - BASE.yearlyShare) * p.w.net;
-    const yearly = newPay * BASE.yearlyShare * p.y.net; // 12 cohorts × 1/12 each
-    return $(weekly + yearly - (d - newPay) * freeExpected(BASE) - FIXED_PER_MONTH);
-  });
-  out(`| ${d.toLocaleString("en-US")} | ${cells.join(" | ")} |`);
+for (const c of CUTS) {
+  const q = payer(withCut(c));
+  out(`\n## 4${c === 0.15 ? "a" : "b"}. Month 12 at a steady download rate, Apple ${c * 100}% (yearly subscribers have piled up; weekly ones turn over)\n`);
+  out("| Downloads a month | " + RATES.map(([n, r]) => `${n} (${r * 100}%)`).join(" | ") + " |\n|---|" + RATES.map(() => "---").join("|") + "|");
+  for (const d of [300, 1_000, 5_000, 20_000]) {
+    const cells = RATES.map(([, r]) => {
+      const newPay = d * r;
+      // Each month's cohort contributes its weekly value once and its yearly value spread over 12 months; after 12 months both are steady.
+      return $(newPay * (1 - BASE.yearlyShare) * q.w.net + newPay * BASE.yearlyShare * q.y.net - (d - newPay) * freeExpected(BASE) - FIXED_PER_MONTH);
+    });
+    out(`| ${d.toLocaleString("en-US")} | ${cells.join(" | ")} |`);
+  }
 }
 
 // ── 5. What moves it ────────────────────────────────────────────────────────────────────────────────────
 out("\n## 5. Sensitivity: blended net per paying user, first year\n");
 const CASES: [string, Partial<A>][] = [
   ["Base", {}],
-  ["No Small Business Program (Apple 30%)", { appleCut: 0.3 }],
   ["Mostly yearly (70%)", { yearlyShare: 0.7 }],
   ["Mostly weekly (10% yearly)", { yearlyShare: 0.1 }],
   ["Most weekly buyers quit after the $1.99 week (70%)", { introOnly: 0.7 }],
@@ -141,10 +147,12 @@ const CASES: [string, Partial<A>][] = [
   ["A third of each segment becomes heavy voice", { heavyShift: 0.33 }],
   ["Everyone heavy (stress test)", { heavyShift: 1 }],
 ];
-out("| Case | Weekly sub | Yearly sub | Blended | Break-even conversion |\n|---|---|---|---|---|");
-for (const [name, c] of CASES) {
-  const a = { ...BASE, ...c }, q = payer(a), f = freeExpected(a);
-  out(`| ${name} | ${$(q.w.net, 2)} | ${$(q.y.net, 2)} | ${$(q.net, 2)} | ${q.net > 0 ? (100 * f / (q.net + f)).toFixed(2) + "%" : "never"} |`);
+out("| Case | " + CUTS.map(c => `Apple ${c * 100}%: weekly / yearly / blended (break-even)`).join(" | ") + " |\n|---|" + CUTS.map(() => "---").join("|") + "|");
+for (const [name, change] of CASES) {
+  out(`| ${name} | ` + CUTS.map(c => {
+    const a = withCut(c, change), q = payer(a), f = freeExpected(a);
+    return `${$(q.w.net, 2)} / ${$(q.y.net, 2)} / **${$(q.net, 2)}** (${q.net > 0 ? (100 * f / (q.net + f)).toFixed(2) + "%" : "never"})`;
+  }).join(" | ") + " |");
 }
 
 mkdirSync(".local", { recursive: true });

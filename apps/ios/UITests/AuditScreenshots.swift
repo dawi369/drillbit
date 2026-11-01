@@ -601,6 +601,43 @@ final class AuditScreenshots: XCTestCase {
     shot("g11-recall-day-one", app)
   }
 
+  /// Settings → Feedback: record (simulated in fixtures), listen back, send, thank-you.
+  func testWalkO_VoiceNote() throws {
+    continueAfterFailure = false
+    let app = launch(["--fixtures", "--fixture-settings"])
+    XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 10))
+    let row = app.buttons["settingsVoiceNote"]
+    for _ in 0..<8 where !row.exists || !row.isHittable { app.swipeUp() }
+    Thread.sleep(forTimeInterval: 0.6)
+    shot("o01-settings-feedback", app)
+    row.tap()
+    let record = app.buttons["voiceNoteRecord"]
+    XCTAssertTrue(record.waitForExistence(timeout: 3))
+    Thread.sleep(forTimeInterval: 0.8)
+    shot("o02-voice-note", app)
+    record.tap()
+    Thread.sleep(forTimeInterval: 2.5)
+    shot("o03-voice-note-recording", app)
+    app.buttons["voiceNoteRecord"].tap()
+    XCTAssertTrue(app.buttons["voiceNoteSend"].waitForExistence(timeout: 3))
+    Thread.sleep(forTimeInterval: 0.6)
+    shot("o04-voice-note-recorded", app)
+    app.buttons["voiceNoteSend"].tap()
+    XCTAssertTrue(app.buttons["voiceNoteDone"].waitForExistence(timeout: 5))
+    Thread.sleep(forTimeInterval: 0.8)
+    shot("o05-voice-note-sent", app)
+    app.buttons["voiceNoteDone"].tap()
+    XCTAssertTrue(row.waitForExistence(timeout: 3))
+    // Too short to be a note: it says so and starts over.
+    row.tap()
+    XCTAssertTrue(record.waitForExistence(timeout: 3))
+    record.tap()
+    Thread.sleep(forTimeInterval: 0.4)
+    app.buttons["voiceNoteRecord"].tap()
+    XCTAssertTrue(app.staticTexts["That was quick. Try a few seconds more."].waitForExistence(timeout: 3))
+    shot("o06-voice-note-too-short", app)
+  }
+
   // MARK: Finish pass — the first two weeks, as far as fixtures reach.
 
   /// Day 2: a thin answer. Day 3: resume yesterday's draft, finish, then try to prepare another question while one is open.

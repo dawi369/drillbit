@@ -12,6 +12,7 @@
 		0AA02AF022C77A9339CDFB76 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F69DED8C37D39A2D21CC2A84 /* Assets.xcassets */; };
 		0EEA0D0A8C2A9562B674EAB4 /* HelpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7FE2F3D17D6A2010A948002 /* HelpView.swift */; };
 		103427E2C089BEA93890BA94 /* OFL-Literata.txt in Resources */ = {isa = PBXBuildFile; fileRef = 9F6AAE6E7C477280E6A8A371 /* OFL-Literata.txt */; };
+		11FF9E030DBAA7B3958B9838 /* VoiceNoteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9624E6CA36440EB607B8DDD /* VoiceNoteView.swift */; };
 		17939E1CE6DADB13BEED9C8F /* AppDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DCB42472B027EF8556E83E2 /* AppDiagnostics.swift */; };
 		18B4090F1EFA1BAD814B974F /* PreparationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D48C7CE46F73492E41D2DDDD /* PreparationView.swift */; };
 		19BDB2BD78083CFC15FFCF77 /* LiveVoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87BD787A61C3C037E268829C /* LiveVoice.swift */; };
@@ -178,6 +179,7 @@
 		EF24F5F233F85813B521B540 /* DrillbitUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = DrillbitUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F69DED8C37D39A2D21CC2A84 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F7FE2F3D17D6A2010A948002 /* HelpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpView.swift; sourceTree = "<group>"; };
+		F9624E6CA36440EB607B8DDD /* VoiceNoteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceNoteView.swift; sourceTree = "<group>"; };
 		FD1F1245F3B3C8AA845AD3BA /* PlanPricing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanPricing.swift; sourceTree = "<group>"; };
 		FDE151C29EEC1990D2C7E840 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -268,6 +270,7 @@
 				CAA02422B05771C6B8DA4D2B /* SettingsView.swift */,
 				6F9D42BA7EF7B514FEACC7F6 /* SetupView.swift */,
 				137147215B8FA4CA44DA4451 /* Ticket.swift */,
+				F9624E6CA36440EB607B8DDD /* VoiceNoteView.swift */,
 				1BA600A70A653AC369122638 /* WelcomeView.swift */,
 				3CB6A2F670BAF46EEE12CA0B /* Fonts */,
 				A7F096FE7B4FC0B351C43223 /* Resources */,
@@ -578,6 +581,7 @@
 				2657C9E9ADBD72C612B2A458 /* SetupView.swift in Sources */,
 				2BCD05DC191DB1D3AC6E50FD /* SharedStore.swift in Sources */,
 				841482E9982EA21DA42B92E3 /* Ticket.swift in Sources */,
+				11FF9E030DBAA7B3958B9838 /* VoiceNoteView.swift in Sources */,
 				E151B6BC51DB2FE7D15DA008 /* VoiceTranscript.swift in Sources */,
 				EAC2A5859464998CB025529A /* WelcomeView.swift in Sources */,
 			);

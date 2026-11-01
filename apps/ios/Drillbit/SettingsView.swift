@@ -10,6 +10,7 @@ struct SettingsView: View {
   @State private var discarding = false
   @State private var saving = false
   @State private var reminderPermissionPending = false
+  @State private var recordingVoiceNote = false
   @AppStorage("appearance") private var appearance = "dark"
   private var time: Binding<Date> {
     Binding(
@@ -137,6 +138,17 @@ struct SettingsView: View {
       }
       if model.bootstrap?.capabilities?.developerTools == true || model.fixture {
         DeveloperSettingsSection(model: model, appearance: $appearance, dismiss: { dismiss() })
+      }
+      Section {
+        Button { recordingVoiceNote = true } label: {
+          Label("Send me a voice note", systemImage: "waveform")
+        }
+        .accessibilityIdentifier("settingsVoiceNote")
+        .sheet(isPresented: $recordingVoiceNote) { VoiceNoteView(model: model) }
+      } header: {
+        Text("Feedback")
+      } footer: {
+        Text("Tell me what’s broken or what you’d love. Voice only, two minutes, straight to the person building this.")
       }
       Section {
         Link("Terms of Use", destination: LegalLinks.terms).accessibilityIdentifier("settingsTerms")

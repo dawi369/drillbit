@@ -26,6 +26,9 @@ export async function exportPage(env: Env, account: string, cursor?: string) {
   const page = rows.results.slice(0,10), last=page.at(-1);
   const sessions=[];
   for (const row of page) sessions.push(await detail(env,account,row.id));
-  return {version:1,asOf:at,settings:await settingsFor(env,account),sessions,questions:questionPage.map(questionProjection),
+  // Voice notes come once, on the first page: when and how long. The recordings are available from support.
+  const voiceNotes = cursor ? undefined : (await env.DB.prepare("SELECT id,created_at,duration_seconds FROM voice_notes WHERE account_id=? AND created_at<=? ORDER BY created_at")
+    .bind(account,at).all<{id:string;created_at:string;duration_seconds:number}>()).results.map(n => ({id:n.id,createdAt:n.created_at,durationSeconds:n.duration_seconds}));
+  return {version:1,asOf:at,settings:await settingsFor(env,account),sessions,questions:questionPage.map(questionProjection),...(voiceNotes ? {voiceNotes} : {}),
     nextCursor:rows.results.length>10 || questions.results.length>10 ? btoa(JSON.stringify({at,after:last?.created_at ?? after,id:last?.id ?? afterID,questionAfter:lastQuestion?.created_at ?? questionAfter,questionID:lastQuestion?.id ?? questionID})) : null};
 }

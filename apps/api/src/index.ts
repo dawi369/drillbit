@@ -56,22 +56,26 @@ function inline(c: { env: Env; executionCtx: { waitUntil(work: Promise<unknown>)
     ? (id: string) => c.executionCtx.waitUntil(runJobInline(c.env, id))
     : undefined;
 }
-app.use(
-  "*",
-  bodyLimit({
-    maxSize: 128 * 1024,
-    onError: (c) =>
-      c.json(
-        {
-          error: {
-            code: "request_too_large",
-            message: "Keep your answer under 24,000 characters.",
-          },
+const VOICE_NOTE_PATH = "/v1/feedback/voice";
+const textLimit = bodyLimit({
+  maxSize: 128 * 1024,
+  onError: (c) =>
+    c.json(
+      {
+        error: {
+          code: "request_too_large",
+          message: "Keep your answer under 24,000 characters.",
         },
-        413,
-      ),
-  }),
-);
+      },
+      413,
+    ),
+});
+// A voice note is two minutes of base64 audio at most; everything else stays small.
+const voiceNoteLimit = bodyLimit({
+  maxSize: 1536 * 1024,
+  onError: (c) => c.json({ error: { code: "request_too_large", message: "Keep your voice note under two minutes." } }, 413),
+});
+app.use("*", (c, next) => (c.req.path === VOICE_NOTE_PATH ? voiceNoteLimit : textLimit)(c, next));
 app.use("*", async (c, next) => {
   // Job intent is already durable in D1. Enqueue without holding the HTTP reply;
   // the scheduled reconciler still recovers a failed workflow dispatch.
@@ -816,6 +820,33 @@ app.delete("/v1/credential", async (c) => {
     ).bind(a),
   ]);
   return c.json({ ok: true });
+});
+const voiceNoteSchema = z.object({
+  audio: z.string().min(1),
+  durationSeconds: z.number().positive().max(125),
+  appVersion: z.string().max(40).optional(),
+});
+app.post(VOICE_NOTE_PATH, async (c) => {
+  const a = c.get("account").id,
+    id = requireCommand(c.req.header("Idempotency-Key"));
+  const note = (row: { id: string; created_at: string; duration_seconds: number }) => ({ id: row.id, createdAt: row.created_at, durationSeconds: row.duration_seconds });
+  const existing = await c.env.DB.prepare("SELECT id,account_id,created_at,duration_seconds FROM voice_notes WHERE id=?").bind(id).first<{ id: string; account_id: string; created_at: string; duration_seconds: number }>();
+  if (existing) {
+    if (existing.account_id !== a) throw new Fault("command_reused", 409, "This command belongs to another request.");
+    return c.json(note(existing));
+  }
+  const input = voiceNoteSchema.parse(await c.req.json());
+  let audio: Uint8Array;
+  try { audio = Uint8Array.from(atob(input.audio), ch => ch.charCodeAt(0)); }
+  catch { throw new Fault("invalid_input", 400, "That recording didn't come through. Try again."); }
+  // An .m4a file names its format at bytes 4–7.
+  if (audio.length < 64 || audio.length > 1024 * 1024 || new TextDecoder().decode(audio.subarray(4, 8)) !== "ftyp")
+    throw new Fault("invalid_input", 400, "That recording didn't come through. Try again.");
+  await consumeUsage(c.env, a, "voice_note", 5, "That’s five voice notes today. I’ll listen to those first.");
+  const now = timestamp();
+  await c.env.DB.prepare("INSERT OR IGNORE INTO voice_notes(id,account_id,audio,duration_seconds,app_version,created_at) VALUES(?,?,?,?,?,?)")
+    .bind(id, a, audio, input.durationSeconds, input.appVersion ?? null, now).run();
+  return c.json(note({ id, created_at: now, duration_seconds: input.durationSeconds }), 201);
 });
 app.post("/v1/devices", async (c) => {
   const token = uuid() + uuid(),
