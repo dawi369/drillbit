@@ -55,7 +55,7 @@ The paywall reads everything from the products, so nothing in code changes with 
 2. Subscription group **Drillbit Pro** with:
    - `dawi.drillbit.pro.yearly`: 1 year.
    - `dawi.drillbit.pro.weekly`: **$7.99** a week, with an introductory offer of 1 week at **$1.99**, pay as you go.
-   - `dawi.drillbit.pro.yearly`: **$99.99** a year (raised from $79.99 on 31 October). The paywall shows "Save 75%" and "$8.33 a month"; `Config/Drillbit.storekit` uses the same prices for the simulator. If yearly is already set at $79.99 in App Store Connect, change it under Subscription Prices before submitting.
+   - `dawi.drillbit.pro.yearly`: **$99.99** a year (raised from $79.99 on 31 October). The paywall shows "Save 75%" and "$1.92 a week"; `Config/Drillbit.storekit` uses the same prices for the simulator. If yearly is already set at $79.99 in App Store Connect, change it under Subscription Prices before submitting.
    - Prices and caps are explained in [paywall-plan.md](paywall-plan.md).
 3. For each product: display name, description (e.g. "Unlimited reps and voice, billed weekly."), and a **review screenshot** of the paywall. Take it on the device with the TestFlight build (section 7): the simulator fixture paywall shows a debug-only "Simulate purchase" button.
 4. **The first subscription has to be submitted with an app version.** On the 1.0 version page, under *In-App Purchases and Subscriptions*, add both products before you press Submit. Otherwise they stay "Ready to Submit" and the reviewer sees an empty paywall.
@@ -101,15 +101,15 @@ If you want Superwall at launch instead:
 
 | Field | Draft |
 | --- | --- |
-| Name | Drillbit Practice (the App Store record; the home screen still says Drillbit) |
-| Subtitle (30) | Rehearse the system design interview |
+| Name (30) | Drillbit: System Design Prep (28; the home screen still says Drillbit) |
+| Subtitle (30) | AI mock interviews for SWEs (27) |
 | Category | Education (secondary: Productivity) |
 | Support URL | `https://<prod-host>/support` |
 | Privacy Policy URL | `https://<prod-host>/privacy` |
 | Copyright | 2026 t23.dev |
 | Age rating | Fill in the 2025 questionnaire honestly. Drillbit has an AI chat feature (the interviewer) that's limited to system design practice. It has no user-to-user communication, no web browsing and no mature content. Expect 13+. Set a higher minimum age if you want. |
 
-**Keywords (100):** `system design,interview,mock interview,software engineer,coding interview,faang,backend,architecture,prep`
+**Keywords (100):** `software engineer,coding,faang,backend,architecture,distributed systems,scalability,tech,career` (95). Words already in the name and subtitle are left out; repeating them adds nothing.
 
 **Promotional text:** Hard questions. Good company. An AI interviewer you can think out loud with, in text or voice.
 
@@ -122,6 +122,7 @@ If you want Superwall at launch instead:
 > • One question at a time, with clear requirements and room to push back
 > • Follow-ups that respond to your reasoning, not a checklist
 > • Live voice that continues the same interview, with your draft intact
+> • Feedback after every rep, in your own words: one thing that worked, one to fix
 > • Recall cards and a library of everything you've practiced
 >
 > Free: two questions to try it, plus a taste of voice. Drillbit Pro: practice as much as you like and use voice most days (fair use applies). Pro renews automatically unless you cancel at least 24 hours before the period ends. Manage or cancel in your Apple Account settings.
@@ -133,7 +134,18 @@ If you want Superwall at launch instead:
 
 Keep "fair use applies" next to "as much as you like": Pro has fair-use caps (10 practised reps a day, where a rep counts from its second message; voice 60 minutes a day, 75 a week, 20 a session). Unqualified "unlimited" claims invite a 2.3.1 accuracy rejection.
 
-**Screenshots:** iPhone 6.9" (1320 × 2868) is required, and the app is iPhone-only, so there's no iPad set. Six are ready in [`docs/design/app-store/`](design/app-store/): welcome, interview, example, Home, Recall and Library, in that order. They're generated from fixtures as a customer account, so there's no developer tab. To regenerate after UI changes, boot an iPhone 17 Pro Max simulator, run `xcrun simctl status_bar <udid> override --time 9:41 --batteryState charged --batteryLevel 100`, then run `-only-testing:DrillbitUITests/StoreScreenshots` and export the attachments (as `scripts/audit-shots.sh` does). Live voice is the headline feature but isn't in the set: the fixture voice room shows a debug "Simulate speech" link. Take that one on your phone during section 7 (a Pro Max, or scale to 1320 × 2868), mid-conversation with a caption showing. Add short captions in App Store Connect if you want, e.g. "An interviewer who pushes back", "Stuck? Ask for an example", "Recall what you learned".
+**Screenshots:** iPhone 6.9" (1320 × 2868) is required, and the app is iPhone-only, so there's no iPad set. The first three frames show in search results, so they have to explain the app on their own.
+
+| # | Frame | File in [`docs/design/app-store/`](design/app-store/) | Caption |
+|---|---|---|---|
+| 1 | The hook | `01-welcome.png` | The design round gets you hired. |
+| 2 | Live voice | taken on your phone, mid-conversation with a caption showing | Say it out loud. It talks back. |
+| 3 | The pushback | `03-pushback.png` | Grills you like the real one. |
+| 4 | Stuck help | `04-example.png` | Stuck? Ask for an example. |
+| 5 | Feedback | `05-feedback.png` | One thing that worked. One to fix. |
+| 6 | Knowledge map | `06-knowledge-map.png` | See what you actually know. |
+
+`spare-home.png`, `spare-recall.png` and `spare-library.png` are there if you want a seventh. Frame 2 can't come from the simulator: the fixture voice room shows a debug "Simulate speech" link. Take it on a Pro Max during section 7, or scale it to 1320 × 2868. The frames come from fixtures as a customer account, so there's no developer tab. To regenerate after UI changes, boot an iPhone 17 Pro Max simulator, run `xcrun simctl status_bar <udid> override --time 9:41 --batteryState charged --batteryLevel 100`, then run `-only-testing:DrillbitUITests/StoreScreenshots` and export the attachments (as `scripts/audit-shots.sh` does).
 
 **App Review notes (paste and fill in):**
 
