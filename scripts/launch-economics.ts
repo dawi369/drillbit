@@ -9,7 +9,10 @@ import { mkdirSync, writeFileSync } from "node:fs";
 // ── Prices (App Store Connect; Config/Drillbit.storekit matches) ─────────────────────────────────────────
 const PRICE = { weekly: 7.99, weeklyIntro: 1.99, yearly: 99.99 };
 const REFUNDS = 0.03;
-const kept = (gross: number, appleCut: number) => gross * (1 - appleCut) * (1 - REFUNDS);
+// EU/UK prices include VAT, which Apple removes before its commission; US sales tax is added on top instead.
+// Assumes 30% of sales come from storefronts with about 20% VAT (Adapty: Europe is about a quarter of revenue).
+const VAT = { share: 0.3, rate: 0.2 };
+const kept = (gross: number, appleCut: number) => gross * (1 - VAT.share * VAT.rate / (1 + VAT.rate)) * (1 - appleCut) * (1 - REFUNDS);
 
 // ── Measured costs (production ai_runs 31 Oct; OpenAI live voice billed per open second) ─────────────────
 const COST = { question: 0.0018, turn: 0.001, feedback: 0.0009, help: 0.001, retry: 1.1, voiceMinute: 0.051 };
@@ -17,14 +20,15 @@ const rep = (turns: number, help: number) => (COST.question + turns * COST.turn 
 const FIXED_PER_MONTH = 99 / 12 + 5; // Apple Developer, Cloudflare Workers Paid. Clerk is free below 50,000 retained users.
 
 // ── Limits (production wrangler vars) ────────────────────────────────────────────────────────────────────
-const FREE = { reps: 2, turns: 8, help: 2, introSessions: 3, sessionMinutes: 3 };
+const FREE = { reps: 2, turns: 8, help: 2, introSessions: 3, sessionMinutes: 3, tastesPerYear: 11 };
 // repsPerDay counts reps practised (second message sent); question writing has its own guard of 20 a day.
 const PRO = { repsPerDay: 10, sessionMinutes: 20, minutesPerDay: 60, minutesPerWeek: 75 };
 // A rolling 7-day cap allows up to five full weeks' worth inside a 30-day month (100 min on days 1, 8, 15, 22, 29).
 const PRO_MAX_MINUTES_30_DAYS = 5 * PRO.minutesPerWeek;
 
 // ── Expected behaviour (assumptions until real numbers arrive) ───────────────────────────────────────────
-const FUNNEL = { rep1: 0.6, rep2: 0.35, triesVoice: 0.4, freeVoiceMinutes: 5, unopenedQuestion: 0.15 };
+// tasteReturners: non-payers who come back for the 3-minute voice taste every 30 days, through the first year.
+const FUNNEL = { rep1: 0.6, rep2: 0.35, triesVoice: 0.4, freeVoiceMinutes: 5, unopenedQuestion: 0.15, tasteReturners: 0.05 };
 // Pro usage per month by segment. A "mock" is about 20 minutes of voice (one session at the cap).
 const SEGMENT = {
   idle: { reps: 0, voice: 0 }, // paid but between prep bursts (yearly)
@@ -76,15 +80,17 @@ const payer = (a: A) => {
 /** What a download that never pays costs, expected and worst case. */
 const freeExpected = (a: A) =>
   (FUNNEL.rep1 + FUNNEL.rep2) * rep(5, 1) + FUNNEL.unopenedQuestion * COST.question * COST.retry
-  + FUNNEL.rep1 * FUNNEL.triesVoice * FUNNEL.freeVoiceMinutes * COST.voiceMinute * a.voicePrice;
-const freeWorst = FREE.reps * rep(FREE.turns, FREE.help) + FREE.introSessions * FREE.sessionMinutes * COST.voiceMinute;
+  + FUNNEL.rep1 * FUNNEL.triesVoice * FUNNEL.freeVoiceMinutes * COST.voiceMinute * a.voicePrice
+  + FUNNEL.tasteReturners * FREE.tastesPerYear * FREE.sessionMinutes * COST.voiceMinute * a.voicePrice;
+/** A non-payer who uses everything free, including every monthly voice taste in the first year. */
+const freeWorst = FREE.reps * rep(FREE.turns, FREE.help) + (FREE.introSessions + FREE.tastesPerYear) * FREE.sessionMinutes * COST.voiceMinute;
 
 const $ = (v: number, d = 0) => (v < 0 ? "–" : "") + "$" + Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
 const L: string[] = []; const out = (s = "") => { L.push(s); console.log(s); };
 
 // ── 1. How much people can use it ────────────────────────────────────────────────────────────────────────
 out("## 1. Caps and the most a user can cost\n");
-out(`- Free, worst case, once: ${FREE.reps} maxed reps (${$(rep(FREE.turns, FREE.help), 3)} each) + ${FREE.introSessions}×${FREE.sessionMinutes} voice minutes = **${$(freeWorst, 2)}**`);
+out(`- Free, worst case in the first year: ${FREE.reps} maxed reps (${$(rep(FREE.turns, FREE.help), 3)} each) + ${FREE.introSessions} intro and ${FREE.tastesPerYear} monthly voice tastes of ${FREE.sessionMinutes} minutes = **${$(freeWorst, 2)}**`);
 const maxProMonth = PRO.repsPerDay * 30 * rep(6, 1) + PRO_MAX_MINUTES_30_DAYS * COST.voiceMinute;
 const maxProWeek = PRO.repsPerDay * 7 * rep(6, 1) + PRO.minutesPerWeek * COST.voiceMinute;
 out(`- Pro, worst case: ${$(maxProWeek, 2)} a week (${PRO.repsPerDay} reps every day + ${PRO.minutesPerWeek} voice minutes), up to ${$(maxProMonth, 2)} in a 30-day month (${PRO_MAX_MINUTES_30_DAYS} voice minutes)`);
@@ -116,7 +122,7 @@ for (const [name, r] of RATES) {
 }
 for (const c of CUTS) {
   const net = payer(withCut(c)).net;
-  out(`\nBreak-even conversion at Apple ${c * 100}%: ${(100 * freeExpected(BASE) / (net + freeExpected(BASE))).toFixed(2)}% expected; ${(100 * freeWorst / (net + freeWorst)).toFixed(1)}% if every non-payer maxes the free voice intro.`);
+  out(`\nBreak-even conversion at Apple ${c * 100}%: ${(100 * freeExpected(BASE) / (net + freeExpected(BASE))).toFixed(2)}% expected; ${(100 * freeWorst / (net + freeWorst)).toFixed(1)}% if every non-payer uses every free voice minute for a year.`);
 }
 
 // ── 4. Monthly picture at a steady download rate ────────────────────────────────────────────────────────

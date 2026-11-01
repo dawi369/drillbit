@@ -237,3 +237,27 @@ Break-even is **0.3%** of downloads, or 2.0% if every non-payer used up the free
 | Pro voice | **75 minutes a week** for everyone, 60 a day, 20 a session: about three 20-minute mocks a week plus some slack | `PRO_VOICE_MINUTES_PER_WEEK=75` |
 
 Hitting the Pro rep cap returns 429 `practice_limit` ("That's 10 reps today, which is plenty. More tomorrow."). Home then shows "Good day's work." with "Back tomorrow" instead of the failure ticket's Review. Text was never the cost, so the rep cap is about fair use and feel; the money is in voice. Section 11's numbers are rerun with these caps. A refunded free rep was used for at most one message, so refunds add well under a cent per download.
+
+## 13. Business model review — 1 November
+
+Two independent reviews: one rechecked the model and the enforced limits, the other researched pricing benchmarks. The arithmetic held. The model gained two corrections, and `.local/launch-economics.md` now shows Apple 15% and 30% side by side.
+
+- **VAT.** EU/UK prices include VAT, and Apple removes it before its commission (Apple Schedule 2 §3.4(a)). The model now assumes 30% of sales in about-20%-VAT storefronts, which cuts proceeds by about 5%.
+- **The free monthly voice taste never ends.** 5% of non-payers are assumed to come back each month, and the free worst case is $2.17 in the first year, not $0.49.
+
+| First year, 35% yearly | Apple 15% | Apple 30% |
+|---|---|---|
+| Weekly / yearly / blended net per paying user | $14.84 / $35.32 / **$22.01** | $10.31 / $21.50 / **$14.23** |
+| Per 1,000 downloads at 1% / 3% / **6%** / 10% / 15% | +$67 / +$510 / **+$1,175** / +$2,061 / +$3,169 | –$11 / +$277 / **+$708** / +$1,283 / +$2,002 |
+| Break-even download-to-paid | 0.7% | 1.1% |
+
+Benchmarks (RevenueCat State of Subscription Apps 2026): day-35 download-to-paid is 10.7% for hard paywalls, 2.1% for freemium, 3.1% for Education and 2.4% for AI apps. AI apps earn more per payer but churn faster (annual retention 21% against 31%). Plan against 3%, and treat 6% as the hopeful case.
+
+Findings, ranked:
+
+1. **Voice accounting trusts the app.** A session's minutes are the seconds the app reports at close (`voice.ts`), so a modified app could report one second and use about 400 minutes a day. A session closed with no user speech is waived and its start refunded, which can repeat without limit even from an unmodified app.
+2. **The weekly plan carries regulatory and review risk.** The EU withdrawal-button rule (19 June 2026) and the UK DMCCA subscription regime (January 2027) both name discounted intros that renew into paid plans. App Review rejects intro prices shown louder than the real price. None of ten interview-prep competitors sells a recurring weekly plan. They use monthly or yearly plans and fixed passes; Hello Interview sells $47 for 1 month, $89 for 1 year and $299 lifetime.
+3. **Yearly voice.** The break-even is about 132 voice minutes a month at 15% and 108 at 30%. The 75-minute weekly cap allows about 325.
+4. **The free monthly taste** is the only free cost without an end.
+5. **The refund rule** lets a free user take one interviewer reply per question, then skip, up to ten times a day.
+6. **Smaller items:** cap the intro week's voice at 20 minutes (+$1.48 per subscriber); price EU/UK and large student markets for their actual proceeds and buying power; enrol in the Small Business Program (worth about $8 per subscriber).
