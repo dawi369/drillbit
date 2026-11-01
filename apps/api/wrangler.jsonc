@@ -34,8 +34,6 @@
     "PRO_VOICE_MINUTES_PER_WEEK": "75",
     "APPLE_BUNDLE_ID": "dawi.drillbit",
     "APPLE_PRODUCT_IDS": "dawi.drillbit.pro.weekly,dawi.drillbit.pro.yearly",
-    "VOICE_UNLIMITED_ACCOUNTS": "3ded3cde-2d6d-44cf-8fae-cc024232b663",
-    "DEVELOPER_ACCOUNTS": "3ded3cde-2d6d-44cf-8fae-cc024232b663",
     "COMPANION_AUTO_ENABLED": "true",
     "INTERACTIVE_INLINE_ENABLED": "true",
     "CREDENTIAL_KEY_VERSION": "1",
