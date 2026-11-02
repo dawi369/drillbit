@@ -10,6 +10,19 @@ import Testing
 
 struct ContractTests {
   #if !canImport(DrillbitCore)
+  /// Every route that hands practice content to a model waits for the AI permission; reading and saving don't.
+  @MainActor @Test func aiRoutesNeedConsentAndOthersDont() {
+    for path in ["challenges", "challenges/c1/interview", "challenges/c1/interview/t1/retry", "challenges/c1/help",
+                 "challenges/c1/example", "challenges/c1/complete", "challenges/c1/voice", "challenges/c1/start",
+                 "challenges/c1/retry-moment/t1", "daily-question", "settings/preview", "questions/q1/start", "jobs/j1/retry"] {
+      #expect(APIClient.usesAI(path), "\(path)")
+    }
+    for path in ["challenges/c1/draft", "challenges/c1/skip", "challenges/c1/next", "settings", "devices", "paywall/view",
+                 "recall/r1/review", "entitlement", "challenges/c1/interview/t1/cancel", "challenges/c1/voice/v1/events"] {
+      #expect(!APIClient.usesAI(path), "\(path)")
+    }
+  }
+
   @Test func recallSessionRevealsAndRequeuesWithoutClaimingMastery() {
     var session = RecallSession(area: .swift, depth: .foundations)
     #expect(session.remainingCount == 1)

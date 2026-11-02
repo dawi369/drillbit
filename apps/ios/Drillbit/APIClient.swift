@@ -15,6 +15,13 @@ private let streamLog = Logger(subsystem: "dawi.drillbit", category: "stream")
        transport: @escaping @MainActor (URLRequest) async throws -> (Data, URLResponse) = { try await URLSession.shared.data(for: $0) }) {
     self.baseURL = baseURL; self.tokenProvider = tokenProvider; self.transport = transport
   }
+  /// The routes that hand practice content to an AI model: writing, interviewing, help, feedback and voice.
+  static func usesAI(_ path: String) -> Bool {
+    let route = String(path.split(separator: "?", maxSplits: 1).first ?? "")
+    return route.wholeMatch(of: /challenges|daily-question|settings\/preview|questions\/[^\/]+\/start|jobs\/[^\/]+\/retry/) != nil
+      || route.wholeMatch(of: /challenges\/[^\/]+\/(coach|companion|complete|example|help|interview|start|voice)/) != nil
+      || route.wholeMatch(of: /challenges\/[^\/]+\/(interview\/[^\/]+\/retry|retry-moment\/[^\/]+)/) != nil
+  }
   /// A session Clerk no longer has (e.g. after account deletion) means signed out, not an error to show.
   static func signedOutWhenSessionIsGone(_ token: @MainActor () async throws -> String?) async throws -> String? {
     do { return try await token() }
@@ -23,6 +30,10 @@ private let streamLog = Logger(subsystem: "dawi.drillbit", category: "stream")
   func request(_ path: String, method: String = "GET", body: Data? = nil, command: String? = nil)
     async throws -> URLRequest
   {
+    // Nothing reaches an AI model without permission, whichever screen asked (App Review 5.1.2(i)).
+    if method != "GET", Self.usesAI(path) {
+      guard await AIConsent.shared.request() else { throw AIConsent.declined }
+    }
     guard let token = try await tokenProvider() else {
       throw APIError(code: "unauthenticated", message: "Sign in to continue.", status: 401)
     }

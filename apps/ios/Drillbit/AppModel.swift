@@ -937,6 +937,8 @@ import WidgetKit
     bootstrap?.queuedNext = result.queuedNext
   }
   func generateForPreview(_ preparation: PreparationInput? = nil, onDraft: (@MainActor (QuestionDraft) -> Void)? = nil) async throws -> Challenge {
+    // Writing a question is the first thing that goes to AI; the permission is asked here, not up front.
+    guard await AIConsent.shared.request() else { throw AIConsent.declined }
     guard !busy, let account = bootstrap?.account.id else {
       throw APIError(code: "busy", message: "Already writing one. Hang tight.", status: 409)
     }
@@ -1099,6 +1101,10 @@ import WidgetKit
     await perform { presented = try await openForPreview(challenge) }
   }
   func openForPreview(_ challenge: Challenge) async throws -> Challenge {
+    // Opening an interview talks to the interviewer; reading a finished one doesn't.
+    if ["ready", "in_progress"].contains(challenge.lifecycle) {
+      guard await AIConsent.shared.request() else { throw AIConsent.declined }
+    }
     let account = bootstrap?.account.id
     var loaded = challenge
     if !fixture {

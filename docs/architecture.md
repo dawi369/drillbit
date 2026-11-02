@@ -715,3 +715,10 @@ Finish goes: the rep-done moment, then `ReflectionView` for everyone, then Home.
 - **Bit tab gate.** `TabBarGate` puts a proxy in front of the `UITabBarController` delegate and refuses the Bit tab for free accounts before it's selected, so the tab bar never moves and the page never loads. Everything else is forwarded to SwiftUI's own delegate. The `tabSelection` binding keeps its check as a fallback.
 - **Bit page.** Stat tiles share one height; the level ladder fills step by step on arrival (static with reduced motion).
 - **First-rep Pro offer.** `offerProAfterFirstRep` refreshes the bootstrap before it decides, so `remaining` includes the rep just finished. Development now uses `FREE_REPS_LIFETIME=2` like production; tests drop it and opt in per case.
+
+## AI permission when it's needed — 2 November 2026
+
+The AI permission (App Review 5.1.2(i)) is no longer a screen of its own. `AIConsent.request()` asks in a sheet presented over whatever is on screen, the first time something would go to an AI model: `generateForPreview` (writing a question), `openForPreview` for a ready or in-progress rep (the interview), and `APIClient.request` for every AI route (`APIClient.usesAI`: generation, interview turns and retries, help, examples, coach, completion, voice, retry-moment, daily question, settings preview, job retry). "Not now" or a swipe down refuses with "That part runs on AI, so it needs your OK first." and nothing is sent; the next attempt asks again. Automatic preparation still waits for `granted`.
+
+The answer is kept in the shared Keychain (`aiConsent.v1`), so it outlives a reinstall like the Clerk session; an earlier UserDefaults answer is carried over. Settings → Legal → AI and your data shows the disclosure with a switch to turn it off. Sign-in and the root no longer carry the disclosure, and the Feedback section in Settings has no footer.
+

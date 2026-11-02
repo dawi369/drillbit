@@ -153,10 +153,12 @@ struct SettingsView: View {
         .sheet(isPresented: $recordingVoiceNote) { VoiceNoteView(model: model) }
       } header: {
         Text("Feedback")
-      } footer: {
-        Text("Something broken? Write it up. Want to tell me how it feels? Send a voice note. Both go straight to the person building this.")
       }
       Section {
+        NavigationLink { AIDataView() } label: {
+          LabeledContent("AI and your data", value: AIConsent.shared.granted ? "On" : "Off")
+        }
+        .accessibilityIdentifier("settingsAIData")
         Link("Terms of Use", destination: LegalLinks.terms).accessibilityIdentifier("settingsTerms")
         if let privacy = LegalLinks.privacy {
           Link("Privacy Policy", destination: privacy).accessibilityIdentifier("settingsPrivacy")

@@ -275,7 +275,6 @@ struct SignInView: View {
   @Bindable var model: AppModel
   @State private var invite = ""
   @State private var signingIn = false
-  private var consented: Bool { AIConsent.shared.granted }
   /// Which sign-in buttons this build offers (`SIGN_IN_PROVIDERS`). Apple is always offered: App Review requires it
   /// alongside any other third-party sign-in.
   private static let providers = Set(((Bundle.main.object(forInfoDictionaryKey: "SignInProviders") as? String) ?? "apple")
@@ -300,10 +299,6 @@ struct SignInView: View {
           .id(inviting)
           .transition(.opacity)
           .signalEntrance(1)
-          // In the scrolling content, not the pinned footer, so the largest text sizes can still read all of it.
-          if !inviting && !consented {
-            AIDisclosure().padding(.top, 16).transition(.opacity).signalEntrance(2)
-          }
         }
         .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: inviteFocused)
         .frame(maxWidth: 400).padding(24).frame(maxWidth: .infinity, minHeight: geometry.size.height)
@@ -331,12 +326,6 @@ struct SignInView: View {
           }
           .buttonStyle(PracticeButtonStyle()).disabled(code.isEmpty || signingIn)
           .accessibilityLabel(signingIn ? "Checking invite" : "Open my question")
-        } else if !consented {
-          Button("Sounds good") {
-            withAnimation(reduceMotion ? nil : DrillbitMotion.page) { AIConsent.shared.grant() }
-          }
-          .buttonStyle(PracticeButtonStyle())
-          .accessibilityIdentifier("aiConsentAgree")
         } else {
           VStack(spacing: 12) {
             Button { authenticate { await model.signIn() } } label: { Label("Sign in with Apple", systemImage: AppIcon.apple.rawValue) }.buttonStyle(PracticeButtonStyle())
@@ -374,64 +363,152 @@ struct SignInView: View {
   }
 }
 
-/// Permission to send practice content to third-party AI (App Review 5.1.2(i)). Asked before sign-in, and again at
-/// the root for anyone already signed in without it (an update, or a Keychain session that outlived a reinstall).
+/// Permission to send practice content to third-party AI (App Review 5.1.2(i)). Asked the first time something
+/// would actually go to an AI model (writing a question, opening an interview), never as a screen of its own. The
+/// answer lives in the Keychain, so it outlives a reinstall like the session does. Settings can take it back.
 /// Fixtures keep it in memory: signed-in fixtures start agreed, signed-out ones start fresh.
 @MainActor @Observable final class AIConsent {
   static let shared = AIConsent()
   private static let key = "aiConsent.v1"
   private(set) var granted: Bool
   private let fixture: Bool
+  private var waiting: [CheckedContinuation<Bool, Never>] = []
+  private weak var sheet: UIViewController?
 
   private init() {
     var fixture = false
+    var unitTests = false
     var arguments: [String] = []
     #if DEBUG
     arguments = ProcessInfo.processInfo.arguments
     fixture = arguments.contains("--fixtures")
+    // Unit tests run inside the app: they start agreed and never put a sheet in front of their host.
+    unitTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     #endif
-    self.fixture = fixture
-    granted = fixture
-      ? !arguments.contains("--fixture-signed-out") && !arguments.contains("--fixture-no-ai-consent")
-      : UserDefaults.standard.bool(forKey: Self.key)
+    self.fixture = fixture || unitTests
+    if unitTests {
+      granted = true
+    } else if fixture {
+      granted = !arguments.contains("--fixture-signed-out") && !arguments.contains("--fixture-no-ai-consent")
+    } else {
+      let stored = SharedStore.secret(Self.key) == "granted"
+      let legacy = UserDefaults.standard.bool(forKey: Self.key)
+      granted = stored || legacy
+      // Agreed before the Keychain held it: carry it over so a reinstall doesn't ask again.
+      if legacy, !stored { try? SharedStore.setSecret("granted", key: Self.key) }
+    }
   }
 
   func grant() {
     granted = true
-    if !fixture { UserDefaults.standard.set(true, forKey: Self.key) }
+    guard !fixture else { return }
+    try? SharedStore.setSecret("granted", key: Self.key)
+    UserDefaults.standard.set(true, forKey: Self.key)
+  }
+
+  func revoke() {
+    granted = false
+    guard !fixture else { return }
+    try? SharedStore.setSecret(nil, key: Self.key)
+    UserDefaults.standard.removeObject(forKey: Self.key)
+  }
+
+  /// True once there's permission. Without it, asks in a sheet over whatever is on screen and waits for the answer.
+  /// Callers that arrive while the sheet is up share the one answer.
+  func request() async -> Bool {
+    if granted { return true }
+    return await withCheckedContinuation { continuation in
+      waiting.append(continuation)
+      if waiting.count == 1 { present() }
+    }
+  }
+
+  static let declined = APIError(code: "ai_consent", message: "That part runs on AI, so it needs your OK first.", status: 0)
+
+  private func present() {
+    let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+    let scene = scenes.first { $0.activationState == .foregroundActive } ?? scenes.first
+    var top = (scene?.windows.first { $0.isKeyWindow } ?? scene?.windows.first)?.rootViewController
+    while let next = top?.presentedViewController, !next.isBeingDismissed { top = next }
+    guard let top else { answer(false); return }
+    let host = UIHostingController(rootView: AIConsentSheet { [weak self] agreed in self?.answer(agreed) })
+    host.view.backgroundColor = UIColor(AppPalette.background)
+    host.sheetPresentationController?.detents = [.large()]
+    host.sheetPresentationController?.prefersGrabberVisible = true
+    host.presentationController?.delegate = SheetDismissal.shared
+    sheet = host
+    top.present(host, animated: true)
+  }
+
+  fileprivate func answer(_ agreed: Bool) {
+    if agreed { grant() }
+    sheet?.dismiss(animated: true)
+    sheet = nil
+    let pending = waiting
+    waiting = []
+    for continuation in pending { continuation.resume(returning: agreed) }
+  }
+
+  /// A swipe down is a "not now".
+  private final class SheetDismissal: NSObject, UIAdaptivePresentationControllerDelegate {
+    static let shared = SheetDismissal()
+    func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
+      MainActor.assumeIsolated { AIConsent.shared.answer(false) }
+    }
   }
 }
 
-/// The root's version of the question, for a signed-in account that hasn't agreed yet. Nothing behind it runs first.
-struct AIConsentGate: View {
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+/// The ask itself: what goes where, then yes or not now. Not now leaves everything as it was.
+struct AIConsentSheet: View {
+  var onAnswer: (Bool) -> Void
   var body: some View {
-    GeometryReader { geometry in
-      ScrollView {
-        VStack(spacing: 16) {
-          BitView().frame(width: 76, height: 84).signalEntrance(0)
-          VStack(spacing: 8) {
-            Text("One quick thing.").font(.title2.weight(.semibold))
-            Text("Then you’re back to practice.").font(.subheadline).foregroundStyle(AppPalette.secondary)
-          }
+    ScrollView {
+      VStack(spacing: 16) {
+        BitView().frame(width: 76, height: 84)
+        Text("Quick one before Bit gets to work.").font(.title2.weight(.semibold))
           .multilineTextAlignment(.center)
-          .signalEntrance(1)
-          AIDisclosure().padding(.top, 16).signalEntrance(2)
-        }
-        .frame(maxWidth: 400).padding(24).frame(maxWidth: .infinity, minHeight: geometry.size.height)
+          .fixedSize(horizontal: false, vertical: true)
+          .accessibilityAddTraits(.isHeader)
+        AIDisclosure().padding(.top, 8)
       }
-      .scrollBounceBehavior(.basedOnSize)
+      .frame(maxWidth: 400).padding(24).frame(maxWidth: .infinity)
     }
+    .scrollBounceBehavior(.basedOnSize)
     .background(AppPalette.background)
-    .containerBackground(AppPalette.background, for: .navigation)
     .safeAreaInset(edge: .bottom, spacing: 0) {
-      Button("Sounds good") { withAnimation(reduceMotion ? nil : DrillbitMotion.page) { AIConsent.shared.grant() } }
-        .buttonStyle(PracticeButtonStyle())
-        .accessibilityIdentifier("aiConsentAgree")
-        .frame(maxWidth: 400).padding(.horizontal, 24).padding(.vertical, 16)
-        .frame(maxWidth: .infinity)
-        .background(AppPalette.background)
+      VStack(spacing: 12) {
+        Button("Sounds good") { onAnswer(true) }
+          .buttonStyle(PracticeButtonStyle())
+          .accessibilityIdentifier("aiConsentAgree")
+        Button("Not now") { onAnswer(false) }
+          .font(.body.weight(.semibold)).foregroundStyle(AppPalette.accent)
+          .frame(minHeight: 44)
+          .accessibilityIdentifier("aiConsentNotNow")
+      }
+      .frame(maxWidth: 400).padding(.horizontal, 24).padding(.vertical, 16)
+      .frame(maxWidth: .infinity)
+      .background(AppPalette.background)
     }
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("aiConsentSheet")
+  }
+}
+
+/// Settings → AI and your data: the same words, and the switch to take permission back or give it.
+struct AIDataView: View {
+  private var consent: AIConsent { AIConsent.shared }
+  var body: some View {
+    SignalList {
+      Section { AIDisclosure().listRowInsets(EdgeInsets()).listRowBackground(Color.clear) }
+      Section {
+        Toggle("Use outside AI", isOn: Binding(get: { consent.granted }, set: { $0 ? consent.grant() : consent.revoke() }))
+          .tint(AppPalette.accent)
+          .accessibilityIdentifier("aiConsentToggle")
+      } footer: {
+        Text(consent.granted ? "Turn it off and Bit asks again before anything else goes out." : "Off. Bit asks before anything goes out.")
+      }
+    }
+    .navigationTitle("AI and your data").navigationBarTitleDisplayMode(.inline)
   }
 }
 
@@ -439,7 +516,7 @@ struct AIConsentGate: View {
 struct AIDisclosure: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
-      Label("Before we start: Bit runs on outside AI.", systemImage: "sparkles")
+      Label("Bit runs on outside AI.", systemImage: "sparkles")
         .font(.subheadline.weight(.semibold))
         .fixedSize(horizontal: false, vertical: true)
       Text("What you write goes to AI models through OpenRouter. When you talk, your voice goes to OpenAI. They get what the interview needs to reply. We never sell it or use it for ads.")
@@ -447,6 +524,7 @@ struct AIDisclosure: View {
         .fixedSize(horizontal: false, vertical: true)
       if let privacy = LegalLinks.privacy {
         Link("Privacy Policy", destination: privacy).font(.footnote.weight(.medium))
+          .tint(AppPalette.accent)
           .accessibilityIdentifier("aiConsentPrivacy")
       }
     }
