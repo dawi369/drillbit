@@ -299,11 +299,6 @@ private struct PaywallHeader: View {
           .font(.title2.weight(.semibold)).multilineTextAlignment(.center)
           .fixedSize(horizontal: false, vertical: true)
           .accessibilityAddTraits(.isHeader)
-        // What it's worth next to the thing it's for, not what it costs us.
-        Text("Less than an hour of what the offer pays.")
-          .font(.subheadline).foregroundStyle(AppPalette.secondary).multilineTextAlignment(.center)
-          .fixedSize(horizontal: false, vertical: true)
-          .accessibilityIdentifier("paywallValue")
       }
       VStack(alignment: .leading, spacing: 9) {
         ForEach(Self.perks, id: \.title) { perk in
