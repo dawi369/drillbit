@@ -726,3 +726,11 @@ The answer is kept in the shared Keychain (`aiConsent.v1`), so it outlives a rei
 
 The tips are no longer interview-only. Once the first rep is over (finished or skipped; `completeOnboarding` sets `coach.tourReady`), Home runs a four-step tour, once: "Three more tabs." pointing at Recall (Show me), Recall's page (Next), Library's page (Next), then "Bit’s map." pointing at the Bit tab from Library (Back home). Bit is never opened, so free accounts never land on a Pro page. It waits for the first-rep Pro offer, a pending reminder ask, Settings and any open rep, and shields the screen (tab bar included) while it runs. Accounts that finished onboarding before this change never see it. `TabBarGeometry` reads the tab item frames from the `UITabBar`, falling back to an even split of the bar. Tests opt in with `--fixture-coach`, and `--fixture-tour` starts Home ready for it.
 
+## Pro asks from the person's own reps — 2 November 2026
+
+See `docs/paywall-plan.md` section 15 for why. In code:
+- `ProPitch.from(model)` (KnowledgeMap.swift) builds the map nodes, the latest grounded gap (a rep's feedback first, then the account summary) and the level line. `MapGlimpse` draws the map read-only with `ConstellationLayout`, shared with the Bit tab's map. The paywall loads taxonomy and memory while the maker's note is up.
+- `ReflectionView.proAsk` picks at most one ask: `freeRepNotice` (with `retryMomentPro` when the feedback has a tricky moment), `voiceUsedNotice`, or `mapTease`. `AppModel.noteProOffered()` stands down the first-rep offer once one is tapped.
+- Free voice is one 10-minute mock; `VoiceCapability.allowanceLine` says "Your free voice mock runs up to 10 minutes. It counts once you speak." when the limit is 1.
+- Fixtures: `--fixture-tricky-moment` adds a gap tied to the last answer; a fixture voice session with speech spends the free mock.
+

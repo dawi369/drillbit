@@ -335,11 +335,7 @@ private struct ConstellationMap: View {
   let appeared: Bool
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-  private var categories: [String] {
-    var seen: [String] = []
-    for node in nodes where !seen.contains(node.category) { seen.append(node.category) }
-    return seen
-  }
+  private var categories: [String] { ConstellationLayout.categories(nodes) }
 
   var body: some View {
     GeometryReader { proxy in
@@ -421,14 +417,27 @@ private struct ConstellationMap: View {
     .overlay { RoundedRectangle(cornerRadius: 12).stroke(AppPalette.ticketEdge, lineWidth: 1) }
   }
 
-  /// Hubs on an inner ring, one per category; each category's concepts fan out on the outer ring within its slice.
   private func positions(side: CGFloat, center: CGPoint) -> (hubs: [(String, CGPoint)], nodes: [String: CGPoint]) {
-    let count = max(1, categories.count)
+    ConstellationLayout.positions(nodes: nodes, side: side, center: center)
+  }
+}
+
+/// Where the map's hubs and dots sit: shared by the Bit tab's map and the Pro sheet's glimpse of it.
+enum ConstellationLayout {
+  static func categories(_ nodes: [KnowledgeNode]) -> [String] {
+    var seen: [String] = []
+    for node in nodes where !seen.contains(node.category) { seen.append(node.category) }
+    return seen
+  }
+  /// Hubs on an inner ring, one per category; each category's concepts fan out on the outer ring within its slice.
+  static func positions(nodes: [KnowledgeNode], side: CGFloat, center: CGPoint) -> (hubs: [(String, CGPoint)], nodes: [String: CGPoint]) {
+    let groups = Self.categories(nodes)
+    let count = max(1, groups.count)
     let slice = 2 * Double.pi / Double(count)
     let inner = side * 0.25, outer = side * 0.42
     var hubs: [(String, CGPoint)] = []
     var points: [String: CGPoint] = [:]
-    for (index, category) in categories.enumerated() {
+    for (index, category) in groups.enumerated() {
       let angle = -Double.pi / 2 + Double(index) * slice
       hubs.append((category, CGPoint(x: center.x + inner * cos(angle), y: center.y + inner * sin(angle))))
       let members = nodes.filter { $0.category == category }
@@ -444,3 +453,76 @@ private struct ConstellationMap: View {
     return (hubs, points)
   }
 }
+
+/// The Pro sheet's look at the person's own map: their real dots, lit where their reps put them, with Bit in the
+/// middle. Read-only and unlabelled; VoiceOver reads what's lit.
+struct MapGlimpse: View {
+  let nodes: [KnowledgeNode]
+  var body: some View {
+    GeometryReader { proxy in
+      let side = min(proxy.size.width, proxy.size.height)
+      let center = CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
+      let layout = ConstellationLayout.positions(nodes: nodes, side: side, center: center)
+      ZStack {
+        Canvas { context, _ in
+          for (category, hub) in layout.hubs {
+            var spoke = Path(); spoke.move(to: center); spoke.addLine(to: hub)
+            context.stroke(spoke, with: .color(AppPalette.hairline), lineWidth: 1)
+            for node in nodes where node.category == category {
+              guard let point = layout.nodes[node.id] else { continue }
+              var edge = Path(); edge.move(to: hub); edge.addLine(to: point)
+              let lit = node.state != .unexplored
+              context.stroke(edge, with: .color(lit ? AppPalette.action.opacity(0.5) : AppPalette.hairline), lineWidth: lit ? 1.5 : 1)
+            }
+          }
+        }
+        ForEach(nodes) { node in
+          if let point = layout.nodes[node.id] {
+            NodeDot(state: node.state, size: node.state == .unexplored ? 6 : 11).position(point)
+          }
+        }
+        BitView().frame(width: 30, height: 34).position(center)
+      }
+    }
+    .aspectRatio(1, contentMode: .fit)
+    .accessibilityElement()
+    .accessibilityLabel(summary)
+    .accessibilityIdentifier("mapGlimpse")
+  }
+  private var summary: String {
+    let lit = nodes.filter { $0.state != .unexplored }.prefix(3).map { node in
+      "\(node.label), " + (node.state == .strong ? "held up" : node.state == .revisit ? "worth another go" : "practised")
+    }
+    return "Your map so far: " + lit.joined(separator: "; ") + ". The full map is part of Pro."
+  }
+}
+
+/// What the Pro sheet can say about this account from its own reps: the map so far, the latest concept the feedback
+/// said needs another go, and how far off a level estimate is. Built on the device and never sent anywhere.
+struct ProPitch {
+  let nodes: [KnowledgeNode]
+  let reps: Int
+  let gap: String?
+  let levelLine: String?
+
+  @MainActor static func from(_ model: AppModel) -> ProPitch? {
+    guard !model.taxonomy.isEmpty else { return nil }
+    let nodes = KnowledgeNode.build(model: model)
+    guard nodes.contains(where: { $0.state != .unexplored }) else { return nil }
+    let sessions = model.memory.sessions.filter { $0.lifecycle == "completed" && !$0.isWarmUp }
+      .sorted { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
+    // The latest gap from a rep's feedback, then the account's summary, as the map itself reads it.
+    let gapID = sessions.lazy.compactMap { $0.reflection?.evidence?.first { $0.signal == "needs_practice" }?.conceptId }.first
+      ?? model.memory.evidence?.first { $0.signal == "needs_practice" }?.conceptId
+    let gap = gapID.flatMap { id in model.taxonomy.first { $0.id == id }?.label }
+    let estimate = LevelEstimate.from(sessions)
+    return ProPitch(nodes: nodes, reps: sessions.count, gap: gap, levelLine: estimate.level == nil ? estimate.basis : nil)
+  }
+
+  /// "2 reps in. Queues & streams needs another go." Only when the feedback actually said so.
+  var headline: String? {
+    guard let gap, reps > 0 else { return nil }
+    return "\(reps == 1 ? "1 rep" : "\(reps) reps") in. \(gap) needs another go."
+  }
+}
+

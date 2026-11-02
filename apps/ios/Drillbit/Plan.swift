@@ -76,7 +76,7 @@ private struct EntitlementReceipt: Decodable { var plan: String }
       if let top = Self.topController(), !top.isBeingDismissed, !top.isBeingPresented, top.transitionCoordinator == nil {
         // Hosted outside the SwiftUI scene, so scene phase would read as background and freeze Bit; while it's up,
         // the app is in front.
-        let host = UIHostingController(rootView: NativePaywallSheet(placement: placement).tint(AppPalette.accent)
+        let host = UIHostingController(rootView: NativePaywallSheet(placement: placement, model: model).tint(AppPalette.accent)
           .environment(\.scenePhase, .active))
         host.overrideUserInterfaceStyle = top.traitCollection.userInterfaceStyle
         host.presentationController?.delegate = sheetDelegate
@@ -176,6 +176,8 @@ private struct EntitlementReceipt: Decodable { var plan: String }
 /// Fallback paywall: Apple's own subscription store for the Pro products.
 struct NativePaywallSheet: View {
   let placement: PaywallPlacement
+  /// For the person's own map and headline; the sheet still works without it.
+  var model: AppModel? = nil
   /// Products are checked up front so a store that sends nothing gets a plain explanation and a retry, not
   /// StoreKit's bare "Subscription unavailable".
   private enum Availability { case checking, ready, missing }
@@ -219,6 +221,12 @@ struct NativePaywallSheet: View {
       }
     }
     .accessibilityIdentifier("paywall")
+    // The map and the headline come from the person's reps: make sure they're loaded while the note is up.
+    .task {
+      guard let model, placement == .knowledgeMap || placement == .practiceRep else { return }
+      await model.loadTaxonomy()
+      await model.loadMemory()
+    }
     .task(id: attempt) {
       let started = Date()
       let found = (try? await Product.products(for: PlanCoordinator.productIDs)) ?? []
@@ -236,7 +244,7 @@ struct NativePaywallSheet: View {
 
   private var store: some View {
     SubscriptionStoreView(productIDs: PlanCoordinator.productIDs) {
-      PaywallHeader(placement: placement)
+      PaywallHeader(placement: placement, model: model)
     }
     .subscriptionStoreControlStyle(PlanPicker())
     .containerBackground(for: .subscriptionStoreFullHeight) { PaywallBackdrop() }
@@ -270,6 +278,12 @@ struct NativePaywallSheet: View {
 /// and Subscribe stay on screen without scrolling.
 private struct PaywallHeader: View {
   let placement: PaywallPlacement
+  var model: AppModel? = nil
+  /// Their own map leads where the map and more reps are the point; otherwise Bit does.
+  private var pitch: ProPitch? {
+    guard placement == .knowledgeMap || placement == .practiceRep, let model else { return nil }
+    return ProPitch.from(model)
+  }
   @State private var glow = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   private static let perks: [(symbol: String, title: String)] = [
@@ -280,28 +294,45 @@ private struct PaywallHeader: View {
     ("point.3.filled.connected.trianglepath.dotted", "Your knowledge map and level"),
   ]
   var body: some View {
+    let pitch = pitch
     VStack(spacing: 12) {
-      ZStack {
-        BitGlow(color: AppPalette.action, opacity: 0.28)
-          .frame(width: 168, height: 168)
-          .scaleEffect(glow ? 1.08 : 0.94)
-          .accessibilityHidden(true)
-        BitView(greets: true).frame(width: 80, height: 92).accessibilityHidden(true)
+      if let pitch {
+        VStack(spacing: 6) {
+          MapGlimpse(nodes: pitch.nodes).frame(width: 120, height: 120)
+          if let levelLine = pitch.levelLine {
+            Text(levelLine).font(.footnote).foregroundStyle(AppPalette.secondary).multilineTextAlignment(.center)
+              .fixedSize(horizontal: false, vertical: true)
+              .accessibilityIdentifier("paywallLevelLine")
+          }
+        }
+        .transition(.opacity)
+      } else {
+        ZStack {
+          BitGlow(color: AppPalette.action, opacity: 0.28)
+            .frame(width: 168, height: 168)
+            .scaleEffect(glow ? 1.08 : 0.94)
+            .accessibilityHidden(true)
+          BitView(greets: true).frame(width: 80, height: 92).accessibilityHidden(true)
+        }
+        .frame(height: 96)
       }
-      .frame(height: 96)
       VStack(spacing: 4) {
-        Text("Drillbit Pro").font(.caption.weight(.semibold)).foregroundStyle(AppPalette.accent)
-          .textCase(.uppercase).tracking(1.2)
+        // With their map up top, the sheet is already about Pro; the label would only push Subscribe down.
+        if pitch == nil {
+          Text("Drillbit Pro").font(.caption.weight(.semibold)).foregroundStyle(AppPalette.accent)
+            .textCase(.uppercase).tracking(1.2)
+        }
         Text(placement == .voiceSession ? "Say it out loud, as often as you want."
              : placement == .knowledgeMap ? "See what you actually know."
              : placement == .firstRep ? "Your next rep’s still on us."
-             : PlanCoordinator.shared.lifetimeFreeReps ? "Keep the reps coming." : "Don’t stop at three.")
+             : pitch?.headline ?? (PlanCoordinator.shared.lifetimeFreeReps ? "Keep the reps coming." : "Don’t stop at three."))
           .font(.title2.weight(.semibold)).multilineTextAlignment(.center)
           .fixedSize(horizontal: false, vertical: true)
           .accessibilityAddTraits(.isHeader)
       }
       VStack(alignment: .leading, spacing: 9) {
-        ForEach(Self.perks, id: \.title) { perk in
+        // The map is already on screen, so its perk would repeat it.
+        ForEach(Self.perks.filter { pitch == nil || $0.symbol != "point.3.filled.connected.trianglepath.dotted" }, id: \.title) { perk in
           HStack(spacing: 12) {
             Image(systemName: perk.symbol)
               .font(.subheadline.weight(.semibold)).foregroundStyle(AppPalette.accent)

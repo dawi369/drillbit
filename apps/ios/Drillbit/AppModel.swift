@@ -98,6 +98,21 @@ import WidgetKit
     reminderHeldBack = true
     PlanCoordinator.shared.register(.firstRep) { [weak self] in await self?.refresh() }
   }
+  /// Pro was just shown from somewhere else (the feedback's own ask): the first-rep offer stands down.
+  func noteProOffered() {
+    guard let account = bootstrap?.account.id else { return }
+    if fixture { proOfferedThisLaunch.insert(account) } else { UserDefaults.standard.set(true, forKey: Self.proOfferedKey + account) }
+  }
+  #if DEBUG
+  /// Fixtures: a free voice session with speech in it spends the free mock, as the server would.
+  func fixtureSpendFreeVoice() {
+    guard fixture, var voice = bootstrap?.capabilities?.voice, voice.plan == "free", voice.kind == "intro",
+          let remaining = voice.remaining, remaining > 0 else { return }
+    voice.remaining = remaining - 1
+    if remaining == 1 { voice.available = false; voice.reason = "That was your free voice mock. Pro has voice any time." }
+    bootstrap?.capabilities?.voice = voice
+  }
+  #endif
   static let proOfferedKey = "proOfferedAfterFirstRep:"
   private var proOfferedThisLaunch: Set<String> = []
   /// One native paywall presentation, for the launch numbers: placement and time only. Failures are dropped.
@@ -817,7 +832,7 @@ import WidgetKit
     case .freeReps:
       bootstrap?.account.plan = "free"
       bootstrap?.practice = PracticeAccess(plan: "free", freeReps: true, available: true, remaining: 2, limit: 3, resetsAt: Self.fixtureReset)
-      bootstrap?.capabilities?.voice = VoiceCapability(available: true, plan: "free", checkedAt: Date().ISO8601Format(), sessionSeconds: 180, remaining: 3, limit: 3, kind: "intro")
+      bootstrap?.capabilities?.voice = VoiceCapability(available: true, plan: "free", checkedAt: Date().ISO8601Format(), sessionSeconds: 600, remaining: 1, limit: 1, kind: "intro")
     case .freeSpent:
       bootstrap?.account.plan = "free"
       bootstrap?.practice = PracticeAccess(plan: "free", freeReps: true, available: false, nextFreeRepAt: Self.fixtureReset, remaining: 0, limit: 3, resetsAt: Self.fixtureReset)
@@ -1292,10 +1307,18 @@ import WidgetKit
       let said = challenge.interview?.turns.last(where: { $0.kind == "answer" })?.text ?? answer
       if let first = said.split(separator: ".").first?.trimmingCharacters(in: .whitespacesAndNewlines), first.count > 3 {
         completed.reflection?.evidence = [LearningEvidence(
-          conceptId: "queues-streams", observation: "Durable records mean a crashed worker’s job gets picked up again, not lost.",
+          conceptId: "queues", observation: "Durable records mean a crashed worker’s job gets picked up again, not lost.",
           quote: first + ".", signal: "demonstrated", assistance: "independent")]
       }
       #if DEBUG
+      // A gap tied to the answer it came from, so the feedback offers "Retry the tricky moment".
+      if ProcessInfo.processInfo.arguments.contains("--fixture-tricky-moment"),
+         let turn = challenge.interview?.turns.last(where: { $0.kind == "answer" }) {
+        let earlier = completed.reflection?.evidence ?? []
+        completed.reflection?.evidence = earlier + [LearningEvidence(
+          conceptId: "retry-safety", observation: "Say what happens when the work finishes but the acknowledgement is lost.",
+          quote: turn.text, signal: "needs_practice", assistance: "independent", sourceTurnId: turn.id)]
+      }
       // The two states feedback can be in when it isn't there yet: still writing, or given up.
       if ProcessInfo.processInfo.arguments.contains("--fixture-feedback-pending") { completed.reflection = nil }
       if ProcessInfo.processInfo.arguments.contains("--fixture-feedback-failed") {
@@ -1611,7 +1634,7 @@ import WidgetKit
     #endif
     let tomorrow = Calendar(identifier: .gregorian).startOfDay(for: .now.addingTimeInterval(86_400))
     bootstrap = Bootstrap(
-      capabilities: .init(voice: VoiceCapability(available: true, plan: "free", checkedAt: Date.now.ISO8601Format(), sessionSeconds: 180, remaining: 2, limit: 3, resetsAt: tomorrow.ISO8601Format(), kind: "intro"),
+      capabilities: .init(voice: VoiceCapability(available: true, plan: "free", checkedAt: Date.now.ISO8601Format(), sessionSeconds: 600, remaining: 1, limit: 1, resetsAt: tomorrow.ISO8601Format(), kind: "intro"),
                           // A customer account for store screenshots: no developer-only tab.
                           developerTools: !ProcessInfo.processInfo.arguments.contains("--fixture-customer")),
       account: .init(id: "fixture", status: "active"), settings: settings, challenge: challenge,
@@ -1652,7 +1675,7 @@ import WidgetKit
     if ProcessInfo.processInfo.arguments.contains("--fixture-free-reps") {
       bootstrap?.account.plan = "free"
       bootstrap?.practice = PracticeAccess(plan: "free", freeReps: true, available: true, remaining: 2, limit: 3, resetsAt: Self.fixtureReset)
-      bootstrap?.capabilities?.voice = VoiceCapability(available: true, plan: "free", checkedAt: Date().ISO8601Format(), sessionSeconds: 180, remaining: 3, limit: 3, kind: "intro")
+      bootstrap?.capabilities?.voice = VoiceCapability(available: true, plan: "free", checkedAt: Date().ISO8601Format(), sessionSeconds: 600, remaining: 1, limit: 1, kind: "intro")
     }
     if ProcessInfo.processInfo.arguments.contains("--fixture-gate") {
       bootstrap?.account.plan = "free"

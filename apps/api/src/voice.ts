@@ -83,7 +83,7 @@ export async function voiceCapability(env: Env, account: string) {
   return { available: true, plan, checkedAt, sessionSeconds, remaining, limit: caps.voiceFreeLifetime, kind: 'intro' as const };
  }
  if (!caps.voiceTasteDays)
-  return { available: false, plan, reason: 'That’s your free voice sessions. Pro has voice any time.', checkedAt, sessionSeconds, remaining: 0, limit: caps.voiceFreeLifetime, kind: 'intro' as const };
+  return { available: false, plan, reason: caps.voiceFreeLifetime === 1 ? 'That was your free voice mock. Pro has voice any time.' : 'That’s your free voice sessions. Pro has voice any time.', checkedAt, sessionSeconds, remaining: 0, limit: caps.voiceFreeLifetime, kind: 'intro' as const };
  const nextAt = history?.last ? new Date(Date.parse(history.last) + caps.voiceTasteDays * 86_400_000).toISOString() : checkedAt;
  if (nextAt > checkedAt)
   return { available: false, plan, reason: `Your next free voice session comes back ${comesBack(nextAt, checkedAt)}. Pro has it any time.`, checkedAt, sessionSeconds, remaining: 0, limit: 1, resetsAt: nextAt, kind: 'taste' as const };

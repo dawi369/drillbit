@@ -40,7 +40,7 @@ Renewals, expiry, refunds → App Store Server Notifications v2 → POST /apple/
 |---|---|---|
 | Questions (reps) | **2 in total** (since 31 Oct; was 3 a day). A rep skipped or swapped away before the first message comes back. | Unlimited*, fair use 10 practised reps a day (since 1 Nov; was 30 questions written) |
 | Inside a rep | 8 follow-ups, 2 nudges or examples | Unlimited |
-| Voice | First 3 sessions, 3 min each (the monthly taste is off since 1 Nov) | Unlimited*, fair use 60 min a day and **75 a week** (since 1 Nov; was 100, before that 150), up to 20 min a session |
+| Voice | **One 10-minute mock** (since 2 Nov; was 3 sessions of 3 min) | Unlimited*, fair use 60 min a day and **75 a week** (since 1 Nov; was 100, before that 150), up to 20 min a session |
 | Feedback, Recall, Library | ✓ | ✓ |
 | Daily question prepared for you | – | ✓ |
 | Knowledge map and level estimate (Bit tab) | – | ✓ |
@@ -282,3 +282,24 @@ Findings, ranked:
 With these changes (VAT included, no free taste), the expected 6% gives **+$1,254 per 1,000 downloads at Apple 15% and +$787 at 30%**. Break-even is 0.3% and 0.5%; it's 2.2% and 3.3% if every non-payer used every free voice minute.
 
 **Known limit.** The server can't end a provider voice session. A modified app could close early in Drillbit's records and keep talking to the provider. Each start is still bounded by the provider's own session length and by 20 starts a day. Closing this needs a server-side hang-up or a provider-enforced session length, if the provider offers one.
+
+## 15. Making Pro more enticing — 2 November
+
+Six ideas went to two reviewers: one on product, honesty and App Review, one on economics and what the code can support. Only what both agreed on was built.
+
+| Idea | Product | Economics | Built |
+|---|---|---|---|
+| 1. Their real map as the paywall's hero | Ship, but no hidden level: a free account never has one (a level needs 3 rated reps) | Same | **Yes.** `practice_rep` and `knowledge_map` lead with `MapGlimpse`: their real dots, Bit in the middle, and "N more reps with real design calls and Bit can place you." No eyebrow, and the map perk is dropped there so Subscribe stays on screen. |
+| 2. A map line on the feedback | Ship, but "moved up" isn't knowable; say the concept's state | Same | **Yes.** "Bit’s map" / "Queues & streams: Held up." (or "Worth another go.") with "See your map with Pro". |
+| 3. Tomorrow's question, locked | Drop: free accounts get no daily question, so it would be invented or wasted AI | Concept-only card, last | **No.** No agreement. |
+| 4. A voice taste that matches Pro | One session, 20 min after rerunning the economics | 20 min costs up to $527 per 1,000 downloads and needs 4.5% to break even; 10 min costs about what 3 × 3 did | **Yes, 10 minutes.** `FREE_VOICE_LIFETIME=1`, `FREE_VOICE_SESSION_MINUTES=10`; "That was your free voice mock." card after it. |
+| 5. Retry the tricky moment free once | Needs server accounting first | First keep it visible behind Pro; the free retry needs D1 work | **Step one.** Once free reps are spent, the retry stays, locked, and opens Pro. The one free retry waits for a server design and D1 race tests. |
+| 6. Personal paywall headline | Ship, from one real concept, no diagnosis | Ship, merged with 1 | **Yes.** "2 reps in. Queues & streams needs another go." from the latest grounded gap, on `practice_rep`; generic otherwise. |
+
+Rules that came with it:
+- At most one Pro ask on a free rep's feedback: reps spent (with the locked retry when there's a tricky moment), else the voice mock just used, else the map line. Tapping any of them stands down the automatic `first_rep` offer.
+- Everything personal is built on the device from the person's own reps and is never sent anywhere (Superwall is off; if it's turned on, nothing practice-derived goes to it as an attribute).
+- No "unlimited" with a number, no levels a free account doesn't have, and no claims beyond the feedback's grounded evidence.
+
+Watch after launch: paywall views and conversion by placement (`scripts/metrics.ts`), and free voice minutes per user. If free voice averages more than about 7 minutes and conversion doesn't move, go back to shorter sessions.
+

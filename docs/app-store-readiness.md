@@ -125,7 +125,7 @@ If you want Superwall at launch instead:
 > • Feedback after every rep, in your own words: one thing that worked, one to fix
 > • Recall cards and a library of everything you've practiced
 >
-> Free: two questions to try it, plus a taste of voice. Drillbit Pro: practice as much as you like and use voice most days (fair use applies). Pro renews automatically unless you cancel at least 24 hours before the period ends. Manage or cancel in your Apple Account settings.
+> Free: two questions to try it, plus one 10-minute voice mock. Drillbit Pro: practice as much as you like and use voice most days (fair use applies). Pro renews automatically unless you cancel at least 24 hours before the period ends. Manage or cancel in your Apple Account settings.
 >
 > Drillbit uses third-party AI (OpenRouter and OpenAI) to run interviews. It asks before anything is sent.
 >
@@ -153,7 +153,7 @@ Keep "fair use applies" next to "as much as you like": Pro has fair-use caps (10
 >
 > Subscriptions: free accounts get two questions in total. To reach the paywall, use Settings → See Pro, or finish two questions. Restore Purchases is on the paywall (Settings → See Pro).
 >
-> Voice: open a question and tap Talk, then tap the microphone to unmute. Microphone permission is requested then. Free accounts get 3 short voice sessions.
+> Voice: open a question and tap Talk, then tap the microphone to unmute. Microphone permission is requested then. Free accounts get one voice mock of up to 10 minutes; it counts once they speak.
 >
 > Account deletion: Settings → Delete account.
 >

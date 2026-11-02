@@ -510,7 +510,7 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.buttons["voiceMute"].waitForExistence(timeout:5))
     XCTAssertFalse(app.buttons["voiceStart"].exists)
     let allowance = app.descendants(matching: .any)["voiceAllowance"]
-    XCTAssertEqual(allowance.label, "2 of 3 free voice sessions left.")
+    XCTAssertEqual(allowance.label, "Your free voice mock runs up to 10 minutes. It counts once you speak.")
     // It says its piece, then gets out of the way.
     XCTAssertTrue(allowance.waitForNonExistence(timeout: 6))
     // Live: Transcript, Mute and End sit in one dock; the keyboard waits in the toolbar.
@@ -543,10 +543,13 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.staticTexts["I'd use a durable queue."].waitForExistence(timeout:5))
     XCTAssertTrue(app.staticTexts["Makes sense. What happens when a worker retries?"].exists)
     capture("Voice room conversation", app)
+    // That was the free voice mock: Talk now offers Pro, and typing carries on with the draft intact.
     app.buttons["liveVoice"].tap()
-    XCTAssertTrue(app.buttons["voiceMute"].waitForExistence(timeout: 5), "Talk reconnects without a Start step")
-    app.buttons["voiceEnd"].tap()
-    XCTAssertTrue(app.buttons["liveVoice"].waitForExistence(timeout: 5))
+    let gate = app.descendants(matching: .any)["confirmDialog"]
+    XCTAssertTrue(gate.waitForExistence(timeout: 5))
+    XCTAssertTrue(gate.buttons["See Pro"].exists)
+    gate.buttons["Keep typing"].tap()
+    XCTAssertEqual(editor.value as? String, "Keep my written draft.")
   }
 
   func testAppearancePersistsAndLibraryMenuIsSkippedOnly() throws {
@@ -1954,6 +1957,101 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.buttons["todayDone"].waitForExistence(timeout: 8))
     XCTAssertFalse(app.descendants(matching: .any)["paywall"].waitForExistence(timeout: 3))
     XCTAssertTrue(app.buttons["seePro"].exists, "Both free reps used: Home points at Pro")
+  }
+
+  func testFirstRepFeedbackPutsItOnBitsMapAndAsksOnce() throws {
+    continueAfterFailure = false
+    let app = finishFirstRep(["--fixture-lifetime"])
+    XCTAssertTrue(app.descendants(matching: .any)["feedbackLead"].waitForExistence(timeout: 8))
+    // What this rep put on the map, in the map's own words, with one way to see it.
+    let tease = app.descendants(matching: .any)["mapTease"]
+    for _ in 0..<6 where !(tease.exists && tease.isHittable) { app.swipeUp() }
+    XCTAssertTrue(tease.exists)
+    XCTAssertTrue(app.staticTexts["Queues & streams: Held up."].exists)
+    XCTAssertFalse(app.descendants(matching: .any)["freeRepNotice"].exists, "One ask on the feedback")
+    capture("Feedback map line", app)
+    tease.buttons["seePro"].tap()
+    // Pro leads with their real map, not a promise.
+    XCTAssertTrue(app.descendants(matching: .any)["paywall"].waitForExistence(timeout: 8))
+    XCTAssertTrue(app.descendants(matching: .any)["mapGlimpse"].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.staticTexts["See what you actually know."].exists)
+    Thread.sleep(forTimeInterval: 1)
+    capture("Pro with their map", app)
+    app.buttons["paywallDismiss"].tap()
+    // Pro was already shown from the feedback, so leaving it goes straight Home.
+    leaveFeedback(app)
+    XCTAssertTrue(app.buttons["todayDone"].waitForExistence(timeout: 8))
+    XCTAssertFalse(app.descendants(matching: .any)["paywall"].waitForExistence(timeout: 3))
+  }
+
+  func testSpentFreeRepsKeepTheTrickyMomentBehindPro() throws {
+    continueAfterFailure = false
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures", "--fixture-home-rich", "--fixture-customer", "--fixture-lifetime-spent", "--fixture-tricky-moment"]
+    app.launch()
+    XCTAssertTrue(app.buttons["startPractice"].waitForExistence(timeout: 10))
+    app.buttons["startPractice"].tap()
+    app.buttons["previewStart"].tap()
+    let editor = app.descendants(matching: .any).matching(identifier: "answerEditor").firstMatch
+    XCTAssertTrue(editor.waitForExistence(timeout: 5))
+    editor.tap(); editor.typeText("The worker deletes the job when it finishes.")
+    app.buttons["shareAnswer"].tap()
+    XCTAssertTrue(app.buttons["interviewOptions"].waitForExistence(timeout: 10))
+    app.buttons["interviewOptions"].tap()
+    app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Finish interview'")).firstMatch.tap()
+    app.descendants(matching: .any)["confirmDialog"].buttons["Finish interview"].tap()
+    // Free reps are spent: the retry stays in view, locked, instead of vanishing. One ask, not two.
+    let locked = app.buttons["retryMomentPro"]
+    XCTAssertTrue(locked.waitForExistence(timeout: 10))
+    XCTAssertFalse(app.buttons["retryMoment"].exists)
+    XCTAssertFalse(app.descendants(matching: .any)["mapTease"].exists)
+    for _ in 0..<6 where !locked.isHittable { app.swipeUp() }
+    capture("Locked tricky moment", app)
+    locked.tap()
+    XCTAssertTrue(app.descendants(matching: .any)["paywall"].waitForExistence(timeout: 8))
+    XCTAssertTrue(app.buttons["paywallDismiss"].waitForExistence(timeout: 10))
+    app.buttons["paywallDismiss"].tap()
+  }
+
+  func testFreeVoiceMockEndsWithOneProCard() throws {
+    continueAfterFailure = false
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures", "--fixture-voice", "--fixture-customer", "--fixture-lifetime"]
+    app.launch()
+    XCTAssertTrue(app.buttons["startPractice"].waitForExistence(timeout: 10))
+    app.buttons["startPractice"].tap(); app.buttons["previewStart"].tap()
+    XCTAssertTrue(app.buttons["liveVoice"].waitForExistence(timeout: 8))
+    app.buttons["liveVoice"].tap()
+    XCTAssertTrue(app.buttons["voiceMute"].waitForExistence(timeout: 5))
+    app.buttons["voiceFixtureSpeech"].tap()
+    app.buttons["voiceEnd"].tap()
+    XCTAssertTrue(app.buttons["liveVoice"].waitForExistence(timeout: 5))
+    app.buttons["interviewOptions"].tap()
+    app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Finish interview'")).firstMatch.tap()
+    app.descendants(matching: .any)["confirmDialog"].buttons["Finish interview"].tap()
+    let card = app.descendants(matching: .any)["voiceUsedNotice"]
+    for _ in 0..<12 where !card.exists { Thread.sleep(forTimeInterval: 0.5); app.swipeUp() }
+    XCTAssertTrue(card.exists)
+    XCTAssertTrue(app.staticTexts["That was your free voice mock."].exists)
+    XCTAssertFalse(app.descendants(matching: .any)["mapTease"].exists, "One ask on the feedback")
+    capture("Free voice mock used", app)
+  }
+
+  func testProSheetLeadsWithTheirMapAndAnHonestHeadline() throws {
+    continueAfterFailure = false
+    let app = XCUIApplication()
+    // A finished rep whose feedback said Queues & streams needs another go, and both free reps used.
+    app.launchArguments = ["--fixtures", "--fixture-home-rich", "--fixture-customer", "--fixture-lifetime-spent"]
+    app.launch()
+    XCTAssertTrue(app.buttons["homeSettings"].waitForExistence(timeout: 10))
+    app.buttons["homeSettings"].tap()
+    XCTAssertTrue(app.buttons["settingsSeePro"].waitForExistence(timeout: 5))
+    app.buttons["settingsSeePro"].tap()
+    XCTAssertTrue(app.descendants(matching: .any)["mapGlimpse"].waitForExistence(timeout: 12))
+    XCTAssertTrue(app.staticTexts["1 rep in. Queues & streams needs another go."].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.buttons["paywallSubscribe"].waitForExistence(timeout: 10))
+    Thread.sleep(forTimeInterval: 1)
+    capture("Pro with their map and gap", app)
   }
 
   func testProAccountsGetNoOfferAfterTheirFirstRep() throws {

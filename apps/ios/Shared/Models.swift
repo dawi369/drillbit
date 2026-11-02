@@ -257,6 +257,11 @@ struct VoiceCapability: Codable, Sendable {
       let day = calendar.isDate(back, inSameDayAs: now) ? "later today" : calendar.isDate(back, inSameDayAs: tomorrow) ? "tomorrow" : back.formatted(style)
       return "Your free voice session comes back \(day). Pro has it any time."
     }
+    // Launch config: one longer free mock rather than a few short tries.
+    if limit == 1 {
+      guard remaining > 0 else { return nil }
+      return "Your free voice mock runs up to \(max(1, (sessionSeconds ?? 600) / 60)) minutes. It counts once you speak."
+    }
     switch remaining {
     case 0: return nil
     case 1: return "Last free voice session. Make it count."

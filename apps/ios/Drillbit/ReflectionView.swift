@@ -179,6 +179,8 @@ struct ReflectionView: View {
     }
     .task(id: feedbackCheck) { await waitForFeedback() }
     .task(id: reflection != nil) { await askForReview() }
+    // The map line names the concept, so the vocabulary has to be on hand.
+    .task { await model.loadTaxonomy() }
   }
 
   /// Apple's review prompt, while finishing a rep still feels good and before any mention of money: shortly after
@@ -260,12 +262,77 @@ struct ReflectionView: View {
         }
       }
       if let retryFailure { Text(retryFailure).font(.subheadline).foregroundStyle(AppPalette.destructive) }
-      if !warmUp, !model.mayStartRep(), let line = model.freeRepsLine {
+      if let ask = proAsk { proAskView(ask).padding(.top, 4) }
+    }
+  }
+
+  /// At most one Pro ask on a free rep's feedback, the most useful first: reps used up, the voice mock just spent,
+  /// then what this rep put on Bit's map. Everything it says comes from this rep; nothing is guessed.
+  private enum ProAsk { case repsSpent(String), voiceUsed, map(label: String, held: Bool) }
+  private var proAsk: ProAsk? {
+    guard !warmUp, let reflection, model.bootstrap?.practice?.freeReps == true else { return nil }
+    if !model.mayStartRep(), let line = model.freeRepsLine { return .repsSpent(line) }
+    if usedFreeVoice { return .voiceUsed }
+    let evidence = reflection.evidence ?? []
+    if let mark = evidence.first(where: { $0.signal == "demonstrated" }) ?? evidence.first(where: { $0.signal == "needs_practice" }),
+       let label = model.taxonomy.first(where: { $0.id == mark.conceptId })?.label {
+      return .map(label: label, held: mark.signal == "demonstrated")
+    }
+    return nil
+  }
+  /// This rep spoke with the interviewer, and that was the free voice mock: voice is now Pro.
+  private var usedFreeVoice: Bool {
+    guard let voice = model.bootstrap?.capabilities?.voice, voice.plan == "free", !voice.available else { return false }
+    return (challenge.interview?.turns ?? []).contains { turn in
+      (turn.voice ?? []).contains { $0.speaker == "user" && !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    }
+  }
+  @ViewBuilder private func proAskView(_ ask: ProAsk) -> some View {
+    switch ask {
+    case .repsSpent(let line):
+      if let reflection, retryTurn(reflection) != nil {
+        // The most useful next step stays in view, behind Pro, rather than vanishing once free reps run out.
+        VStack(alignment: .leading, spacing: 12) {
+          Text(line).font(.subheadline).foregroundStyle(AppPalette.secondary).fixedSize(horizontal: false, vertical: true)
+          Button { offerPro(.practiceRep) } label: {
+            Label("Retry the tricky moment", systemImage: "lock.fill")
+          }
+          .buttonStyle(PracticeButtonStyle(secondary: true))
+          .accessibilityLabel("Retry the tricky moment. Part of Pro.")
+          .accessibilityIdentifier("retryMomentPro")
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("freeRepNotice")
+      } else {
         ProNudge(message: line, placement: .practiceRep) { await model.refresh() }
           .accessibilityIdentifier("freeRepNotice")
-          .padding(.top, 4)
       }
+    case .voiceUsed:
+      proCard(title: "That was your free voice mock.", line: "Pro keeps voice open for every rep.", action: "See Pro") { offerPro(.voiceSession) }
+        .accessibilityIdentifier("voiceUsedNotice")
+    case .map(let label, let held):
+      proCard(eyebrow: "Bit’s map", title: "\(label): \(held ? "Held up." : "Worth another go.")", line: nil, action: "See your map with Pro") { offerPro(.knowledgeMap) }
+        .accessibilityIdentifier("mapTease")
     }
+  }
+  private func proCard(eyebrow: String? = nil, title: String, line: String?, action: String, tap: @escaping () -> Void) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      if let eyebrow { SignalEyebrow(text: eyebrow) }
+      Text(title).font(.headline).fixedSize(horizontal: false, vertical: true)
+      if let line { Text(line).font(.subheadline).foregroundStyle(AppPalette.secondary).fixedSize(horizontal: false, vertical: true) }
+      Button(action, action: tap)
+        .font(.subheadline.weight(.semibold)).frame(minHeight: 44)
+        .accessibilityIdentifier("seePro")
+    }
+    .padding(16)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 12))
+    .accessibilityElement(children: .contain)
+  }
+  /// One ask is enough: once Pro has been shown from the feedback, leaving it doesn't show it again.
+  private func offerPro(_ placement: PaywallPlacement) {
+    model.noteProOffered()
+    PlanCoordinator.shared.register(placement) { await model.refresh() }
   }
 
   /// The answer behind the gap, when the feedback points at one: retrying it is the most useful next step.

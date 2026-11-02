@@ -259,6 +259,9 @@ private struct VoiceOutbox: Codable {
       return
     }
     if interview.model.fixture || transport == nil {
+      #if DEBUG
+      if interview.model.fixture, outbox?.fragments.contains(where: { $0.speaker == "user" }) == true { interview.model.fixtureSpendFreeVoice() }
+      #endif
       await finalize(confirmed:interview.model.fixture); return
     }
     transport?.send(["type":"session.close","event_id":UUID().uuidString])

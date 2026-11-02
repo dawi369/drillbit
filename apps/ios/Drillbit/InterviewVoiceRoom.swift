@@ -6,7 +6,7 @@ import SwiftUI
 struct InterviewVoiceRoom<Question: View>: View {
   let voice: LiveVoice
   let interview: InterviewController
-  /// "2 of 3 free voice sessions left.", when the account is on the free plan.
+  /// "Your free voice mock runs up to 10 minutes…", when the account is on the free plan.
   var allowance: String? = nil
   /// True while the shell is about to start voice itself; the room reads as connecting until it does.
   var opening = false

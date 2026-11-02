@@ -20,7 +20,8 @@ it('closed sessions cannot delegate new paid work',async()=>{const {a,id}=await 
 it('does not activate a session if the question was skipped during provider startup',async()=>{const {a,id}=await fixture(),cmd=crypto.randomUUID();const mock=vi.spyOn(globalThis,'fetch').mockImplementation(async()=>{await e.DB.prepare("UPDATE challenges SET lifecycle='skipped' WHERE id=?").bind(id).run();return new Response(JSON.stringify({session:{id:'live_late'},transport:{sdp:'answer'}}));});try{await expect(startVoice(e,a,id,cmd,{sdp:'offer',revision:2})).rejects.toMatchObject({code:'inactive'});const row=await e.DB.prepare('SELECT status FROM voice_sessions WHERE id=?').bind(cmd).first<any>();expect(row.status).toBe('uncertain');}finally{mock.mockRestore();}});
 
 // The monthly taste is off in production; these tests pin it on where they exercise it.
-const free={...e,PRACTICE_GATE:'true',FREE_VOICE_TASTE_DAYS:'30'} as Env;
+// The older three short intro sessions; the launch config (one 10-minute mock) has its own test below.
+const free={...e,PRACTICE_GATE:'true',FREE_VOICE_TASTE_DAYS:'30',FREE_VOICE_LIFETIME:'3',FREE_VOICE_SESSION_MINUTES:'3'} as Env;
 const day=()=>new Date().toISOString().slice(0,10);
 /** Past sessions that reached the provider; the free allowance counts these. */
 async function spentSessions(account:string,challenge:string,n:number,agoDays=0){
@@ -240,6 +241,14 @@ it('Pro voice is metered in minutes: today, the rolling week, and the next sessi
   const trimmed=await startVoice({...pro,PRO_VOICE_MINUTES_PER_DAY:'5'} as Env,third.a,third.id,crypto.randomUUID(),{sdp:'offer',revision:2});
   expect(trimmed.sessionSeconds).toBe(300);
  } finally { mock.mockRestore(); }
+});
+
+it('launch config: one free 10-minute voice mock, then Pro', async()=>{
+ const {a,id}=await fixture(), launch={...free,FREE_VOICE_TASTE_DAYS:'0',FREE_VOICE_LIFETIME:'1',FREE_VOICE_SESSION_MINUTES:'10'} as Env;
+ expect(await voiceCapability(launch,a)).toMatchObject({available:true,remaining:1,limit:1,kind:'intro',sessionSeconds:600});
+ await spentSessions(a,id,1,40);
+ expect(await voiceCapability(launch,a)).toMatchObject({available:false,plan:'free',remaining:0,limit:1,kind:'intro',reason:'That was your free voice mock. Pro has voice any time.'});
+ await expect(startVoice(launch,a,id,crypto.randomUUID(),{sdp:'offer',revision:2})).rejects.toMatchObject({code:'voice_gate',status:402});
 });
 
 it('free voice with the monthly taste off: the three intro sessions are all there is', async()=>{
