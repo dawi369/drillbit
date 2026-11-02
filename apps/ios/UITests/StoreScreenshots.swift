@@ -101,6 +101,46 @@ final class StoreScreenshots: XCTestCase {
     return false
   }
 
+  /// For App Review (5.1.2(i)): where the third-party AI permission is asked, and where it can be read again.
+  func testAIConsentReviewScreenshots() throws {
+    // A new account: setup, then the first question is about to be written. Nothing has gone to a model yet.
+    var app = launch(["--fixtures", "--fixture-onboarding", "--fixture-no-ai-consent"])
+    XCTAssertTrue(app.staticTexts["Quick one. No wrong answers."].waitForExistence(timeout: 10))
+    app.buttons["The database"].tap()
+    for _ in 0..<6 { app.buttons["Continue"].tap() }
+    XCTAssertTrue(app.buttons["Show me my first question"].waitForExistence(timeout: 5))
+    app.buttons["Show me my first question"].tap()
+    XCTAssertTrue(app.buttons["aiConsentAgree"].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.staticTexts["Bit runs on outside AI."].exists)
+    Thread.sleep(forTimeInterval: 1.2)
+    shot("review-ai-consent-first-question", app)
+    app.buttons["aiConsentAgree"].tap()
+    XCTAssertTrue(app.buttons["previewStart"].waitForExistence(timeout: 15), "Agreeing lets the first question be written")
+    app.terminate()
+
+    // Signed in without it (an update): Home is open; starting a question asks first.
+    app = launch(["--fixtures", "--fixture-home-rich", "--fixture-no-ai-consent"])
+    XCTAssertTrue(app.buttons["startPractice"].waitForExistence(timeout: 10))
+    app.buttons["startPractice"].tap()
+    XCTAssertTrue(app.buttons["previewStart"].waitForExistence(timeout: 5))
+    app.buttons["previewStart"].tap()
+    XCTAssertTrue(app.buttons["aiConsentAgree"].waitForExistence(timeout: 5))
+    Thread.sleep(forTimeInterval: 1.2)
+    shot("review-ai-consent-returning", app)
+    app.terminate()
+
+    // Settings → AI and your data: the same words, any time.
+    app = launch(["--fixtures", "--fixture-settings"])
+    let row = app.buttons["settingsAIData"]
+    for _ in 0..<8 where !row.exists || !row.isHittable { app.swipeUp() }
+    Thread.sleep(forTimeInterval: 0.6)
+    shot("review-ai-data-settings-row", app)
+    row.tap()
+    XCTAssertTrue(app.descendants(matching: .any)["aiDisclosure"].waitForExistence(timeout: 5))
+    Thread.sleep(forTimeInterval: 0.8)
+    shot("review-ai-data-settings", app)
+  }
+
   /// The subscription review screenshot App Store Connect asks for: the paywall with real plan options.
   func testPaywallReviewScreenshot() throws {
     let store = try SKTestSession(configurationFileNamed: "Drillbit")

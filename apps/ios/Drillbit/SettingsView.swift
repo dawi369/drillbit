@@ -137,7 +137,8 @@ struct SettingsView: View {
             ConfirmAction("Cancel"),
           ])
       }
-      if model.bootstrap?.capabilities?.developerTools == true || model.fixture {
+      // Fixtures carry the capability too, except customer ones, which show what a subscriber sees.
+      if model.bootstrap?.capabilities?.developerTools == true {
         DeveloperSettingsSection(model: model, appearance: $appearance, dismiss: { dismiss() })
       }
       Section {
@@ -155,9 +156,7 @@ struct SettingsView: View {
         Text("Feedback")
       }
       Section {
-        NavigationLink { AIDataView() } label: {
-          LabeledContent("AI and your data", value: AIConsent.shared.granted ? "On" : "Off")
-        }
+        NavigationLink("AI and your data") { AIDataView() }
         .accessibilityIdentifier("settingsAIData")
         Link("Terms of Use", destination: LegalLinks.terms).accessibilityIdentifier("settingsTerms")
         if let privacy = LegalLinks.privacy {

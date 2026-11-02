@@ -594,21 +594,17 @@ final class PracticeUITests: XCTestCase {
     app.buttons["aiConsentAgree"].tap()
     XCTAssertTrue(editor.waitForExistence(timeout: 8))
     app.terminate()
-    // Settings shows it above the legal links, and can take it back.
+    // Settings shows the same words above the legal links, and nothing to switch.
     app.launchArguments = ["--fixtures", "--fixture-settings"]
     app.launch()
     let row = app.buttons["settingsAIData"]
     for _ in 0..<8 where !row.exists || !row.isHittable { app.swipeUp() }
-    XCTAssertTrue(row.label.contains("On"), row.label)
     XCTAssertLessThan(row.frame.minY, app.buttons["settingsTerms"].exists ? app.buttons["settingsTerms"].frame.minY : app.links["settingsTerms"].frame.minY)
     capture("Settings AI and your data row", app)
     row.tap()
-    let toggle = app.switches["aiConsentToggle"]
-    XCTAssertTrue(toggle.waitForExistence(timeout: 5))
-    XCTAssertEqual(toggle.value as? String, "1")
+    XCTAssertTrue(app.descendants(matching: .any)["aiDisclosure"].waitForExistence(timeout: 5))
+    XCTAssertFalse(app.switches.firstMatch.exists, "Nothing to toggle: Drillbit runs on its own AI keys")
     capture("AI and your data", app)
-    toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
-    XCTAssertEqual(toggle.value as? String, "0")
   }
 
   func testSessionRestorationDoesNotShowSignIn() throws {

@@ -365,7 +365,7 @@ struct SignInView: View {
 
 /// Permission to send practice content to third-party AI (App Review 5.1.2(i)). Asked the first time something
 /// would actually go to an AI model (writing a question, opening an interview), never as a screen of its own. The
-/// answer lives in the Keychain, so it outlives a reinstall like the session does. Settings can take it back.
+/// answer lives in the Keychain, so it outlives a reinstall like the session does. Settings shows the words again.
 /// Fixtures keep it in memory: signed-in fixtures start agreed, signed-out ones start fresh.
 @MainActor @Observable final class AIConsent {
   static let shared = AIConsent()
@@ -404,13 +404,6 @@ struct SignInView: View {
     guard !fixture else { return }
     try? SharedStore.setSecret("granted", key: Self.key)
     UserDefaults.standard.set(true, forKey: Self.key)
-  }
-
-  func revoke() {
-    granted = false
-    guard !fixture else { return }
-    try? SharedStore.setSecret(nil, key: Self.key)
-    UserDefaults.standard.removeObject(forKey: Self.key)
   }
 
   /// True once there's permission. Without it, asks in a sheet over whatever is on screen and waits for the answer.
@@ -494,20 +487,15 @@ struct AIConsentSheet: View {
   }
 }
 
-/// Settings → AI and your data: the same words, and the switch to take permission back or give it.
+/// Settings → AI and your data: the same words the permission sheet shows, to read again any time.
 struct AIDataView: View {
-  private var consent: AIConsent { AIConsent.shared }
   var body: some View {
-    SignalList {
-      Section { AIDisclosure().listRowInsets(EdgeInsets()).listRowBackground(Color.clear) }
-      Section {
-        Toggle("Use outside AI", isOn: Binding(get: { consent.granted }, set: { $0 ? consent.grant() : consent.revoke() }))
-          .tint(AppPalette.accent)
-          .accessibilityIdentifier("aiConsentToggle")
-      } footer: {
-        Text(consent.granted ? "Turn it off and Bit asks again before anything else goes out." : "Off. Bit asks before anything goes out.")
-      }
+    ScrollView {
+      AIDisclosure()
+        .frame(maxWidth: 680).padding(20).frame(maxWidth: .infinity)
     }
+    .background(AppPalette.background)
+    .containerBackground(AppPalette.background, for: .navigation)
     .navigationTitle("AI and your data").navigationBarTitleDisplayMode(.inline)
   }
 }

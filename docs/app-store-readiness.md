@@ -16,7 +16,7 @@ Verification is reported in three levels, as the release gate in [operations.md]
 | --- | --- |
 | `PrivacyPolicyURL` is now copied into Info.plist (`project.yml`). Before this, `PRIVACY_POLICY_URL` never reached the app, so the paywall and Settings had no privacy link in any build. | 3.1.2: subscription apps need a working privacy link in the app. |
 | Release builds fail if `PRIVACY_POLICY_URL` isn't an `https://` URL. | Stops the mistake above from coming back. |
-| Third-party AI disclosure and consent, asked just in time: a sheet ("Bit runs on outside AI." → **Sounds good** / Not now) the first time a question would be written or an interview opened, and the API client refuses every AI route until it's given. No automatic generation runs without it. Settings → Legal → AI and your data shows it again and can turn it off. | 5.1.2(i), Nov 2025: you must name third-party AI and get explicit permission before any data is sent to it. |
+| Third-party AI disclosure and consent, asked just in time: a sheet ("Bit runs on outside AI." → **Sounds good** / Not now) the first time a question would be written or an interview opened, and the API client refuses every AI route until it's given. No automatic generation runs without it. Settings → Legal → AI and your data shows the same words any time. Screenshots for the review notes: `review-ai-consent-first-question.png`, `review-ai-consent-returning.png`, `review-ai-data-settings.png` in `docs/design/app-store/`. | 5.1.2(i), Nov 2025: you must name third-party AI and get explicit permission before any data is sent to it. |
 | `OPEN_SIGNUP=true` in production: new accounts are active without an invite. Development stays invite-only. | 2.1: reviewers can't use an invite-only app with no code, and paying customers can't either. |
 | Privacy policy and support pages served by the Worker at `/privacy` and `/support` (`apps/api/src/legal.ts`), contact `support@t23.dev`. | App Store Connect requires both URLs. |
 
@@ -149,7 +149,7 @@ Keep "fair use applies" next to "as much as you like": Pro has fair-use caps (10
 
 **App Review notes (paste and fill in):**
 
-> Sign in with Apple to create an account; no invite or demo code is needed. The first launch shows a short intro and a one-minute setup, then sign-in. Before the first question is written, a sheet asks permission to use third-party AI (OpenRouter for text, OpenAI for voice); nothing is sent to an AI model before that. Settings → AI and your data shows it again and can turn it off.
+> Sign in with Apple to create an account; no invite or demo code is needed. The first launch shows a short intro and a one-minute setup, then sign-in. Before the first question is written, a sheet asks permission to use third-party AI (OpenRouter for text, OpenAI for voice); nothing is sent to an AI model before that. Settings → AI and your data shows the same words any time. Screenshots of the permission sheet are attached.
 >
 > Subscriptions: free accounts get two questions in total. To reach the paywall, use Settings → See Pro, or finish two questions. Restore Purchases is on the paywall (Settings → See Pro).
 >
