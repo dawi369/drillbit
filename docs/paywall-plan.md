@@ -61,7 +61,7 @@ Renewals, expiry, refunds → App Store Server Notifications v2 → POST /apple/
 
 There's no paywall at launch or during onboarding, and no nagging. Apart from the one soft offer after the first rep, upgrades appear only where a limit actually stopped someone.
 
-Development runs the same lifetime model since 2 November, so the offer can be tested in the simulator. Since 2 November no account is on the development allowlists (`DEVELOPER_ACCOUNTS`, `VOICE_UNLIMITED_ACCOUNTS`), so the owner's account is a plain free account there too, without the Developer section.
+Development runs the same lifetime model since 2 November, so the offer can be tested in the simulator. Since 2 November development also runs with `PRACTICE_GATE=true` (before, every development account was Pro) and no account is on its allowlists (`DEVELOPER_ACCOUNTS`, `VOICE_UNLIMITED_ACCOUNTS`), so the owner's account is a plain free account there too, without the Developer section. The API tests reset the gate to off and opt in per case.
 
 Every native paywall presentation is recorded with its placement and time only (`POST /v1/paywall/view`, table `paywall_views`, at most 50 a day per account), so `scripts/metrics.ts` can show views and conversion by placement.
 

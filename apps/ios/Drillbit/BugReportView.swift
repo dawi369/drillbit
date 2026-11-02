@@ -42,9 +42,7 @@ struct BugReportView: View {
                 .accessibilityLabel("What you were doing, optional")
                 .accessibilityIdentifier("bugReportDoing")
                 .listRowBackground(AppPalette.inset)
-            } header: { Text("What were you doing? (optional)") } footer: {
-              Text("This goes to Sentry, the service that tells me when the app breaks, with the app version, device model and iOS version. Leave out anything personal.")
-            }
+            } header: { Text("What were you doing? (optional)") }
             if let failure {
               Section { Text(failure).foregroundStyle(AppPalette.destructive) }
             }

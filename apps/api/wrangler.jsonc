@@ -16,7 +16,7 @@
     "MODEL_ID": "openai/gpt-6-luna",
     "MANAGED_AI_ENABLED": "true",
     "VOICE_ENABLED": "true",
-    "PRACTICE_GATE": "false",
+    "PRACTICE_GATE": "true",
     "SUPPORT_EMAIL": "support@t23.dev",
     // Sentry tags events with this; the DSN itself is the SENTRY_DSN secret (unset: reporting off).
     "SENTRY_ENVIRONMENT": "development",
