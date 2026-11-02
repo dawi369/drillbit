@@ -334,6 +334,40 @@ final class PracticeUITests: XCTestCase {
     app.buttons["voiceEnd"].tap()
     XCTAssertTrue(app.buttons["liveVoice"].waitForExistence(timeout: 5))
   }
+  func testTabTourAfterTheFirstRepWalksRecallLibraryAndPointsAtBit() throws {
+    continueAfterFailure = false
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures", "--fixture-dashboard", "--fixture-customer", "--fixture-coach", "--fixture-tour"]
+    app.launch()
+    let tip = { (mark: String) in app.descendants(matching: .any)["coach-" + mark] }
+    XCTAssertTrue(tip("tabs").waitForExistence(timeout: 10))
+    XCTAssertTrue(app.staticTexts["Three more tabs."].exists)
+    capture("Tour: three more tabs", app)
+    app.buttons["coachDone"].tap()
+    XCTAssertTrue(tip("recallPage").waitForExistence(timeout: 5))
+    XCTAssertTrue(app.tabBars.buttons["Recall"].isSelected)
+    capture("Tour: Recall", app)
+    app.buttons["coachDone"].tap()
+    XCTAssertTrue(tip("libraryPage").waitForExistence(timeout: 5))
+    XCTAssertTrue(app.tabBars.buttons["Library"].isSelected)
+    capture("Tour: Library", app)
+    app.buttons["coachDone"].tap()
+    // Bit is pointed at, never opened: free accounts would land on a Pro page.
+    XCTAssertTrue(tip("bitTab").waitForExistence(timeout: 5))
+    XCTAssertTrue(app.tabBars.buttons["Library"].isSelected)
+    XCTAssertFalse(app.descendants(matching: .any)["paywall"].exists)
+    capture("Tour: Bit", app)
+    app.buttons["coachDone"].tap()
+    XCTAssertTrue(app.tabBars.buttons["Home"].waitForSelection(timeout: 5))
+    XCTAssertFalse(app.descendants(matching: .any)["coachShield"].waitForExistence(timeout: 2))
+    // Once only.
+    app.terminate()
+    app.launchArguments.removeAll { $0 == "--fixture-tour" }
+    app.launch()
+    XCTAssertTrue(app.buttons["homeSettings"].waitForExistence(timeout: 10))
+    XCTAssertFalse(tip("tabs").waitForExistence(timeout: 3))
+  }
+
   func testCoachmarksPointAtTheComposerThenTheTools() throws {
     let app = XCUIApplication()
     app.launchArguments = ["--fixtures", "--fixture-coach"]
@@ -364,7 +398,7 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.buttons["Show an example"].exists)
     XCTAssertTrue(app.buttons["Finish interview"].exists)
   }
-  func testFirstRunTipsStayInsideTheInterview() throws {
+  func testFirstRunTipsThenTheTabTour() throws {
     let app = XCUIApplication()
     app.launchArguments = ["--fixtures", "--fixture-onboarding", "--fixture-coach"]
     app.launch()
@@ -395,12 +429,16 @@ final class PracticeUITests: XCTestCase {
     let alert = app.descendants(matching: .any)["confirmDialog"]
     XCTAssertTrue(alert.waitForExistence(timeout: 5))
     alert.buttons["Skip question"].tap()
-    // Tips live inside the interview only: Home and every tab stay clear after the first rep.
+    // Onboarding is over: Home walks the tabs once, Recall, Library, then points at Bit, and is clear after.
     XCTAssertTrue(app.buttons["homeSettings"].waitForExistence(timeout: 10))
-    XCTAssertFalse(app.descendants(matching: .any)["coachDone"].waitForExistence(timeout: 2), "Home offers no tip")
+    for mark in ["tabs", "recallPage", "libraryPage", "bitTab"] {
+      XCTAssertTrue(app.descendants(matching: .any)["coach-" + mark].waitForExistence(timeout: 8), mark)
+      app.buttons["coachDone"].tap()
+    }
+    XCTAssertTrue(app.buttons["homeSettings"].waitForExistence(timeout: 5))
     for tab in ["Recall", "Library", "Home"] {
       app.tabBars.buttons[tab].tap()
-      XCTAssertFalse(app.descendants(matching: .any)["coachDone"].waitForExistence(timeout: 2), "\(tab) offers no tip")
+      XCTAssertFalse(app.descendants(matching: .any)["coachDone"].waitForExistence(timeout: 2), "\(tab) offers no tip after the tour")
     }
   }
   func testLiveVoiceAccessibleDark() throws { try voiceJourney(extra:["--dark","-UIPreferredContentSizeCategoryName","UICTContentSizeCategoryAccessibilityXXXL"]) }
@@ -1968,5 +2006,13 @@ final class PracticeUITests: XCTestCase {
     attachment.name = name
     attachment.lifetime = .keepAlways
     add(attachment)
+  }
+}
+
+private extension XCUIElement {
+  func waitForSelection(timeout: TimeInterval) -> Bool {
+    let deadline = Date().addingTimeInterval(timeout)
+    while Date() < deadline { if isSelected { return true }; Thread.sleep(forTimeInterval: 0.2) }
+    return isSelected
   }
 }

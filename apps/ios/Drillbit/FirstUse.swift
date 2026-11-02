@@ -51,16 +51,22 @@ private struct CalloutPointer: Shape {
 
 // MARK: Coachmarks
 
-/// The first-run tips. They live inside the interview only, each shown once at the moment its control matters, and
-/// only for what the screen can't say itself. Home and the tabs carry none.
+/// The first-run tips. Inside the interview, each shows once at the moment its control matters. After the first rep,
+/// a short tour points at the other tabs: Recall, Library, then Bit (which stays put, since it's Pro).
 enum CoachMark: String, CaseIterable {
-  case voice, composer, path, tools
+  case voice, composer, path, tools, tabs, recallPage, libraryPage, bitTab
+  /// Set when the first rep is over: the tab tour waits for it, so people who finished onboarding before never see it.
+  static let tourReadyKey = "coach.tourReady"
   var title: String {
     switch self {
     case .voice: "You’re in voice."
     case .composer: "Your turn."
     case .path: "Your roadmap."
     case .tools: "Stuck? Tap ⋯ up here."
+    case .tabs: "Three more tabs."
+    case .recallPage: "Your cards."
+    case .libraryPage: "Every rep, kept."
+    case .bitTab: "Bit’s map."
     }
   }
   var message: String {
@@ -69,13 +75,28 @@ enum CoachMark: String, CaseIterable {
     case .composer: "A rough first take is fine. End a line with “?” to ask the interviewer instead."
     case .path: "The steps a strong answer usually covers. You move along as you cover them."
     case .tools: "Hints and examples live here, whenever you want one."
+    case .tabs: "Recall, Library and Bit. Ten seconds, then it’s all yours."
+    case .recallPage: "Each card comes from something you said in a rep. A quick look every few days makes it stick."
+    case .libraryPage: "Every question, your answers and the feedback. Come back to any of them."
+    case .bitTab: "What you know, drawn from your reps, plus a read on your level. Part of Pro."
     }
   }
   /// The dismiss button's label; the voice tip asks for the one tap it's pointing at.
   var action: String {
     switch self {
-    case .voice, .path: "Show me"
+    case .voice, .path, .tabs: "Show me"
+    case .recallPage, .libraryPage: "Next"
+    case .bitTab: "Back home"
     default: "Got it"
+    }
+  }
+  /// The tab bar item a tour tip points at.
+  var tabTitle: String? {
+    switch self {
+    case .tabs, .recallPage: "Recall"
+    case .libraryPage: "Library"
+    case .bitTab: "Bit"
+    default: nil
     }
   }
   var storageKey: String { "coach." + rawValue }
@@ -155,6 +176,16 @@ private struct CoachMarkLayer: View {
 
   private func place(_ mark: CoachMark, width: CGFloat, in proxy: GeometryProxy) -> (origin: CGPoint, edge: Edge?, pointerX: CGFloat)? {
     let size = proxy.size
+    // Tour tips point down at their tab bar item, measured from the bar itself.
+    if let tab = mark.tabTitle {
+      let global = proxy.frame(in: .global)
+      let item = TabBarGeometry.item(title: tab)
+      let tabX = item.midX - global.minX
+      let x = min(max(tabX - width / 2, 16), size.width - 16 - width)
+      // The layer covers the bar too, so sit above the measured item rather than the layer's bottom.
+      let bottom = min(size.height, item.minY - global.minY)
+      return (CGPoint(x: x, y: bottom - 12 - height), .bottom, min(max(tabX - x, 24), width - 24))
+    }
     if trailingToolbar && mark == .tools {
       // The trailing toolbar button's centre sits about 38 points in from the edge.
       let x = size.width - 12 - width
@@ -245,5 +276,44 @@ struct PracticeAreaGroupRow: View {
       Spacer(minLength: 8)
       Image(systemName: "chevron.right").font(.caption).foregroundStyle(AppPalette.secondary).accessibilityHidden(true)
     }.frame(minHeight: 64).contentShape(Rectangle())
+  }
+}
+
+/// Where the tab bar's items are. SwiftUI's tab bar can't carry anchors, so the bar is read from UIKit. If its
+/// buttons can't be told apart, the bar is split evenly; if there's no bar at all, a phone-sized guess.
+enum TabBarGeometry {
+  private static let titles = ["Home", "Recall", "Library", "Bit"]
+  /// The item's frame in window coordinates.
+  @MainActor static func item(title: String) -> CGRect {
+    let index = titles.firstIndex(of: title) ?? 0
+    let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+    let scene = scenes.first { $0.activationState == .foregroundActive } ?? scenes.first
+    let window = scene?.windows.first { $0.isKeyWindow } ?? scene?.windows.first
+    let bounds = window?.bounds ?? CGRect(x: 0, y: 0, width: 402, height: 874)
+    guard let window, let bar = find(UITabBar.self, in: window), !bar.isHidden else {
+      let pitch = min(bounds.width - 48, 360) / CGFloat(titles.count)
+      let x = bounds.midX + (CGFloat(index) - CGFloat(titles.count - 1) / 2) * pitch
+      return CGRect(x: x - pitch / 2, y: bounds.height - 90, width: pitch, height: 54)
+    }
+    var buttons: [CGRect] = []
+    var queue: [UIView] = [bar]
+    while let view = queue.popLast() {
+      let name = String(describing: type(of: view))
+      if name.contains("TabBarButton") || (view.accessibilityTraits.contains(.button) && view !== bar) {
+        let frame = view.convert(view.bounds, to: window)
+        if frame.width > 20, frame.height > 20 { buttons.append(frame); continue }
+      }
+      queue.append(contentsOf: view.subviews)
+    }
+    buttons.sort { $0.minX < $1.minX }
+    if buttons.count == titles.count { return buttons[index] }
+    let frame = bar.convert(bar.bounds, to: window).insetBy(dx: 24, dy: 0)
+    let pitch = frame.width / CGFloat(titles.count)
+    return CGRect(x: frame.minX + CGFloat(index) * pitch, y: frame.minY, width: pitch, height: frame.height)
+  }
+  private static func find<T: UIView>(_ type: T.Type, in view: UIView) -> T? {
+    if let match = view as? T { return match }
+    for child in view.subviews { if let match = find(type, in: child) { return match } }
+    return nil
   }
 }

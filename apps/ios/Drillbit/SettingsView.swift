@@ -228,6 +228,7 @@ private struct DeveloperSettingsSection: View {
       .accessibilityIdentifier("developerPlan")
       Button(coachReplayed ? "Tips will show again" : "Replay first-run tips") {
         for mark in CoachMark.allCases { UserDefaults.standard.removeObject(forKey: mark.storageKey) }
+        UserDefaults.standard.set(true, forKey: CoachMark.tourReadyKey)
         coachReplayed = true
       }
       .disabled(coachReplayed)

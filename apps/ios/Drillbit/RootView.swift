@@ -15,6 +15,37 @@ struct RootView: View {
   @State private var showingQuestion = false
   @State private var startedFirstRep: Challenge?
   @State private var applyingDraft = false
+  @AppStorage(CoachMark.tourReadyKey) private var tourReady = false
+  @AppStorage(CoachMark.tabs.storageKey) private var seenTabs = false
+  @AppStorage(CoachMark.recallPage.storageKey) private var seenRecallPage = false
+  @AppStorage(CoachMark.libraryPage.storageKey) private var seenLibraryPage = false
+  @AppStorage(CoachMark.bitTab.storageKey) private var seenBitTab = false
+  /// After the first rep, once Pro and the reminder have had their say: Home points at the tabs, Show me walks Recall
+  /// and Library, and the last tip points at Bit without opening it. It owns the screen until it's done.
+  private var tourRunning: Bool {
+    CoachMark.enabled && tourReady && !seenBitTab && model.firstUse.stage == .complete && !settingsOpen
+      && model.presented == nil && PlanCoordinator.shared.presenting == nil
+      && !(model.offersReminder && !model.reminderHeldBack)
+  }
+  private func tourMark(_ tab: String) -> CoachMark? {
+    guard tourRunning else { return nil }
+    switch tab {
+    case "home": return seenTabs ? nil : .tabs
+    case "recall": return seenRecallPage ? nil : .recallPage
+    case "library": return !seenLibraryPage ? .libraryPage : .bitTab
+    default: return nil
+    }
+  }
+  private func advanceTour(_ mark: CoachMark) {
+    withAnimation(DrillbitMotion.page) {
+      switch mark {
+      case .tabs: seenTabs = true; selectedTab = "recall"
+      case .recallPage: seenTabs = true; seenRecallPage = true; selectedTab = "library"
+      case .libraryPage: seenLibraryPage = true
+      default: seenTabs = true; seenRecallPage = true; seenLibraryPage = true; seenBitTab = true; selectedTab = "home"
+      }
+    }
+  }
   enum FirstRunStage: String { case welcome, setup, signIn, done }
   private enum Stage { case restoring, welcome, setup, signIn, app }
   private var signedIn: Bool { model.bootstrap?.account.status == "active" }
@@ -116,6 +147,8 @@ struct RootView: View {
               }
             }
           }
+          // One layer over the whole TabView: tour tips measure the bar themselves, and the shield covers it too.
+          .coachMark(tourMark(selectedTab), shielding: tourRunning, dismiss: advanceTour)
           .background {
             // Free accounts: tapping Bit opens Pro and the tab bar stays where it was.
             TabBarGate { title in

@@ -722,3 +722,7 @@ The AI permission (App Review 5.1.2(i)) is no longer a screen of its own. `AICon
 
 The answer is kept in the shared Keychain (`aiConsent.v1`), so it outlives a reinstall like the Clerk session; an earlier UserDefaults answer is carried over. Settings → Legal → AI and your data shows the same disclosure, read-only: there's nothing to switch, since Drillbit runs on its own keys (no BYOK). Sign-in and the root no longer carry the disclosure, and the Feedback section in Settings has no footer.
 
+## Tab tour after the first rep — 2 November 2026
+
+The tips are no longer interview-only. Once the first rep is over (finished or skipped; `completeOnboarding` sets `coach.tourReady`), Home runs a four-step tour, once: "Three more tabs." pointing at Recall (Show me), Recall's page (Next), Library's page (Next), then "Bit’s map." pointing at the Bit tab from Library (Back home). Bit is never opened, so free accounts never land on a Pro page. It waits for the first-rep Pro offer, a pending reminder ask, Settings and any open rep, and shields the screen (tab bar included) while it runs. Accounts that finished onboarding before this change never see it. `TabBarGeometry` reads the tab item frames from the `UITabBar`, falling back to an even split of the bar. Tests opt in with `--fixture-coach`, and `--fixture-tour` starts Home ready for it.
+

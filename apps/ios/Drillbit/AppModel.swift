@@ -808,6 +808,7 @@ import WidgetKit
     defaults.removeObject(forKey: "firstRun.stage")
     defaults.removeObject(forKey: SetupView.draftKey)
     for mark in CoachMark.allCases { defaults.removeObject(forKey: mark.storageKey) }
+    defaults.removeObject(forKey: CoachMark.tourReadyKey)
   }
   /// Developer preview of the free plan without touching the server; a refresh puts the real plan back.
   func previewPlan(_ preview: PlanPreview) {
@@ -1341,6 +1342,8 @@ import WidgetKit
   func completeOnboarding() async {
     guard let account = bootstrap?.account.id, !settings.onboardingComplete else { return }
     settings.onboardingComplete = true
+    // The first rep is over: the tab tour can show once Home is clear.
+    UserDefaults.standard.set(true, forKey: CoachMark.tourReadyKey)
     // Setup's answers are applied; a kept draft could only replay setup over a finished account.
     UserDefaults.standard.removeObject(forKey: SetupView.draftKey)
     do { try await saveSettingsLocally() } catch let failure { error = failure.localizedDescription }
@@ -1515,6 +1518,8 @@ import WidgetKit
     #if DEBUG
     // Device-level choices from an earlier test run must not leak into this one.
     for mark in CoachMark.allCases { UserDefaults.standard.removeObject(forKey: mark.storageKey) }
+    // `--fixture-tour` starts on Home with the first rep just done, so the tab tour runs.
+    UserDefaults.standard.set(ProcessInfo.processInfo.arguments.contains("--fixture-tour"), forKey: CoachMark.tourReadyKey)
     if ProcessInfo.processInfo.arguments.contains("--fixture-onboarding") {
       settings.onboardingComplete = false
       // A fresh first run: forget any draft or stage left behind by an earlier launch.
