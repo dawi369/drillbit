@@ -25,7 +25,7 @@ Renewals, expiry, refunds → App Store Server Notifications v2 → POST /apple/
 ```
 
 - **The server decides.** Every limit is enforced in the Worker (`plans.ts`, `practice-gate.ts`, `voice.ts`); the app only shows what the server says. A hacked app can't unlock Pro.
-- **The paywall** is Apple's `SubscriptionStoreView` with our own header (Bit, one line, four perks) and plan picker: yearly first with "Save N%", weekly with its intro offer. It also carries Restore, Terms and Privacy, which App Review requires. Everything fits on one screen.
+- **The paywall** is Apple's `SubscriptionStoreView` with our own header (Bit, one line, four perks) and plan picker: weekly first with its intro offer ("First week $1.99"), yearly with "Save N%". It also carries Restore, Terms and Privacy, which App Review requires. Everything fits on one screen.
 
 ### Why not Superwall or RevenueCat (decided 28 October)
 
@@ -303,3 +303,10 @@ Rules that came with it:
 
 Watch after launch: paywall views and conversion by placement (`scripts/metrics.ts`), and free voice minutes per user. If free voice averages more than about 7 minutes and conversion doesn't move, go back to shorter sessions.
 
+## 16. Decided 3 November: three free reps, one Pro sheet
+
+| | Decision | Where |
+|---|---|---|
+| Free | **Three reps in total**, never refilled (was two). The first-rep Pro offer still comes once, after the first. | `FREE_REPS_LIFETIME=3` (development and production) |
+| Pro sheet | One sheet for every placement, led by Bit. The map-led variant from section 15 (ideas 1 and 6) is removed. | `Plan.swift` |
+| Weekly line | "$1.99 to start, then $7.99 a week" | `PlanOptionLabel` |

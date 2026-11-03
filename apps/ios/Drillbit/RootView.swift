@@ -60,13 +60,6 @@ struct RootView: View {
     case .signIn, .done: return signedIn ? .setup : .signIn
     }
   }
-  /// The Bit tab is Pro: for everyone else, tapping it opens the Pro screen and the current tab stays put.
-  private var tabSelection: Binding<String> {
-    Binding(get: { selectedTab }, set: { tab in
-      guard tab == "bit", !model.isPro else { selectedTab = tab; return }
-      PlanCoordinator.shared.register(.knowledgeMap) { selectedTab = "bit" }
-    })
-  }
   /// Signing out mid-flow (or a full reset) starts the first run over.
   private func resetFirstRunIfSignedOut() { if !signedIn, FirstRunStage(rawValue: firstRunStage) == .done { firstRunStage = FirstRunStage.welcome.rawValue } }
   private func finishSetup(_ draft: LearningPlanCoordinator.Draft) {
@@ -123,7 +116,7 @@ struct RootView: View {
           NavigationStack { SetupView(model: model, onFinish: finishSetup) }
             .transition(.opacity)
         } else {
-          TabView(selection: tabSelection) {
+          TabView(selection: $selectedTab) {
             Tab("Home", systemImage: AppIcon.home.rawValue, value: "home") {
               NavigationStack {
                 HomeView(model: model, openSettings: { settingsOpen = true })
@@ -139,26 +132,20 @@ struct RootView: View {
                 MemoryView(model: model).drillbitTabClearance()
               }
             }
-            // Pro: the knowledge map. Free accounts get the Pro screen instead of the tab (see tabSelection).
+            // Pro: the knowledge map. Free accounts get the tab too, as Pro's showcase built on their own map.
             Tab("Bit", image: "BitTab", value: "bit") {
               NavigationStack {
-                KnowledgeMapView(model: model).drillbitTabClearance()
-                  .accessibilityIdentifier("bitTab")
+                if model.isPro {
+                  KnowledgeMapView(model: model).drillbitTabClearance()
+                    .accessibilityIdentifier("bitTab")
+                } else {
+                  ProShowcaseView(model: model).drillbitTabClearance()
+                }
               }
             }
           }
           // One layer over the whole TabView: tour tips measure the bar themselves, and the shield covers it too.
           .coachMark(tourMark(selectedTab), shielding: tourRunning, dismiss: advanceTour)
-          .background {
-            // Free accounts: tapping Bit opens Pro and the tab bar stays where it was.
-            TabBarGate { title in
-              guard title == "Bit", !model.isPro else { return true }
-              PlanCoordinator.shared.register(.knowledgeMap) { selectedTab = "bit" }
-              return false
-            }
-            .frame(width: 0, height: 0)
-            .accessibilityHidden(true)
-          }
           .transition(.opacity)
         }
       } else {
@@ -355,56 +342,5 @@ struct LocalRecoveryView: View {
       Text(local).textSelection(.enabled)
       ShareLink("Export local answer", item: local)
     }.task { local = await model.localAnswer(challenge) }
-  }
-}
-
-/// Asks before the tab bar moves. A refused tab never gets selected, so its highlight never jumps there and back.
-/// SwiftUI's own tab bar delegate keeps working: everything this proxy doesn't decide is forwarded to it.
-struct TabBarGate: UIViewRepresentable {
-  /// The title of the tab being tapped; false keeps the current tab.
-  var allows: (String) -> Bool
-  func makeUIView(context: Context) -> GateView { GateView() }
-  func updateUIView(_ view: GateView, context: Context) {
-    view.proxy.allows = allows
-    view.install()
-  }
-
-  final class GateView: UIView {
-    let proxy = Proxy()
-    override func didMoveToWindow() {
-      super.didMoveToWindow()
-      install()
-      // The tab bar controller can arrive a moment after this view does.
-      DispatchQueue.main.async { [weak self] in self?.install() }
-    }
-    func install() {
-      guard let root = window?.rootViewController, let tabs = Self.tabBarController(in: root), tabs.delegate !== proxy else { return }
-      proxy.original = tabs.delegate
-      tabs.delegate = proxy
-    }
-    private static func tabBarController(in controller: UIViewController) -> UITabBarController? {
-      if let tabs = controller as? UITabBarController { return tabs }
-      for child in controller.children { if let found = tabBarController(in: child) { return found } }
-      return nil
-    }
-  }
-
-  final class Proxy: NSObject, UITabBarControllerDelegate {
-    weak var original: UITabBarControllerDelegate?
-    var allows: (String) -> Bool = { _ in true }
-    func tabBarController(_ controller: UITabBarController, shouldSelectTab tab: UITab) -> Bool {
-      guard allows(tab.title) else { return false }
-      return original?.tabBarController?(controller, shouldSelectTab: tab) ?? true
-    }
-    func tabBarController(_ controller: UITabBarController, shouldSelect viewController: UIViewController) -> Bool {
-      guard allows(viewController.tabBarItem.title ?? "") else { return false }
-      return original?.tabBarController?(controller, shouldSelect: viewController) ?? true
-    }
-    override func responds(to selector: Selector!) -> Bool {
-      super.responds(to: selector) || (original?.responds(to: selector) ?? false)
-    }
-    override func forwardingTarget(for selector: Selector!) -> Any? {
-      original?.responds(to: selector) == true ? original : super.forwardingTarget(for: selector)
-    }
   }
 }

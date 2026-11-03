@@ -145,22 +145,30 @@ final class PracticeUITests: XCTestCase {
 
   func testBitTabIsProAndMapsWhatYouKnow() throws {
     continueAfterFailure = false
+    let store = try SKTestSession(configurationFileNamed: "Drillbit")
+    store.resetToDefaultState(); store.disableDialogs = true; store.clearTransactions()
     var app = XCUIApplication()
     app.launchArguments = ["--fixtures", "--fixture-dashboard", "--fixture-customer", "--fixture-free-reps"]
     app.launch()
     XCTAssertTrue(app.tabBars.buttons["Bit"].waitForExistence(timeout: 10))
     app.tabBars.buttons["Bit"].tap()
-    // Free: the tab opens the Pro screen instead, and the tab bar never moves off Home.
-    XCTAssertTrue(app.descendants(matching: .any)["paywall"].waitForExistence(timeout: 5))
-    XCTAssertTrue(app.tabBars.buttons["Home"].isSelected)
-    XCTAssertFalse(app.tabBars.buttons["Bit"].isSelected)
-    XCTAssertFalse(app.descendants(matching: .any)["bitTab"].exists, "The Bit tab's page never loads for free accounts")
-    // The maker's note shows first while the plans load, then the pitch.
-    XCTAssertTrue(app.descendants(matching: .any)["makersNote"].exists || app.staticTexts["See what you actually know."].exists)
-    XCTAssertTrue(app.staticTexts["See what you actually know."].waitForExistence(timeout: 10))
-    capture("Bit tab paywall", app)
-    app.buttons["paywallDismiss"].tap()
-    XCTAssertFalse(app.descendants(matching: .any)["knowledgeMap"].exists)
+    // Free: the tab opens like any other, as Pro's showcase on their own map. No sheet, no full map.
+    XCTAssertTrue(app.descendants(matching: .any)["proShowcase"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.tabBars.buttons["Bit"].isSelected)
+    XCTAssertFalse(app.descendants(matching: .any)["paywall"].exists)
+    XCTAssertFalse(app.descendants(matching: .any)["bitTab"].exists, "The full map is Pro")
+    XCTAssertTrue(app.staticTexts["See what you actually know."].exists)
+    XCTAssertTrue(app.descendants(matching: .any)["showcaseMap"].exists)
+    capture("Bit tab showcase", app)
+    // The plans, the first-week story and the terms App Review wants next to the button.
+    let subscribe = app.buttons["showcaseSubscribe"]
+    for _ in 0..<6 where !(subscribe.exists && subscribe.isHittable) { app.swipeUp() }
+    XCTAssertTrue(subscribe.waitForExistence(timeout: 10))
+    XCTAssertTrue(app.descendants(matching: .any)["showcaseTerms"].exists)
+    app.buttons["showcasePlan-weekly"].tap()
+    XCTAssertTrue(app.staticTexts["How your first week works"].waitForExistence(timeout: 3))
+    XCTAssertEqual(subscribe.label, "Start for $1.99")
+    capture("Bit tab showcase plans", app)
     app.terminate()
 
     app = XCUIApplication()
@@ -191,12 +199,12 @@ final class PracticeUITests: XCTestCase {
     let app = XCUIApplication()
     app.launchArguments = ["--fixtures", "--fixture-dashboard", "--fixture-customer", "--fixture-lifetime-spent"]
     app.launch()
-    // Both free reps are spent for good: no "back tomorrow", just Pro.
+    // Every free rep is spent for good: no "back tomorrow", just Pro.
     let waiting = app.descendants(matching: .any)["freeRepWaiting"]
     XCTAssertTrue(waiting.waitForExistence(timeout: 10))
     XCTAssertTrue(waiting.label.contains("That’s your free reps. Pro keeps them coming."), waiting.label)
     XCTAssertFalse(waiting.label.contains("tomorrow"), waiting.label)
-    XCTAssertTrue(waiting.label.contains("Two to try it"), waiting.label)
+    XCTAssertTrue(waiting.label.contains("Three to try it"), waiting.label)
     capture("Lifetime free reps spent", app)
     app.buttons["Settings"].tap()
     XCTAssertTrue(app.staticTexts["That’s your free reps. Pro keeps them coming."].waitForExistence(timeout: 5))
@@ -1594,7 +1602,7 @@ final class PracticeUITests: XCTestCase {
     let option = { (text: String) in app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch }
     XCTAssertTrue(option("Save 75%").waitForExistence(timeout: 10))
     XCTAssertTrue(option("$1.92 a week").exists)
-    XCTAssertTrue(option("Try a week for $1.99, then $7.99 a week").exists)
+    XCTAssertTrue(option("$1.99 to start, then $7.99 a week").exists)
     // What App Review checks on a subscription paywall: terms, renewal terms, restore and a way out.
     XCTAssertTrue(option("Terms of Service").exists)
     XCTAssertTrue(option("Auto-renews").exists)
@@ -1924,7 +1932,7 @@ final class PracticeUITests: XCTestCase {
     return app
   }
 
-  func testFirstFreeRepOffersProOnceWhileRepTwoIsFree() throws {
+  func testFirstFreeRepOffersProOnceWhileTheRestAreFree() throws {
     continueAfterFailure = false
     let app = finishFirstRep(["--fixture-lifetime"])
     XCTAssertTrue(app.descendants(matching: .any)["feedbackLead"].waitForExistence(timeout: 8))
@@ -1956,7 +1964,7 @@ final class PracticeUITests: XCTestCase {
     leaveFeedback(app)
     XCTAssertTrue(app.buttons["todayDone"].waitForExistence(timeout: 8))
     XCTAssertFalse(app.descendants(matching: .any)["paywall"].waitForExistence(timeout: 3))
-    XCTAssertTrue(app.buttons["seePro"].exists, "Both free reps used: Home points at Pro")
+    XCTAssertTrue(app.buttons["oneMore"].exists, "Rep three is still free")
   }
 
   func testFirstRepFeedbackPutsItOnBitsMapAndAsksOnce() throws {
@@ -1971,12 +1979,10 @@ final class PracticeUITests: XCTestCase {
     XCTAssertFalse(app.descendants(matching: .any)["freeRepNotice"].exists, "One ask on the feedback")
     capture("Feedback map line", app)
     tease.buttons["seePro"].tap()
-    // Pro leads with their real map, not a promise.
     XCTAssertTrue(app.descendants(matching: .any)["paywall"].waitForExistence(timeout: 8))
-    XCTAssertTrue(app.descendants(matching: .any)["mapGlimpse"].waitForExistence(timeout: 10))
-    XCTAssertTrue(app.staticTexts["See what you actually know."].exists)
+    XCTAssertTrue(app.staticTexts["See what you actually know."].waitForExistence(timeout: 10))
     Thread.sleep(forTimeInterval: 1)
-    capture("Pro with their map", app)
+    capture("Pro from the map line", app)
     app.buttons["paywallDismiss"].tap()
     // Pro was already shown from the feedback, so leaving it goes straight Home.
     leaveFeedback(app)
@@ -2035,23 +2041,6 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.staticTexts["That was your free voice mock."].exists)
     XCTAssertFalse(app.descendants(matching: .any)["mapTease"].exists, "One ask on the feedback")
     capture("Free voice mock used", app)
-  }
-
-  func testProSheetLeadsWithTheirMapAndAnHonestHeadline() throws {
-    continueAfterFailure = false
-    let app = XCUIApplication()
-    // A finished rep whose feedback said Queues & streams needs another go, and both free reps used.
-    app.launchArguments = ["--fixtures", "--fixture-home-rich", "--fixture-customer", "--fixture-lifetime-spent"]
-    app.launch()
-    XCTAssertTrue(app.buttons["homeSettings"].waitForExistence(timeout: 10))
-    app.buttons["homeSettings"].tap()
-    XCTAssertTrue(app.buttons["settingsSeePro"].waitForExistence(timeout: 5))
-    app.buttons["settingsSeePro"].tap()
-    XCTAssertTrue(app.descendants(matching: .any)["mapGlimpse"].waitForExistence(timeout: 12))
-    XCTAssertTrue(app.staticTexts["1 rep in. Queues & streams needs another go."].waitForExistence(timeout: 5))
-    XCTAssertTrue(app.buttons["paywallSubscribe"].waitForExistence(timeout: 10))
-    Thread.sleep(forTimeInterval: 1)
-    capture("Pro with their map and gap", app)
   }
 
   func testProAccountsGetNoOfferAfterTheirFirstRep() throws {

@@ -10,7 +10,7 @@ enum PaywallPlacement: String {
   case practiceRep = "practice_rep"
   case voiceSession = "voice_session"
   case knowledgeMap = "knowledge_map"
-  /// Offered once after a first free rep's feedback, while the second rep is still free.
+  /// Offered once after a first free rep's feedback, while the rest are still free.
   case firstRep = "first_rep"
 }
 
@@ -21,9 +21,9 @@ private struct EntitlementReceipt: Decodable { var plan: String }
 /// native subscription store does. Either way the Worker decides the plan from Apple's signed transaction.
 @MainActor @Observable final class PlanCoordinator {
   static let shared = PlanCoordinator()
-  /// Yearly first: it's the anchor the weekly price is measured against. Prices and the weekly intro offer live in
-  /// App Store Connect (and `Config/Drillbit.storekit` for the simulator), never in code.
-  static let productIDs = ["dawi.drillbit.pro.yearly", "dawi.drillbit.pro.weekly"]
+  /// Weekly first, and chosen by default: its $1.99 first week is the easiest yes. Prices and the weekly intro offer
+  /// live in App Store Connect (and `Config/Drillbit.storekit` for the simulator), never in code.
+  static let productIDs = ["dawi.drillbit.pro.weekly", "dawi.drillbit.pro.yearly"]
   /// Non-nil while the native paywall is up.
   private(set) var presenting: PaywallPlacement?
   /// Presented from UIKit over whatever is on top. A SwiftUI sheet on the root can't appear while Settings or an
@@ -76,7 +76,7 @@ private struct EntitlementReceipt: Decodable { var plan: String }
       if let top = Self.topController(), !top.isBeingDismissed, !top.isBeingPresented, top.transitionCoordinator == nil {
         // Hosted outside the SwiftUI scene, so scene phase would read as background and freeze Bit; while it's up,
         // the app is in front.
-        let host = UIHostingController(rootView: NativePaywallSheet(placement: placement, model: model).tint(AppPalette.accent)
+        let host = UIHostingController(rootView: NativePaywallSheet(placement: placement).tint(AppPalette.accent)
           .environment(\.scenePhase, .active))
         host.overrideUserInterfaceStyle = top.traitCollection.userInterfaceStyle
         host.presentationController?.delegate = sheetDelegate
@@ -176,8 +176,6 @@ private struct EntitlementReceipt: Decodable { var plan: String }
 /// Fallback paywall: Apple's own subscription store for the Pro products.
 struct NativePaywallSheet: View {
   let placement: PaywallPlacement
-  /// For the person's own map and headline; the sheet still works without it.
-  var model: AppModel? = nil
   /// Products are checked up front so a store that sends nothing gets a plain explanation and a retry, not
   /// StoreKit's bare "Subscription unavailable".
   private enum Availability { case checking, ready, missing }
@@ -221,12 +219,6 @@ struct NativePaywallSheet: View {
       }
     }
     .accessibilityIdentifier("paywall")
-    // The map and the headline come from the person's reps: make sure they're loaded while the note is up.
-    .task {
-      guard let model, placement == .knowledgeMap || placement == .practiceRep else { return }
-      await model.loadTaxonomy()
-      await model.loadMemory()
-    }
     .task(id: attempt) {
       let started = Date()
       let found = (try? await Product.products(for: PlanCoordinator.productIDs)) ?? []
@@ -244,7 +236,7 @@ struct NativePaywallSheet: View {
 
   private var store: some View {
     SubscriptionStoreView(productIDs: PlanCoordinator.productIDs) {
-      PaywallHeader(placement: placement, model: model)
+      PaywallHeader(placement: placement)
     }
     .subscriptionStoreControlStyle(PlanPicker())
     .containerBackground(for: .subscriptionStoreFullHeight) { PaywallBackdrop() }
@@ -278,61 +270,38 @@ struct NativePaywallSheet: View {
 /// and Subscribe stay on screen without scrolling.
 private struct PaywallHeader: View {
   let placement: PaywallPlacement
-  var model: AppModel? = nil
-  /// Their own map leads where the map and more reps are the point; otherwise Bit does.
-  private var pitch: ProPitch? {
-    guard placement == .knowledgeMap || placement == .practiceRep, let model else { return nil }
-    return ProPitch.from(model)
-  }
   @State private var glow = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   private static let perks: [(symbol: String, title: String)] = [
     ("infinity", "More reps, whenever it’s clicking"),
-    ("waveform", "Voice mocks up to 20 minutes"),
+    ("waveform", "Voice mode, 20 minutes at a time"),
     ("lightbulb", "Every nudge and follow-up"),
     ("sun.max", "A fresh question waiting each day"),
     ("point.3.filled.connected.trianglepath.dotted", "Your knowledge map and level"),
   ]
   var body: some View {
-    let pitch = pitch
     VStack(spacing: 12) {
-      if let pitch {
-        VStack(spacing: 6) {
-          MapGlimpse(nodes: pitch.nodes).frame(width: 120, height: 120)
-          if let levelLine = pitch.levelLine {
-            Text(levelLine).font(.footnote).foregroundStyle(AppPalette.secondary).multilineTextAlignment(.center)
-              .fixedSize(horizontal: false, vertical: true)
-              .accessibilityIdentifier("paywallLevelLine")
-          }
-        }
-        .transition(.opacity)
-      } else {
-        ZStack {
-          BitGlow(color: AppPalette.action, opacity: 0.28)
-            .frame(width: 168, height: 168)
-            .scaleEffect(glow ? 1.08 : 0.94)
-            .accessibilityHidden(true)
-          BitView(greets: true).frame(width: 80, height: 92).accessibilityHidden(true)
-        }
-        .frame(height: 96)
+      ZStack {
+        BitGlow(color: AppPalette.action, opacity: 0.28)
+          .frame(width: 168, height: 168)
+          .scaleEffect(glow ? 1.08 : 0.94)
+          .accessibilityHidden(true)
+        BitView(greets: true).frame(width: 80, height: 92).accessibilityHidden(true)
       }
+      .frame(height: 96)
       VStack(spacing: 4) {
-        // With their map up top, the sheet is already about Pro; the label would only push Subscribe down.
-        if pitch == nil {
-          Text("Drillbit Pro").font(.caption.weight(.semibold)).foregroundStyle(AppPalette.accent)
-            .textCase(.uppercase).tracking(1.2)
-        }
+        Text("Drillbit Pro").font(.caption.weight(.semibold)).foregroundStyle(AppPalette.accent)
+          .textCase(.uppercase).tracking(1.2)
         Text(placement == .voiceSession ? "Say it out loud, as often as you want."
              : placement == .knowledgeMap ? "See what you actually know."
              : placement == .firstRep ? "Your next rep’s still on us."
-             : pitch?.headline ?? (PlanCoordinator.shared.lifetimeFreeReps ? "Keep the reps coming." : "Don’t stop at three."))
+             : PlanCoordinator.shared.lifetimeFreeReps ? "Keep the reps coming." : "Don’t stop at three.")
           .font(.title2.weight(.semibold)).multilineTextAlignment(.center)
           .fixedSize(horizontal: false, vertical: true)
           .accessibilityAddTraits(.isHeader)
       }
       VStack(alignment: .leading, spacing: 9) {
-        // The map is already on screen, so its perk would repeat it.
-        ForEach(Self.perks.filter { pitch == nil || $0.symbol != "point.3.filled.connected.trianglepath.dotted" }, id: \.title) { perk in
+        ForEach(Self.perks, id: \.title) { perk in
           HStack(spacing: 12) {
             Image(systemName: perk.symbol)
               .font(.subheadline.weight(.semibold)).foregroundStyle(AppPalette.accent)
@@ -493,11 +462,17 @@ private struct PlanOptionLabel: View {
         .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: 4) {
         Text(period == .year ? "Yearly" : "Weekly").font(.headline)
-        Text(detail).font(.subheadline).foregroundStyle(AppPalette.secondary)
+        detail.font(.subheadline).foregroundStyle(AppPalette.secondary)
           .fixedSize(horizontal: false, vertical: true)
       }
       Spacer(minLength: 8)
-      if period == .year, let weekly, let saving = PlanPricing.yearlySaving(yearly: product.price, weekly: weekly.price) {
+      if let intro = weeklyIntro {
+        Text("First week \(intro.displayPrice)")
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(AppPalette.actionInk)
+          .padding(.horizontal, 8).padding(.vertical, 4)
+          .background(AppPalette.action, in: Capsule())
+      } else if period == .year, let weekly, let saving = PlanPricing.yearlySaving(yearly: product.price, weekly: weekly.price) {
         Text("Save \(saving)%")
           .font(.caption.weight(.semibold))
           .foregroundStyle(AppPalette.actionInk)
@@ -509,16 +484,24 @@ private struct PlanOptionLabel: View {
     .accessibilityAddTraits(selected ? .isSelected : [])
   }
 
-  private var detail: String {
+  /// A one-week paid introductory offer on the weekly plan; nil otherwise.
+  private var weeklyIntro: StoreKit.Product.SubscriptionOffer? {
+    guard period == .week, let offer, offer.paymentMode != .freeTrial, offer.period.unit == .week,
+          offer.period.value * offer.periodCount == 1 else { return nil }
+    return offer
+  }
+
+  /// The renewal price stays the most prominent figure (App Review 3.1.2); the first week is called out in gold.
+  private var detail: Text {
     if period == .year {
       // The billed price leads (App Review 3.1.2); the per-week figure only puts it next to the weekly plan.
       let perWeek = PlanPricing.weekly(fromYearly: product.price).formatted(format)
-      return "\(product.displayPrice) a year, so \(perWeek) a week"
+      return Text("\(product.displayPrice) a year, so \(perWeek) a week")
     }
-    if let offer, offer.paymentMode != .freeTrial, offer.period.unit == .week, offer.period.value * offer.periodCount == 1 {
-      return "Try a week for \(offer.displayPrice), then \(product.displayPrice) a week"
+    if let intro = weeklyIntro {
+      return Text("\(Text(intro.displayPrice).foregroundStyle(AppPalette.accent).fontWeight(.semibold)) to start, then \(product.displayPrice) a week")
     }
-    return "\(product.displayPrice) a week"
+    return Text("\(product.displayPrice) a week")
   }
 }
 

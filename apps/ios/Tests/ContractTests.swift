@@ -113,11 +113,26 @@ struct ContractTests {
       #expect(restored.selectedLevel == "principal")
       #expect(restored.timezone == "Asia/Kolkata")
     }
-    let components = reminderComponents(minutes: 540, timezone: "America/New_York")
-    var calendar = Calendar(identifier: .gregorian)
-    calendar.timeZone = TimeZone(identifier: "America/New_York")!
-    let date = calendar.nextDate(after: ISO8601DateFormatter().date(from: "2026-03-07T15:00:00Z")!, matching: components, matchingPolicy: .nextTime)!
-    #expect(ISO8601DateFormatter().string(from: date) == "2026-03-08T13:00:00Z")
+    // 9:00 in New York, across the spring-forward night: today's 9:00 has passed, so the first is tomorrow's.
+    let now = ISO8601DateFormatter().date(from: "2026-03-07T15:00:00Z")!
+    let schedule = reminderSchedule(minutes: 540, timezone: "America/New_York", from: now)
+    let first = try #require(schedule.first)
+    #expect(ISO8601DateFormatter().string(from: first.date.date!) == "2026-03-08T13:00:00Z")
+    #expect(first.id == "daily-practice-2026-03-08")
+  }
+
+  @Test func reminderScheduleRotatesLinesWithoutReshuffling() throws {
+    let now = ISO8601DateFormatter().date(from: "2026-11-03T08:00:00Z")!
+    let schedule = reminderSchedule(minutes: 750, timezone: "Europe/Prague", from: now)
+    #expect(schedule.count == 28)
+    #expect(Set(schedule.map(\.id)).count == 28)
+    #expect(schedule.first?.id == "daily-practice-2026-11-03", "12:30 in Prague is still ahead today")
+    #expect(schedule.allSatisfy { $0.date.date! > now })
+    for (today, tomorrow) in zip(schedule, schedule.dropFirst()) { #expect(today.title != tomorrow.title) }
+    #expect(Set(schedule.map(\.title)).count == reminderLines.count, "Every line gets a turn")
+    // Rescheduling later the same morning keeps each day's line.
+    let later = reminderSchedule(minutes: 750, timezone: "Europe/Prague", from: now.addingTimeInterval(3600))
+    #expect(later.map(\.title) == schedule.map(\.title))
   }
 
   @Test func decodeHelpAndAdoption() throws {

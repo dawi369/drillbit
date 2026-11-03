@@ -33,6 +33,7 @@
 		3D1A1EB693F960C1596B0D8F /* DrillbitApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAD863FB5DA9BAE45F86B3AB /* DrillbitApp.swift */; };
 		3D5577BDD7DCA1065A504626 /* LiveWalkthrough.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9C0CC02D6FB5471487DDEB7 /* LiveWalkthrough.swift */; };
 		4E43449932FD2F5EE7F94EA3 /* StreamProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185BAB722977AA5EAC231D0 /* StreamProbe.swift */; };
+		50CF28AF9DFC188187ACF3C3 /* ProShowcase.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6AB085CA485878EA38BAFE4 /* ProShowcase.swift */; };
 		5298401BAA9BE8477CDBCFFF /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D561B63C630BDBE5ABC6DF2 /* LibraryView.swift */; };
 		5980E7756037BF8082CA3F81 /* InterviewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66848CC15C0E69172DC285E0 /* InterviewController.swift */; };
 		60C8FC1C39DFF81C6C1F19A8 /* ClerkKit in Frameworks */ = {isa = PBXBuildFile; productRef = D0E2F449415E69EBA68ED8CD /* ClerkKit */; };
@@ -178,6 +179,7 @@
 		CAA02422B05771C6B8DA4D2B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		CCDB9D254A54D86DF356AC77 /* PracticeCompanion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeCompanion.swift; sourceTree = "<group>"; };
 		D48C7CE46F73492E41D2DDDD /* PreparationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreparationView.swift; sourceTree = "<group>"; };
+		D6AB085CA485878EA38BAFE4 /* ProShowcase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProShowcase.swift; sourceTree = "<group>"; };
 		DAD863FB5DA9BAE45F86B3AB /* DrillbitApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrillbitApp.swift; sourceTree = "<group>"; };
 		DEB88C95F95BC8B5C6E32099 /* KnowledgeMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KnowledgeMap.swift; sourceTree = "<group>"; };
 		E1126329A3402DB0A44CA474 /* Defaults.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Defaults.xcconfig; sourceTree = "<group>"; };
@@ -274,6 +276,7 @@
 				5CF83E5C54AF9B2C1262CAB8 /* PracticeWorkspace.swift */,
 				D48C7CE46F73492E41D2DDDD /* PreparationView.swift */,
 				47DC20AA0A42DCF87633ED5D /* PrivacyInfo.xcprivacy */,
+				D6AB085CA485878EA38BAFE4 /* ProShowcase.swift */,
 				52EA11B5A88C191EA7F6F9B2 /* QuestionFlow.swift */,
 				EA7AEA4C9157169D31D8D3B8 /* RecallView.swift */,
 				AD095763BDFB10A241582226 /* ReflectionView.swift */,
@@ -589,6 +592,7 @@
 				BA66BF7CF5979DAA6AC4E9C5 /* PracticeEvidence.swift in Sources */,
 				868D112482709522C36A981D /* PracticeWorkspace.swift in Sources */,
 				18B4090F1EFA1BAD814B974F /* PreparationView.swift in Sources */,
+				50CF28AF9DFC188187ACF3C3 /* ProShowcase.swift in Sources */,
 				08DB809C86A394F196FA0039 /* QuestionFlow.swift in Sources */,
 				EAEFF3596AD2741C1A97EF7B /* RecallView.swift in Sources */,
 				98976F6C3CDB3840953CD676 /* ReflectionView.swift in Sources */,

@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Pro: everything you've practised as one map, an honest level estimate, and where to go next.
-/// Built only from your own reps: coverage counts, grounded feedback quotes and the levels you practised at.
+/// Pro: everything you've practised as one map, what the last rep changed on it, an honest level estimate, and where
+/// to go next. Built only from your own reps: coverage counts, grounded feedback quotes and the levels you practised at.
 struct KnowledgeMapView: View {
   var model: AppModel
   @State private var selected: String?
@@ -13,23 +13,34 @@ struct KnowledgeMapView: View {
 
   var body: some View {
     let nodes = KnowledgeNode.build(model: model)
+    let lastRep = LastRepChange.from(model, nodes: nodes)
     ScrollView {
-      VStack(alignment: .leading, spacing: 28) {
-        LevelCard(estimate: LevelEstimate.from(model.memory.sessions), target: model.settings.selectedLevel)
-        stats(nodes)
-        VStack(alignment: .leading, spacing: 12) {
-          SignalEyebrow(text: "Your map")
-          ConstellationMap(nodes: nodes, selected: $selected, appeared: appeared)
+      VStack(alignment: .leading, spacing: 32) {
+        VStack(alignment: .leading, spacing: 16) {
+          // The map is the page: no card around it, as wide as the screen allows.
+          ConstellationMap(nodes: nodes, fresh: lastRep?.touched ?? [], selected: $selected, appeared: appeared)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("knowledgeMap")
-          legend
-          if let id = selected, let node = nodes.first(where: { $0.id == id }) {
-            nodeDetail(node).transition(.opacity.combined(with: .offset(y: reduceMotion ? 0 : 8)))
+            .padding(.horizontal, 4)
+          legend.padding(.horizontal, 20)
+          Group {
+            if let id = selected, let node = nodes.first(where: { $0.id == id }) {
+              nodeDetail(node).transition(.opacity.combined(with: .offset(y: reduceMotion ? 0 : 8)))
+            } else if let lastRep {
+              lastRepLine(lastRep).transition(.opacity)
+            }
           }
+          .padding(.horizontal, 20)
         }
-        nextUp(nodes)
+        VStack(alignment: .leading, spacing: 32) {
+          LevelCard(estimate: LevelEstimate.from(model.memory.sessions), target: model.settings.selectedLevel)
+            .signalEntrance(1)
+          stats(nodes).signalEntrance(2)
+          nextUp(nodes).signalEntrance(3)
+        }
+        .padding(.horizontal, 20)
       }
-      .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 40)
+      .padding(.top, 4).padding(.bottom, 40)
       .frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity)
     }
     .background(AppPalette.background)
@@ -49,28 +60,52 @@ struct KnowledgeMapView: View {
     }
   }
 
+  // MARK: Since the last rep
+
+  /// Said the way onboarding reacts to an answer: a sparkle and a line, no box.
+  private func lastRepLine(_ change: LastRepChange) -> some View {
+    HStack(alignment: .top, spacing: 10) {
+      Image(systemName: "sparkle").font(.caption.weight(.semibold)).foregroundStyle(AppPalette.accent).padding(.top, 3)
+        .accessibilityHidden(true)
+      Text("Your last rep: \(change.line)")
+        .font(.subheadline).foregroundStyle(AppPalette.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    .padding(.horizontal, 4).padding(.vertical, 8)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .accessibilityElement(children: .combine)
+    .accessibilityIdentifier("lastRepChange")
+  }
+
   // MARK: Stats
 
-  private func stats(_ nodes: [KnowledgeNode]) -> some View {
+  /// Only what's already true: a count that's still zero is left out rather than shown as a score.
+  @ViewBuilder private func stats(_ nodes: [KnowledgeNode]) -> some View {
     let reps = model.bootstrap?.todayPlan?.completedTotal ?? model.memory.statistics?.completed ?? 0
     let explored = nodes.filter { $0.state != .unexplored }.count
     let strong = nodes.filter { $0.state == .strong }.count
-    // Three across normally; stacked at accessibility sizes so the numbers and labels read in full.
-    // The tiles share one height, so a label that wraps doesn't knock its tile out of line.
-    let row = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 12)) : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
-    return row {
-      statTile(value: "\(reps)", label: reps == 1 ? "rep" : "reps")
-      statTile(value: "\(explored)/\(nodes.count)", label: "areas explored")
-      statTile(value: "\(strong)", label: strong == 1 ? "decision held up" : "decisions held up")
+    let tiles = [
+      reps > 0 ? (value: "\(reps)", label: reps == 1 ? "rep" : "reps") : nil,
+      explored > 0 ? (value: "\(explored)", label: "of \(nodes.count) areas explored") : nil,
+      strong > 0 ? (value: "\(strong)", label: strong == 1 ? "decision held up" : "decisions held up") : nil,
+    ].compactMap { $0 }
+    if !tiles.isEmpty {
+      // Side by side normally; stacked at accessibility sizes so the numbers and labels read in full.
+      // The tiles share one height, so a label that wraps doesn't knock its tile out of line.
+      let row = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 12)) : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
+      row {
+        ForEach(tiles, id: \.label) { tile in statTile(value: tile.value, label: tile.label) }
+      }
+      .fixedSize(horizontal: false, vertical: true)
+      .accessibilityElement(children: .combine)
+      .accessibilityIdentifier("mapStats")
     }
-    .fixedSize(horizontal: false, vertical: true)
-    .accessibilityElement(children: .combine)
-    .accessibilityIdentifier("mapStats")
   }
 
   private func statTile(value: String, label: String) -> some View {
     VStack(alignment: .leading, spacing: 4) {
-      Text(value).font(.title2.weight(.semibold).monospacedDigit()).foregroundStyle(AppPalette.primary)
+      Text(value).font(.title.weight(.semibold).monospacedDigit()).foregroundStyle(AppPalette.primary)
+        .lineLimit(1).minimumScaleFactor(0.7)
       Text(label).font(.footnote).foregroundStyle(AppPalette.secondary).lineLimit(2).fixedSize(horizontal: false, vertical: true)
     }
     .padding(16)
@@ -130,39 +165,62 @@ struct KnowledgeMapView: View {
 
   // MARK: Next up
 
-  private func nextUp(_ nodes: [KnowledgeNode]) -> some View {
+  /// One clear pick with the reason it's next, then a quiet list of the alternatives.
+  @ViewBuilder private func nextUp(_ nodes: [KnowledgeNode]) -> some View {
     let revisit = nodes.filter { $0.state == .revisit }
     let fresh = nodes.filter { $0.state == .unexplored && PracticeAreaCatalog.ids.contains($0.id) }
     let picks = Array((revisit + fresh).prefix(3))
-    return Group {
-      if !picks.isEmpty {
-        VStack(alignment: .leading, spacing: 12) {
-          SignalEyebrow(text: "Next up")
-          ForEach(picks) { node in
-            Button { practise(node) } label: {
-              let row = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12)) : AnyLayout(HStackLayout(alignment: .center, spacing: 12))
-              row {
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
-                  NodeDot(state: node.state, size: 12, glow: false)
+    if let first = picks.first {
+      VStack(alignment: .leading, spacing: 12) {
+        SignalEyebrow(text: "Next up")
+        VStack(alignment: .leading, spacing: 16) {
+          VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+              NodeDot(state: first.state, size: 10, glow: false)
+              DrillbitMetadata(text: first.state == .revisit ? "Worth another go" : "Not on your map yet")
+            }
+            .accessibilityElement(children: .combine)
+            Text(first.label).font(.title2.weight(.semibold)).foregroundStyle(AppPalette.primary)
+            if let reason = first.state == .revisit ? first.evidence?.observation : first.description {
+              Text(reason).font(.subheadline).foregroundStyle(AppPalette.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+          }
+          Button("Practise \(first.label)") { practise(first) }
+            .buttonStyle(PracticeButtonStyle())
+            .accessibilityIdentifier("nextUp-\(first.id)")
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppPalette.ticket, in: RoundedRectangle(cornerRadius: 12))
+        .overlay { RoundedRectangle(cornerRadius: 12).stroke(AppPalette.ticketEdge, lineWidth: 1) }
+        if picks.count > 1 {
+          VStack(spacing: 0) {
+            ForEach(Array(picks.dropFirst().enumerated()), id: \.element.id) { index, node in
+              if index > 0 { Divider().overlay(AppPalette.hairline).padding(.leading, 38) }
+              Button { practise(node) } label: {
+                HStack(spacing: 12) {
+                  NodeDot(state: node.state, size: 10, glow: false).frame(width: 14)
                   VStack(alignment: .leading, spacing: 2) {
                     Text(node.label).font(.body.weight(.medium)).foregroundStyle(AppPalette.primary)
                       .fixedSize(horizontal: false, vertical: true)
                     Text(node.state == .revisit ? "Worth another go" : "Not explored yet").font(.footnote).foregroundStyle(AppPalette.secondary)
-                      .fixedSize(horizontal: false, vertical: true)
                   }
+                  Spacer(minLength: 8)
+                  Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(AppPalette.secondary)
+                    .accessibilityHidden(true)
                 }
-                if !typeSize.isAccessibilitySize { Spacer(minLength: 8) }
-                StubPill(label: "Practise").fixedSize()
+                .padding(.horizontal, 16).padding(.vertical, 12)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
               }
-              .padding(16)
-              .background(AppPalette.ticket, in: RoundedRectangle(cornerRadius: 12))
-              .overlay { RoundedRectangle(cornerRadius: 12).stroke(AppPalette.ticketEdge, lineWidth: 1) }
-              .contentShape(RoundedRectangle(cornerRadius: 12))
+              .buttonStyle(TicketPressStyle())
+              .accessibilityLabel("Practise \(node.label)")
+              .accessibilityIdentifier("nextUp-\(node.id)")
             }
-            .buttonStyle(TicketPressStyle())
-            .accessibilityLabel("Practise \(node.label)")
-            .accessibilityIdentifier("nextUp-\(node.id)")
           }
+          .background(AppPalette.ticket.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
+          .overlay { RoundedRectangle(cornerRadius: 12).stroke(AppPalette.ticketEdge, lineWidth: 1) }
         }
       }
     }
@@ -219,8 +277,12 @@ struct KnowledgeNode: Identifiable {
 /// feedback found at least as many sound decisions as gaps, and needs a few reps at a level before it says anything.
 struct LevelEstimate {
   static let ladder = EngineeringLevel.choices
+  /// Reps with grounded feedback it takes before Bit says anything.
+  static let needed = 3
   let level: String?
   let basis: String
+  /// Reps so far that count towards an estimate.
+  var rated = 0
 
   static func from(_ sessions: [Challenge]) -> LevelEstimate {
     let rated = sessions.compactMap { rep -> (rank: Int, heldUp: Bool)? in
@@ -230,18 +292,63 @@ struct LevelEstimate {
       let gaps = evidence.filter { $0.signal == "needs_practice" }.count
       return (rank, shown > 0 && shown >= gaps)
     }
-    guard rated.count >= 3 else {
-      let left = 3 - rated.count
-      return LevelEstimate(level: nil, basis: "\(left) more \(left == 1 ? "rep" : "reps") with real design calls and Bit can place you.")
+    guard rated.count >= needed else {
+      let left = needed - rated.count
+      return LevelEstimate(level: nil, basis: "\(left) more \(left == 1 ? "rep" : "reps") and Bit places you.", rated: rated.count)
     }
     for rank in ladder.indices.reversed() {
       let atOrAbove = rated.filter { $0.rank >= rank }
       let held = atOrAbove.filter(\.heldUp).count
       if atOrAbove.count >= 2, held >= 2, Double(held) / Double(atOrAbove.count) >= 0.6 {
-        return LevelEstimate(level: ladder[rank].0, basis: "\(held) of \(atOrAbove.count) reps at \(ladder[rank].1) or above held up.")
+        return LevelEstimate(level: ladder[rank].0, basis: "\(held) of \(atOrAbove.count) reps at \(ladder[rank].1) or above held up.", rated: rated.count)
       }
     }
-    return LevelEstimate(level: ladder.first?.0, basis: "Your decisions are still settling. Keep going and this firms up fast.")
+    return LevelEstimate(level: ladder.first?.0, basis: "Your decisions are still settling. Keep going and this firms up fast.", rated: rated.count)
+  }
+}
+
+/// What the latest finished rep put on the map, in the map's own words: what held up, what's worth another go,
+/// and what it touched for the first time. Nil when the rep didn't tie to any concept.
+struct LastRepChange {
+  let touched: Set<String>
+  let line: String
+
+  @MainActor static func from(_ model: AppModel, nodes: [KnowledgeNode]) -> LastRepChange? {
+    guard let rep = model.memory.sessions.filter({ $0.lifecycle == "completed" && !$0.isWarmUp })
+      .max(by: { ($0.completedAt ?? "") < ($1.completedAt ?? "") }) else { return nil }
+    let evidence = rep.reflection?.evidence ?? []
+    let label = { (id: String) in nodes.first { $0.id == id }?.label }
+    var touched = Set(rep.conceptIds ?? [])
+    if let primary = rep.primaryConceptId { touched.insert(primary) }
+    touched.formUnion(evidence.map(\.conceptId))
+    touched = touched.filter { label($0) != nil }
+    guard !touched.isEmpty else { return nil }
+    let held = unique(evidence.filter { $0.signal == "demonstrated" }.compactMap { label($0.conceptId) })
+    let revisit = unique(evidence.filter { $0.signal == "needs_practice" }.compactMap { label($0.conceptId) })
+      .filter { !held.contains($0) }
+    var parts: [String] = []
+    if !held.isEmpty { parts.append("\(list(held)) held up.") }
+    if !revisit.isEmpty { parts.append("\(list(revisit)) \(revisit.count == 1 ? "is" : "are") worth another go.") }
+    if parts.isEmpty {
+      let labels = touched.compactMap(label).sorted()
+      parts.append("\(list(labels)) \(labels.count == 1 ? "is" : "are") on your map now.")
+    }
+    return LastRepChange(touched: touched, line: parts.joined(separator: " "))
+  }
+
+  private static func unique(_ labels: [String]) -> [String] {
+    var seen: [String] = []
+    for label in labels where !seen.contains(label) { seen.append(label) }
+    return seen
+  }
+  /// "Caching", "Caching and Queues", "Caching, Queues and 2 more".
+  static func list(_ labels: [String]) -> String {
+    switch labels.count {
+    case 0: ""
+    case 1: labels[0]
+    case 2: "\(labels[0]) and \(labels[1])"
+    default: "\(labels[0]), \(labels[1]) and \(labels.count - 2) more"
+    }
   }
 }
 
@@ -250,7 +357,7 @@ struct LevelEstimate {
 private struct LevelCard: View {
   let estimate: LevelEstimate
   let target: String
-  /// The ladder fills up to the estimate on arrival, one step after another.
+  /// The ladder (or the progress towards it) fills on arrival, one step after another.
   @State private var filled = false
   @Environment(\.dynamicTypeSize) private var typeSize
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -259,37 +366,16 @@ private struct LevelCard: View {
     let current = estimate.level.flatMap { level in ladder.firstIndex { $0.0 == level } }
     let goal = ladder.firstIndex { $0.0 == target }
     VStack(alignment: .leading, spacing: 16) {
-      VStack(alignment: .leading, spacing: 4) {
-        DrillbitMetadata(text: "Working at about")
-        Text(current.map { ladder[$0].1 } ?? "Too early to say")
-          .font(.title.weight(.semibold)).foregroundStyle(current == nil ? AppPalette.primary : AppPalette.accent)
+      VStack(alignment: .leading, spacing: 6) {
+        SignalEyebrow(text: current == nil ? "Your level" : "Working at about")
+        Text(current.map { ladder[$0].1 } ?? estimate.basis)
+          .font(current == nil ? .title2.weight(.semibold) : .largeTitle.weight(.semibold))
+          .foregroundStyle(current == nil ? AppPalette.primary : AppPalette.accent)
+          .fixedSize(horizontal: false, vertical: true)
           .accessibilityIdentifier("levelEstimate")
       }
-      HStack(spacing: 0) {
-        ForEach(ladder.indices, id: \.self) { index in
-          VStack(spacing: 8) {
-            ZStack {
-              Capsule().fill(AppPalette.elevated).frame(height: 6)
-              Capsule().fill(AppPalette.action).frame(height: 6)
-                .scaleEffect(x: filled && index <= (current ?? -1) ? 1 : 0, anchor: .leading)
-                .animation(reduceMotion ? nil : .easeOut(duration: 0.28).delay(0.15 + Double(index) * 0.09), value: filled)
-              if index == goal { Circle().stroke(AppPalette.primary, lineWidth: 1.5).frame(width: 14, height: 14) }
-            }
-            .frame(height: 14)
-            // At accessibility sizes six labels can't share a row; the level is named in full above.
-            if !typeSize.isAccessibilitySize {
-              Text(ladder[index].1.replacingOccurrences(of: "-level", with: ""))
-                .font(.caption2.weight(index == current ? .semibold : .regular))
-                .foregroundStyle(index == current ? AppPalette.primary : AppPalette.secondary)
-                .lineLimit(1).minimumScaleFactor(0.8)
-            }
-          }
-          .frame(maxWidth: .infinity)
-          .padding(.horizontal, 2)
-        }
-      }
-      .accessibilityHidden(true)
-      Text(estimate.basis + (goal != nil ? " The ring is your target." : "") + " An estimate from your reps, not a hiring call.")
+      if current == nil { progress } else { ladderRow(current: current, goal: goal) }
+      Text(footnote(placed: current != nil, goal: goal))
         .font(.footnote).foregroundStyle(AppPalette.secondary).fixedSize(horizontal: false, vertical: true)
     }
     .padding(20)
@@ -300,11 +386,63 @@ private struct LevelCard: View {
     .accessibilityIdentifier("levelCard")
     .onAppear { filled = true }
   }
+
+  /// One segment per rep the estimate needs, lit for each rep that already counts.
+  private var progress: some View {
+    HStack(spacing: 8) {
+      ForEach(0..<LevelEstimate.needed, id: \.self) { index in
+        ZStack(alignment: .leading) {
+          Capsule().fill(AppPalette.hairline)
+          Capsule().fill(AppPalette.action)
+            .scaleEffect(x: filled && index < estimate.rated ? 1 : 0, anchor: .leading)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.32).delay(0.2 + Double(index) * 0.12), value: filled)
+        }
+        .frame(height: 8)
+      }
+    }
+    .accessibilityHidden(true)
+  }
+
+  private func ladderRow(current: Int?, goal: Int?) -> some View {
+    let ladder = LevelEstimate.ladder
+    return HStack(spacing: 0) {
+      ForEach(ladder.indices, id: \.self) { index in
+        VStack(spacing: 8) {
+          ZStack {
+            Capsule().fill(AppPalette.hairline).frame(height: 6)
+            Capsule().fill(AppPalette.action).frame(height: 6)
+              .scaleEffect(x: filled && index <= (current ?? -1) ? 1 : 0, anchor: .leading)
+              .animation(reduceMotion ? nil : .easeOut(duration: 0.28).delay(0.15 + Double(index) * 0.09), value: filled)
+            if index == goal { Circle().stroke(AppPalette.primary, lineWidth: 1.5).frame(width: 14, height: 14) }
+          }
+          .frame(height: 14)
+          // At accessibility sizes six labels can't share a row; the level is named in full above.
+          if !typeSize.isAccessibilitySize {
+            Text(ladder[index].1.replacingOccurrences(of: "-level", with: ""))
+              .font(.caption2.weight(index == current ? .semibold : .regular))
+              .foregroundStyle(index == current ? AppPalette.primary : AppPalette.secondary)
+              .lineLimit(1).minimumScaleFactor(0.8)
+          }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 2)
+      }
+    }
+    .accessibilityHidden(true)
+  }
+
+  private func footnote(placed: Bool, goal: Int?) -> String {
+    let aim = goal.map { LevelEstimate.ladder[$0].1 }
+    if !placed {
+      return "Only reps with real design calls count." + (aim.map { " You’re aiming for \($0)." } ?? "")
+    }
+    return estimate.basis + (goal != nil ? " The ring is your target." : "") + " An estimate from your reps, not a hiring call."
+  }
 }
 
 // MARK: - Constellation
 
-private struct NodeDot: View {
+struct NodeDot: View {
   let state: KnowledgeNode.State
   let size: CGFloat
   var glow = true
@@ -329,8 +467,10 @@ private struct NodeDot: View {
 }
 
 /// Bit in the middle, a hub per category around him, and each concept fanned out past its hub. Tap a concept to see it.
-private struct ConstellationMap: View {
+struct ConstellationMap: View {
   let nodes: [KnowledgeNode]
+  /// What the latest rep touched: ringed so the change is the first thing you see.
+  var fresh: Set<String> = []
   @Binding var selected: String?
   let appeared: Bool
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -344,6 +484,11 @@ private struct ConstellationMap: View {
       let layout = positions(side: side, center: center)
       ZStack {
         Canvas { context, _ in
+          // Two faint orbits, hubs on the inner one and concepts on the outer, so the map reads as one system.
+          for radius in [side * 0.25, side * 0.42] {
+            let orbit = Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2))
+            context.stroke(orbit, with: .color(AppPalette.hairline.opacity(0.35)), style: StrokeStyle(lineWidth: 1, dash: [2, 5]))
+          }
           for (category, hub) in layout.hubs {
             var spoke = Path(); spoke.move(to: center); spoke.addLine(to: hub)
             context.stroke(spoke, with: .color(AppPalette.hairline), lineWidth: 1)
@@ -358,16 +503,22 @@ private struct ConstellationMap: View {
         }
         .opacity(appeared ? 1 : 0)
 
-        BitView().frame(width: 40, height: 46).position(center).accessibilityHidden(true)
+        BitGlow(color: AppPalette.action, opacity: 0.16)
+          .frame(width: side * 0.3, height: side * 0.3)
+          .position(center)
+          .opacity(appeared ? 1 : 0)
+          .accessibilityHidden(true)
+        BitView().frame(width: 52, height: 60).position(center).accessibilityHidden(true)
 
         ForEach(Array(categories.enumerated()), id: \.element) { index, category in
           if let hub = layout.hubs.first(where: { $0.0 == category })?.1 {
             VStack(spacing: 4) {
               Circle().fill(AppPalette.secondary.opacity(0.6)).frame(width: 6, height: 6)
+              // A halo in the page colour keeps the name legible over the spokes without boxing it in.
               Text(category).font(.caption2.weight(.semibold)).foregroundStyle(AppPalette.secondary)
                 .multilineTextAlignment(.center).lineLimit(2)
-                .padding(.horizontal, 6).padding(.vertical, 2)
-                .background(AppPalette.background.opacity(0.85), in: RoundedRectangle(cornerRadius: 6))
+                .shadow(color: AppPalette.background, radius: 1.5)
+                .shadow(color: AppPalette.background, radius: 3)
                 .frame(width: 96)
             }
             .position(hub)
@@ -382,6 +533,9 @@ private struct ConstellationMap: View {
             let size: CGFloat = node.state == .unexplored ? 10 : min(22, 12 + CGFloat(node.reps) * 2)
             Button { selected = isSelected ? nil : node.id } label: {
               NodeDot(state: node.state, size: isSelected ? size + 6 : size)
+                .background {
+                  if fresh.contains(node.id) && !isSelected { FreshRing(size: size) }
+                }
                 .overlay {
                   if isSelected { Circle().stroke(AppPalette.primary, lineWidth: 1.5).frame(width: size + 14, height: size + 14) }
                 }
@@ -403,7 +557,7 @@ private struct ConstellationMap: View {
             .scaleEffect(appeared || reduceMotion ? 1 : 0.4)
             .opacity(appeared ? 1 : 0)
             .animation(reduceMotion ? nil : .spring(duration: 0.5, bounce: 0.35).delay(Double(index) * 0.025), value: appeared)
-            .accessibilityLabel("\(node.label). \(node.statusLine)")
+            .accessibilityLabel("\(node.label). \(node.statusLine)" + (fresh.contains(node.id) ? ". From your last rep" : ""))
             .accessibilityAddTraits(isSelected ? .isSelected : [])
             .accessibilityIdentifier("mapNode-\(node.id)")
           }
@@ -413,8 +567,6 @@ private struct ConstellationMap: View {
     .aspectRatio(1, contentMode: .fit)
     // A diagram: its labels stop growing past XXL so they fit their spots; each dot speaks its full name.
     .dynamicTypeSize(...DynamicTypeSize.xxLarge)
-    .background(AppPalette.ticket.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
-    .overlay { RoundedRectangle(cornerRadius: 12).stroke(AppPalette.ticketEdge, lineWidth: 1) }
   }
 
   private func positions(side: CGFloat, center: CGPoint) -> (hubs: [(String, CGPoint)], nodes: [String: CGPoint]) {
@@ -422,7 +574,36 @@ private struct ConstellationMap: View {
   }
 }
 
-/// Where the map's hubs and dots sit: shared by the Bit tab's map and the Pro sheet's glimpse of it.
+/// A ring around a concept the last rep touched. It ripples out twice on arrival to point the change out, then
+/// rests as a still ring; with reduced motion it is only the still ring.
+private struct FreshRing: View {
+  let size: CGFloat
+  @State private var ripples = 0
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  var body: some View {
+    ZStack {
+      Circle().stroke(AppPalette.action.opacity(0.8), lineWidth: 1.5)
+      Circle().stroke(AppPalette.action, lineWidth: 1.5)
+        .keyframeAnimator(initialValue: 0.0, trigger: ripples) { ring, t in
+          ring.scaleEffect(1 + t * 0.7).opacity(t == 0 ? 0 : 1 - t)
+        } keyframes: { _ in
+          KeyframeTrack(\.self) { LinearKeyframe(0, duration: 0); CubicKeyframe(1, duration: 1.4); LinearKeyframe(0, duration: 0) }
+        }
+    }
+    .frame(width: size + 10, height: size + 10)
+    .task {
+      guard !reduceMotion else { return }
+      for _ in 0..<2 {
+        try? await Task.sleep(for: .seconds(1))
+        ripples += 1
+        try? await Task.sleep(for: .seconds(0.6))
+      }
+    }
+    .accessibilityHidden(true)
+  }
+}
+
+/// Where the map's hubs and dots sit on the Bit tab.
 enum ConstellationLayout {
   static func categories(_ nodes: [KnowledgeNode]) -> [String] {
     var seen: [String] = []
@@ -453,76 +634,3 @@ enum ConstellationLayout {
     return (hubs, points)
   }
 }
-
-/// The Pro sheet's look at the person's own map: their real dots, lit where their reps put them, with Bit in the
-/// middle. Read-only and unlabelled; VoiceOver reads what's lit.
-struct MapGlimpse: View {
-  let nodes: [KnowledgeNode]
-  var body: some View {
-    GeometryReader { proxy in
-      let side = min(proxy.size.width, proxy.size.height)
-      let center = CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
-      let layout = ConstellationLayout.positions(nodes: nodes, side: side, center: center)
-      ZStack {
-        Canvas { context, _ in
-          for (category, hub) in layout.hubs {
-            var spoke = Path(); spoke.move(to: center); spoke.addLine(to: hub)
-            context.stroke(spoke, with: .color(AppPalette.hairline), lineWidth: 1)
-            for node in nodes where node.category == category {
-              guard let point = layout.nodes[node.id] else { continue }
-              var edge = Path(); edge.move(to: hub); edge.addLine(to: point)
-              let lit = node.state != .unexplored
-              context.stroke(edge, with: .color(lit ? AppPalette.action.opacity(0.5) : AppPalette.hairline), lineWidth: lit ? 1.5 : 1)
-            }
-          }
-        }
-        ForEach(nodes) { node in
-          if let point = layout.nodes[node.id] {
-            NodeDot(state: node.state, size: node.state == .unexplored ? 6 : 11).position(point)
-          }
-        }
-        BitView().frame(width: 30, height: 34).position(center)
-      }
-    }
-    .aspectRatio(1, contentMode: .fit)
-    .accessibilityElement()
-    .accessibilityLabel(summary)
-    .accessibilityIdentifier("mapGlimpse")
-  }
-  private var summary: String {
-    let lit = nodes.filter { $0.state != .unexplored }.prefix(3).map { node in
-      "\(node.label), " + (node.state == .strong ? "held up" : node.state == .revisit ? "worth another go" : "practised")
-    }
-    return "Your map so far: " + lit.joined(separator: "; ") + ". The full map is part of Pro."
-  }
-}
-
-/// What the Pro sheet can say about this account from its own reps: the map so far, the latest concept the feedback
-/// said needs another go, and how far off a level estimate is. Built on the device and never sent anywhere.
-struct ProPitch {
-  let nodes: [KnowledgeNode]
-  let reps: Int
-  let gap: String?
-  let levelLine: String?
-
-  @MainActor static func from(_ model: AppModel) -> ProPitch? {
-    guard !model.taxonomy.isEmpty else { return nil }
-    let nodes = KnowledgeNode.build(model: model)
-    guard nodes.contains(where: { $0.state != .unexplored }) else { return nil }
-    let sessions = model.memory.sessions.filter { $0.lifecycle == "completed" && !$0.isWarmUp }
-      .sorted { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
-    // The latest gap from a rep's feedback, then the account's summary, as the map itself reads it.
-    let gapID = sessions.lazy.compactMap { $0.reflection?.evidence?.first { $0.signal == "needs_practice" }?.conceptId }.first
-      ?? model.memory.evidence?.first { $0.signal == "needs_practice" }?.conceptId
-    let gap = gapID.flatMap { id in model.taxonomy.first { $0.id == id }?.label }
-    let estimate = LevelEstimate.from(sessions)
-    return ProPitch(nodes: nodes, reps: sessions.count, gap: gap, levelLine: estimate.level == nil ? estimate.basis : nil)
-  }
-
-  /// "2 reps in. Queues & streams needs another go." Only when the feedback actually said so.
-  var headline: String? {
-    guard let gap, reps > 0 else { return nil }
-    return "\(reps == 1 ? "1 rep" : "\(reps) reps") in. \(gap) needs another go."
-  }
-}
-

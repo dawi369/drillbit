@@ -364,3 +364,11 @@ The app now records each paywall presentation, which needs migration `0019_paywa
 ```
 
 The migration is additive. An older app never calls the new route, and a newer app talking to an older Worker gets a 404 that it ignores, so either order is safe. `scripts/metrics.ts` skips the paywall section until the table exists.
+
+### Three free reps; owner Pro by hand — 3 November 2026
+
+`FREE_REPS_LIFETIME=3` in both environments' config. Development Worker `48629aa8-3119-4433-8469-7ae4b5a7ce23` is deployed with it; `/health` 200, unauthenticated `/v1/bootstrap` 401. Production Worker `7bd077ff-8c79-4c0a-b404-c68d21434410` is deployed with it (no pending migrations); `/health` and `/privacy` 200, unauthenticated `/v1/bootstrap` 401.
+
+The owner's development account (`eccd64b9-7b24-487d-b600-56ae0b67f332`, not a developer) is Pro through a hand-made entitlement row, `original_transaction_id='manual-owner-20261103'`, environment `Manual`, no expiry. To make it free again: `DELETE FROM entitlements WHERE original_transaction_id='manual-owner-20261103'` against `drillbit-development`.
+
+The manual Pro row was deleted again the same evening so the owner could review the free Bit tab; the account is free. To go back to Pro: `INSERT INTO entitlements(original_transaction_id,account_id,product_id,environment,status,active_until,signed_at,created_at,updated_at) VALUES('manual-owner-20261103','eccd64b9-7b24-487d-b600-56ae0b67f332','dawi.drillbit.pro.yearly','Manual','active',NULL,<now>,<now>,<now>)` against `drillbit-development`.

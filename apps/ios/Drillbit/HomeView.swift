@@ -304,7 +304,7 @@ struct HomeView: View {
       } stub: {
         if next == nil {
           let limit = model.bootstrap?.practice?.limit ?? 2
-          stubText(title: "Free reps", note: "\(limit == 2 ? "Two" : String(limit)) to try it, on the house")
+          stubText(title: "Free reps", note: "\([2: "Two", 3: "Three", 4: "Four", 5: "Five"][limit] ?? String(limit)) to try it, on the house")
         } else {
           stubText(title: "Free reps", note: "Three a day, on the house")
         }

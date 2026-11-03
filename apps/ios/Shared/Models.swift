@@ -537,8 +537,43 @@ struct CompanionUpdate: Codable {
   static func legacy(_ difficulty: String) -> String { difficulty == "easy" ? "junior" : difficulty == "hard" ? "senior" : "mid" }
  }
 
-func reminderComponents(minutes: Int, timezone: String) -> DateComponents {
-  DateComponents(calendar: Calendar(identifier: .gregorian), timeZone: TimeZone(identifier: timezone), hour: minutes / 60, minute: minutes % 60)
+/// The daily reminder's title/line pairs, in the voice of `RepDoneMoment`. None of them promise a question is ready.
+let reminderLines: [(title: String, body: String)] = [
+  ("Your next boss fight", "A few minutes, one good design call."),
+  ("Rep o’clock", "One question, a few minutes. Interview-day you says thanks."),
+  ("Ping from Bit", "Got a few minutes? There’s a design call with your name on it."),
+  ("Servers don’t scale themselves", "Neither do interview answers. One quick rep?"),
+  ("Quick one?", "Pick a design, defend it, get back to your day."),
+  ("Daily quest", "Small rep, real tradeoffs. No grinding required."),
+  ("Your interviewer’s warmed up", "Are you? A few minutes is plenty."),
+  ("Practise now, panic less later", "One system design rep. That’s the whole ask."),
+]
+
+struct ScheduledReminder: Equatable, Sendable {
+  let id: String
+  let date: DateComponents
+  let title: String
+  let body: String
+}
+
+/// The reminders for the next `days` days at the chosen time. A repeating trigger can't change its text, so each day
+/// gets its own dated request, topped up after every bootstrap. The line is picked by calendar day, so rescheduling
+/// never reshuffles a day's text and two days in a row never repeat.
+func reminderSchedule(minutes: Int, timezone: String, from now: Date = .now, days: Int = 28) -> [ScheduledReminder] {
+  var calendar = Calendar(identifier: .gregorian)
+  calendar.timeZone = TimeZone(identifier: timezone) ?? .current
+  let today = calendar.startOfDay(for: now)
+  var reminders: [ScheduledReminder] = []
+  for offset in 0...days where reminders.count < days {
+    guard let day = calendar.date(byAdding: .day, value: offset, to: today),
+          let fire = calendar.date(bySettingHour: minutes / 60, minute: minutes % 60, second: 0, of: day), fire > now,
+          let ordinal = calendar.ordinality(of: .day, in: .era, for: day) else { continue }
+    let line = reminderLines[ordinal % reminderLines.count]
+    let date = calendar.dateComponents([.calendar, .timeZone, .year, .month, .day, .hour, .minute], from: fire)
+    let stamp = String(format: "%04d-%02d-%02d", date.year ?? 0, date.month ?? 0, date.day ?? 0)
+    reminders.append(ScheduledReminder(id: "daily-practice-" + stamp, date: date, title: line.title, body: line.body))
+  }
+  return reminders
 }
 
 enum GuidanceMode: String, CaseIterable, Codable, Identifiable, Sendable {

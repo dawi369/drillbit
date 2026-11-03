@@ -79,14 +79,15 @@ import WidgetKit
     settings.reminderEnabled = true
     do { try await saveSettingsLocally(); try await reconcileReminder() } catch let failure { error = failure.localizedDescription }
   }
-  /// After the first free rep's feedback, Pro is offered once while the second rep is still free. An offer, never a
-  /// gate: Not now goes Home with rep two untouched, and the server's limits don't change. Once per account on this
+  /// After the first free rep's feedback, Pro is offered once while the rest are still free. An offer, never a
+  /// gate: Not now goes Home with the next rep untouched, and the server's limits don't change. Once per account on this
   /// device; a reinstall may show it again. Starting another rep from the feedback skips it.
   func offerProAfterFirstRep(_ finished: Challenge) async {
-    // The count has to include the rep just finished; a bootstrap from before it was written still says two.
+    // The count has to include the rep just finished; a bootstrap from before it was written still has it free.
     if !fixture { await refresh() }
     guard let account = bootstrap?.account.id, !finished.isWarmUp, finished.lifecycle == "completed",
-      bootstrap?.practice?.freeReps == true, lifetimeFreeReps, bootstrap?.practice?.remaining == 1 else { return }
+      let practice = bootstrap?.practice, practice.freeReps, lifetimeFreeReps,
+      let remaining = practice.remaining, let limit = practice.limit, remaining > 0, limit - remaining == 1 else { return }
     // Fixtures share one account id across runs, so they remember the offer for this launch only.
     if fixture {
       guard proOfferedThisLaunch.insert(account).inserted else { return }
@@ -178,7 +179,7 @@ import WidgetKit
     let when = calendar.isDateInToday(date) ? "later today, at \(date.formatted(style))" : calendar.isDateInTomorrow(date) ? "tomorrow at \(date.formatted(style))" : date.formatted(.dateTime.weekday(.wide).locale(locale))
     return "That’s today’s free reps. More land \(when)."
   }
-  /// "2 of 3 free reps left today" (or "1 of 2 free reps left" when they're lifetime), or nil on Pro.
+  /// "2 of 3 free reps left today" (or "2 of 3 free reps left" when they're lifetime), or nil on Pro.
   var repsLeftLine: String? {
     guard let practice = bootstrap?.practice, practice.freeReps, let remaining = practice.remaining, let limit = practice.limit, remaining > 0 else { return nil }
     return "\(remaining) of \(limit) free reps left" + (practice.lifetime == true ? "" : " today")
@@ -1456,8 +1457,10 @@ import WidgetKit
   func reconcileReminder(requestPermission: Bool = false) async throws {
     guard !fixture else { return }
     let center = UNUserNotificationCenter.current()
+    // "daily-practice" alone is the old repeating reminder; the dated ones carry the day after it.
+    let scheduled = await center.pendingNotificationRequests().map(\.identifier).filter { $0.hasPrefix("daily-practice") }
     guard settings.reminderEnabled else {
-      center.removePendingNotificationRequests(withIdentifiers: ["daily-practice"])
+      center.removePendingNotificationRequests(withIdentifiers: scheduled)
       return
     }
     var authorization = await center.notificationSettings().authorizationStatus
@@ -1466,16 +1469,19 @@ import WidgetKit
       authorization = await center.notificationSettings().authorizationStatus
     }
     guard authorization == .authorized || authorization == .provisional else {
-      center.removePendingNotificationRequests(withIdentifiers: ["daily-practice"])
+      center.removePendingNotificationRequests(withIdentifiers: scheduled)
       if requestPermission { throw APIError(code: "notifications_denied", message: "Your practice time is saved. Turn on notifications for Drillbit in iPhone Settings and the reminders will come through.", status: 0) }
       return
     }
-    let content = UNMutableNotificationContent()
-    content.title = "Your next boss fight"
-    content.body = "Today’s question is waiting. A few minutes, one good design call."
-    content.userInfo = ["route": "home"]
-    try await center.add(UNNotificationRequest(identifier: "daily-practice", content: content,
-      trigger: UNCalendarNotificationTrigger(dateMatching: reminderComponents(minutes: settings.dailyMinutes, timezone: settings.timezone), repeats: true)))
+    center.removePendingNotificationRequests(withIdentifiers: scheduled)
+    for reminder in reminderSchedule(minutes: settings.dailyMinutes, timezone: settings.timezone) {
+      let content = UNMutableNotificationContent()
+      content.title = reminder.title
+      content.body = reminder.body
+      content.userInfo = ["route": "home"]
+      try await center.add(UNNotificationRequest(identifier: reminder.id, content: content,
+        trigger: UNCalendarNotificationTrigger(dateMatching: reminder.date, repeats: false)))
+    }
   }
   func requestReminderPermission() async -> Bool {
     guard !fixture else { return true }
@@ -1657,20 +1663,20 @@ import WidgetKit
       bootstrap?.todayPlan?.nextTicket = 11
     }
     if ProcessInfo.processInfo.arguments.contains("--fixture-pro") { applyConfirmedPro() }
-    // Production's model: two free reps in total, both spent; nothing comes back at midnight.
+    // Production's model: three free reps in total, all spent; nothing comes back at midnight.
     if ProcessInfo.processInfo.arguments.contains("--fixture-lifetime-spent") {
       bootstrap?.account.plan = "free"
-      bootstrap?.practice = PracticeAccess(plan: "free", freeReps: true, available: false, nextFreeRepAt: nil, remaining: 0, limit: 2, resetsAt: nil, lifetime: true)
+      bootstrap?.practice = PracticeAccess(plan: "free", freeReps: true, available: false, nextFreeRepAt: nil, remaining: 0, limit: 3, resetsAt: nil, lifetime: true)
     }
-    // Production's model for a new account: two lifetime free reps, none used.
+    // Production's model for a new account: three lifetime free reps, none used.
     if ProcessInfo.processInfo.arguments.contains("--fixture-lifetime") {
       bootstrap?.account.plan = "free"
-      bootstrap?.practice = PracticeAccess(plan: "free", freeReps: true, available: true, nextFreeRepAt: nil, remaining: 2, limit: 2, resetsAt: nil, lifetime: true)
+      bootstrap?.practice = PracticeAccess(plan: "free", freeReps: true, available: true, nextFreeRepAt: nil, remaining: 3, limit: 3, resetsAt: nil, lifetime: true)
     }
-    // Production's model after the first rep was prepared: one of two lifetime free reps left.
+    // Production's model with one of three lifetime free reps left.
     if ProcessInfo.processInfo.arguments.contains("--fixture-lifetime-one-left") {
       bootstrap?.account.plan = "free"
-      bootstrap?.practice = PracticeAccess(plan: "free", freeReps: true, available: true, nextFreeRepAt: nil, remaining: 1, limit: 2, resetsAt: nil, lifetime: true)
+      bootstrap?.practice = PracticeAccess(plan: "free", freeReps: true, available: true, nextFreeRepAt: nil, remaining: 1, limit: 3, resetsAt: nil, lifetime: true)
     }
     if ProcessInfo.processInfo.arguments.contains("--fixture-free-reps") {
       bootstrap?.account.plan = "free"
