@@ -1,12 +1,12 @@
 # App Store readiness
 
-Status, 1 November 2026: **the app code and the production environment are ready; App Store Connect and the physical-device checklist aren't confirmed.** Everything below that says *you* needs an account, a dashboard or a real iPhone. Work through the sections in order. Each one says how to check it's done.
+Status, 4 November 2026: **App Privacy is published; version 1.0 is still missing from the review draft. Physical-device acceptance remains unrecorded.** The live listing already describes three lifetime free questions and one voice mock. See [the current audit](apple-review-audit-2026-11-04.md) for verified portal findings and remaining work. This checklist does not authorize submitting or releasing the app.
 
 Verification is reported in three levels, as the release gate in [operations.md](operations.md#release-gate) requires:
 
 | Level | Status |
 | --- | --- |
-| Compiled and tested (simulator, D1) | Done this pass. See [Test evidence](#test-evidence). |
+| Compiled and tested (simulator, D1) | 58 Swift core tests passed on 4 November. Older simulator/D1 evidence is dated below; it is not a fresh acceptance run. |
 | Live-service verified | Production Worker serving real traffic: on 31 October, D1 recorded completed question, interview, feedback and voice jobs and one Sandbox entitlement (now expired). |
 | Physical-device verified | **Not recorded.** The 31 October production activity suggests a phone signed in and bought in Sandbox, but section 7's checklist hasn't been written up. |
 
@@ -36,7 +36,7 @@ cd apps/api
 
 ## 2. Release build: one command
 
-Production values are committed in `apps/ios/Config/Production.xcconfig`, and every Release build uses them. Bump `CURRENT_PROJECT_VERSION` in `apps/ios/project.yml` for each upload. It's 16 on 1 November; use 17 for the next upload unless App Store Connect shows 16 was never uploaded. `MARKETING_VERSION` is `1.0`, matching the version record in App Store Connect; keep them equal. Then, **in your own Terminal** (an agent or SSH shell can't reach the signing key):
+Production values are committed in `apps/ios/Config/Production.xcconfig`, and every Release build uses them. Bump `CURRENT_PROJECT_VERSION` in `apps/ios/project.yml` for each upload. Build 17 uploaded successfully on 4 November at 22:37 CET; Apple processing was pending at upload completion. Use a number above 17 for the next upload after checking the portal. `MARKETING_VERSION` is `1.0`, matching the version record in App Store Connect; keep them equal. Then run the release script. Signing requires the login keychain to be available to that session; a signed archive succeeded from the agent session on 4 November:
 
 ```sh
 scripts/release-ios.sh            # archive and verify: production API, pk_live key, privacy URL
@@ -57,9 +57,9 @@ The paywall reads everything from the products, so nothing in code changes with 
    - `dawi.drillbit.pro.weekly`: **$7.99** a week, with an introductory offer of 1 week at **$1.99**, pay as you go.
    - `dawi.drillbit.pro.yearly`: **$99.99** a year (raised from $79.99 on 31 October). The paywall shows "Save 75%" and "$1.92 a week"; `Config/Drillbit.storekit` uses the same prices for the simulator. If yearly is already set at $79.99 in App Store Connect, change it under Subscription Prices before submitting.
    - Prices and caps are explained in [paywall-plan.md](paywall-plan.md).
-3. For each product: display name, description (e.g. "Unlimited reps and voice, billed weekly."), and a **review screenshot** of the paywall. Take it on the device with the TestFlight build (section 7): the simulator fixture paywall shows a debug-only "Simulate purchase" button.
-4. **The first subscription has to be submitted with an app version.** On the 1.0 version page, under *In-App Purchases and Subscriptions*, add both products before you press Submit. Otherwise they stay "Ready to Submit" and the reviewer sees an empty paywall.
-5. App Information → **App Store Server Notifications**: Production and Sandbox URL `https://<prod-host>/apple/notifications`, Version 2. Leave `APPLE_ENVIRONMENT` unset on production; App Review buys with Sandbox accounts against your production Worker.
+3. For each product: display name, description (e.g. "More reps and voice, billed weekly. Fair use applies."), and a **review screenshot** of the paywall. Take it on the device with the TestFlight build (section 7): the simulator fixture paywall shows a debug-only "Simulate purchase" button.
+4. **The first subscription has to be submitted with an app version.** The current shared review draft already contains both products and their group, all Ready for Review. Add version 1.0 to that same draft after choosing the release build; the portal currently refuses submission because no app version is included. Do not submit subscriptions alone.
+5. App Information → **App Store Server Notifications**: Production and Sandbox URL `https://api.drillbit.t23.dev/apple/notifications`, Version 2. Leave `APPLE_ENVIRONMENT` unset on production; App Review buys with Sandbox accounts against your production Worker.
 
 What the paywall already does for Guideline 3.1.2 (no work needed; listed so you can answer reviewer questions):
 - There are two places to buy, and both carry every disclosure: the Pro sheet (Home, Settings, voice, the first-rep offer) and the Bit tab's showcase for free accounts (`ProShowcase.swift`). Apple allows several purchase screens; each one has to stand on its own.
@@ -72,7 +72,7 @@ What the paywall already does for Guideline 3.1.2 (no work needed; listed so you
 
 ## 4. App Privacy ("nutrition label") answers
 
-Match `apps/ios/Drillbit/PrivacyInfo.xcprivacy`. Tracking: **No**. For every type below: *Linked to the user: Yes* (except the Diagnostics rows, which are not linked), *Used for tracking: No*, *Purpose: App Functionality*.
+Match `apps/ios/Drillbit/PrivacyInfo.xcprivacy`. Tracking: **No**. For every type below: *Linked to the user: Yes* (except Diagnostics and Customer Support, which are not linked), *Used for tracking: No*, *Purpose: App Functionality*.
 
 | Category | Type | Why |
 | --- | --- | --- |
@@ -87,15 +87,15 @@ Match `apps/ios/Drillbit/PrivacyInfo.xcprivacy`. Tracking: **No**. For every typ
 | Diagnostics | Other Diagnostic Data | Device model, OS and app version on Sentry reports. **Linked: No** |
 | User Content | Customer Support | Bug reports typed in Settings → Feedback, sent to Sentry. **Linked: No** |
 
-Privacy Policy URL: `https://<prod-host>/privacy`.
+Privacy Policy URL: `https://api.drillbit.t23.dev/privacy`.
 
 ## 5. Paywall: native StoreKit vs Superwall
 
-**Recommendation: launch with `SUPERWALL_API_KEY` empty.** The app then shows Apple's `SubscriptionStoreView` with the plan picker. It's tested in the simulator (real StoreKit products, gate → paywall → purchase → unlock), compliant by construction, and doesn't depend on a remote dashboard the reviewer might catch half-configured.
+**Production keeps `SUPERWALL_API_KEY` empty.** The Pro sheet uses Apple's `SubscriptionStoreView` with a custom `PlanPicker`; the free Bit tab has its own `ProShowcaseView`. Both purchase surfaces need current-device verification of prices, introductory terms, Restore, Terms and Privacy. Earlier simulator purchase tests do not establish App Review readiness.
 
 If you want Superwall at launch instead:
 - Create placements `practice_rep` and `voice_session` and attach one paywall with both products.
-- The remote paywall must show, by itself: price and period for each plan, intro-offer terms, Restore, and links to Terms (`https://www.apple.com/legal/internet-services/itunes/dev/stdeula/`) and Privacy (`https://<prod-host>/privacy`). Reviewers reject Superwall templates that hide these or make the close button hard to find.
+- The remote paywall must show, by itself: price and period for each plan, intro-offer terms, Restore, and links to Terms (`https://www.apple.com/legal/internet-services/itunes/dev/stdeula/`) and Privacy (`https://api.drillbit.t23.dev/privacy`). Reviewers reject Superwall templates that hide these or make the close button hard to find.
 - Add Superwall to the App Privacy answers if you enable its analytics.
 - Test on device with a Sandbox tester before submitting.
 
@@ -103,11 +103,11 @@ If you want Superwall at launch instead:
 
 | Field | Draft |
 | --- | --- |
-| Name (30) | Drillbit: System Design Prep (28; the home screen still says Drillbit) |
-| Subtitle (30) | AI mock interviews for SWEs (27) |
+| Name (30) | Saved: Drillbit Practice |
+| Subtitle (30) | Saved: System design interview prep |
 | Category | Education (secondary: Productivity) |
-| Support URL | `https://<prod-host>/support` |
-| Privacy Policy URL | `https://<prod-host>/privacy` |
+| Support URL | `https://api.drillbit.t23.dev/support` |
+| Privacy Policy URL | `https://api.drillbit.t23.dev/privacy` |
 | Copyright | 2026 t23.dev |
 | Age rating | Fill in the 2025 questionnaire honestly. Drillbit has an AI chat feature (the interviewer) that's limited to system design practice. It has no user-to-user communication, no web browsing and no mature content. Expect 13+. Set a higher minimum age if you want. |
 
@@ -127,16 +127,16 @@ If you want Superwall at launch instead:
 > • Feedback after every rep, in your own words: one thing that worked, one to fix
 > • Recall cards and a library of everything you've practiced
 >
-> Free: two questions to try it, plus one 10-minute voice mock. Drillbit Pro: practice as much as you like and use voice most days (fair use applies). Pro renews automatically unless you cancel at least 24 hours before the period ends. Manage or cancel in your Apple Account settings.
+> Free: three questions in total and one voice mock of up to 10 minutes. Drillbit Pro: up to 10 practice reps a day and 75 minutes of voice a week, with daily and per-session limits. Pro renews automatically unless you cancel at least 24 hours before the period ends. Manage or cancel in your Apple Account settings.
 >
 > Drillbit uses third-party AI (OpenRouter and OpenAI) to run interviews. It asks before anything is sent.
 >
 > Terms of Use: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
 > Privacy Policy: https://api.drillbit.t23.dev/privacy
 
-Keep "fair use applies" next to "as much as you like": Pro has fair-use caps (10 practised reps a day, where a rep counts from its second message; voice 60 minutes a day, 75 a week, 20 a session). Unqualified "unlimited" claims invite a 2.3.1 accuracy rejection.
+State the actual allowance in listing copy: Pro has fair-use caps (10 practised reps a day, where a rep counts from its second message; voice 60 minutes a day, 75 a week, 20 a session). Unqualified "unlimited" claims invite a 2.3.1 accuracy rejection.
 
-**Screenshots:** iPhone 6.9" (1320 × 2868) is required, and the app is iPhone-only, so there's no iPad set. The first three frames show in search results, so they have to explain the app on their own.
+**Screenshots:** the 4 November portal shows the required medium Dynamic Island display inheriting six uploaded large-display screenshots (including 6.9" at 1320 × 2868). No additional size was flagged as missing; the app is iPhone-only, so there is no iPad set. The first three frames show in search results, so they have to explain the app on their own.
 
 | # | Frame | File in [`docs/design/app-store/`](design/app-store/) | Caption |
 |---|---|---|---|
@@ -151,9 +151,9 @@ Keep "fair use applies" next to "as much as you like": Pro has fair-use caps (10
 
 **App Review notes (paste and fill in):**
 
-> Sign in with Apple to create an account; no invite or demo code is needed. The first launch shows a short intro and a one-minute setup, then sign-in. Before the first question is written, a sheet asks permission to use third-party AI (OpenRouter for text, OpenAI for voice); nothing is sent to an AI model before that. Settings → AI and your data shows the same words any time. Screenshots of the permission sheet are attached.
+> Sign in with Apple to create an account; no invite or demo code is needed. The first launch shows a short intro and a one-minute setup, then sign-in. Before the first question is written, a sheet asks permission to use third-party AI (OpenRouter for text, OpenAI for voice); nothing is sent to an AI model before that. Settings → AI and your data shows the same words any time. The AI disclosure is also available in Settings → AI and your data.
 >
-> Subscriptions: free accounts get two questions in total. To reach the paywall, use Settings → See Pro, or finish two questions. Restore Purchases is on the paywall (Settings → See Pro).
+> Subscriptions: free accounts get three questions in total and one voice mock of up to 10 minutes. To reach the paywall, use Settings → See Pro, or use the three free questions. Restore Purchases is on the paywall (Settings → See Pro).
 >
 > Voice: open a question and tap Talk, then tap the microphone to unmute. Microphone permission is requested then. Free accounts get one voice mock of up to 10 minutes; it counts once they speak.
 >
@@ -214,4 +214,4 @@ Version 1.0 → choose the build → attach both subscriptions → add the revie
 
 Four existing UI scripts were stale and failed on their first run; none was an app bug. Two screenshot walks typed while the second coach tip deliberately shielded the screen. The Settings walk looked for Delete account in the wrong scroll direction. The profile test didn't scroll to a row that moved under Developer. All four were fixed and pass.
 
-**Not verified**, and can't be from here: real Sign in with Apple/Google/GitHub, live AI and voice through providers, a Sandbox purchase, restore and Apple notifications, production Worker and Clerk (not created yet), widget cold launch, and anything on a physical iPhone. That's sections 1 and 7.
+**Historical scope of the 27–28 October tests:** they did not verify production authentication, live providers, Sandbox purchase/restore/notifications, or physical-device behavior. Production was subsequently provisioned and later service evidence is recorded above and in operations. The complete physical-device checklist in section 7 still has no recorded result.
