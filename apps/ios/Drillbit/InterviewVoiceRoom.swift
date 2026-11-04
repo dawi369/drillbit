@@ -103,14 +103,14 @@ struct InterviewVoiceRoom<Question: View>: View {
   @ViewBuilder private var dock: some View {
     VStack(spacing: 8) {
       if warned, phase == .active, voice.message == nil {
-        Text("Thirty seconds left. Land the point.").font(.footnote).foregroundStyle(AppPalette.accent)
+        Text("Thirty seconds left. Land the point.").font(.footnote).foregroundStyle(AppPalette.primary)
           .accessibilityIdentifier("voiceClosing")
       } else if voice.hearsNothing, phase == .active, voice.message == nil {
         Text("Can’t hear you yet. Check your mic is on and Drillbit is allowed to use it.").font(.footnote)
-          .foregroundStyle(AppPalette.accent).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+          .foregroundStyle(AppPalette.primary).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
           .accessibilityIdentifier("voiceNoInput")
       } else if voice.idleWarning, phase == .active, voice.message == nil {
-        Text("Still there? Voice ends in 30 seconds if it stays quiet.").font(.footnote).foregroundStyle(AppPalette.accent)
+        Text("Still there? Voice ends in 30 seconds if it stays quiet.").font(.footnote).foregroundStyle(AppPalette.primary)
           .accessibilityIdentifier("voiceIdle")
       }
       if let message = voice.message {
@@ -312,7 +312,7 @@ private struct VoiceRoomTitle: View {
   }
 }
 
-/// The microphone: one big circle in the middle of the dock. Filled and glowing while they can hear you, quiet while muted.
+/// The microphone: one big circle in the middle of the dock. Filled while they can hear you, quiet while muted.
 private struct MicControl: View {
   enum State: Equatable { case start, connecting, muted, live }
   let state: State
@@ -337,7 +337,7 @@ private struct MicControl: View {
   }
   var body: some View {
     Button(action: action) {
-      VStack(spacing: 10) {
+      VStack(spacing: 8) {
         ZStack {
           if state == .connecting {
             // One quiet ring breathing out from the mic while the line comes up.
@@ -348,7 +348,6 @@ private struct MicControl: View {
           Circle()
             .fill(filled ? AppPalette.action : AppPalette.elevated)
             .overlay { Circle().strokeBorder(filled ? AppPalette.action.opacity(0.5) : AppPalette.hairline, lineWidth: 1) }
-            .shadow(color: AppPalette.action.opacity(filled ? 0.35 : 0), radius: 18, y: 4)
           Image(systemName: symbol)
             .font(.system(size: 30, weight: .semibold))
             .foregroundStyle(filled ? AppPalette.actionInk : state == .connecting ? AppPalette.secondary : AppPalette.primary)
@@ -397,7 +396,7 @@ private struct RoomControl: View {
   private let size: CGFloat = 56
   var body: some View {
     Button(action: action) {
-      VStack(spacing: 10) {
+      VStack(spacing: 8) {
         Image(systemName: symbol)
           .font(.system(size: 20, weight: .semibold))
           .foregroundStyle(ink)

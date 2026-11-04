@@ -21,11 +21,11 @@ struct HomeWeekStrip: View {
         let isToday = day == today
         VStack(spacing: 8) {
           Text(day.formatted(.dateTime.weekday(.narrow)))
-            .font(.caption2.weight(isToday ? .bold : .medium).monospaced())
+            .font(.caption2.weight(isToday ? .semibold : .medium))
             .foregroundStyle(isToday ? AppPalette.primary : AppPalette.secondary)
           ZStack {
             Circle().fill(done ? AppPalette.action : AppPalette.elevated)
-            if isToday && !done { Circle().stroke(AppPalette.accent, lineWidth: 1.5) }
+            if isToday && !done { Circle().stroke(AppPalette.secondary, lineWidth: 1.5) }
           }
           .frame(width: 14, height: 14)
           .scaleEffect(done || reduceMotion ? 1 : 0.84)

@@ -253,7 +253,7 @@ private struct CalloutButtonStyle: ButtonStyle {
       .font(.footnote.weight(.semibold))
       .foregroundStyle(AppPalette.actionInk)
       .padding(.horizontal, 12)
-      .padding(.vertical, 6)
+      .padding(.vertical, 8)
       .background(AppPalette.action, in: Capsule())
       .scaleEffect(configuration.isPressed && !reduceMotion ? 0.96 : 1)
       .animation(DrillbitMotion.press, value: configuration.isPressed)
@@ -267,7 +267,7 @@ struct PracticeAreaGroupRow: View {
   let area: PracticeAreaGroup
   var body: some View {
     HStack(spacing: 16) {
-      Image(systemName: area.symbol).font(.system(size: 20)).foregroundStyle(AppPalette.accent).frame(width: 24)
+      Image(systemName: area.symbol).font(.system(size: 20)).foregroundStyle(AppPalette.secondary).frame(width: 24)
         .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: 4) {
         Text(area.title).foregroundStyle(AppPalette.primary)

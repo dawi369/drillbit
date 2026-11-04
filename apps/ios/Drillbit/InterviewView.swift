@@ -234,7 +234,7 @@ struct InterviewView: View {
                       .animation(DrillbitMotion.fast, value: InterviewComposerIntent.isQuestion(interview.answer))
                     // Names the style, so the tappable answers below read as Guided's, not every interview's.
                     if interview.mode == .learnTogether {
-                      Text("Guided").font(.subheadline.weight(.semibold)).foregroundStyle(AppPalette.accent)
+                      Text("Guided").font(.subheadline.weight(.semibold)).foregroundStyle(AppPalette.secondary)
                         .fixedSize()
                         .accessibilityIdentifier("guidedTag")
                     }
@@ -866,7 +866,7 @@ struct InterviewView: View {
 private struct AssistanceTitleStyle: LabelStyle {
   func makeBody(configuration: Configuration) -> some View {
     HStack(spacing: 8) {
-      configuration.icon.foregroundStyle(AppPalette.accent)
+      configuration.icon.foregroundStyle(AppPalette.secondary)
       configuration.title
     }
   }
@@ -918,7 +918,7 @@ struct RoundClock: View {
         Text(over ? "+" + clock : clock).monospacedDigit().contentTransition(.numericText(countsDown: !over))
       }
       .foregroundStyle(over ? AppPalette.destructive : remaining <= 300 ? AppPalette.accent : AppPalette.secondary)
-      .animation(.snappy, value: seconds)
+      .animation(DrillbitMotion.fast, value: seconds)
       .accessibilityElement(children: .ignore)
       .accessibilityLabel(over ? "Over time by \(max(1, seconds / 60)) minutes" : "\(max(1, (seconds + 59) / 60)) minutes left")
       .accessibilityIdentifier("roundClock")
@@ -941,7 +941,7 @@ struct GuidedPathBar: View {
           }
         }
         HStack(spacing: 8) {
-          Text("Step \(index + 1) of \(steps.count)").font(.caption.monospacedDigit()).foregroundStyle(AppPalette.accent)
+          Text("Step \(index + 1) of \(steps.count)").font(.caption.monospacedDigit()).foregroundStyle(AppPalette.secondary)
           Text(steps[index]).font(.subheadline.weight(.semibold)).foregroundStyle(AppPalette.primary).lineLimit(1)
             .id(index)
             .transition(.asymmetric(insertion: .opacity.combined(with: .offset(x: 12)), removal: .opacity))
@@ -986,7 +986,7 @@ private struct GuidedPathSteps: View {
 
             }
           }
-          .padding(.vertical, 6)
+          .padding(.vertical, 4)
           .accessibilityElement(children: .ignore)
           .accessibilityLabel("Step \(step + 1)\(step < current ? ", done" : step == current ? ", you’re here" : ""): \(steps[step])")
         }

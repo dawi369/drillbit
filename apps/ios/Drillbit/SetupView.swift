@@ -85,7 +85,7 @@ struct SetupView: View {
     .id(page)
     .transition(reduceMotion ? .identity : .deal(forward: movingForward))
     .frame(maxWidth: 560, alignment: .topLeading)
-    .padding(.horizontal, 20).padding(.top, 28)
+    .padding(.horizontal, 24).padding(.top, 28)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     .clipped()
     .background(AppPalette.background)
@@ -152,8 +152,8 @@ struct SetupView: View {
     case 0:
       VStack(alignment: .leading, spacing: 12) {
         TicketStub(padding: 16) {
-          VStack(alignment: .leading, spacing: 6) {
-            Text("Scenario").font(.caption2.weight(.medium).monospaced()).textCase(.uppercase).tracking(0.8).foregroundStyle(AppPalette.accent)
+          VStack(alignment: .leading, spacing: 8) {
+            Text("Scenario").font(.caption2.weight(.medium).monospaced()).textCase(.uppercase).tracking(0.8).foregroundStyle(AppPalette.secondary)
             Text("Your side project hits Reddit. Ten thousand people open it in the same minute. What gives first?")
               .font(.headline).fixedSize(horizontal: false, vertical: true)
           }
@@ -217,10 +217,11 @@ struct SetupView: View {
     }
   }
 
-  /// Bit's one-line answer to the tap, in the amber card every page uses.
+  /// Bit's one-line answer to the tap, under the cards on every page.
   private func reaction<V: Equatable>(_ text: String, value: V, order: Int?) -> some View {
-    HStack(alignment: .top, spacing: 10) {
-      Image(systemName: "sparkle").font(.caption.weight(.semibold)).foregroundStyle(AppPalette.accent).padding(.top, 3)
+    // Bit's voice: the gold sparkle is shared with the Bit tab's lines, so keep the two alike.
+    HStack(alignment: .firstTextBaseline, spacing: 8) {
+      Image(systemName: "sparkle").font(.caption.weight(.semibold)).foregroundStyle(AppPalette.accent)
       Text(text)
         .font(.subheadline)
         .foregroundStyle(AppPalette.secondary)
@@ -410,7 +411,7 @@ private struct ChoiceCards: View {
           HStack(spacing: 12) {
             Image(systemName: option.symbol)
               .font(.system(size: 15, weight: .semibold))
-              .foregroundStyle(on ? AppPalette.actionInk : AppPalette.accent)
+              .foregroundStyle(on ? AppPalette.actionInk : AppPalette.secondary)
               .frame(width: 36, height: 36)
               .background(on ? AppPalette.action : AppPalette.inset, in: Circle())
             VStack(alignment: .leading, spacing: 2) {
@@ -422,7 +423,7 @@ private struct ChoiceCards: View {
             Image(systemName: "checkmark").font(.footnote.weight(.bold)).foregroundStyle(AppPalette.accent)
               .opacity(on ? 1 : 0).scaleEffect(on ? 1 : 0.6)
           }
-          .padding(.horizontal, 14).padding(.vertical, 12)
+          .padding(.horizontal, 16).padding(.vertical, 12)
           .frame(maxWidth: .infinity, alignment: .leading)
           .background(on ? AppPalette.accentSoft : AppPalette.surface, in: RoundedRectangle(cornerRadius: 12))
           .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(on ? AppPalette.accent : AppPalette.hairline, lineWidth: on ? 1.5 : 1) }
@@ -448,9 +449,9 @@ private struct PlanTicket: View {
     let areas = SetupView.startingAreas(level: draft.level).compactMap { id in PracticeAreaGroup.all.first { $0.id == id } }
     VStack(alignment: .leading, spacing: 16) {
       Ticket {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
           TicketHeader(number: "Your plan", detail: Date.now.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)))
-          Text(SetupView.planHeadline(level: draft.level)).font(.title3.weight(.semibold)).tracking(-0.3)
+          Text(SetupView.planHeadline(level: draft.level)).font(.title3.weight(.semibold))
           VStack(alignment: .leading, spacing: 8) {
             row("map", "Start with", areas.isEmpty ? "Whatever you’re weakest at. Drillbit picks." : areas.enumerated().map { $0.offset == 0 ? $0.element.title : $0.element.title.lowercased() }.joined(separator: ", then "))
             row("mic", "Practice", SetupView.modes.first { $0.id == draft.mode }?.title ?? "Talking it out")
@@ -470,8 +471,8 @@ private struct PlanTicket: View {
     }
   }
   private func row(_ symbol: String, _ title: String, _ value: String) -> some View {
-    HStack(alignment: .firstTextBaseline, spacing: 10) {
-      Image(systemName: symbol).font(.footnote.weight(.semibold)).foregroundStyle(AppPalette.accent).frame(width: 18)
+    HStack(alignment: .firstTextBaseline, spacing: 12) {
+      Image(systemName: symbol).font(.footnote.weight(.semibold)).foregroundStyle(AppPalette.secondary).frame(width: 20)
       Text(title).font(.subheadline).foregroundStyle(AppPalette.secondary).frame(width: 76, alignment: .leading)
       Text(value).font(.subheadline.weight(.medium)).foregroundStyle(AppPalette.primary).fixedSize(horizontal: false, vertical: true)
     }
@@ -489,7 +490,7 @@ private struct InterviewCountdown: View {
         VStack(alignment: .leading, spacing: 4) {
           HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text("\(days)")
-              .font(.system(size: numeral, weight: .bold))
+              .font(.system(size: numeral, weight: .semibold))
               .monospacedDigit()
               .contentTransition(.numericText(value: Double(days)))
               .foregroundStyle(AppPalette.accent)

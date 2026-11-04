@@ -116,13 +116,13 @@ struct DrillbitLogo: View {
   func reset() { input = 0; output = 0 }
 }
 
+/// A section label: sentence case and quiet, so the gold stays for what matters on the screen.
 struct SignalEyebrow: View {
   let text: String
   var body: some View {
-    Text(text.uppercased())
-      .font(.caption2.weight(.semibold).monospaced())
-      .tracking(1.2)
-      .foregroundStyle(AppPalette.accent)
+    Text(text)
+      .font(.footnote.weight(.semibold))
+      .foregroundStyle(AppPalette.secondary)
   }
 }
 
@@ -414,8 +414,8 @@ struct DrillbitSectionHeader: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 4) {
       if let eyebrow {
-        Text(eyebrow.uppercased())
-          .font(.caption2.weight(.semibold)).tracking(0.8)
+        Text(eyebrow)
+          .font(.footnote.weight(.semibold))
           .foregroundStyle(AppPalette.secondary)
       }
       Text(title).font(.title3.weight(.semibold))
@@ -425,26 +425,22 @@ struct DrillbitSectionHeader: View {
   }
 }
 
-/// The yellow action surface: a faint top light so it reads as something you can press, and in dark
-/// appearance a soft warm glow underneath. Disabled actions go neutral instead of dimming the yellow,
-/// which turns olive on the graphite floor.
+/// The yellow action surface, flat. Disabled actions go neutral instead of dimming the yellow, which turns olive on
+/// the graphite floor.
 private struct ActionSurface<S: InsettableShape>: ViewModifier {
   let shape: S
   let lit: Bool
   let pressed: Bool
-  @Environment(\.colorScheme) private var colorScheme
   func body(content: Content) -> some View {
     content
       .background(lit ? AppPalette.action : AppPalette.elevated, in: shape)
       .overlay {
         if lit {
-          shape.strokeBorder(LinearGradient(colors: [.white.opacity(0.45), .white.opacity(0)], startPoint: .top, endPoint: .center), lineWidth: 1)
           shape.fill(AppPalette.actionInk.opacity(pressed ? 0.08 : 0))
         } else {
           shape.strokeBorder(AppPalette.hairline, lineWidth: 0.5)
         }
       }
-      .shadow(color: AppPalette.action.opacity(lit && colorScheme == .dark ? (pressed ? 0.1 : 0.2) : 0), radius: 10, y: 3)
   }
 }
 
@@ -757,7 +753,7 @@ struct StreamingDocument: View {
       let text = Text(isEmpty ? AttributedString(" ") : segment.text)
       switch segment.style {
       case .eyebrow:
-        text.font(.caption2.weight(.semibold).monospaced()).tracking(1.2).foregroundStyle(AppPalette.accent)
+        text.font(.footnote.weight(.semibold)).foregroundStyle(AppPalette.secondary)
           .textRenderer(renderer)
       case .title:
         text.font(.largeTitle.weight(.semibold)).tracking(-0.8)
@@ -890,52 +886,12 @@ struct EmptyTabState: View {
   }
 }
 
-/// "Pro" set in gold: a warm gradient and one sweep of light when it appears. Reduce Motion keeps the gold, drops the sweep.
+/// "Pro" in the accent. Solid, so it reads as a word and not an effect.
 struct ProWordmark: View {
-  var font: Font = .body.weight(.bold)
-  @State private var sweep: CGFloat = -1
-  @Environment(\.colorScheme) private var scheme
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  private var gold: [Color] {
-    scheme == .dark
-      ? [Color(red: 1, green: 0.91, blue: 0.64), Color(red: 1, green: 0.8, blue: 0.4), Color(red: 0.91, green: 0.64, blue: 0.23)]
-      : [Color(red: 0.79, green: 0.54, blue: 0.12), Color(red: 0.6, green: 0.37, blue: 0.07)]
-  }
-  /// A small sparkle before the word, for places where Pro is the point (Settings' plan row).
-  var sparkle = false
+  var font: Font = .body.weight(.semibold)
   var body: some View {
-    HStack(spacing: 4) {
-      if sparkle {
-        Image(systemName: "sparkle").font(.caption.weight(.bold))
-          .foregroundStyle(LinearGradient(colors: gold, startPoint: .top, endPoint: .bottom))
-          .accessibilityHidden(true)
-      }
-      word
-    }
-    .shadow(color: Color(red: 1, green: 0.8, blue: 0.4).opacity(scheme == .dark ? 0.35 : 0), radius: 6)
-    .accessibilityElement(children: .ignore)
-    .accessibilityLabel("Pro")
-  }
-  private var word: some View {
-    Text("Pro")
-      .font(font)
-      .tracking(0.3)
-      .foregroundStyle(LinearGradient(colors: gold, startPoint: .topLeading, endPoint: .bottomTrailing))
-      .overlay {
-        GeometryReader { proxy in
-          LinearGradient(colors: [.clear, .white.opacity(scheme == .dark ? 0.75 : 0.5), .clear], startPoint: .leading, endPoint: .trailing)
-            .frame(width: proxy.size.width * 0.6)
-            .offset(x: sweep * proxy.size.width * 1.6)
-        }
-        .mask(Text("Pro").font(font).tracking(0.3))
-        .allowsHitTesting(false)
-        .opacity(reduceMotion ? 0 : 1)
-      }
-      .task {
-        guard !reduceMotion else { return }
-        try? await Task.sleep(for: .milliseconds(400))
-        withAnimation(.easeInOut(duration: 1.1)) { sweep = 1 }
-      }
+    Text("Pro").font(font).foregroundStyle(AppPalette.accent)
+      .accessibilityLabel("Pro")
   }
 }
 

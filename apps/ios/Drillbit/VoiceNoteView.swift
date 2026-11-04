@@ -125,7 +125,7 @@ struct VoiceNoteView: View {
         let _: VoiceNoteReceipt = try await model.api.send("feedback/voice", method: "POST", body: input, command: command)
       }
       recorder.discard(keepPhase: true)
-      withAnimation(reduceMotion ? nil : DrillbitMotion.celebrate) { sent = true }
+      withAnimation(reduceMotion ? nil : DrillbitMotion.reveal) { sent = true }
     } catch {
       failure = "Couldn’t send it. Your recording’s still here, so try again in a moment."
     }

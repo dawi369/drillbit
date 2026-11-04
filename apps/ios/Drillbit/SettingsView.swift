@@ -78,7 +78,7 @@ struct SettingsView: View {
       }
       Section("Plan") {
         LabeledContent("Plan") {
-          if model.isPro { ProWordmark(sparkle: true) } else { Text("Free") }
+          if model.isPro { ProWordmark() } else { Text("Free") }
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("planRow")

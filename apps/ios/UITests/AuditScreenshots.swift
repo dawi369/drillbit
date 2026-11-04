@@ -803,8 +803,9 @@ final class AuditScreenshots: XCTestCase {
     XCTAssertTrue(app.buttons["library-rep-recent"].waitForExistence(timeout: 10))
     Thread.sleep(forTimeInterval: 0.8)
     shot("i04-library", app)
-    // With reps in it, search is always in view under the title.
+    // With reps in it, search sits under the large title: a pull down shows it.
     let search = app.searchFields.firstMatch
+    if !(search.exists && search.isHittable) { app.swipeDown() }
     XCTAssertTrue(search.waitForExistence(timeout: 3) && search.isHittable)
     search.tap(); search.typeText("notification")
     Thread.sleep(forTimeInterval: 1)
@@ -843,7 +844,7 @@ final class AuditScreenshots: XCTestCase {
   /// The core rep at the largest accessibility size and in light mode: layout changes, nothing clips.
   func testWalkK_LargestTypeAndLight() throws {
     continueAfterFailure = false
-    var app = launch(["--fixtures", "--fixture-home-rich", "--fixture-lifetime-one-left", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
+    var app = launch(["--fixtures", "--fixture-home-rich", "--fixture-lifetime-first-spent", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
     let start = app.buttons["startPractice"]
     XCTAssertTrue(start.waitForExistence(timeout: 10))
     Thread.sleep(forTimeInterval: 1)
@@ -876,7 +877,7 @@ final class AuditScreenshots: XCTestCase {
     Thread.sleep(forTimeInterval: 0.6)
     shot("k06-rep-done-axxxl", app)
     leaveFeedback(app, "k07-feedback-axxxl")
-    // One free rep left: Pro is offered once, and Not now stays reachable at the largest size.
+    // The first free rep is spent: Pro is offered once, and Not now stays reachable at the largest size.
     XCTAssertTrue(app.descendants(matching: .any)["paywall"].waitForExistence(timeout: 8))
     Thread.sleep(forTimeInterval: 1.5)
     shot("k08-first-rep-offer-axxxl", app)

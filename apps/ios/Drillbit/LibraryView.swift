@@ -203,7 +203,7 @@ struct AttemptQuestion: View {
         Button(expanded ? "Show less" : "Show all") {
           withAnimation(reduceMotion ? nil : DrillbitMotion.reveal) { expanded.toggle() }
         }
-        .font(.subheadline.weight(.medium)).foregroundStyle(AppPalette.accent)
+        .font(.subheadline.weight(.medium)).foregroundStyle(AppPalette.primary)
         .frame(minHeight: 44)
         .accessibilityIdentifier("attemptQuestionToggle")
       }
@@ -291,7 +291,7 @@ struct LibraryView: View {
           }.accessibilityIdentifier("library-question-" + question.id)
           ForEach(Array(question.conceptIds.prefix(2)), id: \.self) { id in
             Button(model.taxonomy.first { $0.id == id }?.label ?? id) { tags = [id] }
-              .font(.caption).buttonStyle(.borderless).foregroundStyle(AppPalette.accent)
+              .font(.caption).buttonStyle(.borderless).foregroundStyle(AppPalette.secondary)
           }
         }.padding(.vertical, 8).listRowBackground(AppPalette.background)
       }

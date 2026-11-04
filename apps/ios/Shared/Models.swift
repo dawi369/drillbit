@@ -307,6 +307,13 @@ struct PracticeAccess: Codable, Sendable, Equatable {
   var resetsAt: String? = nil
   /// Free reps are a fixed number in total that never come back, rather than a daily allowance.
   var lifetime: Bool? = nil
+
+  /// Pro is offered once, after the first lifetime free rep is spent while others are still free. The offer is an
+  /// offer, never a gate, so a second chance at it would only nag.
+  func offersProAfterFirstRep(alreadyOffered: Bool) -> Bool {
+    guard !alreadyOffered, freeReps, lifetime == true, let remaining, let limit else { return false }
+    return remaining > 0 && limit - remaining == 1
+  }
 }
 struct TodayPlan: Codable, Sendable, Equatable {
   var state: String

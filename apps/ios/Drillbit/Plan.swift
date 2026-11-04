@@ -270,8 +270,6 @@ struct NativePaywallSheet: View {
 /// and Subscribe stay on screen without scrolling.
 private struct PaywallHeader: View {
   let placement: PaywallPlacement
-  @State private var glow = false
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   private static let perks: [(symbol: String, title: String)] = [
     ("infinity", "More reps, whenever it’s clicking"),
     ("waveform", "Voice mode, 20 minutes at a time"),
@@ -284,14 +282,12 @@ private struct PaywallHeader: View {
       ZStack {
         BitGlow(color: AppPalette.action, opacity: 0.28)
           .frame(width: 168, height: 168)
-          .scaleEffect(glow ? 1.08 : 0.94)
           .accessibilityHidden(true)
         BitView(greets: true).frame(width: 80, height: 92).accessibilityHidden(true)
       }
       .frame(height: 96)
       VStack(spacing: 4) {
-        Text("Drillbit Pro").font(.caption.weight(.semibold)).foregroundStyle(AppPalette.accent)
-          .textCase(.uppercase).tracking(1.2)
+        Text("Drillbit Pro").font(.footnote.weight(.semibold)).foregroundStyle(AppPalette.secondary)
         Text(placement == .voiceSession ? "Say it out loud, as often as you want."
              : placement == .knowledgeMap ? "See what you actually know."
              : placement == .firstRep ? "Your next rep’s still on us."
@@ -300,13 +296,12 @@ private struct PaywallHeader: View {
           .fixedSize(horizontal: false, vertical: true)
           .accessibilityAddTraits(.isHeader)
       }
-      VStack(alignment: .leading, spacing: 9) {
+      VStack(alignment: .leading, spacing: 8) {
         ForEach(Self.perks, id: \.title) { perk in
           HStack(spacing: 12) {
             Image(systemName: perk.symbol)
-              .font(.subheadline.weight(.semibold)).foregroundStyle(AppPalette.accent)
+              .font(.subheadline.weight(.semibold)).foregroundStyle(AppPalette.secondary)
               .frame(width: 28, height: 28)
-              .background(AppPalette.accentSoft, in: Circle())
               .accessibilityHidden(true)
             Text(perk.title).font(.subheadline.weight(.medium))
               .fixedSize(horizontal: false, vertical: true)
@@ -319,21 +314,13 @@ private struct PaywallHeader: View {
     }
     .padding(.horizontal, 16)
     .frame(maxWidth: 520)
-    .onAppear {
-      guard !reduceMotion else { return }
-      withAnimation(.easeInOut(duration: 3.2).repeatForever(autoreverses: true)) { glow = true }
-    }
   }
 }
 
-/// A warm wash from the top, so the sheet reads as Drillbit rather than a settings form.
+/// The app's own floor behind the store and the maker's note.
 private struct PaywallBackdrop: View {
   var body: some View {
-    ZStack(alignment: .top) {
-      AppPalette.background
-      LinearGradient(colors: [AppPalette.action.opacity(0.14), AppPalette.background.opacity(0)], startPoint: .top, endPoint: .center)
-    }
-    .ignoresSafeArea()
+    AppPalette.background.ignoresSafeArea()
   }
 }
 
@@ -365,7 +352,7 @@ private struct PlanPickerBody: View {
   let configuration: SubscriptionStoreControlStyleConfiguration
   @State private var selection: SubscriptionStoreControlStyleConfiguration.Option?
   var body: some View {
-    let weekly = configuration.allOptions.first { $0.subscription?.subscriptionPeriod.unit == .week }
+    let weekly = configuration.allOptions.first { $0.isWeeklyPlan }
     SubscriptionStorePicker(configuration, selection: $selection) { option in
       PlanOptionLabel(product: option.subscription, offer: option.activeOffer, weekly: weekly,
                       selected: option.subscription.id == selection?.subscription.id)
@@ -384,7 +371,7 @@ private struct PaywallCheckout: View {
   @State private var working = false
   @State private var note: String?
   private var product: StoreKit.Product { option.subscription }
-  private var yearly: Bool { product.subscription?.subscriptionPeriod.unit == .year }
+  private var yearly: Bool { product.isYearlyPlan }
   private var intro: StoreKit.Product.SubscriptionOffer? {
     guard let offer = option.activeOffer, offer.paymentMode != .freeTrial else { return nil }
     return offer
@@ -392,7 +379,10 @@ private struct PaywallCheckout: View {
   private var terms: String {
     let period = yearly ? "a year" : "a week"
     // One line: price, period and that it renews. App Review wants the renewal said; cancelling is iOS's job.
-    if let intro { return "First week \(intro.displayPrice), then \(product.displayPrice) \(period). Auto-renews." }
+    if let intro {
+      let start = intro.lastsOneWeek ? "First week \(intro.displayPrice)" : "\(intro.displayPrice) to start"
+      return "\(start), then \(product.displayPrice) \(period). Auto-renews."
+    }
     return "\(product.displayPrice) \(period). Auto-renews, cancel anytime."
   }
   var body: some View {
@@ -414,7 +404,7 @@ private struct PaywallCheckout: View {
         .accessibilityIdentifier("paywallRestore")
       // Where the money goes, in the maker's note's voice; below the buttons so Subscribe stays on screen.
       Text("Your subscription keeps Drillbit independent, the voice running and improvements coming. Thank you.")
-        .font(.footnote.italic()).foregroundStyle(AppPalette.secondary)
+        .font(.footnote).foregroundStyle(AppPalette.secondary)
         .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
         .padding(.top, 4)
         .accessibilityIdentifier("paywallThanks")
@@ -450,7 +440,7 @@ private struct PlanOptionLabel: View {
   let offer: StoreKit.Product.SubscriptionOffer?
   let weekly: StoreKit.Product?
   var selected = false
-  private var period: StoreKit.Product.SubscriptionPeriod.Unit? { product.subscription?.subscriptionPeriod.unit }
+  private var period: StoreKit.Product.SubscriptionPeriod.Unit? { product.isYearlyPlan ? .year : product.isWeeklyPlan ? .week : nil }
   private var format: Decimal.FormatStyle.Currency { product.priceFormatStyle }
 
   var body: some View {
@@ -474,10 +464,11 @@ private struct PlanOptionLabel: View {
           .background(AppPalette.action, in: Capsule())
       } else if period == .year, let weekly, let saving = PlanPricing.yearlySaving(yearly: product.price, weekly: weekly.price) {
         Text("Save \(saving)%")
-          .font(.caption.weight(.semibold))
-          .foregroundStyle(AppPalette.actionInk)
+          .font(.caption.weight(.semibold)).monospacedDigit()
+          .foregroundStyle(AppPalette.primary)
           .padding(.horizontal, 8).padding(.vertical, 4)
-          .background(AppPalette.action, in: Capsule())
+          .background(AppPalette.elevated, in: Capsule())
+          .overlay { Capsule().stroke(AppPalette.ticketEdge, lineWidth: 1) }
       }
     }
     .accessibilityElement(children: .combine)
@@ -486,8 +477,7 @@ private struct PlanOptionLabel: View {
 
   /// A one-week paid introductory offer on the weekly plan; nil otherwise.
   private var weeklyIntro: StoreKit.Product.SubscriptionOffer? {
-    guard period == .week, let offer, offer.paymentMode != .freeTrial, offer.period.unit == .week,
-          offer.period.value * offer.periodCount == 1 else { return nil }
+    guard period == .week, let offer, offer.paymentMode != .freeTrial, offer.lastsOneWeek else { return nil }
     return offer
   }
 
@@ -527,4 +517,28 @@ private final class PaywallSheetDelegate: NSObject, UIAdaptivePresentationContro
   func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
     MainActor.assumeIsolated { onSwipeDown?() }
   }
+}
+
+extension StoreKit.Product.SubscriptionPeriod {
+  /// Length in days, for the units a plan or offer here can use. The App Store may describe one week as seven days,
+  /// so plans and offers are compared by length, never by unit.
+  var days: Int? {
+    switch unit {
+    case .day: value
+    case .week: value * 7
+    case .month: value * 30
+    case .year: value * 365
+    @unknown default: nil
+    }
+  }
+}
+
+extension StoreKit.Product {
+  var isWeeklyPlan: Bool { subscription?.subscriptionPeriod.days == 7 }
+  var isYearlyPlan: Bool { subscription.map { $0.subscriptionPeriod.unit == .year || $0.subscriptionPeriod.days == 360 } ?? false }
+}
+
+extension StoreKit.Product.SubscriptionOffer {
+  /// The offer covers exactly the first week, however the App Store describes it.
+  var lastsOneWeek: Bool { (period.days ?? 0) * periodCount == 7 }
 }

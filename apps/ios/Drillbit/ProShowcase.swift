@@ -33,7 +33,8 @@ struct ProShowcaseView: View {
           ConstellationMap(nodes: nodes, selected: .constant(nil), appeared: appeared)
             .allowsHitTesting(false)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(mapSummary(nodes))
+            // The line under it reads the map out; this only names it, so VoiceOver doesn't say it twice.
+            .accessibilityLabel("Your knowledge map")
             .accessibilityIdentifier("showcaseMap")
             .padding(.horizontal, 4)
           reaction(mapSummary(nodes)).padding(.horizontal, 20)
@@ -131,7 +132,7 @@ struct ProShowcaseView: View {
 
   /// What happens to the money, in order, for the plan that's selected. Prices come from the product.
   private func steps(for product: StoreKit.Product) -> (title: String, steps: [Step]) {
-    let yearly = product.subscription?.subscriptionPeriod.unit == .year
+    let yearly = product.isYearlyPlan
     let cancel = Step(when: "Anytime", what: "Cancel in your iPhone’s Settings. Pro stays until the time you paid for runs out.", symbol: "xmark.circle")
     if yearly {
       return ("How it works", [
@@ -140,7 +141,7 @@ struct ProShowcaseView: View {
         cancel,
       ])
     }
-    if let intro = introOffer(product) {
+    if let intro = firstWeek(product) {
       return ("How your first week works", [
         Step(when: "Today", what: "\(intro.displayPrice) for your first week. All of Pro opens up.", symbol: "lock.open"),
         Step(when: "Day 8", what: "\(product.displayPrice) a week from then, unless you cancel.", symbol: "arrow.clockwise"),
@@ -191,7 +192,7 @@ struct ProShowcaseView: View {
   // MARK: Plans
 
   private var selectedProduct: StoreKit.Product? { products.first { $0.id == selection } }
-  private var weekly: StoreKit.Product? { products.first { $0.subscription?.subscriptionPeriod.unit == .week } }
+  private var weekly: StoreKit.Product? { products.first { $0.isWeeklyPlan } }
 
   private func introOffer(_ product: StoreKit.Product) -> StoreKit.Product.SubscriptionOffer? {
     guard introEligible.contains(product.id), let offer = product.subscription?.introductoryOffer, offer.paymentMode != .freeTrial else { return nil }
@@ -231,7 +232,7 @@ struct ProShowcaseView: View {
 
   private func planCard(_ product: StoreKit.Product) -> some View {
     let selected = product.id == selection
-    let yearly = product.subscription?.subscriptionPeriod.unit == .year
+    let yearly = product.isYearlyPlan
     let saving = yearly ? weekly.flatMap { PlanPricing.yearlySaving(yearly: product.price, weekly: $0.price) } : nil
     let intro = firstWeek(product)
     let tag = intro.map { "First week \($0.displayPrice)" } ?? saving.map { "Save \($0)%" }
@@ -279,8 +280,8 @@ struct ProShowcaseView: View {
 
   /// The weekly plan's one-week intro price, when this account can still have it.
   private func firstWeek(_ product: StoreKit.Product) -> StoreKit.Product.SubscriptionOffer? {
-    guard product.subscription?.subscriptionPeriod.unit == .week, let intro = introOffer(product),
-          intro.period.unit == .week, intro.period.value * intro.periodCount == 1 else { return nil }
+    guard product.isWeeklyPlan, let intro = introOffer(product),
+          intro.lastsOneWeek else { return nil }
     return intro
   }
 
@@ -298,9 +299,10 @@ struct ProShowcaseView: View {
 
   /// The terms App Review wants next to the button, the button, then Restore and the legal links.
   private func checkout(_ product: StoreKit.Product) -> some View {
-    let yearly = product.subscription?.subscriptionPeriod.unit == .year
+    let yearly = product.isYearlyPlan
     let intro = introOffer(product)
-    let terms = intro.map { "First week \($0.displayPrice), then \(product.displayPrice) a week. Auto-renews." }
+    let terms = firstWeek(product).map { "First week \($0.displayPrice), then \(product.displayPrice) a week. Auto-renews." }
+      ?? intro.map { "\($0.displayPrice) to start, then \(product.displayPrice) \(yearly ? "a year" : "a week"). Auto-renews." }
       ?? "\(product.displayPrice) \(yearly ? "a year" : "a week"). Auto-renews, cancel anytime."
     return VStack(spacing: 12) {
       Text(terms).font(.footnote).foregroundStyle(AppPalette.secondary)

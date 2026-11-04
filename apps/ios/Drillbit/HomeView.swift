@@ -147,8 +147,7 @@ struct HomeView: View {
     VStack(alignment: .leading, spacing: 4) {
       HStack(alignment: .center) {
         Text(Date.now.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)))
-          .font(.caption.weight(.medium).monospaced()).textCase(.uppercase).tracking(0.8)
-          .foregroundStyle(AppPalette.secondary)
+          .font(.subheadline).foregroundStyle(AppPalette.secondary)
         Spacer()
         Button("Settings", systemImage: AppIcon.settings.rawValue, action: openSettings)
           .labelStyle(.iconOnly)
@@ -156,7 +155,7 @@ struct HomeView: View {
           .accessibilityIdentifier("homeSettings")
       }
       Text(Date.now.formatted(.dateTime.weekday(.wide)))
-        .font(.largeTitle.weight(.bold)).tracking(-0.6)
+        .font(.largeTitle.weight(.semibold)).tracking(-0.6)
         .accessibilityAddTraits(.isHeader)
       HStack(alignment: .top, spacing: 0) {
         Text(subtitle).font(.subheadline).foregroundStyle(AppPalette.secondary)
@@ -296,7 +295,7 @@ struct HomeView: View {
       Ticket {
         VStack(alignment: .leading, spacing: 12) {
           TicketHeader(number: nextNumber, detail: shortDate)
-          Text(next.map { AppModel.freeRepLine($0) } ?? AppModel.lifetimeSpentLine).font(.title2.weight(.semibold)).tracking(-0.4)
+          Text(next.map { AppModel.freeRepLine($0) } ?? AppModel.lifetimeSpentLine).font(.title2.weight(.semibold))
             .fixedSize(horizontal: false, vertical: true)
           ProNudge(message: next == nil ? "Your reps stay in Library and Recall. Pro gets you practising again." : "Recall and Library are still open in the meantime. Pro skips the wait.",
                    placement: .practiceRep) { await model.refresh() }
@@ -406,7 +405,7 @@ struct HomeView: View {
             if let milestoneImage {
               ShareLink(item: milestoneImage, message: Text("\(milestone) Practising system design on Drillbit."),
                         preview: SharePreview(String(format: "Drillbit No. %03d", ticket), image: milestoneImage)) {
-                Image(systemName: "square.and.arrow.up").font(.body.weight(.semibold)).foregroundStyle(AppPalette.accent)
+                Image(systemName: "square.and.arrow.up").font(.body.weight(.semibold)).foregroundStyle(AppPalette.primary)
                   .frame(width: 44, height: 44).contentShape(Rectangle())
               }
               .accessibilityLabel("Share milestone")
@@ -467,8 +466,7 @@ struct HomeView: View {
             .font(.subheadline).foregroundStyle(AppPalette.secondary).lineLimit(introducing ? 3 : 2).multilineTextAlignment(.leading)
         }
         Spacer(minLength: 8)
-        Text("\(plan.dueRecallCount) due").font(.caption.weight(.medium).monospaced()).textCase(.uppercase)
-          .foregroundStyle(AppPalette.accent)
+        Text("\(plan.dueRecallCount) due").font(.subheadline).foregroundStyle(AppPalette.secondary)
         Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary).accessibilityHidden(true)
       }
       .padding(16)

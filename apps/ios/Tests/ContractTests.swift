@@ -121,6 +121,24 @@ struct ContractTests {
     #expect(first.id == "daily-practice-2026-03-08")
   }
 
+  @Test func proIsOfferedOnceAfterTheFirstFreeRep() {
+    let fresh = PracticeAccess(plan: "free", freeReps: true, available: true, remaining: 3, limit: 3, lifetime: true)
+    var afterFirst = fresh; afterFirst.remaining = 2
+    var afterSecond = fresh; afterSecond.remaining = 1
+    var spent = fresh; spent.remaining = 0; spent.available = false
+    #expect(!fresh.offersProAfterFirstRep(alreadyOffered: false), "Nothing finished yet")
+    #expect(afterFirst.offersProAfterFirstRep(alreadyOffered: false))
+    #expect(!afterFirst.offersProAfterFirstRep(alreadyOffered: true), "Once per account")
+    #expect(!afterSecond.offersProAfterFirstRep(alreadyOffered: false), "Only after the first")
+    #expect(!spent.offersProAfterFirstRep(alreadyOffered: false), "Spent reps get the gate, not the offer")
+    var two = PracticeAccess(plan: "free", freeReps: true, available: true, remaining: 1, limit: 2, lifetime: true)
+    #expect(two.offersProAfterFirstRep(alreadyOffered: false), "Whatever the limit")
+    two.lifetime = false
+    #expect(!two.offersProAfterFirstRep(alreadyOffered: false), "Daily reps come back, so there's no first-rep offer")
+    let pro = PracticeAccess(plan: "pro", freeReps: false, available: true)
+    #expect(!pro.offersProAfterFirstRep(alreadyOffered: false))
+  }
+
   @Test func reminderScheduleRotatesLinesWithoutReshuffling() throws {
     let now = ISO8601DateFormatter().date(from: "2026-11-03T08:00:00Z")!
     let schedule = reminderSchedule(minutes: 750, timezone: "Europe/Prague", from: now)

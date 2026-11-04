@@ -86,16 +86,12 @@ import WidgetKit
     // The count has to include the rep just finished; a bootstrap from before it was written still has it free.
     if !fixture { await refresh() }
     guard let account = bootstrap?.account.id, !finished.isWarmUp, finished.lifecycle == "completed",
-      let practice = bootstrap?.practice, practice.freeReps, lifetimeFreeReps,
-      let remaining = practice.remaining, let limit = practice.limit, remaining > 0, limit - remaining == 1 else { return }
+      let practice = bootstrap?.practice else { return }
     // Fixtures share one account id across runs, so they remember the offer for this launch only.
-    if fixture {
-      guard proOfferedThisLaunch.insert(account).inserted else { return }
-    } else {
-      let key = Self.proOfferedKey + account
-      guard !UserDefaults.standard.bool(forKey: key) else { return }
-      UserDefaults.standard.set(true, forKey: key)
-    }
+    let key = Self.proOfferedKey + account
+    let offered = fixture ? proOfferedThisLaunch.contains(account) : UserDefaults.standard.bool(forKey: key)
+    guard practice.offersProAfterFirstRep(alreadyOffered: offered) else { return }
+    if fixture { proOfferedThisLaunch.insert(account) } else { UserDefaults.standard.set(true, forKey: key) }
     reminderHeldBack = true
     PlanCoordinator.shared.register(.firstRep) { [weak self] in await self?.refresh() }
   }
@@ -1673,10 +1669,10 @@ import WidgetKit
       bootstrap?.account.plan = "free"
       bootstrap?.practice = PracticeAccess(plan: "free", freeReps: true, available: true, nextFreeRepAt: nil, remaining: 3, limit: 3, resetsAt: nil, lifetime: true)
     }
-    // Production's model with one of three lifetime free reps left.
-    if ProcessInfo.processInfo.arguments.contains("--fixture-lifetime-one-left") {
+    // Production's model once the first rep was prepared: two of three lifetime free reps left.
+    if ProcessInfo.processInfo.arguments.contains("--fixture-lifetime-first-spent") {
       bootstrap?.account.plan = "free"
-      bootstrap?.practice = PracticeAccess(plan: "free", freeReps: true, available: true, nextFreeRepAt: nil, remaining: 1, limit: 3, resetsAt: nil, lifetime: true)
+      bootstrap?.practice = PracticeAccess(plan: "free", freeReps: true, available: true, nextFreeRepAt: nil, remaining: 2, limit: 3, resetsAt: nil, lifetime: true)
     }
     if ProcessInfo.processInfo.arguments.contains("--fixture-free-reps") {
       bootstrap?.account.plan = "free"

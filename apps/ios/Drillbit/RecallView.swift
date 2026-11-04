@@ -439,12 +439,12 @@ struct RecallView: View {
             HStack(alignment: .top, spacing: 12) {
               Image(systemName: evidence?.signal == "demonstrated" ? "checkmark.circle" : evidence?.signal == "needs_practice" ? "arrow.clockwise.circle" : "circle")
                 .foregroundStyle(evidence == nil ? .tertiary : .primary).frame(width: 20)
-              VStack(alignment: .leading, spacing: 3) {
+              VStack(alignment: .leading, spacing: 4) {
                 Text(concept.label).font(.body.weight(.medium))
                 Text(mapStatus(concept: concept, coverage: coverage, evidence: evidence)).font(.subheadline).foregroundStyle(.secondary)
               }
               Spacer()
-            }.padding(.vertical, 10)
+            }.padding(.vertical, 12)
             if concept.id != concepts.last?.id { Divider().padding(.leading, 32) }
           }
         }

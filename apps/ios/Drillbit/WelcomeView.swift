@@ -9,7 +9,6 @@ struct WelcomeView: View {
   @State private var page = 0
   @State private var storyDone = false
   @State private var exampleDone = false
-  @State private var glow = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
@@ -32,17 +31,11 @@ struct WelcomeView: View {
           let frame = proxy[anchor]
           BitGlow(color: AppPalette.action, opacity: 0.22)
             .frame(width: frame.width * 2.2, height: frame.width * 2.2)
-            .scaleEffect(glow ? 1.25 : 0.9)
-            .opacity(glow ? 1 : 0.55)
             .position(x: frame.midX, y: frame.midY)
             .allowsHitTesting(false)
         }
       }
       .ignoresSafeArea()
-    }
-    .onAppear {
-      guard !reduceMotion else { glow = true; return }
-      withAnimation(.easeInOut(duration: 3.2).repeatForever(autoreverses: true)) { glow = true }
     }
     .safeAreaInset(edge: .bottom, spacing: 0) {
       // Each page's way on fades up once that page has played out: Continue, then Get started. The bar keeps its
@@ -155,7 +148,7 @@ private struct SeparatorSlide: View {
   private var loop: some View {
     let count = Self.rounds.count
     let spotOn = lit > count
-    return VStack(alignment: .leading, spacing: 18) {
+    return VStack(alignment: .leading, spacing: 16) {
       GeometryReader { proxy in
         let width = proxy.size.width - 2 * Self.railInset
         let step = width / CGFloat(count - 1)
@@ -172,8 +165,7 @@ private struct SeparatorSlide: View {
             Circle()
               .fill(spot ? AppPalette.action : on ? AppPalette.primary : AppPalette.inset)
               .overlay { Circle().strokeBorder(on ? Color.clear : AppPalette.hairline, lineWidth: 1) }
-              .frame(width: spot ? 18 : 12, height: spot ? 18 : 12)
-              .shadow(color: AppPalette.action.opacity(spot ? 0.6 : 0), radius: 12)
+              .frame(width: spot ? 20 : 12, height: spot ? 20 : 12)
               .scaleEffect(on ? 1 : 0.6)
               .opacity(railDrawn ? 1 : 0)
               .position(x: CGFloat(index) * step, y: proxy.size.height / 2)
@@ -190,18 +182,18 @@ private struct SeparatorSlide: View {
           let spot = index == Self.spotlight && spotOn
           Text(Self.rounds[index])
             .font(.caption.weight(spot ? .semibold : .medium))
-            .foregroundStyle(spot ? AppPalette.accent : on ? AppPalette.primary.opacity(0.85) : AppPalette.secondary)
+            .foregroundStyle(spot ? AppPalette.primary : on ? AppPalette.primary.opacity(0.85) : AppPalette.secondary)
             .lineLimit(1).fixedSize()
             .opacity(on ? 1 : 0.5)
             .position(x: Self.railInset + CGFloat(index) * step, y: proxy.size.height / 2)
         }
       }
-      .frame(height: 18)
+      .frame(height: 20)
       VStack(spacing: 4) {
         Text("System design")
           .font(.title3.weight(.semibold)).foregroundStyle(AppPalette.primary)
         Text("The one most people walk into cold.")
-          .font(.subheadline).foregroundStyle(AppPalette.accent)
+          .font(.subheadline).foregroundStyle(AppPalette.secondary)
       }
       .multilineTextAlignment(.center)
       .frame(maxWidth: .infinity)
@@ -474,7 +466,7 @@ struct AIConsentSheet: View {
           .buttonStyle(PracticeButtonStyle())
           .accessibilityIdentifier("aiConsentAgree")
         Button("Not now") { onAnswer(false) }
-          .font(.body.weight(.semibold)).foregroundStyle(AppPalette.accent)
+          .font(.body.weight(.semibold)).foregroundStyle(AppPalette.primary)
           .frame(minHeight: 44)
           .accessibilityIdentifier("aiConsentNotNow")
       }
@@ -504,7 +496,7 @@ struct AIDataView: View {
 struct AIDisclosure: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
-      Label("Bit runs on outside AI.", systemImage: "sparkles")
+      Text("Bit runs on outside AI.")
         .font(.subheadline.weight(.semibold))
         .fixedSize(horizontal: false, vertical: true)
       Text("What you write goes to AI models through OpenRouter. When you talk, your voice goes to OpenAI. They get what the interview needs to reply. We never sell it or use it for ads.")

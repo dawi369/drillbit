@@ -44,6 +44,7 @@ struct LibraryHomeView: View {
     .containerBackground(AppPalette.background, for: .navigation)
     .navigationTitle("Library")
     .navigationSubtitle(statsLine ?? "")
+    .navigationBarTitleDisplayMode(.large)
     .modifier(LibrarySearch(text: $search, shown: !reps.isEmpty))
     .toolbar {
       Menu {
@@ -107,8 +108,8 @@ struct LibraryHomeView: View {
 
   private func chip(label: String, count: Int?, stale: Bool, selected: Bool, action: @escaping () -> Void) -> some View {
     Button(action: action) {
-      HStack(spacing: 6) {
-        if stale { Circle().fill(AppPalette.accent).frame(width: 6, height: 6).accessibilityHidden(true) }
+      HStack(spacing: 8) {
+        if stale { Circle().fill(AppPalette.secondary).frame(width: 6, height: 6).accessibilityHidden(true) }
         Text(label).font(.subheadline.weight(.medium))
         if let count { Text("\(count)").font(.subheadline.monospacedDigit()).opacity(0.65) }
       }
@@ -160,13 +161,14 @@ struct LibraryHomeView: View {
           .lineLimit(typeSize.isAccessibilitySize ? nil : 2).fixedSize(horizontal: false, vertical: true)
         if !typeSize.isAccessibilitySize { Spacer(minLength: 8) }
         Button { openRetry(item.rep) } label: {
-          HStack(spacing: 6) {
-            if loadingRetry == item.rep.id { ProgressView().controlSize(.small).tint(AppPalette.actionInk) }
+          HStack(spacing: 8) {
+            if loadingRetry == item.rep.id { ProgressView().controlSize(.small) }
             Text("Try again").lineLimit(1).fixedSize()
           }
-          .font(.subheadline.weight(.semibold)).foregroundStyle(AppPalette.actionInk)
+          .font(.subheadline.weight(.semibold)).foregroundStyle(AppPalette.primary)
           .padding(.horizontal, 16).frame(minHeight: 36)
-          .background(AppPalette.action, in: Capsule())
+          .background(AppPalette.elevated, in: Capsule())
+          .overlay { Capsule().stroke(AppPalette.hairline, lineWidth: 0.5) }
           .frame(minHeight: 44).contentShape(Capsule())
         }
         .buttonStyle(DrillbitPressStyle())
@@ -317,13 +319,14 @@ struct QuestionRetrySheet: View {
   }
 }
 
-/// Search sits in view under the title whenever there's something to search, and is absent before the first rep.
+/// Search tucks under the large title until you pull down, like Mail and Notes, and is absent before the first rep.
+/// Pinning it (`.always`) made the tab open with its large title already collapsed, as if scrolled.
 private struct LibrarySearch: ViewModifier {
   @Binding var text: String
   let shown: Bool
   func body(content: Content) -> some View {
     if shown {
-      content.searchable(text: $text, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search your questions")
+      content.searchable(text: $text, placement: .navigationBarDrawer(displayMode: .automatic), prompt: "Search your questions")
     } else {
       content
     }

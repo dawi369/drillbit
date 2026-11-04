@@ -74,7 +74,7 @@ struct Ticket<Content: View, Stub: View>: View {
   var body: some View {
     VStack(spacing: 0) {
       content()
-        .padding(.horizontal, 20).padding(.top, 18).padding(.bottom, 20)
+        .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
           TicketHalf(perforation: .bottom)
@@ -84,7 +84,7 @@ struct Ticket<Content: View, Stub: View>: View {
             .overlay { TicketHalf(perforation: .bottom).stroke(foil ? AppPalette.accent.opacity(0.5) : AppPalette.ticketEdge, lineWidth: 1) }
         }
       stub()
-        .padding(.horizontal, 20).padding(.top, 14).padding(.bottom, 16)
+        .padding(.horizontal, 20).padding(.vertical, 16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
           TicketHalf(perforation: .top).fill(AppPalette.ticketStub)
@@ -100,7 +100,7 @@ struct Ticket<Content: View, Stub: View>: View {
 
 /// A ticket that is only a stub: the torn-off part that carries your words.
 struct TicketStub<Content: View>: View {
-  var padding: CGFloat = 22
+  var padding: CGFloat = 24
   @ViewBuilder var content: () -> Content
   var body: some View {
     content()
@@ -208,7 +208,7 @@ struct KeyFacts<Content: View>: View {
         .accessibilityAddTraits(.isHeader)
       content()
     }
-    .padding(.horizontal, 16).padding(.vertical, 14)
+    .padding(16)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(AppPalette.inset, in: RoundedRectangle(cornerRadius: 12))
   }

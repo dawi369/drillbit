@@ -70,7 +70,7 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.staticTexts["12 reps · 4 this week"].exists)
     XCTAssertTrue(app.buttons["libraryArea-Queues & streams"].exists)
     XCTAssertTrue(app.staticTexts["Say what a retry does when the first delivery already went out."].exists)
-    XCTAssertTrue(app.staticTexts["THIS WEEK"].exists)
+    XCTAssertTrue(app.staticTexts["This week"].exists)
     app.buttons["Library menu"].tap()
     XCTAssertTrue(app.buttons["Skipped questions"].waitForExistence(timeout: 3))
     XCTAssertFalse(app.buttons["Practice evidence"].exists)
@@ -1947,7 +1947,7 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.buttons["todayDone"].waitForExistence(timeout: 8))
     XCTAssertTrue(app.buttons["oneMore"].waitForExistence(timeout: 5))
     XCTAssertFalse(app.descendants(matching: .any)["confirmDialog"].waitForExistence(timeout: 3))
-    // Rep two: its feedback leads straight Home. The offer was once.
+    // Rep two: its feedback leads straight Home. (The once-per-account rule is covered by the core tests.)
     app.buttons["oneMore"].tap()
     XCTAssertTrue(app.buttons["submitPreparation"].waitForExistence(timeout: 5))
     app.buttons["submitPreparation"].tap()
@@ -2056,7 +2056,7 @@ final class PracticeUITests: XCTestCase {
   func testSkippingAFreeRepNeverOffersPro() throws {
     continueAfterFailure = false
     let app = XCUIApplication()
-    app.launchArguments = ["--fixtures", "--fixture-customer", "--fixture-lifetime-one-left"]
+    app.launchArguments = ["--fixtures", "--fixture-customer", "--fixture-lifetime-first-spent"]
     app.launch()
     XCTAssertTrue(app.buttons["startPractice"].waitForExistence(timeout: 10))
     app.buttons["startPractice"].tap()
