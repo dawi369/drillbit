@@ -62,8 +62,10 @@ The paywall reads everything from the products, so nothing in code changes with 
 5. App Information → **App Store Server Notifications**: Production and Sandbox URL `https://<prod-host>/apple/notifications`, Version 2. Leave `APPLE_ENVIRONMENT` unset on production; App Review buys with Sandbox accounts against your production Worker.
 
 What the paywall already does for Guideline 3.1.2 (no work needed; listed so you can answer reviewer questions):
-- Shows each plan's name, period and full price. The yearly price comes first and is bigger than the per-month figure.
-- Shows the intro offer as "Try a week for $X, then $Y a week".
+- There are two places to buy, and both carry every disclosure: the Pro sheet (Home, Settings, voice, the first-rep offer) and the Bit tab's showcase for free accounts (`ProShowcase.swift`). Apple allows several purchase screens; each one has to stand on its own.
+- Shows each plan's name, period and full billed price. Weekly comes first and is selected; the billed price ($7.99 / week, $99.99 / year) is always the largest figure, as App Review expects. The yearly per-week figure is secondary.
+- Shows the intro offer as "$1.99 to start, then $7.99 a week", a "First week $1.99" tag, "First week $1.99, then $7.99 a week. Auto-renews." above the button, and "Start for $1.99". The Bit tab adds a "How your first week works" timeline (Today, Day 8, Anytime). The intro only shows to accounts Apple says are eligible.
+- Plans and offers are matched by length in days, because the App Store can report a week as seven days (seen in the sandbox on 3 November).
 - Has Restore Purchases, Terms of Service (Apple's standard EULA) and Privacy Policy links, plus a clear Not now.
 - Settings has Plan, See Pro or Manage subscription, Terms and Privacy. Restore lives on the paywall (Settings → See Pro → Restore).
 - The Worker unlocks Pro only from Apple-signed transactions (`POST /v1/entitlement`) and keeps it current from Apple's notifications.
@@ -169,7 +171,8 @@ Install the production build on an iPhone signed into a **Sandbox** Apple ID (Se
 - [ ] Only Sign in with Apple is offered (Google and GitHub come back once production OAuth apps exist in Clerk)
 - [ ] Answer, follow-up, nudge, Finish → feedback
 - [ ] Voice: microphone prompt, live conversation, back to text with the draft intact; a free account stops at the cap
-- [ ] Use both free reps → Home shows the paywall nudge → See Pro → paywall shows real prices and intro offer → buy weekly → Pro without relaunch
+- [ ] Use all three free reps → Home shows the paywall nudge → See Pro → paywall shows real prices and intro offer → buy weekly → Pro without relaunch
+- [ ] Free account → Bit tab → showcase shows real prices, "First week $1.99" and the timeline → Restore, Terms and Privacy open → buying turns the tab into the map
 - [ ] Delete and reinstall → sign in → See Pro → Restore → Pro
 - [ ] Settings → Manage subscription opens Apple's sheet; cancel there and check that the plan returns to Free after expiry (sandbox weeks last minutes)
 - [ ] `SELECT * FROM entitlements` in production D1 shows the row with `environment = Sandbox`
