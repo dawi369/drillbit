@@ -1,5 +1,7 @@
 # Development and operations
 
+App Store review (what reviewers get, pre-submit checks, rejections): [apple-review.md](apple-review.md).
+
 ## Local verification
 
 Prerequisites: Bun, Xcode 26+, a matching iOS simulator runtime, and XcodeGen (`brew install xcodegen`).
