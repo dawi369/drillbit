@@ -216,15 +216,37 @@ export async function provider(
       "AI could not finish. Your answer is safe. Try again.",
     );
   }
-  if (!response.ok)
-    throw new Fault(
-      response.status === 401 ? "credential_invalid" : "provider_unavailable",
-      response.status === 401 ? 422 : 503,
-      response.status === 401
-        ? "Your OpenRouter key was rejected. Replace it in Settings."
-        : "AI is unavailable or its limit was reached. Try again later.",
-    );
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    const fault = providerFault(response.status, detail, settings.aiMode === "managed");
+    // OpenRouter's error text names the policy or limit, never practice content.
+    console.error(JSON.stringify({ event: "provider_rejected", model, status: response.status, code: fault.code, detail: detail.slice(0, 300) }));
+    throw fault;
+  }
   return response;
+}
+
+/**
+ * Turns an OpenRouter rejection into a Fault the operator can tell apart. On the managed key, credits, budgets,
+ * guardrails and a revoked key are our configuration, so they stay 503 (reported to Sentry) under their own code.
+ * On a BYOK key they're the user's to fix, so they're 422 with a message pointing at Settings.
+ */
+export function providerFault(status: number, detail: string, managed: boolean): Fault {
+  const limit = /\b(limit|budget)\b/i.test(detail);
+  const kind =
+    status === 401 ? "key"
+    : status === 402 && !limit ? "credits"
+    : (status === 402 || status === 403) && limit ? "budget"
+    : (status === 403 || status === 404) && /guardrail|data policy/i.test(detail) ? "policy"
+    : undefined;
+  if (!kind) return new Fault("provider_unavailable", 503, "AI is unavailable right now. Your answer is safe. Try again later.");
+  if (managed)
+    return new Fault(`managed_${kind === "key" ? "key_rejected" : kind === "credits" ? "out_of_credits" : kind === "budget" ? "budget_reached" : "policy_blocked"}`, 503,
+      "AI is unavailable right now. Your answer is safe. Try again later.");
+  return kind === "key" ? new Fault("credential_invalid", 422, "Your OpenRouter key was rejected. Replace it in Settings.")
+    : kind === "credits" ? new Fault("credential_out_of_credits", 422, "Your OpenRouter key is out of credits. Top it up or replace it in Settings.")
+    : kind === "budget" ? new Fault("credential_limit_reached", 422, "Your OpenRouter key hit its spending limit. Raise it or replace the key in Settings.")
+    : new Fault("credential_policy_blocked", 422, "Your OpenRouter guardrails block this model. Allow it in OpenRouter or pick another model in Settings.");
 }
 export async function structured<T>(
   env: Env,
