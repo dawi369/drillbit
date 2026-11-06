@@ -7,10 +7,10 @@ import { INTERVIEW_PROMPT_VERSION, interviewerPrompt, isSocialOpening, socialOpe
 import { personalizationInstructions } from "./prompts/personalization";
 import { endingPolicy, teachingPolicy } from "./prompts/teaching";
 export type ModelMessage = { role: "system" | "user" | "assistant"; content: string };
-const contextualInterviewVersions = ["interviewer-standard-v4", "interviewer-standard-v5", "interviewer-teaching-v1", "interviewer-teaching-v2", "interviewer-teaching-v3", "interviewer-teaching-v4", "interviewer-teaching-v5", "interviewer-teaching-v6"];
-const teachingInterviewVersions = ["interviewer-teaching-v1", "interviewer-teaching-v2", "interviewer-teaching-v3", "interviewer-teaching-v4", "interviewer-teaching-v5", "interviewer-teaching-v6"];
+const contextualInterviewVersions = ["interviewer-standard-v4", "interviewer-standard-v5", "interviewer-teaching-v1", "interviewer-teaching-v2", "interviewer-teaching-v3", "interviewer-teaching-v4", "interviewer-teaching-v5", "interviewer-teaching-v6", "interviewer-teaching-v7"];
+const teachingInterviewVersions = ["interviewer-teaching-v1", "interviewer-teaching-v2", "interviewer-teaching-v3", "interviewer-teaching-v4", "interviewer-teaching-v5", "interviewer-teaching-v6", "interviewer-teaching-v7"];
 /** Editions that return move, parameters and the Guided/Mock fields. */
-const structuredInterviewVersions = ["interviewer-teaching-v4", "interviewer-teaching-v5", "interviewer-teaching-v6"];
+const structuredInterviewVersions = ["interviewer-teaching-v4", "interviewer-teaching-v5", "interviewer-teaching-v6", "interviewer-teaching-v7"];
 export async function modelAccess(
   env: Env,
   account: string,
@@ -274,7 +274,7 @@ export async function structured<T>(
   await recordUsage(env, account, settings, kind, body.usage, kind === "summarize" ? "feedback-v4" : "companion-v1");
   try {
     const output = schema.parse(
-      JSON.parse(body.choices?.[0]?.message?.content ?? ""),
+      plainDashesDeep(JSON.parse(body.choices?.[0]?.message?.content ?? "")),
     );
     return output;
   } catch {
@@ -301,10 +301,11 @@ export async function streamedStructured<T>(
   // One write in flight at a time, and whatever arrived meanwhile goes out as soon as it lands:
   // a provider that streams in big chunks must never leave the preview a chunk behind until the next one.
   const flush = () => {
-    if (publishing || published === raw) return;
-    const write = publish(raw);
+    const clean = plainDashes(raw);
+    if (publishing || published === clean) return;
+    const write = publish(clean);
     if (!write) return;
-    published = raw;
+    published = clean;
     publishing = Promise.all([write, new Promise(r => setTimeout(r, 120))])
       .catch(() => {})
       .finally(() => { publishing = undefined; flush(); });
@@ -317,9 +318,9 @@ export async function streamedStructured<T>(
   }
   while (publishing) await publishing;
   // The model has stopped writing: the preview can settle now, while the job finishes its bookkeeping.
-  await publish(raw, true)?.catch(() => {});
+  await publish(plainDashes(raw), true)?.catch(() => {});
   try {
-    return schema.parse(parseModelJSON(raw));
+    return schema.parse(plainDashesDeep(parseModelJSON(raw)));
   } catch {
     throw new Fault(
       "invalid_output",
@@ -464,6 +465,30 @@ export function partialJSONStrings(raw: string, key: string): string[] {
   return items.filter(Boolean);
 }
 /** Strict-schema output whose object a provider left unclosed; the schema still decides what is accepted. */
+/**
+ * Model text never carries em dashes; people don't type them in chat. A dash between words becomes a comma, a range
+ * between numbers a hyphen. Works on raw JSON as it streams (escaped dashes included) and on decoded strings.
+ */
+export function plainDashes(text: string): string {
+  // A marker stands in for each dash, so only commas this adds are ever tidied; JSON's own commas stay put.
+  const mark = "\u0001";
+  return text
+    .replace(/\\u2014/gi, "—").replace(/\\u2013/gi, "–")
+    .replace(/(\d)\s*[–—]\s*(\d)/g, "$1-$2")
+    .replace(/\s*—\s*/g, mark).replace(/\s+–\s+/g, mark)
+    .replace(/\u0001+/g, mark)
+    .replace(/,?\s*\u0001\s*(?=[.!?;:]|$)/g, "")
+    .replace(/,\s*\u0001/g, ", ")
+    .replace(/\u0001/g, ", ");
+}
+/** `plainDashes` on every string in a parsed result, except the person's own quoted words. */
+export function plainDashesDeep<T>(value: T, key?: string): T {
+  if (typeof value === "string") return (key === "quote" ? value : plainDashes(value)) as T;
+  if (Array.isArray(value)) return value.map(item => plainDashesDeep(item)) as T;
+  if (value && typeof value === "object")
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, plainDashesDeep(v, k)])) as T;
+  return value;
+}
 export function parseModelJSON(raw: string): unknown {
   try { return JSON.parse(raw); } catch (error) {
     try { return JSON.parse(raw.trimEnd() + "}"); } catch { throw error; }
@@ -542,14 +567,14 @@ export async function streamedInterview(env: Env, account: string, settings: Set
     if (raw.length > 50000) throw new Error("oversized_stream");
     // A reply padding whitespace will only stop at the token limit; what came before is all there is.
     if (runaway(raw)) { controller.abort(); break; }
-    const text = partialInterviewText(raw);
+    const text = plainDashes(partialInterviewText(raw));
     if (text && first) { first = false; console.info(JSON.stringify({event: "inference_first_text", model: settings.aiMode === "byok" ? "byok" : managedModel("interview"), afterHeadersMs: Date.now() - started})); }
     if (text !== last && Date.now() - updated >= 150) { enqueue(text); last = text; updated = Date.now(); }
   }
   } finally {
     while (publishing) await publishing;
   }
-  const output = parseInterviewModelResult(context, schema, parseModelJSON(raw));
+  const output = parseInterviewModelResult(context, schema, plainDashesDeep(parseModelJSON(raw)));
   while (publishing) await publishing;
   if (failure) throw failure;
   await publish(output.text);

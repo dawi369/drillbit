@@ -108,7 +108,9 @@ final class LiveWalkthrough: XCTestCase {
     // Home, or the first question's preview rising over setup.
     if !resumed, !app.buttons["previewStart"].waitForExistence(timeout: 45) {
       shot("home")
-      if tapIfPresent(app.buttons["startPractice"], timeout: 10) || tapIfPresent(app.buttons["prepareQuestion"], timeout: 2) {
+      // Today's rep may already be done: One more opens the next one.
+      if tapIfPresent(app.buttons["startPractice"], timeout: 10) || tapIfPresent(app.buttons["prepareQuestion"], timeout: 2)
+        || tapIfPresent(app.buttons["oneMore"], timeout: 2) {
         leaveVoiceIfOpen("voice-on-resume")
         if tapIfPresent(app.buttons["submitPreparation"], timeout: 5) { shot("preparation-submitted") }
       }
