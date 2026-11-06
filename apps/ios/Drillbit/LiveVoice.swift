@@ -39,8 +39,13 @@ private struct VoiceOutbox: Codable {
   /// True only while a delegated reasoning request is actually in flight.
   var thinking = false
   /// A session nobody speaks in still bills every open second, so it ends after this long without speech from
-  /// either side. Any transcript or an unmute resets the clock.
+  /// either side. Any transcript or an unmute resets the clock. Pauses mid-answer are thinking time, so once the
+  /// person has said something the line waits three minutes; before their first word, one minute is plenty.
   static let idleLimit: TimeInterval = 180
+  static let idleLimitBeforeSpeech: TimeInterval = 60
+  /// The person has said something in this session.
+  private var userSpoke = false
+  private var currentIdleLimit: TimeInterval { userSpoke ? Self.idleLimit : Self.idleLimitBeforeSpeech }
   /// The last thirty seconds before a quiet session ends.
   var idleWarning = false
   /// Unmuted for a while and the microphone has picked up nothing: wrong input, a muted Mac or no permission.
@@ -101,6 +106,7 @@ private struct VoiceOutbox: Codable {
     guard !blocksText, !interview.locked, interview.currentAccount, interview.acceptsVoiceInput else { return }
     let epoch = UUID(); generation = epoch
     phase = .connecting; message = nil; muted = true; startedAt = nil; thinking = false; seen = []; delegations = []; guidanceDeliveries = [:]; acknowledged = []
+    userSpoke = false
     do {
       #if DEBUG
       if interview.model.fixture, ProcessInfo.processInfo.arguments.contains("--fixture-voice-connecting") {
@@ -128,6 +134,7 @@ private struct VoiceOutbox: Codable {
         phase = .active
         startedAt = .now
         present([],id:id)
+        watchIdle(epoch: epoch)
         #if DEBUG
         startFixtureMeter(epoch: epoch)
         #endif
@@ -282,12 +289,15 @@ private struct VoiceOutbox: Codable {
         try? await Task.sleep(for: .seconds(5))
         guard let self, self.generation == epoch, self.phase == .active else { return }
         let quiet = Date().timeIntervalSince(self.lastActivity)
-        if quiet >= Self.idleLimit {
+        let limit = self.currentIdleLimit
+        if quiet >= limit {
+          let spoke = self.userSpoke
           await self.end()
-          self.message = "Voice ended after three quiet minutes. Your transcript is saved."
+          self.message = spoke ? "Voice ended after three quiet minutes. Your transcript is saved."
+            : "Voice ended after a quiet minute. Tap Talk when you’re ready."
           return
         }
-        self.idleWarning = quiet >= Self.idleLimit - 30
+        self.idleWarning = quiet >= limit - 30
       }
     }
   }
@@ -338,6 +348,7 @@ private struct VoiceOutbox: Codable {
       let text = Self.stripNonVerbal(delta)
       let f = VoiceFragment(id:id,sequence:(outbox?.fragments.last?.sequence ?? -1)+1,speaker:type == "session.input_transcript.delta" ? "user":"assistant",text:text,startMs:start,endMs:end)
       outbox?.fragments.append(f); seen.insert(id)
+      if f.speaker == "user", !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { userSpoke = true }
       markActivity()
       do {
         try await persist()

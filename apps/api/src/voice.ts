@@ -33,6 +33,8 @@ async function sessionFor(env:Env, account:string, challenge:string, id:string) 
  return s;
 }
 const VOICE_FREE_LOOKS_PER_DAY = 2;
+/** A free account's one silent look, ever: after it, a silent session spends the free mock like any other. */
+const VOICE_FREE_LOOKS_FREE_PLAN = 1;
 // A start that never produced a provider session costs nothing, so it doesn't count.
 async function refundVoiceStart(env: Env, account: string, day: string) {
  await env.DB.prepare("UPDATE usage SET count=count-1 WHERE account_id=? AND day=? AND kind='voice_start' AND count>0").bind(account, day).run();
@@ -165,10 +167,14 @@ export async function voiceEvents(env:Env,account:string,challenge:string,id:str
  if(input.closed) await env.DB.prepare("UPDATE voice_sessions SET status=?,finalized=MAX(finalized,?),usage_seconds=MAX(COALESCE(usage_seconds,0),?,MAX(0,MIN((julianday(?)-julianday(created_at))*86400,(julianday(expires_at)-julianday(created_at))*86400-30))) WHERE id=? AND account_id=?").bind(input.finalized?'closed':'uncertain',input.finalized?1:0,input.usageSeconds??0,timestamp(),id,account).run();
  // A confirmed close before the user said a word is a free look: it gives the start back, so switching between voice
  // and text costs nothing. Unconfirmed closes still count, since more speech could yet arrive. Silence is billed, so
- // only VOICE_FREE_LOOKS_PER_DAY looks a day are free; after that a silent session counts like any other.
+ // only VOICE_FREE_LOOKS_PER_DAY looks a day are free on Pro, and one in total on Free; after that a silent session
+ // counts like any other.
  if(input.closed&&input.finalized){
   const day=String(s.created_at).slice(0,10);
-  const waived=await env.DB.prepare("UPDATE voice_sessions SET waived=1 WHERE id=? AND account_id=? AND waived=0 AND status='closed' AND provider_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM voice_fragments WHERE session_id=? AND speaker='user') AND (SELECT COUNT(*) FROM voice_sessions WHERE account_id=? AND waived=1 AND substr(created_at,1,10)=?)<?").bind(id,account,id,account,day,VOICE_FREE_LOOKS_PER_DAY).run();
+  const pro=(await planFor(env,account))==='pro';
+  const looks=pro?"(SELECT COUNT(*) FROM voice_sessions WHERE account_id=? AND waived=1 AND substr(created_at,1,10)=?)<?":"(SELECT COUNT(*) FROM voice_sessions WHERE account_id=? AND waived=1)<?";
+  const waived=await env.DB.prepare("UPDATE voice_sessions SET waived=1 WHERE id=? AND account_id=? AND waived=0 AND status='closed' AND provider_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM voice_fragments WHERE session_id=? AND speaker='user') AND "+looks)
+   .bind(id,account,id,account,...(pro?[day,VOICE_FREE_LOOKS_PER_DAY]:[VOICE_FREE_LOOKS_FREE_PLAN])).run();
   if(waived.meta.changes) await refundVoiceStart(env,account,day);
  }
  return {accepted:input.fragments.map(f=>f.id)};

@@ -171,20 +171,18 @@ it('pins locally supplied profile into the actual live session instructions',asy
  }finally{mock.mockRestore();}
 });
 
-it('a session counts once the user speaks: two silent confirmed closes a day are free, and each refunds once', async()=>{
+it('a session counts once the user speaks: a free account gets one silent look in total, refunded once', async()=>{
  const {a,id}=await fixture(), usage=async()=>(await e.DB.prepare("SELECT count FROM usage WHERE account_id=? AND day=? AND kind='voice_start'").bind(a,day()).first<any>())?.count ?? 0;
  const start=async()=>{const cmd=crypto.randomUUID(),mock=connection();try{await startVoice(free,a,id,cmd,{sdp:'offer',revision:2});}finally{mock.mockRestore();}return cmd;};
- // Peek and leave without a word: nothing spent, twice a day, even with a duplicated close.
- for(let i=0;i<2;i++){
-  const cmd=await start();
-  expect(await voiceCapability(free,a)).toMatchObject({remaining:2});
-  await Promise.all([voiceEvents(free,a,id,cmd,{fragments:[],closed:true,finalized:true}),voiceEvents(free,a,id,cmd,{fragments:[],closed:true,finalized:true})]);
-  expect(await voiceCapability(free,a)).toMatchObject({available:true,remaining:3});
-  expect(await usage()).toBe(0);
- }
- // Silence is billed, so the third silent look counts.
- const third=await start();
- await voiceEvents(free,a,id,third,{fragments:[],closed:true,finalized:true});
+ // Peek and leave without a word: nothing spent, once, even with a duplicated close.
+ const look=await start();
+ expect(await voiceCapability(free,a)).toMatchObject({remaining:2});
+ await Promise.all([voiceEvents(free,a,id,look,{fragments:[],closed:true,finalized:true}),voiceEvents(free,a,id,look,{fragments:[],closed:true,finalized:true})]);
+ expect(await voiceCapability(free,a)).toMatchObject({available:true,remaining:3});
+ expect(await usage()).toBe(0);
+ // Silence is billed, so a free account's second silent look counts, the same day or any later one.
+ const second=await start();
+ await voiceEvents(free,a,id,second,{fragments:[],closed:true,finalized:true});
  expect(await voiceCapability(free,a)).toMatchObject({remaining:2});
  expect(await usage()).toBe(1);
  // The interviewer talking alone doesn't count; the user's first words do.

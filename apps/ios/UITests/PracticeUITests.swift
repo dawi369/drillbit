@@ -450,6 +450,25 @@ final class PracticeUITests: XCTestCase {
     }
   }
   func testLiveVoiceAccessibleDark() throws { try voiceJourney(extra:["--dark","-UIPreferredContentSizeCategoryName","UICTContentSizeCategoryAccessibilityXXXL"]) }
+  /// Nobody has said a word yet: a minute of quiet closes the line, with a warning at thirty seconds.
+  func testSilentVoiceEndsAfterAQuietMinute() throws {
+    continueAfterFailure = false
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures", "--fixture-voice"]
+    app.launch()
+    XCTAssertTrue(app.buttons["startPractice"].waitForExistence(timeout: 10))
+    app.buttons["startPractice"].tap(); app.buttons["previewStart"].tap()
+    XCTAssertTrue(app.buttons["liveVoice"].waitForExistence(timeout: 8))
+    app.buttons["liveVoice"].tap()
+    XCTAssertTrue(app.buttons["voiceMute"].waitForExistence(timeout: 5))
+    let started = Date()
+    XCTAssertTrue(app.descendants(matching: .any)["voiceIdle"].waitForExistence(timeout: 45), "Warned before the line closes")
+    XCTAssertLessThan(Date().timeIntervalSince(started), 40)
+    XCTAssertTrue(app.staticTexts["Voice ended after a quiet minute. Tap Talk when you’re ready."].waitForExistence(timeout: 45))
+    XCTAssertLessThan(Date().timeIntervalSince(started), 75, "Ends after a minute, not three")
+    XCTAssertFalse(app.buttons["voiceMute"].exists)
+  }
+
   func testVoiceRoomCancelDuringConnection() throws {
     let app = XCUIApplication()
     app.launchArguments = ["--fixtures", "--fixture-voice", "--fixture-voice-connecting"]

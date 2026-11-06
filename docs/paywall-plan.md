@@ -273,7 +273,7 @@ Findings, ranked:
 |---|---|---|
 | Free voice | **The 3 intro sessions only.** The monthly taste is off: after the intro sessions, voice is Pro. | `FREE_VOICE_TASTE_DAYS=0` (0 turns it off) |
 | Free refunds | A free rep comes back only if it's skipped or swapped away **before the user's first message**. One message already earned an interviewer reply. | `abandonedUnused` in `practice-gate.ts` |
-| Silent voice | **Two silent sessions a day are free**, and each refunds its start. After that a silent session counts like any other, because silence is billed. | `VOICE_FREE_LOOKS_PER_DAY` in `voice.ts` |
+| Silent voice | **Two silent sessions a day are free on Pro; one in total on Free** (since 6 Nov), and each refunds its start. After that a silent session counts like any other, because silence is billed. | `VOICE_FREE_LOOKS_PER_DAY` in `voice.ts` |
 | Voice minutes | A close counts **at least the time from start to close**, up to the session's cap, whatever the app reports. | `voiceEvents` in `voice.ts` |
 | Weekly plan | **Kept** ($7.99, first week $1.99), against the reviewers' advice. See below. | App Store Connect |
 
@@ -310,3 +310,12 @@ Watch after launch: paywall views and conversion by placement (`scripts/metrics.
 | Free | **Three reps in total**, never refilled (was two). The first-rep Pro offer still comes once, after the first. | `FREE_REPS_LIFETIME=3` (development and production) |
 | Pro sheet | One sheet for every placement, led by Bit. The map-led variant from section 15 (ideas 1 and 6) is removed. | `Plan.swift` |
 | Weekly line | "$1.99 to start, then $7.99 a week" | `PlanOptionLabel` |
+
+## 16. Silent voice — 6 November
+
+An open voice line bills about $0.05 a minute whether anyone talks or not. Before this change, someone who opened voice and said nothing kept the line for 3 minutes (about $0.17), and a free account could do that twice a day without ever spending its free mock.
+
+- **The app hangs up after a quiet minute until the person says something** ("Voice ended after a quiet minute. Tap Talk when you’re ready."), with the warning at 30 seconds. Once they've spoken it waits 3 minutes, since pauses mid-answer are thinking time. A silent visit now costs at most about $0.06.
+- **Free accounts get one silent look in total**; after that a silent session spends the free mock. Pro keeps 2 a day.
+- Still true: leaving the app ends voice at once, sessions cap at 10 (Free) and 20 (Pro) minutes, and a modified app could hold a line open, because the server can't hang up a provider session (section 14).
+

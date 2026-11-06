@@ -750,3 +750,7 @@ See `docs/paywall-plan.md` section 15 for why. In code:
 
 Interviewer prompt `interviewer-teaching-v7` adds `<plain_talk>`: sound like an SWE 1 or SWE 2 explaining to a teammate, everyday words, no textbook or consultant phrasing, and no em or en dashes. Because a model doesn't always follow style rules, `plainDashes` / `plainDashesDeep` (ai.ts) also clean every model string on the way out: interview turns, nudges and examples (streamed partials and the final result), question writing (streamed preview and final), and feedback. A dash between words becomes a comma, a range between numbers a hyphen; a marker keeps raw JSON's own commas untouched while it streams. The person's own quoted words (`quote` fields) are never changed, so feedback quotes still match what they typed. Voice is spoken, so its transcript isn't touched.
 
+## Silent voice — 6 November 2026
+
+`LiveVoice` ends a session after `idleLimitBeforeSpeech` (60 s) of quiet until the user's first transcribed words, then after `idleLimit` (180 s); the warning shows 30 s before either. Fixture sessions run the same timer. `voiceEvents` waives a silent confirmed close up to 2 a day on Pro and once in total on Free (`VOICE_FREE_LOOKS_FREE_PLAN`), using `planFor` at close time.
+
