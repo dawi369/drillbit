@@ -16,6 +16,7 @@
 		17939E1CE6DADB13BEED9C8F /* AppDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DCB42472B027EF8556E83E2 /* AppDiagnostics.swift */; };
 		18B4090F1EFA1BAD814B974F /* PreparationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D48C7CE46F73492E41D2DDDD /* PreparationView.swift */; };
 		19BDB2BD78083CFC15FFCF77 /* LiveVoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87BD787A61C3C037E268829C /* LiveVoice.swift */; };
+		1A9D3B15B91E60E2AA2737F6 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 0C0F33F963F11040258EC708 /* AppIcon.icon */; };
 		1C4095680EF8C258B0FC0879 /* BitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8BD0996355C1121C323D9E2 /* BitTests.swift */; };
 		20212ED453359321401BBE55 /* CompanionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39439B81E58CADD0F8243F46 /* CompanionTests.swift */; };
 		2027DBB976212CFEA63A6BE4 /* BitView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17CD35FA19967623C29EB147 /* BitView.swift */; };
@@ -125,6 +126,7 @@
 		01713294F3436278FCEE46B6 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		04CE1C0E2D55B42FFFD0982A /* CompanionPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionPanel.swift; sourceTree = "<group>"; };
 		078F7E279FD81437551FFBB2 /* HomeProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeProgress.swift; sourceTree = "<group>"; };
+		0C0F33F963F11040258EC708 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		1185BAB722977AA5EAC231D0 /* StreamProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamProbe.swift; sourceTree = "<group>"; };
 		137147215B8FA4CA44DA4451 /* Ticket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ticket.swift; sourceTree = "<group>"; };
 		13F8E4917CAF05B015AA09E0 /* BitRig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitRig.swift; sourceTree = "<group>"; };
@@ -243,6 +245,7 @@
 			children = (
 				165CE5F9FA389F64A4730557 /* APIClient.swift */,
 				1DCB42472B027EF8556E83E2 /* AppDiagnostics.swift */,
+				0C0F33F963F11040258EC708 /* AppIcon.icon */,
 				C8E06A264C65F45E7AD14AD1 /* AppModel.swift */,
 				F69DED8C37D39A2D21CC2A84 /* Assets.xcassets */,
 				82CAC54FBF8FD27088584441 /* BitRenderer.swift */,
@@ -488,6 +491,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1A9D3B15B91E60E2AA2737F6 /* AppIcon.icon in Resources */,
 				0AA02AF022C77A9339CDFB76 /* Assets.xcassets in Resources */,
 				9D0A9C663935A2276F7DA317 /* LaunchScreen.storyboard in Resources */,
 				22EAA8C50206081D7F3562EA /* Literata.ttf in Resources */,

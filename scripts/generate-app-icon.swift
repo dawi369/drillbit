@@ -1,7 +1,9 @@
-// Renders the opaque 1024 px App Store icon and the launch screen's Bit with his own rig and renderer.
-// Run from the repo root:
+// Renders the app icon's layers for Icon Composer (apps/ios/Drillbit/AppIcon.icon), a flat 1024 px preview, and the
+// launch screen's Bit, all with his own rig and renderer. Run from the repo root:
 //   swiftc -parse-as-library scripts/generate-app-icon.swift apps/ios/Drillbit/BitRig.swift \
 //     apps/ios/Drillbit/BitRenderer.swift -o /tmp/drillbit-icon && /tmp/drillbit-icon
+// The background is the .icon's gradient fill (icon.json); Bit and his glow are transparent layers above it, so iOS can
+// draw the Dark, Clear and Tinted appearances itself.
 import AppKit
 import SwiftUI
 
@@ -10,11 +12,33 @@ struct GenerateAppIcon {
   static let side = 1024
 
   @MainActor static func main() throws {
-    let output = URL(fileURLWithPath: CommandLine.arguments.dropFirst().first
-      ?? "apps/ios/Drillbit/Assets.xcassets/AppIcon.appiconset/AppIcon.png")
-    try icon().write(to: output)
-    try launchMark(output.deletingLastPathComponent().deletingLastPathComponent()
-      .appendingPathComponent("LaunchBit.imageset"))
+    let layers = URL(fileURLWithPath: "apps/ios/Drillbit/AppIcon.icon/Assets")
+    try layer { context in drawBit(&context) }.write(to: layers.appendingPathComponent("Bit.png"))
+    try layer { context in drawGlow(&context) }.write(to: layers.appendingPathComponent("Glow.png"))
+    try icon().write(to: URL(fileURLWithPath: "docs/design/app-icon-flat.png"))
+    try launchMark(URL(fileURLWithPath: "apps/ios/Drillbit/Assets.xcassets/LaunchBit.imageset"))
+  }
+
+  static func drawGlow(_ context: inout GraphicsContext) {
+    context.fill(Path(ellipseIn: CGRect(x: 112, y: 120, width: 800, height: 800)), with: .radialGradient(
+      Gradient(colors: [rgb(0xFFCC65, 0.16), rgb(0xFFCC65, 0)]), center: CGPoint(x: 512, y: 520), startRadius: 0, endRadius: 400))
+  }
+  static func drawBit(_ context: inout GraphicsContext) {
+    var bit = context
+    bit.translateBy(x: 512, y: 500)
+    bit.rotate(by: .degrees(-12))
+    bit.scaleBy(x: 4.7, y: 4.7)
+    bit.translateBy(x: -100, y: -111)
+    BitRenderer.draw(pose, style: BitFinish.satin.style, in: &bit, size: BitShape.viewBox, shadow: false)
+  }
+  /// One transparent 1024 px layer.
+  @MainActor static func layer(_ draw: @escaping (inout GraphicsContext) -> Void) -> Data {
+    let art = Canvas { context, _ in draw(&context) }.frame(width: CGFloat(side), height: CGFloat(side))
+    let renderer = ImageRenderer(content: art)
+    renderer.scale = 1
+    guard let image = renderer.cgImage, let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
+    else { fatalError("Could not render icon layer") }
+    return png
   }
 
   /// Bit mid-hop: tipped over a little, leaning into it and glancing up.
@@ -37,19 +61,13 @@ struct GenerateAppIcon {
     let art = Canvas { context, size in
       context.fill(Path(CGRect(origin: .zero, size: size)), with: .linearGradient(
         Gradient(colors: [rgb(0x272D3A), rgb(0x1B1F29)]), startPoint: .zero, endPoint: CGPoint(x: 0, y: size.height)))
-      context.fill(Path(ellipseIn: CGRect(x: 112, y: 120, width: 800, height: 800)), with: .radialGradient(
-        Gradient(colors: [rgb(0xFFCC65, 0.16), rgb(0xFFCC65, 0)]), center: CGPoint(x: 512, y: 520), startRadius: 0, endRadius: 400))
+      drawGlow(&context)
       var shadow = context
       shadow.translateBy(x: 560, y: 930)
       shadow.scaleBy(x: 1, y: 0.16)
       shadow.fill(Path(ellipseIn: CGRect(x: -150, y: -150, width: 300, height: 300)), with: .radialGradient(
         Gradient(colors: [rgb(0x000000, 0.45), rgb(0x000000, 0)]), center: .zero, startRadius: 0, endRadius: 150))
-      var bit = context
-      bit.translateBy(x: 512, y: 500)
-      bit.rotate(by: .degrees(-12))
-      bit.scaleBy(x: 4.7, y: 4.7)
-      bit.translateBy(x: -100, y: -111)
-      BitRenderer.draw(pose, style: BitFinish.satin.style, in: &bit, size: BitShape.viewBox, shadow: false)
+      drawBit(&context)
     }
     .frame(width: CGFloat(side), height: CGFloat(side))
     let renderer = ImageRenderer(content: art)

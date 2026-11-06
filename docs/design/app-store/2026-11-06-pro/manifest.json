@@ -1,0 +1,42 @@
+[
+  {
+    "file": "01-interview.png",
+    "width": 1320,
+    "height": 2868,
+    "color": "RGB",
+    "alpha": false,
+    "sha256": "9bf865166fd45db743c04b6fb63c7c593a88d303c159b12046090767683e1ba3"
+  },
+  {
+    "file": "02-feedback.png",
+    "width": 1320,
+    "height": 2868,
+    "color": "RGB",
+    "alpha": false,
+    "sha256": "e499c9d48b902fdbde38fcf796f4e67d8608cbd5757f6ba25a1531f2ab0bd50b"
+  },
+  {
+    "file": "03-example.png",
+    "width": 1320,
+    "height": 2868,
+    "color": "RGB",
+    "alpha": false,
+    "sha256": "e192d768a624a73f1f94fc92a08a48c4af60cab2d279380753d63d4ef4792b31"
+  },
+  {
+    "file": "04-knowledge-map.png",
+    "width": 1320,
+    "height": 2868,
+    "color": "RGB",
+    "alpha": false,
+    "sha256": "e0d32f6f36d16829b05c9c008f7ab8313a37327369bdb5996c65dc4d6a3d641d"
+  },
+  {
+    "file": "05-recall.png",
+    "width": 1320,
+    "height": 2868,
+    "color": "RGB",
+    "alpha": false,
+    "sha256": "e3e7fe3331eacb4c6c173726867885601ac3a603f0053be92b95278f1b61691f"
+  }
+]

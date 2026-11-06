@@ -103,23 +103,23 @@ If you want Superwall at launch instead:
 
 | Field | Draft |
 | --- | --- |
-| Name (30) | Saved: Drillbit Practice |
-| Subtitle (30) | Saved: System design interview prep |
+| Name (30) | **Drillbit: System Design Prep** (28). Saved today: Drillbit Practice. |
+| Subtitle (30) | **AI Mock Interviews for SWEs** (27). Saved today: System design interview prep. |
 | Category | Education (secondary: Productivity) |
 | Support URL | `https://api.drillbit.t23.dev/support` |
 | Privacy Policy URL | `https://api.drillbit.t23.dev/privacy` |
 | Copyright | 2026 t23.dev |
 | Age rating | Fill in the 2025 questionnaire honestly. Drillbit has an AI chat feature (the interviewer) that's limited to system design practice. It has no user-to-user communication, no web browsing and no mature content. Expect 13+. Set a higher minimum age if you want. |
 
-**Keywords (100):** `software engineer,coding,faang,backend,architecture,distributed systems,scalability,tech,career` (95). Words already in the name and subtitle are left out; repeating them adds nothing.
+**Keywords (100):** `software,engineer,coding,developer,backend,architecture,distributed,scalability,practice,coach,sde` (98). No word repeats the name or subtitle (Apple combines all three, so a repeat is a wasted slot), everything is singular (plurals match automatically) and there are no spaces after commas. "faang" is gone: it spells out Apple, Amazon and Meta, and Guideline 2.3.7 bans other companies' names in keywords. Checked 6 November with the before.click ASO skill; for "system design interview" the top results mostly have under 100 ratings, so the exact phrase belongs in the name.
 
-**Promotional text:** Hard questions. Good company. An AI interviewer you can think out loud with, in text or voice.
+**Promotional text:** Your answer is the start. Practise system design with an AI interviewer that pushes back, shows you what to fix, and helps the lesson stick.
 
 **Description:**
 
 > The coding round gets you a callback. The design round gets you hired.
 >
-> Drillbit puts you in the system design interview. You get one real question scoped to your level, from Intern to Principal, and an interviewer who reacts to what you actually said. Write your answer or talk it through out loud. Ask for a nudge when you're stuck. Change your mind halfway. That's the point.
+> Drillbit puts you in the system design interview: AI mock interviews for software engineers, from Intern to Principal. You get one real question scoped to your level and an interviewer who reacts to what you actually said. Write your answer or talk it through out loud. Ask for a nudge when you're stuck. Change your mind halfway. That's the point.
 >
 > • One question at a time, with clear requirements and room to push back
 > • Follow-ups that respond to your reasoning, not a checklist
@@ -136,18 +136,19 @@ If you want Superwall at launch instead:
 
 State the actual allowance in listing copy: Pro has fair-use caps (10 practised reps a day, where a rep counts from its second message; voice 60 minutes a day, 75 a week, 20 a session). Unqualified "unlimited" claims invite a 2.3.1 accuracy rejection.
 
-**Screenshots:** the 4 November portal shows the required medium Dynamic Island display inheriting six uploaded large-display screenshots (including 6.9" at 1320 × 2868). No additional size was flagged as missing; the app is iPhone-only, so there is no iPad set. The first three frames show in search results, so they have to explain the app on their own.
+**Screenshots:** upload the five captioned images in [`docs/design/app-store/2026-11-06-pro/ready/`](design/app-store/2026-11-06-pro/ready/), in order, to the 6.9" (1320 × 2868) slot; App Store Connect scales them into the required 6.3" slot. They replace the six 29 October screenshots still in App Store Connect. All five show the app in use (5 of 5; App Review needs more than half). The app is iPhone-only, so there's no iPad set.
 
-| # | Frame | File in [`docs/design/app-store/`](design/app-store/) | Caption |
-|---|---|---|---|
-| 1 | The hook | `01-welcome.png` | The design round gets you hired. |
-| 2 | Live voice | taken on your phone, mid-conversation with a caption showing | Say it out loud. It talks back. |
-| 3 | The pushback | `03-pushback.png` | Grills you like the real one. |
-| 4 | Stuck help | `04-example.png` | Stuck? Ask for an example. |
-| 5 | Feedback | `05-feedback.png` | One thing that worked. One to fix. |
-| 6 | Knowledge map | `06-knowledge-map.png` | See what you actually know. |
+| # | File | Headline |
+|---|---|---|
+| 1 | `01-interview.png` | Get better at system design. |
+| 2 | `02-feedback.png` | Know what worked. Know what to fix. |
+| 3 | `03-example.png` | Stuck? See one worked example. |
+| 4 | `04-knowledge-map.png` | See what you actually know. |
+| 5 | `05-recall.png` | Make the lesson stick. |
 
-`spare-home.png`, `spare-recall.png` and `spare-library.png` are there if you want a seventh. Frame 2 can't come from the simulator: the fixture voice room shows a debug "Simulate speech" link. Take it on a Pro Max during section 7, or scale it to 1320 × 2868. The frames come from fixtures as a customer account, so there's no developer tab. To regenerate after UI changes, boot an iPhone 17 Pro Max simulator, run `xcrun simctl status_bar <udid> override --time 9:41 --batteryState charged --batteryLevel 100`, then run `-only-testing:DrillbitUITests/StoreScreenshots` and export the attachments (as `scripts/audit-shots.sh` does).
+A live voice frame from a phone would make a strong sixth (or first) image later; the simulator can't take it. How the set was made and regenerated: [its README](design/app-store/2026-11-06-pro/README.md). The subscription review image is [`review-paywall.png`](design/app-store/review-paywall.png) (regenerated 6 November: weekly first, $1.99 first week, $99.99 a year).
+
+**App icon:** a layered Icon Composer icon, [`apps/ios/Drillbit/AppIcon.icon`](../apps/ios/Drillbit/AppIcon.icon), from build 20. iOS draws its Dark, Clear and Tinted looks from the layers; `scripts/generate-app-icon.swift` renders them, and `ictool` (inside Icon Composer) previews each look.
 
 **App Review notes (paste and fill in):**
 
