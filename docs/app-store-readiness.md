@@ -152,7 +152,7 @@ A live voice frame from a phone would make a strong sixth (or first) image later
 
 **App Review notes (paste and fill in):**
 
-> Sign in with Apple to create an account; no invite or demo code is needed. The first launch shows a short intro and a one-minute setup, then sign-in. Before the first question is written, a sheet asks permission to use third-party AI (OpenRouter for text, OpenAI for voice); nothing is sent to an AI model before that. Settings → AI and your data shows the same words any time. The AI disclosure is also available in Settings → AI and your data.
+> Sign in with Apple to create an account; no invite or demo code is needed. The first launch shows a short intro and a one-minute setup, then sign-in. Before the first question is written, a sheet asks permission to use third-party AI (OpenRouter for text, OpenAI for voice); nothing is sent to an AI model before that. Settings → AI and your data shows the same words any time. Screenshots of the permission sheet are attached.
 >
 > Subscriptions: free accounts get three questions in total and one voice mock of up to 10 minutes. To reach the paywall, use Settings → See Pro, or use the three free questions. Restore Purchases is on the paywall (Settings → See Pro).
 >
