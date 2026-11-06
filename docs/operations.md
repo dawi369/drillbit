@@ -396,3 +396,7 @@ Release **1.0 (18)** archived, verified against production and uploaded with `sc
 Server-only: interviewer prompt `interviewer-teaching-v7` and dash cleanup on all model text. Deployed: development `9fbe78d5-4bcf-41e4-a90d-391f6059ef29`, production `d1121e79-b1b7-4cd3-a095-26dcbefa3906` (`/health`, `/privacy` 200; unauthenticated bootstrap 401). No app change, so build 18 on TestFlight picks it up without a new upload.
 
 Live end-to-end walk on development (owner account Pro for the run via `manual-e2e-20261106c`, deleted after): passed in 626 s. 2 questions, 9 interview turns (nudge and example included), 3 voice sessions, 2 feedback summaries; all jobs completed and none of the stored turns, questions or feedback contain an em or en dash. A live sample of v6 against v7 on the same three answers: v6 wrote one em dash, v7 none, before the cleanup.
+
+### Silent voice and build 19 — 6 November 2026
+
+Server: a free account's silent voice look is waived once in total (Pro keeps two a day). Deployed: development `f4e5bc48-7a56-4c0e-a339-7bf4ba87502c`, production `26edeeb5-70ba-4632-9a01-980e9c2aff5a` (`/health` 200, unauthenticated bootstrap 401). App: voice ends after a quiet minute until the person speaks, then after three; this needs build 19. Release **1.0 (19)** archived, verified against production and uploaded ("Upload succeeded"); dSYMs on Sentry. Tests: API 200, iOS unit 72, UI 92 (74 practice, 18 audit walks) including `testSilentVoiceEndsAfterAQuietMinute`. Not yet checked: Apple processing and the build on a phone.
