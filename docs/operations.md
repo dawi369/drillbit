@@ -390,3 +390,9 @@ OpenRouter rejections on the managed key now report as `managed_out_of_credits`,
 Live end-to-end walk (`LiveWalkthrough`, `TEST_RUNNER_DRILLBIT_LIVE=1`, signed simulator build, owner's development account made Pro for the run with a `manual-e2e-20261106` entitlement that was deleted afterwards): passed in 577 s. Two questions written, seven interview turns, a nudge, an example, the voice room opened and closed, two feedback summaries; all 13 jobs completed.
 
 Release **1.0 (18)** archived, verified against production and uploaded with `scripts/release-ios.sh --upload` ("Upload succeeded", "EXPORT SUCCEEDED"); dSYMs were already on Sentry. Not yet checked: Apple processing, TestFlight availability and the build on a physical device.
+
+### Plain talk, no dashes — 6 November 2026
+
+Server-only: interviewer prompt `interviewer-teaching-v7` and dash cleanup on all model text. Deployed: development `9fbe78d5-4bcf-41e4-a90d-391f6059ef29`, production `d1121e79-b1b7-4cd3-a095-26dcbefa3906` (`/health`, `/privacy` 200; unauthenticated bootstrap 401). No app change, so build 18 on TestFlight picks it up without a new upload.
+
+Live end-to-end walk on development (owner account Pro for the run via `manual-e2e-20261106c`, deleted after): passed in 626 s. 2 questions, 9 interview turns (nudge and example included), 3 voice sessions, 2 feedback summaries; all jobs completed and none of the stored turns, questions or feedback contain an em or en dash. A live sample of v6 against v7 on the same three answers: v6 wrote one em dash, v7 none, before the cleanup.
