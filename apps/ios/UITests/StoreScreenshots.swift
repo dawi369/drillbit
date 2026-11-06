@@ -38,7 +38,7 @@ final class StoreScreenshots: XCTestCase {
     shot("01-welcome", app)
     app.terminate()
 
-    app = launch(["--fixtures", "--fixture-home-rich"])
+    app = launch(["--fixtures", "--fixture-home-rich", "--fixture-pro"])
     XCTAssertTrue(app.buttons["startPractice"].waitForExistence(timeout: 10))
     XCTAssertTrue(app.tabBars.buttons["Bit"].exists, "Everyone sees the Bit tab; it's Pro behind the tap")
     app.buttons["startPractice"].tap()
@@ -78,7 +78,7 @@ final class StoreScreenshots: XCTestCase {
     shot("06-knowledge-map", app)
     app.terminate()
 
-    app = launch(["--fixtures", "--fixture-dashboard", "--fixture-evidence", "--fixture-recall-due"])
+    app = launch(["--fixtures", "--fixture-dashboard", "--fixture-evidence", "--fixture-recall-due", "--fixture-pro"])
     XCTAssertTrue(app.tabBars.buttons["Recall"].waitForExistence(timeout: 10))
     Thread.sleep(forTimeInterval: 1)
     shot("spare-home", app)
