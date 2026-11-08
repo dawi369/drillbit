@@ -18,6 +18,8 @@ import seventeenth from "../migrations/0017_spent_free_reps.sql?raw";
 import eighteenth from "../migrations/0018_voice_notes.sql?raw";
 import nineteenth from "../migrations/0019_paywall_views.sql?raw";
 import twentieth from "../migrations/0020_spent_voice.sql?raw";
+import twentyFirst from "../migrations/0021_deleted_subjects.sql?raw";
+import twentySecond from "../migrations/0022_spent_voice_waived.sql?raw";
 export async function initializeDatabase(db: D1Database) {
   for (const sql of [first, second, third, fourth, fifth, sixth, seventh, eighth, ninth, tenth, eleventh])
     for (const statement of sql.split(";").filter((s) => s.trim()))
@@ -37,6 +39,12 @@ export async function initializeDatabase(db: D1Database) {
     await db.prepare(statement).run().catch((error: Error) => {
       if (!/duplicate column/i.test(error.message)) throw error;
     });
-  for (const statement of [...thirteenth.split(";"), ...fourteenth.split(";"), ...seventeenth.replace(/^--.*$/gm, "").split(";"), ...eighteenth.replace(/^--.*$/gm, "").split(";"), ...nineteenth.replace(/^--.*$/gm, "").split(";"), ...twentieth.replace(/^--.*$/gm, "").split(";")].filter((s) => s.trim()))
+  for (const statement of [...thirteenth.split(";"), ...fourteenth.split(";"), ...seventeenth.replace(/^--.*$/gm, "").split(";"), ...eighteenth.replace(/^--.*$/gm, "").split(";"), ...nineteenth.replace(/^--.*$/gm, "").split(";"), ...twentieth.replace(/^--.*$/gm, "").split(";").filter((s) => !/CREATE VIEW/.test(s)), ...twentyFirst.replace(/^--.*$/gm, "").split(";")].filter((s) => s.trim()))
     await db.prepare(statement.replace(/CREATE TABLE /g, "CREATE TABLE IF NOT EXISTS ").replace(/CREATE INDEX /g, "CREATE INDEX IF NOT EXISTS ").replace(/CREATE VIEW /g, "CREATE VIEW IF NOT EXISTS ")).run();
+  // 0022 adds a column (repeat initialisations already have it) and replaces 0020's view. Test files initialise the
+  // shared database concurrently, so the final view is created once and never dropped here.
+  for (const statement of twentySecond.replace(/^--.*$/gm, "").split(";").filter((s) => s.trim() && !/DROP VIEW/.test(s)))
+    await db.prepare(statement.replace(/CREATE VIEW /g, "CREATE VIEW IF NOT EXISTS ")).run().catch((error: Error) => {
+      if (!/duplicate column/i.test(error.message)) throw error;
+    });
 }

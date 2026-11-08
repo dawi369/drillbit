@@ -40,6 +40,8 @@ export interface Env {
   /** Sentry (t23/drillbit-api). A secret; unset means reporting is off. */
   SENTRY_DSN?: string;
   SENTRY_ENVIRONMENT?: string;
+  /** Per-IP limit on the public App Store notification endpoint (wrangler `ratelimits`); absent in tests. */
+  APPLE_NOTIFICATIONS_LIMIT?: RateLimit;
   /** The deployed Worker version; its id is the Sentry release, matching `wrangler deployments list`. */
   CF_VERSION_METADATA?: WorkerVersionMetadata;
   PRO_VOICE_STARTS_PER_DAY?: string;

@@ -308,6 +308,15 @@ it("deletes a redeemed invitation and all account data after Clerk deletion", as
       .bind(id)
       .first(),
   ).toBeNull();
+  // A token from before the deletion is valid for up to a minute more; it must not bring the account back.
+  await expect(accountFor(bindings, "delete-test-person")).rejects.toMatchObject({ code: "account_unavailable", status: 403 });
+  expect(await bindings.DB.prepare("SELECT id FROM accounts WHERE subject='delete-test-person'").first()).toBeNull();
+  // Once the tombstone lapses, the cron clears it and the same person can start over.
+  await bindings.DB.prepare("UPDATE deleted_subjects SET until=? WHERE until>?").bind(new Date(Date.now() - 1000).toISOString(), new Date().toISOString()).run();
+  await reconcile(bindings);
+  expect(await bindings.DB.prepare("SELECT COUNT(*) AS n FROM deleted_subjects").first<{ n: number }>()).toEqual({ n: 0 });
+  expect((await accountFor(bindings, "delete-test-person")).status).not.toBe("deleting");
+  await bindings.DB.prepare("DELETE FROM accounts WHERE subject='delete-test-person'").run();
 });
 it("returns durable job intent before slow workflow dispatch completes", async () => {
   const account = await accountFor(bindings, crypto.randomUUID());
@@ -337,4 +346,23 @@ it("runs interactive question writing in the request instead of waiting for a wo
   await reconcile(env);
   expect(await bindings.DB.prepare("SELECT status FROM jobs WHERE id=?").bind(id).first()).toEqual({status:"pending"});
   expect(dispatched).toBeGreaterThan(0);
+});
+
+it("drops a finished interview job's context a week on, keeping what history and replays read", async () => {
+  const account = await accountFor(bindings, crypto.randomUUID());
+  const at = (msAgo: number) => new Date(Date.now() - msAgo).toISOString();
+  const input = JSON.stringify({ settings: { aiMode: "managed" }, action: { kind: "answer", text: "x", revision: 3 }, turnId: "t1", context: { turns: ["a long conversation"] } });
+  const job = async (status: string, msAgo: number) => {
+    const id = crypto.randomUUID();
+    await bindings.DB.prepare("INSERT INTO jobs(id,account_id,challenge_id,kind,status,input,created_at,updated_at) VALUES(?,?,NULL,'interview',?,?,?,?)").bind(id, account.id, status, input, at(msAgo), at(msAgo)).run();
+    return id;
+  };
+  const week = 7 * 86_400_000;
+  const old = await job("completed", week + 30 * 60_000), recent = await job("completed", week - 60_000), failed = await job("failed", week + 30 * 60_000);
+  await reconcile(bindings);
+  const read = async (id: string) => JSON.parse((await bindings.DB.prepare("SELECT input FROM jobs WHERE id=?").bind(id).first<{ input: string }>())!.input);
+  expect(await read(old)).toEqual({ settings: { aiMode: "managed" }, action: { kind: "answer", text: "x", revision: 3 }, turnId: "t1" });
+  expect(await read(recent)).toHaveProperty("context");
+  // A failed turn can still be retried from its input.
+  expect(await read(failed)).toHaveProperty("context");
 });

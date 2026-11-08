@@ -21,10 +21,6 @@ export function limits(env: Env, plan: Plan) {
       voiceSecondsPerDay: n(env.PRO_VOICE_MINUTES_PER_DAY, 60) * 60,
       voiceSecondsPerWeek: n(env.PRO_VOICE_MINUTES_PER_WEEK, 75) * 60,
       voiceReasoningPerDay: 400,
-      // Runaway guards, above everything the caps above allow: unlimited turns inside a rep, and every AI call
-      // (questions, turns, help, feedback, voice reasoning) in a full day.
-      interviewTurnsPerDay: 400,
-      providerCallsPerDay: 1000,
       voiceFreeLifetime: Infinity,
       voiceTasteDays: 0,
       dailyQuestion: true,
@@ -40,8 +36,6 @@ export function limits(env: Env, plan: Plan) {
       voiceSecondsPerDay: Infinity,
       voiceSecondsPerWeek: Infinity,
       voiceReasoningPerDay: 40,
-      interviewTurnsPerDay: 50,
-      providerCallsPerDay: 100,
       voiceFreeLifetime: n(env.FREE_VOICE_LIFETIME, 3),
       // 0 turns the taste off: the intro sessions are all the free voice there is.
       voiceTasteDays: env.FREE_VOICE_TASTE_DAYS === "0" ? 0 : n(env.FREE_VOICE_TASTE_DAYS, 30),

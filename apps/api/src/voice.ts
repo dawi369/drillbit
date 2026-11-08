@@ -10,7 +10,7 @@ import { limits, nextUtcMidnight, planFor, utcDayStart } from './plans';
 import { practicePersonality, questionTerminology } from "./prompts/interviewer";
 import { personalizationInstructions } from "./prompts/personalization";
 import { guidanceModeSchema, TEACHING_VERSION, teachingPolicy, truthfulVoiceProgress } from "./prompts/teaching";
-import { questionReference, spokenHistory, voiceDelegationMessages } from "./prompts/voice-context";
+import { questionReference, spokenHistory, spokenLength, voiceDelegationMessages } from "./prompts/voice-context";
 import { ownedChallenge, settingsFor } from './store';
 
 export const voiceStartSchema = z.object({practiceProfile:practiceProfileSchema.optional(),guidanceMode:guidanceModeSchema.optional(),sdp:z.string().min(1).max(64000),revision:z.number().int().nonnegative()});
@@ -195,9 +195,10 @@ export async function voiceEvents(env:Env,account:string,challenge:string,id:str
  if(input.closed&&input.finalized){
   const day=String(s.created_at).slice(0,10);
   const pro=(await planFor(env,account))==='pro';
-  const looks=pro?"(SELECT COUNT(*) FROM voice_sessions WHERE account_id=? AND waived=1 AND substr(created_at,1,10)=?)<?":"(SELECT COUNT(*) FROM voice_sessions WHERE account_id=? AND waived=1)<?";
+  // Looks on deleted questions stay in spent_voice (migration 0022).
+  const looks=pro?"(SELECT COUNT(*) FROM (SELECT created_at FROM voice_sessions WHERE account_id=? AND waived=1 UNION ALL SELECT created_at FROM spent_voice WHERE account_id=? AND waived=1) WHERE substr(created_at,1,10)=?)<?":"(SELECT COUNT(*) FROM (SELECT id FROM voice_sessions WHERE account_id=? AND waived=1 UNION ALL SELECT id FROM spent_voice WHERE account_id=? AND waived=1))<?";
   const waived=await env.DB.prepare("UPDATE voice_sessions SET waived=1 WHERE id=? AND account_id=? AND waived=0 AND status='closed' AND provider_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM voice_fragments WHERE session_id=? AND speaker='user') AND "+looks)
-   .bind(id,account,id,account,...(pro?[day,VOICE_FREE_LOOKS_PER_DAY]:[VOICE_FREE_LOOKS_FREE_PLAN])).run();
+   .bind(id,account,id,account,account,...(pro?[day,VOICE_FREE_LOOKS_PER_DAY]:[VOICE_FREE_LOOKS_FREE_PLAN])).run();
   if(waived.meta.changes) await refundVoiceStart(env,account,day);
  }
  return {accepted:input.fragments.map(f=>f.id)};
@@ -231,7 +232,9 @@ export async function delegateVoice(env:Env,account:string,challenge:string,id:s
   for(let attempt=0;;attempt++){
    const response=await provider(env,account,settings,messages,{kind:'voice_reasoning',maxTokens:900,schema:voiceSchema,reasoning:{enabled:false},signal:deadline});
    const body=await response.json() as any;await recordUsage(env,account,settings,'voice_reasoning',body.usage,TEACHING_VERSION+'-'+interview.guidanceMode);
-   try { const parsed=voiceSchema.parse(parseModelJSON(body.choices?.[0]?.message?.content)) as {text:string;step?:number}; text=parsed.text; step=parsed.step; break; }
+   try { const parsed=voiceSchema.parse(parseModelJSON(body.choices?.[0]?.message?.content)) as {text:string;step?:number}; text=spokenLength(parsed.text); step=parsed.step;
+    if(text!==parsed.text) console.warn(JSON.stringify({event:'voice_delegation_trimmed',characters:parsed.text.length,kept:text.length}));
+    break; }
    catch(error){ if(attempt>0 || Date.now()-started>6000) throw error; console.log(JSON.stringify({event:'voice_delegation_retry',finishReason:body.choices?.[0]?.finish_reason})); }
   }
   // Voice has no answer turn to carry the step, so the challenge remembers how far the roadmap got.

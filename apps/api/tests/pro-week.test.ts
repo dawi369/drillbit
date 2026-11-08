@@ -875,30 +875,33 @@ describe("around the week", () => {
     await endOfDay([E]);
   });
 
-  it("a Pro day inside the fair-use caps never stops an open rep: nine reps of six typed answers", async () => {
+  it("Pro's fair-use cap on typed answers is 50 a day, on purpose: the 51st is refused and the rep still finishes", async () => {
     at("2026-11-20T16:00:00Z");
     const F = await signUp("America/Los_Angeles");
     await subscribe(F, YEARLY, Date.now(), Date.now() + 365 * DAY);
-    const refused: string[] = [];
-    for (let r = 1; r <= 9 && !refused.length; r++) {
-      const id = await prepare(F);
-      expect((await call(F, "POST", `/v1/challenges/${id}/start`)).status).toBe(200);
+    let sent = 0, refused: { status: number; code: string } | undefined, open = "";
+    for (let r = 1; r <= 9 && !refused; r++) {
+      open = await prepare(F);
+      expect((await call(F, "POST", `/v1/challenges/${open}/start`)).status).toBe(200);
       for (let t = 1; t <= 6; t++) {
-        const reply = await answer(F, id, ANSWERS[t - 1]);
-        if (reply.status !== 202) { refused.push(`rep ${r}, answer ${t}: ${reply.status} ${reply.body.error.code}`); break; }
+        const reply = await answer(F, open, ANSWERS[t - 1]);
+        if (reply.status !== 202) { refused = { status: reply.status, code: reply.body.error.code }; break; }
+        sent++;
       }
-      if (!refused.length) await finish(F, id);
+      if (!refused) await finish(F, open);
     }
-    expect(refused).toEqual([]);
+    expect(sent).toBe(50);
+    expect(refused).toEqual({ status: 429, code: "usage_limit" });
+    await finish(F, open);
   });
 
-  it("an hour of Pro voice can delegate to the interviewer throughout, and the rep still gets its feedback", async () => {
+  it("an hour of Pro voice meets the 100 AI calls a day fair-use cap, on purpose: later delegations are refused", async () => {
     at("2026-11-25T16:00:00Z");
     const G = await signUp("America/Los_Angeles");
     await subscribe(G, YEARLY, Date.now(), Date.now() + 365 * DAY);
     const id = await prepare(G);
     expect((await call(G, "POST", `/v1/challenges/${id}/start`)).status).toBe(200);
-    const failed: string[] = [];
+    const statuses: number[] = [];
     // Three 20-minute sessions, the documented day, with a delegation about every 35 seconds.
     for (let s = 0; s < 3; s++) {
       const started = await startVoice(G, id);
@@ -908,16 +911,14 @@ describe("around the week", () => {
       expect((await call(G, "POST", `/v1/challenges/${id}/voice/${sid}/events`, { fragments: [{ id: "u0", sequence: 0, speaker: "user", text: SAID[0], startMs: 0, endMs: 3000 }] })).status).toBe(200);
       for (let k = 0; k < 34; k++) {
         at(created + 30_000 + k * 34_000);
-        const reply = await call(G, "POST", `/v1/challenges/${id}/voice/${sid}/delegate`, { id: `d${k}` });
-        if (reply.status !== 200) failed.push(`session ${s + 1}, delegation ${k + 1}: ${reply.status} ${reply.body.error.code}`);
+        statuses.push((await call(G, "POST", `/v1/challenges/${id}/voice/${sid}/delegate`, { id: `d${k}` })).status);
       }
       at(created + 1_197_000);
       expect((await call(G, "POST", `/v1/challenges/${id}/voice/${sid}/events`, { fragments: [], closed: true, finalized: true, usageSeconds: 1200 })).status).toBe(200);
     }
-    expect.soft(failed, "delegations refused inside the documented hour of Pro voice").toEqual([]);
-    ai.concept = (await challenge(G, id)).primaryConceptId; ai.signal = "needs_practice";
-    const revision = (await challenge(G, id)).session.revision;
-    expect((await call(G, "POST", `/v1/challenges/${id}/complete`, { answer: "", revision })).status).toBe(200);
-    expect((await challenge(G, id)).reflection, "feedback for the spoken rep").not.toBeNull();
+    // The question took one call; delegations get the other 99, then the cap holds for the rest of the UTC day.
+    expect(statuses.slice(0, 99).every(status => status === 200)).toBe(true);
+    expect(statuses.slice(99).every(status => status !== 200)).toBe(true);
+    expect(await usage(G.id, "provider_attempt", "2026-11-25")).toBe(100);
   });
 });

@@ -129,6 +129,10 @@ app.onError((error, c) => {
     fault.status as 400,
   );
 });
+/** A body that isn't JSON is the client's mistake: a 400, never a 5xx or a Sentry event. */
+const jsonBody = (c: Context<AppEnv>) => c.req.json().catch(() => {
+  throw new Fault("invalid_input", 400, "Check the supplied fields.");
+});
 /** A polling stream has already answered 200, so onError never sees its failures; the client sees the stream end. */
 const streamFailed = (c: Context<AppEnv>) => async (error: Error) => {
   if (error instanceof Fault && error.status < 500) return;
@@ -139,7 +143,14 @@ app.get("/health", (c) => c.json({ status: "ok" }));
 app.get("/privacy", (c) => c.html(privacyPolicy(c.env)));
 app.get("/support", (c) => c.html(supportPage(c.env)));
 // Apple posts here unauthenticated; the payload's own signature chain is the credential.
-app.post("/apple/notifications", async c => c.json(await applyAppleNotification(c.env, await c.req.json())));
+app.post("/apple/notifications", async c => {
+  const ip = c.req.header("CF-Connecting-IP") ?? "unknown";
+  if (c.env.APPLE_NOTIFICATIONS_LIMIT && !(await c.env.APPLE_NOTIFICATIONS_LIMIT.limit({ key: ip })).success) {
+    console.warn(JSON.stringify({ event: "apple_notifications_limited" }));
+    return c.json({ error: { code: "rate_limited", message: "Too many notifications. Retry later.", retryable: true, requestId: c.get("requestId") } }, 429);
+  }
+  return c.json(await applyAppleNotification(c.env, await jsonBody(c)));
+});
 app.get("/v1/widget", async (c) => {
   const token = c.req.header("Authorization")?.replace(/^Bearer /, "");
   if (!token)
@@ -183,9 +194,9 @@ app.get("/v1/taxonomy", c => c.json({version:1,concepts}));
 app.get("/v1/library", async c => c.json(await libraryPage(c.env,c.get("account").id,new URL(c.req.url).searchParams)));
 app.get("/v1/library/coverage", async c => c.json({concepts:await coverage(c.env,c.get("account").id)}));
 app.get("/v1/recall", async c => c.json(await recallDeck(c.env,c.get("account").id)));
-app.post("/v1/recall/:id/review", async c => c.json(await reviewRecall(c.env,c.get("account").id,c.req.param("id"),requireCommand(c.req.header("Idempotency-Key")),await c.req.json())));
+app.post("/v1/recall/:id/review", async c => c.json(await reviewRecall(c.env,c.get("account").id,c.req.param("id"),requireCommand(c.req.header("Idempotency-Key")),await jsonBody(c))));
 app.get("/v1/questions/:id", async c => c.json(await questionDetail(c.env,c.get("account").id,c.req.param("id"),c.req.query("cursor"))));
-app.put("/v1/questions/:id/eligibility", async c => c.json(await setEligibility(c.env,c.get("account").id,c.req.param("id"),requireCommand(c.req.header("Idempotency-Key")),await c.req.json())));
+app.put("/v1/questions/:id/eligibility", async c => c.json(await setEligibility(c.env,c.get("account").id,c.req.param("id"),requireCommand(c.req.header("Idempotency-Key")),await jsonBody(c))));
 app.post("/v1/questions/:id/start", async c => c.json(await startQuestion(c.env,c.get("account").id,c.req.param("id"),requireCommand(c.req.header("Idempotency-Key")))));
 app.get("/v1/bootstrap", async (c) => {
   const a = c.get("account");
@@ -222,7 +233,7 @@ app.get("/v1/bootstrap", async (c) => {
 });
 app.post("/v1/entitlement", async c => {
   const account = c.get("account").id;
-  const entitlement = await recordEntitlement(c.env, account, await c.req.json());
+  const entitlement = await recordEntitlement(c.env, account, await jsonBody(c));
   return c.json({ plan: await planFor(c.env, account), entitlement });
 });
 // Puts the owner's account back behind the invite gate so the very first run can be replayed; the next redeem reactivates it.
@@ -243,7 +254,7 @@ app.post("/v1/developer/plan", async c => {
   const account = c.get("account").id;
   const permitted = (c.env.DEVELOPER_ACCOUNTS ?? "").split(",").map(id => id.trim()).filter(Boolean);
   if (!permitted.includes(account)) throw new Fault("not_found", 404, "Not found.");
-  const { plan } = developerPlanSchema.parse(await c.req.json());
+  const { plan } = developerPlanSchema.parse(await jsonBody(c));
   await c.env.DB.prepare("UPDATE accounts SET plan_override=? WHERE id=?").bind(plan, account).run();
   return c.json({ plan: await planFor(c.env, account), planOverride: plan ?? undefined });
 });
@@ -270,7 +281,7 @@ app.delete("/v1/developer/practice", async (c) => {
 app.post("/v1/invite", async (c) => {
   const { code } = z
     .object({ code: z.string().min(8).max(200) })
-    .parse(await c.req.json());
+    .parse(await jsonBody(c));
   const account = c.get("account");
   const digest = await hash(code.trim());
   await c.env.DB.batch([
@@ -295,7 +306,7 @@ app.post("/v1/invite", async (c) => {
   return c.json({ ok: true });
 });
 app.post("/v1/settings/preview", async (c) => {
-  const profile = practiceProfileSchema.parse(await c.req.json());
+  const profile = practiceProfileSchema.parse(await jsonBody(c));
   const account = c.get("account").id;
   await consumeUsage(c.env, account, "personalization_preview", 10);
   const settings = await settingsFor(c.env, account);
@@ -306,7 +317,7 @@ app.post("/v1/settings/preview", async (c) => {
   return c.json({text: result.body});
 });
 app.put("/v1/settings", async (c) => {
-  const settings = settingsSchema.parse(await c.req.json());
+  const settings = settingsSchema.parse(await jsonBody(c));
   settings.model = MODEL_ID;
   const account = c.get("account").id;
   const previous = await settingsFor(c.env, account);
@@ -425,7 +436,7 @@ app.put("/v1/challenges/:id/companion", async (c) =>
       c.get("account").id,
       c.req.param("id"),
       requireCommand(c.req.header("Idempotency-Key")),
-      await c.req.json(),
+      await jsonBody(c),
     ),
   ),
 );
@@ -435,7 +446,7 @@ app.post("/v1/challenges/:id/deliveries", async (c) =>
       c.env,
       c.get("account").id,
       c.req.param("id"),
-      await c.req.json(),
+      await jsonBody(c),
     ),
   ),
 );
@@ -446,7 +457,7 @@ app.post("/v1/challenges/:id/help", async (c) =>
       c.get("account").id,
       c.req.param("id"),
       requireCommand(c.req.header("Idempotency-Key")),
-      await c.req.json(),
+      await jsonBody(c),
     ),
     202,
   ),
@@ -458,7 +469,7 @@ app.post("/v1/challenges/:id/adopt", async (c) =>
       c.get("account").id,
       c.req.param("id"),
       requireCommand(c.req.header("Idempotency-Key")),
-      await c.req.json(),
+      await jsonBody(c),
     ),
   ),
 );
@@ -490,11 +501,11 @@ app.get("/v1/challenges/:id/interview/:turn/stream", async c => {
     }
   }, streamFailed(c));
 });
-app.post("/v1/challenges/:id/voice", async c => c.json(await startVoice(c.env,c.get("account").id,c.req.param("id"),requireCommand(c.req.header("Idempotency-Key")),await c.req.json()),201));
-app.post("/v1/challenges/:id/voice/:voice/events", async c => c.json(await voiceEvents(c.env,c.get("account").id,c.req.param("id"),c.req.param("voice"),await c.req.json())));
-app.post("/v1/challenges/:id/voice/:voice/delegate", async c => c.json(await delegateVoice(c.env,c.get("account").id,c.req.param("id"),c.req.param("voice"),await c.req.json())));
+app.post("/v1/challenges/:id/voice", async c => c.json(await startVoice(c.env,c.get("account").id,c.req.param("id"),requireCommand(c.req.header("Idempotency-Key")),await jsonBody(c)),201));
+app.post("/v1/challenges/:id/voice/:voice/events", async c => c.json(await voiceEvents(c.env,c.get("account").id,c.req.param("id"),c.req.param("voice"),await jsonBody(c))));
+app.post("/v1/challenges/:id/voice/:voice/delegate", async c => c.json(await delegateVoice(c.env,c.get("account").id,c.req.param("id"),c.req.param("voice"),await jsonBody(c))));
 app.post("/v1/challenges/:id/interview", async c => {
-  return c.json(await requestInterview(c.env,c.get("account").id,c.req.param("id"),requireCommand(c.req.header("Idempotency-Key")),interviewInputSchema.parse(await c.req.json()),inline(c)),202);
+  return c.json(await requestInterview(c.env,c.get("account").id,c.req.param("id"),requireCommand(c.req.header("Idempotency-Key")),interviewInputSchema.parse(await jsonBody(c)),inline(c)),202);
 });
 app.post("/v1/challenges/:id/interview/:turn/retry", async c => c.json(await retryInterview(c.env,c.get("account").id,c.req.param("id"),c.req.param("turn"),requireCommand(c.req.header("Idempotency-Key"))),202));
 app.post("/v1/challenges/:id/interview/:turn/cancel", async c => c.json(await cancelInterviewAssistance(c.env,c.get("account").id,c.req.param("id"),c.req.param("turn"))));
@@ -515,7 +526,7 @@ app.put("/v1/challenges/:id/draft", async (c) => {
     id = c.req.param("id"),
     command = requireCommand(c.req.header("Idempotency-Key"));
   await ownedChallenge(c.env, a, id);
-  const { answer, revision } = answerSchema.parse(await c.req.json());
+  const { answer, revision } = answerSchema.parse(await jsonBody(c));
   const old = await c.env.DB.prepare(
     "SELECT command_id,revision FROM sessions WHERE challenge_id=?",
   )
@@ -543,7 +554,7 @@ app.post("/v1/challenges/:id/complete", async (c) => {
   const a = c.get("account").id,
     id = c.req.param("id"),
     command = requireCommand(c.req.header("Idempotency-Key"));
-  const body = answerSchema.parse(await c.req.json());
+  const body = answerSchema.parse(await jsonBody(c));
   await complete(
     c.env,
     a,
@@ -750,6 +761,7 @@ app.delete("/v1/challenges/:id", async (c) => {
     c.env.DB.prepare(`INSERT OR IGNORE INTO spent_free_reps(account_id,stamp) SELECT fr.account_id,json_extract(fr.data,'$.freeRepAt') FROM challenges fr WHERE fr.id=? AND fr.account_id=? AND json_extract(fr.data,'$.freeRepAt') IS NOT NULL AND NOT ${abandonedUnused("fr")}`).bind(id, a),
     // Voice sessions cascade with the challenge; their time stays counted, or deleting would reset voice limits.
     c.env.DB.prepare("INSERT OR IGNORE INTO spent_voice(id,account_id,created_at,seconds) SELECT id,account_id,created_at,seconds FROM counted_voice WHERE account_id=? AND id IN (SELECT id FROM voice_sessions WHERE challenge_id=? AND account_id=?)").bind(a, id, a),
+    c.env.DB.prepare("INSERT OR IGNORE INTO spent_voice(id,account_id,created_at,seconds,waived) SELECT id,account_id,created_at,0,1 FROM voice_sessions WHERE challenge_id=? AND account_id=? AND waived=1").bind(id, a),
     c.env.DB.prepare("DELETE FROM challenges WHERE id=? AND account_id=?").bind(id, a),
   ]);
   return c.json({ ok: true });
@@ -766,7 +778,7 @@ app.put("/v1/credential", async (c) => {
         .regex(/^[\w.-]+\/[\w.:~-]+$/)
         .default(MODEL_ID),
     })
-    .parse(await c.req.json());
+    .parse(await jsonBody(c));
   // One tiny structured call proves the key works and that this model can
   // return the strict JSON every Drillbit feature depends on.
   const result = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -852,7 +864,7 @@ app.post(VOICE_NOTE_PATH, async (c) => {
     if (existing.account_id !== a) throw new Fault("command_reused", 409, "This command belongs to another request.");
     return c.json(note(existing));
   }
-  const input = voiceNoteSchema.parse(await c.req.json());
+  const input = voiceNoteSchema.parse(await jsonBody(c));
   let audio: Uint8Array;
   try { audio = Uint8Array.from(atob(input.audio), ch => ch.charCodeAt(0)); }
   catch { throw new Fault("invalid_input", 400, "That recording didn't come through. Try again."); }
@@ -873,7 +885,7 @@ app.post(VOICE_NOTE_PATH, async (c) => {
   return c.json(note({ id, created_at: now, duration_seconds: input.durationSeconds }), 201);
 });
 app.post("/v1/paywall/view", async (c) => {
-  await recordPaywallView(c.env, c.get("account").id, await c.req.json());
+  await recordPaywallView(c.env, c.get("account").id, await jsonBody(c));
   return c.json({ ok: true }, 201);
 });
 app.post("/v1/devices", async (c) => {
@@ -938,7 +950,7 @@ app.post("/v1/challenges/:id/coach", async (c) => {
     .object({
       question: z.string().max(4000).default("Give me one useful hint."),
     })
-    .parse(await c.req.json());
+    .parse(await jsonBody(c));
   const context = await detail(c.env, a, id);
   if (!["ready", "in_progress"].includes(String(context.lifecycle)))
     throw new Fault(

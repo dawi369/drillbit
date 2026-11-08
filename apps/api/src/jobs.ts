@@ -27,7 +27,7 @@ import { interviewSchemaFor, revisedGuidedPath } from "./interview";
 import { groundReflection } from "./learning";
 import { selectConcept } from "./library";
 import { reportFailure } from "./monitoring";
-import type { Env } from "./platform";
+import { hash, type Env } from "./platform";
 import { normalizeQuestionMarkup, plainQuestion } from "./prompts/formatting";
 import { guidanceMode } from "./prompts/teaching";
 import { activeChallenge, COUNTED, detail, dispatch, type Job } from "./store";
@@ -60,6 +60,8 @@ export async function runJob(env: Env, id: string) {
         job.account_id,
       ),
       env.DB.prepare("DELETE FROM accounts WHERE id=?").bind(job.account_id),
+      env.DB.prepare("INSERT OR REPLACE INTO deleted_subjects(subject_hash,until) VALUES(?,?)")
+        .bind(await hash(account.subject), new Date(Date.now() + 600000).toISOString()),
     ]);
     return;
   }
@@ -401,6 +403,13 @@ export async function reconcile(env: Env) {
   )
     .bind(new Date(Date.now() - 120000).toISOString())
     .run();
+  await env.DB.prepare("DELETE FROM deleted_subjects WHERE until<?").bind(timestamp()).run();
+  // An interview job carries the whole conversation as `context` (about 13 KB, nine tenths of all job bytes) and
+  // nothing reads it once the job is done. A week on it's dropped; the action, turn id and settings stay. Each tick
+  // takes the hour that just turned a week old, so a cron gap longer than an hour leaves those rows as they were.
+  const week = Date.now() - 7 * 86_400_000;
+  await env.DB.prepare("UPDATE jobs SET input=json_remove(input,'$.context') WHERE status IN ('completed','cancelled') AND created_at<? AND created_at>=? AND kind='interview' AND json_type(input,'$.context') IS NOT NULL")
+    .bind(new Date(week).toISOString(), new Date(week - 3_600_000).toISOString()).run();
 }
 
 /** The ticket's text: the prompt, then its constraints as a bulleted list. */

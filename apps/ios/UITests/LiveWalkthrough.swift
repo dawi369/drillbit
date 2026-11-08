@@ -65,11 +65,20 @@ final class LiveWalkthrough: XCTestCase {
   }
   /// Interviews open in voice for "Talking it out"; look at the room, then go to typing.
   private func leaveVoiceIfOpen(_ name: String) {
-    Thread.sleep(forTimeInterval: 6)
-    app.tap()
-    guard app.buttons["voiceMute"].exists || app.buttons["voiceEnd"].exists || app.buttons["voiceBack"].exists || app.buttons["Show me"].exists else { return }
+    // A real voice session takes several seconds to connect before its controls appear.
+    let deadline = Date().addingTimeInterval(20)
+    var open = false
+    repeat {
+      open = app.buttons["voiceMute"].exists || app.buttons["voiceEnd"].exists || app.buttons["voiceBack"].exists || app.buttons["Show me"].exists
+      if open || editor.exists { break }
+      Thread.sleep(forTimeInterval: 1)
+    } while Date() < deadline
+    guard open else { return }
+    Thread.sleep(forTimeInterval: 2)
     shot(name)
     if tapIfPresent(app.buttons["Show me"], timeout: 1) { Thread.sleep(forTimeInterval: 3); return }
+    // A later session's tip only acknowledges; then leave voice for typing.
+    if tapIfPresent(app.buttons["Got it"], timeout: 1) { Thread.sleep(forTimeInterval: 1) }
     _ = tapIfPresent(app.buttons["voiceEnd"], timeout: 2) || tapIfPresent(app.buttons["voiceBack"], timeout: 2)
     Thread.sleep(forTimeInterval: 4)
   }
@@ -78,6 +87,10 @@ final class LiveWalkthrough: XCTestCase {
     let store = try SKTestSession(configurationFileNamed: "Drillbit")
     store.resetToDefaultState(); store.disableDialogs = true; store.clearTransactions()
     app = XCUIApplication()
+    // A throwaway development account from `bun scripts/e2e-live.ts --ui-account`, signed in by the Debug build.
+    if let ticket = ProcessInfo.processInfo.environment["DRILLBIT_SIGN_IN_TICKET"], !ticket.isEmpty {
+      app.launchArguments += ["--sign-in-ticket", ticket]
+    }
     // System prompts (Apple Account verification, microphone) shouldn't stall the walk.
     addUIInterruptionMonitor(withDescription: "System alerts") { alert in
       for title in ["Allow", "Not Now", "OK"] where alert.buttons[title].exists { alert.buttons[title].tap(); return true }
@@ -100,6 +113,8 @@ final class LiveWalkthrough: XCTestCase {
         shot("setup-\(page)")
       }
       if tapIfPresent(app.buttons["Show me my first question"], timeout: 5) { shot("first-question-requested") }
+      // A fresh device asks for AI consent at the first AI request, which is this one.
+      if tapIfPresent(app.buttons["aiConsentAgree"], timeout: 8) { shot("after-consent-first-question") }
     }
 
     // Came back mid-rep: the interview reopens by itself (in voice, for "Talking it out").
@@ -111,6 +126,7 @@ final class LiveWalkthrough: XCTestCase {
       // Today's rep may already be done: One more opens the next one.
       if tapIfPresent(app.buttons["startPractice"], timeout: 10) || tapIfPresent(app.buttons["prepareQuestion"], timeout: 2)
         || tapIfPresent(app.buttons["oneMore"], timeout: 2) {
+        _ = tapIfPresent(app.buttons["aiConsentAgree"], timeout: 4)
         leaveVoiceIfOpen("voice-on-resume")
         if tapIfPresent(app.buttons["submitPreparation"], timeout: 5) { shot("preparation-submitted") }
       }
@@ -171,6 +187,8 @@ final class LiveWalkthrough: XCTestCase {
       shot("after-finish")
     }
 
+    // The App Store review prompt shows once after feedback, over Home.
+    if tapIfPresent(app.buttons["Not Now"], timeout: 4) { Thread.sleep(forTimeInterval: 1) }
     // Home after the rep, and the one-time reminder question.
     Thread.sleep(forTimeInterval: 3)
     shot("home-after-rep")

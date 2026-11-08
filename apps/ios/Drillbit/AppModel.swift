@@ -529,6 +529,14 @@ import WidgetKit
       launchError = "Couldn’t restore your session. Check your connection and try again."
       return
     }
+    #if DEBUG
+      // A live UI run signs in a throwaway Clerk development user with a Backend API sign-in token, hands-free.
+      if Clerk.shared.user == nil, let index = ProcessInfo.processInfo.arguments.firstIndex(of: "--sign-in-ticket"),
+        index + 1 < ProcessInfo.processInfo.arguments.count
+      {
+        _ = try? await Clerk.shared.auth.signInWithTicket(ProcessInfo.processInfo.arguments[index + 1])
+      }
+    #endif
     if let subject = Clerk.shared.user?.id, subject == SharedStore.secret("subject"),
       let account = SharedStore.secret("account"),
       let data = try? await disk.cached(key: "bootstrap:" + account),

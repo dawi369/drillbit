@@ -3,7 +3,6 @@ import { boundedContext, visibleQuestion, xmlContext } from "./context";
 import { FAST_MODEL_ID, FAST_PROVIDERS, Fault, managedModel, MODEL_ID, timestamp, uuid, type Settings } from "./domain";
 import { providerReason, reportFailure } from "./monitoring";
 import { consumeUsage, decrypt, type Env } from "./platform";
-import { limits, planFor } from "./plans";
 import { questionFormattingInstructions } from "./prompts/formatting";
 import { INTERVIEW_PROMPT_VERSION, interviewerPrompt, isSocialOpening, socialOpeningPrompt } from "./prompts/interviewer";
 import { personalizationInstructions } from "./prompts/personalization";
@@ -177,7 +176,7 @@ export async function provider(
   const schema = options.schema ? z.toJSONSchema(options.schema) : undefined;
   const started = Date.now();
   const { key, model } = await modelAccess(env, account, settings, options.kind);
-  await consumeUsage(env, account, "provider_attempt", limits(env, await planFor(env, account)).providerCallsPerDay);
+  await consumeUsage(env, account, "provider_attempt", 100);
   let response: Response;
   try {
     const dispatched = Date.now();

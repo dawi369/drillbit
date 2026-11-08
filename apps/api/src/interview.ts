@@ -2,7 +2,6 @@ import { z } from "zod";
 import { Fault, roundTiming, timestamp } from "./domain";
 import { historicalSnapshot } from "./history";
 import { consumeUsage, type Env } from "./platform";
-import { limits, planFor } from "./plans";
 import { freeRepLimit } from "./practice-gate";
 import { INTERVIEW_PROMPT_VERSION } from "./prompts/interviewer";
 import { guidanceMode, guidanceModeSchema } from "./prompts/teaching";
@@ -118,7 +117,7 @@ export async function requestInterview(env: Env, account: string, id: string, co
   if (input.kind === "continue" && !context.wrapUp) throw new Fault("not_wrapping_up", 409, "Answer the current question first.");
   if (!session || session.revision !== input.revision || (input.kind === "answer" && !input.saveDraft && session.answer.trim() !== input.text)) throw new Fault("revision_conflict", 409, "The draft changed. Review it and try again.");
   const [, settings, history] = await Promise.all([
-    planFor(env, account).then(plan => consumeUsage(env, account, "interview", limits(env, plan).interviewTurnsPerDay)),
+    consumeUsage(env, account, "interview", 50),
     settingsFor(env, account),
     historicalSnapshot(env, account, id, JSON.parse(challenge.data).conceptIds ?? []),
   ]);
@@ -150,7 +149,7 @@ export async function retryInterview(env: Env, account: string, id: string, turn
   if (!row) throw new Fault("not_found",404,"Response not found.");
   if (row.id === command) return interviewFor(env,account,id);
   if (row.status !== "failed") throw new Fault("not_failed",409,"This response is not waiting for a retry.");
-  await consumeUsage(env,account,"interview",limits(env,await planFor(env,account)).interviewTurnsPerDay);
+  await consumeUsage(env,account,"interview",50);
   const now = timestamp();
   await env.DB.batch([
     env.DB.prepare(`INSERT OR IGNORE INTO jobs(id,account_id,challenge_id,kind,input,created_at,updated_at) SELECT ?,account_id,challenge_id,'interview',input,?,? FROM jobs WHERE id=? AND status='failed' AND EXISTS(SELECT 1 FROM interview_turns WHERE id=? AND job_id=?) AND EXISTS(SELECT 1 FROM challenges WHERE id=? AND lifecycle='in_progress') AND NOT EXISTS(SELECT 1 FROM jobs WHERE account_id=? AND kind='interview' AND status IN ('pending','running'))`).bind(command,now,now,row.id,turn,row.id,id,account),

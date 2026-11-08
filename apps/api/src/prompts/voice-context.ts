@@ -59,3 +59,23 @@ export function voiceDelegationMessages(question: any, history: unknown, intervi
 <spoken_delivery>The same JSON response contract applies. The text will be spoken aloud: one short conversational paragraph, normally two or three sentences. Do not write Markdown, bullet lists, a JSON example inside text, or code fences. Describe example fields in ordinary words. Only say path syntax when the user asks for it. Keep replies under about 60 words; a requested example may run to 120. Older assistant fragments may have been interrupted; never assume they were heard. If the user complains about waiting, acknowledge the wait without denying their experience, inventing a cause or asking them to wait again.</spoken_delivery>`;
   return messages;
 }
+
+/**
+ * The spoken contract's ceiling, enforced: whole sentences up to `maxWords` (the prompt allows about 60 words, 120 for
+ * a requested example). A longer reply would be read out at length or arrive cut mid-sentence by the schema's limit.
+ */
+export function spokenLength(text: string, maxWords = 120): string {
+  const words = (part: string) => part.trim().split(/\s+/).filter(Boolean).length;
+  if (words(text) <= maxWords) return text;
+  const sentences = text.match(/[^.!?]+(?:[.!?]+["'’”)\]]*|$)\s*/g) ?? [text];
+  let kept = "", count = 0;
+  for (const sentence of sentences) {
+    const n = words(sentence);
+    if (count + n > maxWords) break;
+    kept += sentence;
+    count += n;
+  }
+  if (kept.trim()) return kept.trim();
+  // One sentence longer than the whole allowance: cut at the word limit and close it.
+  return text.trim().split(/\s+/).slice(0, maxWords).join(" ").replace(/[,;:\s]+$/, "") + ".";
+}

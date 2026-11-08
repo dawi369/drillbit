@@ -112,3 +112,23 @@ it("deleting a practised question keeps Pro's voice minutes counted for the day 
     mock.mockRestore();
   }
 });
+
+it("deleting a question keeps its waived silent look: a free account still gets only one", async () => {
+  const { subject, a } = await person(), id = await question(a), mock = provider();
+  try {
+    const free1 = { ...free, FREE_VOICE_LIFETIME: "3" } as Env;
+    const look = await startVoice(free1, a, id, crypto.randomUUID(), { sdp: "offer", revision: 2 });
+    const { voiceEvents } = await import("../src/voice");
+    await voiceEvents(free1, a, id, look.id, { fragments: [], closed: true, finalized: true, usageSeconds: 5 });
+    expect(await bindings.DB.prepare("SELECT waived FROM voice_sessions WHERE id=?").bind(look.id).first()).toEqual({ waived: 1 });
+    await bindings.DB.prepare("UPDATE challenges SET lifecycle='completed' WHERE id=?").bind(id).run();
+    expect((await request(`challenges/${id}`, subject, "DELETE", free1)).status).toBe(200);
+    // A second silent look on a new question is billed: the free plan's one waived look is spent.
+    const next = await question(a);
+    const second = await startVoice(free1, a, next, crypto.randomUUID(), { sdp: "offer", revision: 2 });
+    await voiceEvents(free1, a, next, second.id, { fragments: [], closed: true, finalized: true, usageSeconds: 5 });
+    expect(await bindings.DB.prepare("SELECT waived FROM voice_sessions WHERE id=?").bind(second.id).first()).toEqual({ waived: 0 });
+  } finally {
+    mock.mockRestore();
+  }
+});

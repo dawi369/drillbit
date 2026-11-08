@@ -12,7 +12,7 @@ import {
     type Settings,
 } from "./domain";
 import { interviewFor } from "./interview";
-import type { Env } from "./platform";
+import { hash, type Env } from "./platform";
 import { assertNoVoice } from "./voice";
 export type Account = { id: string; subject: string; status: string };
 export type ChallengeRow = {
@@ -41,10 +41,11 @@ export async function accountFor(env: Env, subject: string): Promise<Account> {
   // Open signup lets anyone in and lifts accounts still waiting on an invite; it never revives one being deleted.
   const status = env.OPEN_SIGNUP === "true" ? "active" : "invited";
   // Every authenticated request starts here, so it is one round trip to D1.
+  // A subject deleted in the last few minutes still holds valid tokens; it gets no new account.
   const [, , selected] = await env.DB.batch([
     env.DB.prepare(
-      "INSERT INTO accounts(id,subject,status,last_seen,created_at) VALUES(?,?,?,?,?) ON CONFLICT(subject) DO UPDATE SET last_seen=excluded.last_seen, status=CASE WHEN accounts.status='invited' AND excluded.status='active' THEN 'active' ELSE accounts.status END",
-    ).bind(id, subject, status, now, now),
+      "INSERT INTO accounts(id,subject,status,last_seen,created_at) SELECT ?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM deleted_subjects WHERE subject_hash=? AND until>?) ON CONFLICT(subject) DO UPDATE SET last_seen=excluded.last_seen, status=CASE WHEN accounts.status='invited' AND excluded.status='active' THEN 'active' ELSE accounts.status END",
+    ).bind(id, subject, status, now, now, await hash(subject), now),
     env.DB.prepare(
       "INSERT OR IGNORE INTO settings(account_id,data,next_due) SELECT id,?,? FROM accounts WHERE subject=? AND status<>'deleting'",
     ).bind(JSON.stringify(defaults), nextDaily(defaults), subject),

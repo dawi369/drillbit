@@ -148,3 +148,17 @@ it("a mock reply can spend the round's one curveball, and never a second", () =>
  expect(parseInterviewModelResult(mock, interviewSchemaFor("answer"), {move:"ask_one",text:"Why a queue?",parameters:[]}).curveball).toBeUndefined();
  expect(messagesFor("interview", mock)[0].content).toContain("Curveball: exactly once per round");
 });
+
+it("keeps spoken guidance to whole sentences within the spoken contract's 120 words", async () => {
+  const { spokenLength } = await import("../src/prompts/voice-context");
+  const short = "Good. What stops a retry from running the job twice?";
+  expect(spokenLength(short)).toBe(short);
+  const sentence = (i: number) => `Sentence ${i} has exactly eight words in it. `;
+  const long = Array.from({ length: 40 }, (_, i) => sentence(i)).join("");
+  const kept = spokenLength(long);
+  expect(kept.split(/\s+/).length).toBe(120);
+  expect(kept.endsWith("in it.")).toBe(true);
+  // A single runaway sentence is cut at the limit and closed, never left mid-word.
+  const runaway = Array.from({ length: 300 }, () => "word").join(" ");
+  expect(spokenLength(runaway)).toBe(Array.from({ length: 120 }, () => "word").join(" ") + ".");
+});

@@ -969,6 +969,49 @@ async function sentry() {
   } catch (error) { run.sentry = { error: (error as Error).message }; }
 }
 
+// UI mode, for apps/ios/UITests/LiveWalkthrough on a Debug simulator build (`--sign-in-ticket`):
+//   bun scripts/e2e-live.ts --ui-account   sets up an invited Pro account and prints SIGN_IN_TICKET=<30-minute token>
+//   bun scripts/e2e-live.ts --ui-cleanup   deletes that account through the API and checks nothing is left
+// The ticket only goes to stdout, for the caller to pass on; the ids (no secrets) wait in .local/e2e/ui-account.json.
+const uiFile = join(ROOT, ".local/e2e/ui-account.json");
+if (process.argv.includes("--ui-account")) {
+  try {
+    await setup();
+    const ticket = await clerk("POST", "/sign_in_tokens", { user_id: clerkUser, expires_in_seconds: 1800 });
+    if (ticket.status !== 200 || typeof ticket.json?.token !== "string") throw new Error(`Sign-in token failed (${ticket.status} ${ticket.errors ?? ""})`);
+    writeFileSync(uiFile, JSON.stringify({ clerkUser, account, inviteHash, entitlement }));
+    console.log(`UI account ready (${short(account!)}); clean up with --ui-cleanup`);
+    console.log(`SIGN_IN_TICKET=${ticket.json.token}`);
+  } catch (error) {
+    console.error("UI account setup failed: " + (error as Error).message);
+    await cleanup();
+    process.exit(1);
+  }
+  process.exit(0);
+}
+if (process.argv.includes("--ui-cleanup")) {
+  const saved = JSON.parse(readFileSync(uiFile, "utf8"));
+  ({ clerkUser, account, inviteHash, entitlement } = saved);
+  try {
+    for (const row of await d1(`SELECT id FROM challenges WHERE account_id=${safe(account!)}`)) ids.challenges.add(row.id);
+    for (const row of await d1(`SELECT id FROM jobs WHERE account_id=${safe(account!)}`)) ids.jobs.add(row.id);
+    for (const row of await d1(`SELECT id FROM voice_sessions WHERE account_id=${safe(account!)}`)) ids.voice.add(row.id);
+    for (const row of await d1(`SELECT id FROM questions WHERE account_id=${safe(account!)}`)) ids.questions.add(row.id);
+    const session = await clerk("POST", "/sessions", { user_id: clerkUser });
+    clerkSession = session.json?.id ?? null;
+    await costs();
+    await deleteAccount();
+  } catch (error) {
+    finding("script", "ui-cleanup", (error as Error).message);
+  } finally {
+    await cleanup();
+    save();
+    console.log(`${run.steps.filter(step => !step.ok).length} failed, ${run.findings.length} findings: ${JSON.stringify(run.findings)}`);
+    (await import("node:fs")).rmSync(uiFile, { force: true });
+  }
+  process.exit(0);
+}
+
 let repA: any = null;
 try {
   await setup();

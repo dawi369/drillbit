@@ -11,6 +11,8 @@
   },
   // Sentry's release: the deployed version id (top level and production, since bindings don't inherit).
   "version_metadata": { "binding": "CF_VERSION_METADATA" },
+  // /apple/notifications is public and each request verifies a certificate chain; Apple sends a handful per purchase.
+  "ratelimits": [{ "name": "APPLE_NOTIFICATIONS_LIMIT", "namespace_id": "1101", "simple": { "limit": 30, "period": 60 } }],
   // Run beside the D1 primary (Marseille): each request makes several sequential queries.
   "placement": { "mode": "targeted", "region": "azure:francesouth" },
   "vars": {
@@ -69,6 +71,7 @@
       // Cloudflare creates the DNS record and certificate; the host stays stable if the Worker ever moves.
       "routes": [{ "pattern": "api.drillbit.t23.dev", "custom_domain": true }],
       "version_metadata": { "binding": "CF_VERSION_METADATA" },
+      "ratelimits": [{ "name": "APPLE_NOTIFICATIONS_LIMIT", "namespace_id": "1102", "simple": { "limit": 30, "period": 60 } }],
       "vars": {
         "CLERK_ISSUER": "https://clerk.drillbit.t23.dev",
         "MODEL_ID": "openai/gpt-6-luna",
