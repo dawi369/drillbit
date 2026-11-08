@@ -317,7 +317,8 @@ private struct MicControl: View {
   enum State: Equatable { case start, connecting, muted, live }
   let state: State
   let action: () -> Void
-  @State private var pulse = false
+  // Qualified: the nested `State` above shadows SwiftUI's property wrapper, which newer compilers reject.
+  @SwiftUI.State private var pulse = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   private let size: CGFloat = 80
   private var filled: Bool { state == .start || state == .live }
