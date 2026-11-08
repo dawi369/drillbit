@@ -406,3 +406,79 @@ Server: a free account's silent voice look is waived once in total (Pro keeps tw
 ### ASO pass, layered icon and build 20 — 6 November 2026
 
 Applied the before.click ASO skill (alexszczurek/before-skills): new name, subtitle and keywords, description and promo text (`docs/app-store-readiness.md` section 6), the 6 November captioned screenshot set, and a current `review-paywall.png`. The app icon is now a layered Icon Composer icon (`apps/ios/Drillbit/AppIcon.icon`), rendered by `scripts/generate-app-icon.swift` and checked in all six appearances with `ictool`; the flat render is byte-identical to the old icon. Release **1.0 (20)** archived, verified against production and uploaded ("Upload succeeded"); dSYMs on Sentry. The first upload attempt ran out of disk while exporting; old local archives (1.0-14 to 1.0-18) and temporary simulator builds were deleted to make room. The App Store Connect side (name, subtitle, keywords, screenshots, review notes, subscription review images, build selection) is written up for a computer-use agent in `computer-use.md` at the repo root.
+
+### Submission recheck and owner Pro — 7 November 2026
+
+Live App Store Connect: version 1.0 is Ready for Review with build 20 selected; existing draft has four Items Ready to Submit (app version, subscription group, weekly and yearly). No Submit for Review action performed. Manual release retained. TestFlight's latest 1.0 upload is build 20, uploaded 6 November at 20:43 CET, processed (Ready to Submit), assigned to Owner Testing and Friends testing, with one installation. Source changes since the build-20 commit are documentation/assets only; no newer binary is needed for those changes.
+
+Owner's sole active production account `e55e3dd1-c8f2-4a02-9351-414615f21944` was granted non-expiring Pro with entitlement `manual-owner-20261107`, product `dawi.drillbit.pro.yearly`, environment `Manual`, status `active`, expiry NULL. Account `plan_override` remains NULL. Live deployed Worker `26edeeb5-70ba-4632-9a01-980e9c2aff5a` has no DEVELOPER_ACCOUNTS, PRACTICE_UNLIMITED_ACCOUNTS or VOICE_UNLIMITED_ACCOUNTS bindings; no developer role or unlimited bypass granted. Normal Pro fair-use limits apply. Revoke only this grant with `DELETE FROM entitlements WHERE original_transaction_id='manual-owner-20261107'` against production D1. No deployment or billing transaction was required. Database/config verified; the updated plan has not been observed on the physical phone in this pass.
+
+Live production checks: health/privacy/support 200, unauthenticated bootstrap 401; Sentry issue lists for drillbit-api and drillbit-ios returned no open issues. Python urllib requests initially returned 403; curl requests to the same endpoints succeeded. Apple provider balances and a fresh authenticated AI request were not tested. Owner previously reported iPhone validation; this pass does not re-run physical-device acceptance or certify every unchecked checklist item.
+
+### Background-refresh crash, Sentry hardening and build 21 — 8 November 2026
+
+Sentry DRILLBIT-IOS-5 (build 18, iPhone15,4, iOS 27.2): fatal `EXC_BREAKPOINT` in `_dispatch_assert_queue_fail` under `closure in DrillbitApp.init`, called from `BGTaskScheduler _runTask:registration:`. The launch handler is formed on the main actor; `using: nil` ran it on `com.apple.BGTaskScheduler (dawi.drillbit.refresh)`, so Swift 6's isolation check trapped on entry. BackgroundTasks has no daemon in the simulator, so the reproduction drove the real registered block through LLDB: the `HEAD` build (`acf1b87`) trapped with the Sentry stack; the fixed build ran the block on the main queue through refresh, reschedule and `setTaskCompleted(success: true)`. `BackgroundRefreshTests` fails if the queue reverts to `nil`. Not yet seen: a background refresh of build 21 on a phone.
+
+Sentry stays error-only (no performance tracing; owner decision). Changes: `device_app_hash`, a per-install hash, is removed from the iOS scope and `beforeSend`. App and Worker 5xx reports carry `request_id`, the Worker's `X-Request-ID`. The Worker's Sentry release is its version id (`CF_VERSION_METADATA`). Live checks: a signed Debug simulator build with the DSN sent a test event and a bug report, neither with `device_app_hash` nor a user. A malformed `POST /apple/notifications` to development produced the first live Worker 5xx in drillbit-api (since round two, below, a body that isn't JSON is a 400 instead), with release, route, code and `request_id` matching the response header and no query or body. All three test issues are resolved.
+
+Tests: API `bun run test` 202 passed and `tsc --noEmit` clean; `swift test --package-path apps/ios` 58 passed; hosted `DrillbitTests` 77 passed on the iPhone 17 simulator.
+
+Workers deployed: development `819524fc-7b25-4ce8-8944-ae6821b986d0`, production `5142f2c8-2d53-4f0b-8f0f-2805be991696`; health, privacy and support 200, unauthenticated bootstrap 401. No migration.
+
+Release **1.0 (21)** from commit `df37b0c` archived, verified against production and uploaded with `scripts/release-ios.sh --upload` ("Upload succeeded"). dSYMs uploaded to t23/drillbit-ios with `sentry-cli` (`SENTRY_AUTH_TOKEN` wasn't set, so the script skipped them). The review draft still selects build 20; swapping it for 21 and submitting is left to the owner. Not yet checked: Apple processing (xcodebuild reported "Uploaded package is processing"; `asc` has no credentials here) and the build on a physical device.
+
+### Launch run: a simulated Pro week, live end-to-end and build 22 — 8 November 2026
+
+- **Simulated week** (`apps/api/tests/pro-week.test.ts`, local D1 only): two Pro subscribers (Los Angeles weekly, Berlin yearly) through eight days, plus lapse/grace/recovery and a DST change, all over HTTP with signed App Store transactions.
+  - It found that typed turns stopped at 50/day, all AI calls at 100/day, and the daily question used a fixed 10-generation cap. It also found that the voice "back" time was early.
+  - The daily question and the "back" time are fixed. The 50 and 100 caps were raised for Pro, then restored on purpose in round two (below). The week passes 14/14.
+  - The fake clock must never be ahead while `reconcile` runs: the cron sweep is account-wide, so the test's `cron()` helper runs it in real time.
+- **Live API run on development** (`bun scripts/e2e-live.ts`): a throwaway Clerk dev user with an invite and a `manual-e2e-20261108-*` Pro entitlement does onboarding, the daily question, extra questions, an interview with help/nudge/example, feedback, Recall, Library, a warm-up and export. Voice is real WebRTC through werift (installed in `.local/e2e/voice`): ICE/DTLS connected, a delegation, a spoken close and a waived silent one. Then deletion through the API, checked across 49 account-owned tables.
+  - Six runs before the fixes and one after found one bug: a voice session left open on a skipped question blocked typing account-wide. It's fixed, with tests in `voice-lifecycle.test.ts`.
+  - Reading the code turned up a second bug: Library deletes handed back voice minutes and the free voice mock. It's fixed by migration 0020.
+  - Final run, on Worker `759d078f-fe34-4a21-b080-b4015df2f585`: 129 steps, 0 failures, 0 findings.
+  - Cost: OpenRouter about $0.013 per run; about 37 s of voice per run.
+  - The Clerk development instance takes usernames, not emails, for Backend API users.
+- **Measured live on development:** question stream first text about 1 s, total about 2 s. Interview POST 0.25–0.5 s, reply stream 0.5–1.5 s. Feedback 2–6 s. Voice start 1.0–1.4 s, delegate 1.8–3.1 s. Deletion finished in 2–8 s. Streams last a few seconds, so the 100 ms polling costs tens of D1 reads per stream; no backoff needed at launch scale.
+- **Tests:** API `bun run test` 221 passed (24 files) and `tsc --noEmit` clean. `swift test --package-path apps/ios` 58 passed. Hosted `DrillbitTests` 77 passed. If a full API run dies before any test with `No such module "node:vm"`, kill leftover `workerd` processes from crashed runs by PID.
+- **Deployed:** migration `0020_spent_voice.sql` to development and production (production backed up first to `.local/backups/before-spent-voice-prod-20261108.sql`). Workers: development `759d078f-fe34-4a21-b080-b4015df2f585`, production `3fd2389e-b29b-472d-ba84-aa08baf9d6f2`. Health, privacy and support return 200; unauthenticated bootstrap returns 401. `counted_voice` matches `voice_sessions` on both.
+- **Release 1.0 (22)** from commit `218a250` was archived, verified against production and uploaded ("Upload succeeded"); dSYMs uploaded with `sentry-cli`. Not yet checked: Apple processing and the build on a physical device. The review draft still selects build 20; selecting 22 and submitting is the owner's.
+- **Known, not fixed** (all but the R2 move were fixed in round two, below):
+  - A request in the ≤60 s token window after account deletion can recreate an empty account row for the deleted Clerk subject (`accountFor`).
+  - Deleting a question also resets its waived silent-look count.
+  - Spoken guidance from delegate sometimes runs to the 2,400-character schema cap; the live model paraphrases it, but the voice prompt deserves an evaluated look.
+  - Voice-note audio belongs in R2 if notes become common.
+  - `/apple/notifications` should get a Cloudflare rate-limiting rule.
+
+### Launch fixes, round two — 8 November 2026
+
+**Owner decision:** the 50 typed turns a day and 100 AI calls a day stay as they were, for every plan. Pro's 400/1,000 from the first round is reverted, and `pro-week.test.ts` asserts the caps. The daily question's use of the plan's 20 generations stays.
+
+**Fixed:**
+- A deleted account can't be recreated by a still-valid token (`deleted_subjects`, migration 0021).
+- Deleting a question keeps its waived silent looks (migration 0022).
+- `/apple/notifications` is rate-limited per IP: a 150-request parallel burst on development drew 9 × 429, since Workers rate limiting is eventually consistent.
+- Every route answers junk JSON with 400, not a 500 plus a Sentry event (checked live: `{bad` → 400 on both Workers).
+- Spoken guidance is cut to whole sentences within 120 words.
+- Finished interview jobs drop their 13 KB `context` after a week. Development measured jobs at about 85% of stored bytes, about 35 KB per rep.
+
+**Sentry** (checked with the stored login):
+- Spike protection is on for both Drillbit projects.
+- In the last 30 days Drillbit sent 9 errors and 3 feedback reports; the org's 22,000 transactions all come from `operloom`.
+- Drillbit has only the default "high priority issues" alert. Creating "new production error" and "regression" alerts like operloom's failed: the login lacks `alerts:write`. Add them in the Sentry UI.
+- The plan's quota isn't readable with this token.
+
+**Live UI run:**
+- `bun scripts/e2e-live.ts --ui-account` prints a 30-minute Clerk sign-in token; the Debug app signs in with `--sign-in-ticket`. Pass it as `TEST_RUNNER_DRILLBIT_SIGN_IN_TICKET` with `TEST_RUNNER_DRILLBIT_LIVE=1` to `-only-testing:DrillbitUITests/LiveWalkthrough` on a signed Debug build (`CODE_SIGNING_ALLOWED=YES`). Then `--ui-cleanup` deletes the account and checks every table.
+- Five runs on the iPhone 17 simulator against development (the fullest took 583 s) covered sign-in, onboarding, AI consent, question writing, typed turns with real replies, nudge, example, session style, roadmap, a real voice room (advancing the guided path), finish, feedback, the review prompt, Home's ticket summary with its Recall card, and the reminder popup.
+- Harness gaps fixed along the way: consent at the first AI request, voice taking more than 6 s to connect, the "Got it" voice tip, and the review prompt.
+- Still blocking the harness: a fresh account's tab tour ("Three more tabs… Show me") stops the Settings/Library/Recall part of the walk.
+- In guided mode the floating Talk/Send buttons cover the bottom of the composer, so the harness's tap often lands on them. Worth a look on a phone.
+
+**Deployed:**
+- Migrations 0021 and 0022 to development and production; production was backed up first to `.local/backups/before-deleted-subjects-prod-20261108.sql`.
+- Workers: development `bebb1df7-8365-48a6-9c64-9f1efc8522c3`, production `a25fcb95-1827-4279-b02c-95e4cb5ee288`.
+- The full live API run on the new development Worker: 131 steps, 0 failed; the only note was no Recall cards from the scripted answers.
+- No new iOS build: this round's app change is Debug-only.
+
+**Tests:** API 225 passed (24 files, twice) and `tsc` clean; hosted `DrillbitTests` 77 and `swift test` 58 passed. Afterwards the docs were checked against the code: build 22 is now the one to submit in apple-review.md, computer-use.md and app-store-readiness.md; paywall-plan.md §3 states the daily caps inside a rep; the OpenAPI voice-note 429 names `voice_notes_full`.

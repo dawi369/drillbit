@@ -5751,7 +5751,7 @@
             }
           },
           "429": {
-            "description": "Usage limit reached",
+            "description": "Usage limit reached; code usage_limit after the account's five notes today, voice_notes_full when the day's total across all accounts is in. Show the message.",
             "content": {
               "application/json": {
                 "schema": {

@@ -80,6 +80,8 @@ scripts/check-ios.sh
 
 `bun run test` runs the backend's Vitest/D1 suite. `scripts/check-ios-ci.sh` runs the isolated release smoke journeys used by GitHub Actions; `scripts/check-ios.sh` runs the complete screenshot-heavy Simulator suite for local visual acceptance. Contract generation should leave checked-in contracts unchanged.
 
+Against the deployed development backend, `bun scripts/e2e-live.ts` walks a throwaway Pro account through a day of practice, real voice and account deletion. Its `--ui-account` and `--ui-cleanup` modes set one up for the `LiveWalkthrough` UI test. Both need `.local/clerk.env` and a wrangler login; see [operations](docs/operations.md), 8 November.
+
 ## Engineering notes
 
 | Start here | What it covers |

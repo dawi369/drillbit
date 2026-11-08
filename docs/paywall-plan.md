@@ -39,13 +39,13 @@ Renewals, expiry, refunds → App Store Server Notifications v2 → POST /apple/
 | | Free | Pro |
 |---|---|---|
 | Questions (reps) | **2 in total** (since 31 Oct; was 3 a day). A rep skipped or swapped away before the first message comes back. | Unlimited*, fair use 10 practised reps a day (since 1 Nov; was 30 questions written) |
-| Inside a rep | 8 follow-ups, 2 nudges or examples | Unlimited |
+| Inside a rep | 8 follow-ups, 2 nudges or examples | Unlimited*, within the daily caps for every plan: 50 typed answers and 100 AI calls a day (kept on purpose, 8 Nov) |
 | Voice | **One 10-minute mock** (since 2 Nov; was 3 sessions of 3 min) | Unlimited*, fair use 60 min a day and **75 a week** (since 1 Nov; was 100, before that 150), up to 20 min a session |
 | Feedback, Recall, Library | ✓ | ✓ |
 | Daily question prepared for you | – | ✓ |
 | Knowledge map and level estimate (Bit tab) | – | ✓ |
 
-\* "Unlimited" is never shown with a number; hitting a fair-use cap says "that's a lot for one day, back tomorrow".
+\* "Unlimited" is never shown with a number; hitting a fair-use cap says "that's a lot for one day, back tomorrow". The two daily caps inside a rep answer with the generic "Daily usage limit reached. Try again tomorrow." A very heavy Pro day can meet them: about 50 typed answers, or an hour of voice with a delegation every 35 seconds (`pro-week.test.ts`).
 
 **New this pass:** a voice session counts only once you actually speak. Opening voice and going back to text without saying anything is free, however often you do it. The server refunds the session when it's confirmed closed with no speech from you. If the app dies mid-session, the session still counts, because more speech might have been in flight.
 

@@ -4,7 +4,7 @@ What App Review gets, what to check before submitting, and what to do while it's
 
 ## State on 6 November
 
-- **Build to submit:** 1.0 (20), uploaded 6 November (layered icon). App Store Connect still selects 16 until [`computer-use.md`](../computer-use.md) step 1 is done.
+- **Build to submit:** 1.0 (22), uploaded 8 November: the layered icon, the background-refresh crash fix and the launch fixes (operations.md, 8 November). The draft selected 20 on 7 November; [`computer-use.md`](../computer-use.md) step 1 swaps it.
 - **Production** (`https://api.drillbit.t23.dev`): `/health`, `/privacy` and `/support` return 200; `/apple/notifications` exists (400 on an empty POST). Sentry has no open issues for `drillbit-api` or `drillbit-ios`.
 - **Live proof:** after the owner's reset, production wrote 3 questions (OpenRouter) and opened a voice session that reached OpenAI. Account deletion ran end to end (Clerk user and all D1 rows gone) about 3 minutes after it was queued.
 - **AI credit:** the OpenRouter account had $20.34 left. The development and production keys share it.
@@ -21,7 +21,7 @@ What App Review gets, what to check before submitting, and what to do while it's
 ## Before you press Submit for Review
 
 1. Physical-device acceptance: [readiness §7](app-store-readiness.md#7-physical-device-acceptance-you-about-45-minutes-required-before-submitting).
-2. [`computer-use.md`](../computer-use.md) is done: build 20 selected; listing, screenshots, review notes and subscription review images are current.
+2. [`computer-use.md`](../computer-use.md) is done: build 22 selected; listing, screenshots, review notes and subscription review images are current.
 3. Credit:
    - Top up OpenRouter so review and launch can't run it dry; $20 is thin.
    - Check the production key's own limit in the OpenRouter dashboard.
@@ -49,7 +49,7 @@ Reply in App Store Connect's Resolution Center. Name the screen and the steps, a
 
 | Guideline | Where it's handled |
 |---|---|
-| 2.1 Crash or bug | Sentry `drillbit-ios` for the build. Reproduce on a phone, fix, then ship build 21. |
+| 2.1 Crash or bug | Sentry `drillbit-ios` for the build. Reproduce on a phone, fix, then ship build 23. |
 | 2.1 Demo account | Explain that Sign in with Apple creates an account in seconds. Don't share an Apple Account. |
 | 2.3 Metadata or screenshots | [Listing](app-store-readiness.md#6-store-listing-you-with-drafts-here). All 5 screenshots show the app in use. |
 | 3.1.2 Subscriptions | Price, period, auto-renewal, Terms, Privacy and Restore are on every Pro screen ([`review-paywall.png`](design/app-store/review-paywall.png)). |

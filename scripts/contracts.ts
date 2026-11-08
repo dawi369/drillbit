@@ -268,6 +268,9 @@ for (const [method, path, summary, schema] of operations) {
       ...(["post challenges", "post questions/{id}/start", "post challenges/{id}/retry-moment/{turn}"].includes(method + " " + path)
         ? { "429": { description: "Usage limit reached; code practice_limit when a Pro account has practised its daily reps (a rep counts from its second message), usage_limit for other fair-use caps.", content: json("Error") } }
         : {}),
+      ...(method + " " + path === "post feedback/voice"
+        ? { "429": { description: "Usage limit reached; code usage_limit after the account's five notes today, voice_notes_full when the day's total across all accounts is in. Show the message.", content: json("Error") } }
+        : {}),
     },
   };
 }
