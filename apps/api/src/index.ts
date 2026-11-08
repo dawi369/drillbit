@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { streamSSE } from "hono/streaming";
 import { z } from "zod";
@@ -43,7 +43,7 @@ import {
     type Job
 } from "./store";
 import { concepts } from "./taxonomy";
-import { delegateVoice, startVoice, voiceCapability, voiceEvents } from "./voice";
+import { delegateVoice, endVoiceFor, startVoice, voiceCapability, voiceEvents } from "./voice";
 import { privacyPolicy, supportPage } from "./legal";
 import { recordPaywallView } from "./paywall";
 import { PracticeWorkflow as PracticeWorkflowBase } from "./jobs";
@@ -51,10 +51,8 @@ import { instrumentWorkflowWithSentry, withSentry } from "@sentry/cloudflare";
 import { reportFailure, sentryOptions } from "./monitoring";
 // Workflow failures reach Sentry too; wrangler binds the class by this export name.
 export const PracticeWorkflow = instrumentWorkflowWithSentry(sentryOptions, PracticeWorkflowBase);
-export const app = new Hono<{
-  Bindings: Env;
-  Variables: { account: Account; requestId: string };
-}>();
+type AppEnv = { Bindings: Env; Variables: { account: Account; requestId: string } };
+export const app = new Hono<AppEnv>();
 /** Interactive jobs run in this request when enabled, skipping Workflow startup; the reconciler still recovers them. */
 function inline(c: { env: Env; executionCtx: { waitUntil(work: Promise<unknown>): void } }) {
   return c.env.INTERACTIVE_INLINE_ENABLED === "true"
@@ -131,6 +129,12 @@ app.onError((error, c) => {
     fault.status as 400,
   );
 });
+/** A polling stream has already answered 200, so onError never sees its failures; the client sees the stream end. */
+const streamFailed = (c: Context<AppEnv>) => async (error: Error) => {
+  if (error instanceof Fault && error.status < 500) return;
+  console.error(JSON.stringify({ event: "stream_failed", requestId: c.get("requestId"), code: error instanceof Fault ? error.code : "stream_failed" }));
+  reportFailure(error, { route: c.req.routePath, code: error instanceof Fault ? error.code : "stream_failed", request_id: c.get("requestId") });
+};
 app.get("/health", (c) => c.json({ status: "ok" }));
 app.get("/privacy", (c) => c.html(privacyPolicy(c.env)));
 app.get("/support", (c) => c.html(supportPage(c.env)));
@@ -251,6 +255,7 @@ app.delete("/v1/developer/practice", async (c) => {
   await c.env.DB.batch([
     c.env.DB.prepare("DELETE FROM challenges WHERE account_id=?").bind(account),
     c.env.DB.prepare("DELETE FROM spent_free_reps WHERE account_id=?").bind(account),
+    c.env.DB.prepare("DELETE FROM spent_voice WHERE account_id=?").bind(account),
     c.env.DB.prepare("DELETE FROM questions WHERE account_id=?").bind(account),
     c.env.DB.prepare("DELETE FROM jobs WHERE account_id=? AND kind!='delete_account'").bind(account),
     c.env.DB.prepare("DELETE FROM ai_runs WHERE account_id=?").bind(account),
@@ -483,7 +488,7 @@ app.get("/v1/challenges/:id/interview/:turn/stream", async c => {
       await stream.sleep(100);
       if (!closed) value = await interviewStreamSnapshot(c.env, account, id, turn);
     }
-  });
+  }, streamFailed(c));
 });
 app.post("/v1/challenges/:id/voice", async c => c.json(await startVoice(c.env,c.get("account").id,c.req.param("id"),requireCommand(c.req.header("Idempotency-Key")),await c.req.json()),201));
 app.post("/v1/challenges/:id/voice/:voice/events", async c => c.json(await voiceEvents(c.env,c.get("account").id,c.req.param("id"),c.req.param("voice"),await c.req.json())));
@@ -565,6 +570,7 @@ app.post("/v1/challenges/:id/skip", async (c) => {
     c.env.DB.prepare(
       "UPDATE jobs SET status='cancelled' WHERE challenge_id=? AND status IN ('pending','running')",
     ).bind(id),
+    endVoiceFor(c.env, a, id),
   ]);
   return c.json({ ok: true });
 });
@@ -620,7 +626,7 @@ app.get("/v1/jobs/:id/stream", async (c) => {
       await stream.sleep(100);
       if (!closed) value = await snapshot();
     }
-  });
+  }, streamFailed(c));
 });
 app.post("/v1/jobs/:id/retry", async (c) => {
   const a = c.get("account").id,
@@ -742,6 +748,8 @@ app.delete("/v1/challenges/:id", async (c) => {
   await c.env.DB.batch([
     // A free rep stays spent after its question is deleted, unless it was abandoned before it was used.
     c.env.DB.prepare(`INSERT OR IGNORE INTO spent_free_reps(account_id,stamp) SELECT fr.account_id,json_extract(fr.data,'$.freeRepAt') FROM challenges fr WHERE fr.id=? AND fr.account_id=? AND json_extract(fr.data,'$.freeRepAt') IS NOT NULL AND NOT ${abandonedUnused("fr")}`).bind(id, a),
+    // Voice sessions cascade with the challenge; their time stays counted, or deleting would reset voice limits.
+    c.env.DB.prepare("INSERT OR IGNORE INTO spent_voice(id,account_id,created_at,seconds) SELECT id,account_id,created_at,seconds FROM counted_voice WHERE account_id=? AND id IN (SELECT id FROM voice_sessions WHERE challenge_id=? AND account_id=?)").bind(a, id, a),
     c.env.DB.prepare("DELETE FROM challenges WHERE id=? AND account_id=?").bind(id, a),
   ]);
   return c.json({ ok: true });
@@ -851,6 +859,13 @@ app.post(VOICE_NOTE_PATH, async (c) => {
   // An .m4a file names its format at bytes 4–7.
   if (audio.length < 64 || audio.length > 1024 * 1024 || new TextDecoder().decode(audio.subarray(4, 8)) !== "ftyp")
     throw new Fault("invalid_input", 400, "That recording didn't come through. Try again.");
+  // Audio lives in D1, whose 10 GB ceiling stops every write in the app; a cap across all accounts bounds a day's growth.
+  const cap = Number(c.env.VOICE_NOTES_PER_DAY_TOTAL ?? 100);
+  const today = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM voice_notes WHERE created_at>=?").bind(timestamp().slice(0, 10)).first<{ n: number }>();
+  if ((today?.n ?? 0) >= cap) {
+    console.warn(JSON.stringify({ event: "voice_notes_full", cap }));
+    throw new Fault("voice_notes_full", 429, "I’ve got a pile of voice notes to get through today. Send yours tomorrow?");
+  }
   await consumeUsage(c.env, a, "voice_note", 5, "That’s five voice notes today. I’ll listen to those first.");
   const now = timestamp();
   await c.env.DB.prepare("INSERT OR IGNORE INTO voice_notes(id,account_id,audio,duration_seconds,app_version,created_at) VALUES(?,?,?,?,?,?)")
@@ -1005,7 +1020,11 @@ app.post("/v1/challenges/:id/coach", async (c) => {
         event: "completed",
         data: JSON.stringify({ requestId: request }),
       });
-    } catch {
+    } catch (error) {
+      // A stream has already answered 200, so onError never sees this; report what a normal route would as a 5xx.
+      const expected = controller.signal.aborted || (error instanceof Error && /^(empty|request_cancelled)$/.test(error.message));
+      if (!expected && !(error instanceof Fault && error.status < 500))
+        reportFailure(error, { route: c.req.routePath, code: error instanceof Fault ? error.code : "stream_failed", request_id: c.get("requestId") });
       await c.env.DB.prepare(
         "UPDATE requests SET status='interrupted',updated_at=? WHERE id=? AND status='running'",
       )

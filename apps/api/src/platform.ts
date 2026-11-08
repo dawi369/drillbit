@@ -35,6 +35,8 @@ export interface Env {
   FREE_VOICE_SESSION_MINUTES?: string;
   PRO_REPS_PER_DAY?: string;
   PRO_GENERATIONS_PER_DAY?: string;
+  /** Voice notes accepted per UTC day across all accounts (default 100); their audio is stored in D1. */
+  VOICE_NOTES_PER_DAY_TOTAL?: string;
   /** Sentry (t23/drillbit-api). A secret; unset means reporting is off. */
   SENTRY_DSN?: string;
   SENTRY_ENVIRONMENT?: string;

@@ -354,7 +354,10 @@ struct ProShowcaseView: View {
           if case .verified(let transaction) = verification { await transaction.finish() }
           await PlanCoordinator.shared.purchased()
         }
-      } catch { note = "That didn’t go through. You haven’t been charged." }
+      } catch {
+        CrashReporting.reportStore(error, operation: "purchase")
+        note = "That didn’t go through. You haven’t been charged."
+      }
     }
   }
 
@@ -362,7 +365,7 @@ struct ProShowcaseView: View {
     working = true; note = nil
     Task {
       defer { working = false }
-      if await !PlanCoordinator.shared.restore() { note = "No Pro subscription on this Apple Account." }
+      note = PlanCoordinator.restoreNote(await PlanCoordinator.shared.restore())
     }
   }
 }

@@ -4,7 +4,7 @@ import { expect, it } from "vitest";
 import { z } from "zod";
 import { Fault } from "../src/domain";
 import { app } from "../src/index";
-import { scrubbed, scrubEvent, sentryOptions } from "../src/monitoring";
+import { providerReason, scrubbed, scrubEvent, sentryOptions } from "../src/monitoring";
 import type { Env } from "../src/platform";
 
 const answer = "I would shard the users table by account id and keep a write-ahead log";
@@ -90,4 +90,12 @@ it("reports an unexpected 5xx through withSentry with its route, code and reques
   const { sdkProcessingMetadata: _, ...sent } = events[0];
   expect(JSON.stringify(sent)).not.toContain("shard");
   expect(JSON.stringify(sent)).not.toContain("secret");
+});
+
+it("logs a provider's rejection without the input it repeats", () => {
+  const moderation = JSON.stringify({ error: { code: 403, message: `Input was flagged for "harassment": "${answer}"`, metadata: { reasons: ["harassment"], flagged_input: answer } } });
+  expect(providerReason(moderation)).toBe("403 Input was flagged for …: …");
+  const validation = JSON.stringify({ error: { type: "invalid_request_error", message: `Invalid value for 'session.instructions': '${answer}'` } });
+  expect(providerReason(validation)).toBe("invalid_request_error Invalid value for …: …");
+  expect(providerReason(`<html>bad gateway "${answer}"</html>`)).not.toContain("shard");
 });

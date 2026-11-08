@@ -8,6 +8,7 @@ import { partialJSONString, partialJSONStrings, streamedInterview, streamedStruc
 import { interventionFor } from "./companion-contract";
 import {
     exampleSchema,
+    Fault,
     helpSchemaFor,
     managedModel,
     normalizeSettings,
@@ -333,8 +334,10 @@ export async function runJobSafely(env: Env, id: string) {
 export async function runJobInline(env: Env, id: string) {
   try {
     await runJob(env, id);
-  } catch {
+  } catch (error) {
     const job = await env.DB.prepare("SELECT kind FROM jobs WHERE id=?").bind(id).first<{ kind: string }>();
+    // The Workflow retries and reports if it finally gives up; this line shows the first failure.
+    console.warn(JSON.stringify({ event: "inline_job_failed", jobId: id, kind: job?.kind, error: error instanceof Fault ? error.code : error instanceof Error ? error.name : "NonError" }));
     if (job?.kind === "interview") return runJobSafely(env, id);
     await env.DB.prepare("UPDATE jobs SET status='pending',updated_at=? WHERE id=? AND status='running'").bind(timestamp(), id).run();
     await dispatch(env, id);
@@ -385,6 +388,14 @@ export async function reconcile(env: Env) {
     "SELECT id FROM jobs WHERE status='pending' ORDER BY created_at LIMIT 30",
   ).all<{ id: string }>();
   for (const row of pending.results) await dispatch(env, row.id);
+  // Jobs that crossed ten minutes since the last tick: dispatch keeps failing (or Workflows are down). Each job falls in
+  // this five-minute window once, so a lasting outage reports per stuck job, not every tick forever.
+  const stuck = await env.DB.prepare("SELECT COUNT(*) AS n, GROUP_CONCAT(DISTINCT kind) AS kinds FROM jobs WHERE status='pending' AND created_at<? AND created_at>=?")
+    .bind(new Date(Date.now() - 600000).toISOString(), new Date(Date.now() - 900000).toISOString()).first<{ n: number; kinds: string | null }>();
+  if (stuck?.n) {
+    console.error(JSON.stringify({ event: "jobs_stuck_pending", count: stuck.n, kinds: stuck.kinds }));
+    reportFailure(new Error(`${stuck.n} job(s) still pending after 10 minutes`), { phase: "reconcile", kinds: stuck.kinds ?? "unknown" });
+  }
   await env.DB.prepare(
     "UPDATE requests SET status='interrupted' WHERE status='running' AND updated_at<?",
   )

@@ -1,5 +1,6 @@
 import Foundation
 import Sentry
+import StoreKit
 
 /// Crash and error reports to Sentry (t23/drillbit-ios, EU), for what nobody expected: crashes, freezes, server
 /// errors and responses the app can't read. Strict by design: no account or install identifier, no screenshots,
@@ -101,6 +102,19 @@ enum CrashReporting {
       tags["request_id"] = String(id.prefix(64))
     }
     return tags
+  }
+
+  /// A StoreKit failure at purchase or restore. Cancelling and being offline are expected; anything else may mean
+  /// someone couldn't pay or get back what they paid for.
+  static func reportStore(_ error: Error, operation: String) {
+    guard SentrySDK.isEnabled, !(error is CancellationError), !(error is URLError) else { return }
+    if let store = error as? StoreKitError {
+      switch store {
+      case .userCancelled, .networkError: return
+      default: break
+      }
+    }
+    SentrySDK.capture(error: error) { scope in scope.setTag(value: operation, key: "operation") }
   }
 
   /// Anything else that went wrong in an operation the user started, unless it's expected: a cancellation, being

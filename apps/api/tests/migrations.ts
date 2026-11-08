@@ -17,6 +17,7 @@ import sixteenth from "../migrations/0016_voice_waived.sql?raw";
 import seventeenth from "../migrations/0017_spent_free_reps.sql?raw";
 import eighteenth from "../migrations/0018_voice_notes.sql?raw";
 import nineteenth from "../migrations/0019_paywall_views.sql?raw";
+import twentieth from "../migrations/0020_spent_voice.sql?raw";
 export async function initializeDatabase(db: D1Database) {
   for (const sql of [first, second, third, fourth, fifth, sixth, seventh, eighth, ninth, tenth, eleventh])
     for (const statement of sql.split(";").filter((s) => s.trim()))
@@ -36,6 +37,6 @@ export async function initializeDatabase(db: D1Database) {
     await db.prepare(statement).run().catch((error: Error) => {
       if (!/duplicate column/i.test(error.message)) throw error;
     });
-  for (const statement of [...thirteenth.split(";"), ...fourteenth.split(";"), ...seventeenth.replace(/^--.*$/gm, "").split(";"), ...eighteenth.replace(/^--.*$/gm, "").split(";"), ...nineteenth.replace(/^--.*$/gm, "").split(";")].filter((s) => s.trim()))
-    await db.prepare(statement.replace(/CREATE TABLE /g, "CREATE TABLE IF NOT EXISTS ").replace(/CREATE INDEX /g, "CREATE INDEX IF NOT EXISTS ")).run();
+  for (const statement of [...thirteenth.split(";"), ...fourteenth.split(";"), ...seventeenth.replace(/^--.*$/gm, "").split(";"), ...eighteenth.replace(/^--.*$/gm, "").split(";"), ...nineteenth.replace(/^--.*$/gm, "").split(";"), ...twentieth.replace(/^--.*$/gm, "").split(";")].filter((s) => s.trim()))
+    await db.prepare(statement.replace(/CREATE TABLE /g, "CREATE TABLE IF NOT EXISTS ").replace(/CREATE INDEX /g, "CREATE INDEX IF NOT EXISTS ").replace(/CREATE VIEW /g, "CREATE VIEW IF NOT EXISTS ")).run();
 }

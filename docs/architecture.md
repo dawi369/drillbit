@@ -758,3 +758,22 @@ Interviewer prompt `interviewer-teaching-v7` adds `<plain_talk>`: sound like an 
 
 `LiveVoice` ends a session after `idleLimitBeforeSpeech` (60 s) of quiet until the user's first transcribed words, then after `idleLimit` (180 s); the warning shows 30 s before either. Fixture sessions run the same timer. `voiceEvents` waives a silent confirmed close up to 2 a day on Pro and once in total on Free (`VOICE_FREE_LOOKS_FREE_PLAN`), using `planFor` at close time.
 
+
+## Launch hardening — 8 November 2026
+
+Found by a simulated Pro week (`apps/api/tests/pro-week.test.ts`: two subscribers, fake clock, real D1, every day checked for stuck jobs and account scoping) and a live API run against development (`scripts/e2e-live.ts`).
+
+- **Pro runaway guards sit above the plan.** `limits()` adds `interviewTurnsPerDay` (Pro 400, Free 50) and `providerCallsPerDay` (Pro 1,000, Free 100). They used to be 50 and 100 for everyone, which cut off typed turns around rep 8 and stopped AI calls (feedback included) inside a documented Pro day of voice delegations. The automatic daily question now spends Pro's `generationsPerDay` (20), not a fixed 10, so an evening of rerolls can't cost the next morning's question in a timezone behind UTC.
+- **Voice outliving its interview.** Skipping a question ends its open voice sessions (`endVoiceFor`): status `uncertain`, billed for the time elapsed (up to the cap), since the app can't report a close for a skipped interview. The account-wide no-voice guard on typed turns ignores sessions whose question is no longer `in_progress`, and a voice start retires them. Before, a crash mid-voice followed by a skip from Home blocked typing and voice for up to 20.5 minutes.
+- **Deleting a question keeps its voice counted.** `voice_sessions` cascade with their challenge, so deleting from Library handed back Pro's minutes and a free account's voice mock. Migration `0020_spent_voice.sql` adds `spent_voice` (written on delete, like `spent_free_reps`) and the `counted_voice` view that every voice-metering query reads.
+- **The rolling week's "back" time** is when enough sessions have left the window to free a minute, not when the oldest leaves (a 30-second look freed too little).
+- **Voice notes across all accounts** are capped at `VOICE_NOTES_PER_DAY_TOTAL` (default 100) per UTC day: the audio lives in D1, whose 10 GB ceiling stops every write. A refusal is 429 `voice_notes_full`, doesn't spend the person's five, and logs `voice_notes_full`; the app now shows a 429's own message instead of "try again in a moment". Audio belongs in R2 if notes become common.
+- **Restore purchases** says "Couldn't reach the App Store. Check your connection and try again." when `AppStore.sync()` failed and nothing was found, instead of "No Pro subscription on this Apple Account."
+
+Observability (Sentry stays error-only):
+
+- `provider_rejected` and `voice_provider_rejected` log `providerReason()`: the error's code, type and message with quoted text removed. The raw body used to be logged and can repeat practice content (moderation metadata echoes the flagged input).
+- New log lines: `provider_unreachable` (model, kind, error name, elapsed), `inline_job_failed` (job id, kind, code), `job_dispatch_deferred` now with the error name, and a structured `ai_usage_record_failed` (also reported).
+- `reconcile` reports jobs still `pending` ten minutes after creation, once per job (`jobs_stuck_pending`): the signal for a Workflows or dispatch outage.
+- SSE failures after the 200 (coach stream, interview and question polling streams) are reported like a 5xx with route, code and `request_id`; aborts, cancellations and 4xx faults aren't.
+- iOS: `CrashReporting.reportStore` reports StoreKit failures at purchase and restore (not cancellation or network). `reportUnexpected` now covers voice transcript sync and voice delegation failures.

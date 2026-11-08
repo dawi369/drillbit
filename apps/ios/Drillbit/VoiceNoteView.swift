@@ -126,6 +126,9 @@ struct VoiceNoteView: View {
       }
       recorder.discard(keepPhase: true)
       withAnimation(reduceMotion ? nil : DrillbitMotion.reveal) { sent = true }
+    } catch let error as APIError where error.status == 429 {
+      // A daily limit: the server's line says why and when, and "try again in a moment" would be wrong.
+      failure = error.message
     } catch {
       failure = "Couldn’t send it. Your recording’s still here, so try again in a moment."
     }

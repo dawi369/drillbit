@@ -65,3 +65,17 @@ export function reportFailure(error: unknown, tags: Record<string, string>) {
   if (!Sentry.isEnabled()) return;
   Sentry.captureException(scrubbed(error), { tags });
 }
+
+/**
+ * A provider's rejection, safe to log: its error code, type and message with anything quoted removed. The raw body
+ * can carry practice content (moderation metadata repeats the flagged input; validation errors quote values).
+ */
+export function providerReason(detail: string): string {
+  try {
+    const body = JSON.parse(detail) as { error?: { code?: unknown; type?: unknown; message?: unknown } };
+    const error = body.error ?? {};
+    return unquoted([error.code, error.type, error.message].filter(part => typeof part === "string" || typeof part === "number").join(" "));
+  } catch {
+    return unquoted(detail);
+  }
+}

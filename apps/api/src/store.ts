@@ -216,8 +216,9 @@ export async function createJob(
   return env.DB.prepare("SELECT * FROM jobs WHERE id=?").bind(id).first<Job>();
 }
 export async function dispatch(env: Env, id: string) {
-  const enqueue = env.JOBS.create({ id, params: { jobId: id } }).catch(() => {
-    console.warn(JSON.stringify({ event: "job_dispatch_deferred", jobId: id }));
+  const enqueue = env.JOBS.create({ id, params: { jobId: id } }).catch((error) => {
+    // The cron retries pending jobs every five minutes and reports any still pending after ten.
+    console.warn(JSON.stringify({ event: "job_dispatch_deferred", jobId: id, error: error instanceof Error ? error.name : "NonError" }));
   });
   if (env.defer) { env.defer(enqueue); return; }
   await enqueue;

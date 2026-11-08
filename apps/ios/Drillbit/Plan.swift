@@ -107,15 +107,27 @@ private struct EntitlementReceipt: Decodable { var plan: String }
   }
 
   /// Asks the App Store for this Apple Account's purchases; true (and the paywall closes) when Pro came back.
-  func restore() async -> Bool {
-    try? await AppStore.sync()
+  static func restoreNote(_ outcome: RestoreOutcome) -> String? {
+    switch outcome {
+    case .restored: nil
+    case .none: "No Pro subscription on this Apple Account."
+    case .failed: "Couldn’t reach the App Store. Check your connection and try again."
+    }
+  }
+  enum RestoreOutcome { case restored, none, failed }
+  /// `failed` only when the App Store couldn't be asked and nothing was found locally: "no subscription" would be a lie.
+  func restore() async -> RestoreOutcome {
+    var syncFailed = false
+    do { try await AppStore.sync() } catch {
+      if case StoreKitError.userCancelled = error {} else { syncFailed = true; CrashReporting.reportStore(error, operation: "restore_purchases") }
+    }
     for await result in Transaction.currentEntitlements {
       if case .verified(let transaction) = result, Self.productIDs.contains(transaction.productID) {
         await purchased()
-        return true
+        return .restored
       }
     }
-    return false
+    return syncFailed ? .failed : .none
   }
   /// The native sheet reports a finished purchase or restore here.
   func purchased() async {
@@ -423,14 +435,17 @@ private struct PaywallCheckout: View {
           if case .verified(let transaction) = verification { await transaction.finish() }
           await PlanCoordinator.shared.purchased()
         }
-      } catch { note = "That didn’t go through. You haven’t been charged." }
+      } catch {
+        CrashReporting.reportStore(error, operation: "purchase")
+        note = "That didn’t go through. You haven’t been charged."
+      }
     }
   }
   private func restore() {
     working = true; note = nil
     Task {
       defer { working = false }
-      if await !PlanCoordinator.shared.restore() { note = "No Pro subscription on this Apple Account." }
+      note = PlanCoordinator.restoreNote(await PlanCoordinator.shared.restore())
     }
   }
 }

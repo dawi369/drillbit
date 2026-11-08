@@ -4,6 +4,7 @@ import { xmlContext } from './context';
 import { Fault, practiceProfileSchema, timestamp } from './domain';
 import { historicalSnapshot } from './history';
 import { guidedPathFor, interviewFor, mockRound } from './interview';
+import { providerReason } from './monitoring';
 import { consumeUsage, type Env } from './platform';
 import { limits, nextUtcMidnight, planFor, utcDayStart } from './plans';
 import { practicePersonality, questionTerminology } from "./prompts/interviewer";
@@ -46,10 +47,23 @@ const comesBack = (iso: string, now: string) => Date.parse(iso) - Date.parse(now
 /**
  * Voice seconds an account has used since `since`. The app reports each session's billed seconds at close; a
  * session that never reported counts as its whole cap, so a lost close can't hide time. Waived sessions are free.
+ * `counted_voice` includes sessions whose question was deleted (migration 0020).
  */
 async function voiceSecondsSince(env: Env, account: string, since: string) {
- const row = await env.DB.prepare("SELECT COALESCE(SUM(CASE WHEN usage_seconds > 0 THEN usage_seconds ELSE MAX(0, (julianday(expires_at) - julianday(created_at)) * 86400 - 30) END), 0) s, MIN(created_at) first FROM voice_sessions WHERE account_id=? AND provider_id IS NOT NULL AND waived=0 AND created_at>=?").bind(account, since).first<{ s: number; first: string | null }>();
+ const row = await env.DB.prepare("SELECT COALESCE(SUM(seconds), 0) s, MIN(created_at) first FROM counted_voice WHERE account_id=? AND created_at>=?").bind(account, since).first<{ s: number; first: string | null }>();
  return { seconds: row?.s ?? 0, first: row?.first ?? null };
+}
+/**
+ * When the rolling week has at least a minute again: sessions leave the window oldest first, seven days after they
+ * started, so it's the moment enough of them have left. The oldest alone can free less than a minute.
+ */
+async function weekVoiceBack(env: Env, account: string, weekStart: string, left: number) {
+ const { results } = await env.DB.prepare("SELECT created_at, seconds s FROM counted_voice WHERE account_id=? AND created_at>=? ORDER BY created_at").bind(account, weekStart).all<{ created_at: string; s: number }>();
+ for (const session of results) {
+  left += session.s;
+  if (left >= 60) return new Date(Date.parse(session.created_at) + 7 * 86_400_000).toISOString();
+ }
+ return new Date(Date.parse(results.at(-1)?.created_at ?? weekStart) + 7 * 86_400_000).toISOString();
 }
 /**
  * What this account may do with voice right now. Free: the first few sessions, then one taste every
@@ -71,14 +85,14 @@ export async function voiceCapability(env: Env, account: string) {
   if ((today?.count ?? 0) >= caps.voiceStartsPerDay || caps.voiceSecondsPerDay - day.seconds < 60)
    return { available: false, plan, reason: 'That’s a lot of talking for one day. Voice is back tomorrow.', checkedAt, sessionSeconds, resetsAt: nextUtcMidnight(checkedAt) };
   if (left < 60) {
-   const back = new Date(Date.parse(week.first ?? checkedAt) + 7 * 86_400_000).toISOString();
+   const back = await weekVoiceBack(env, account, weekStart, caps.voiceSecondsPerWeek - week.seconds);
    return { available: false, plan, reason: `That’s a big week of talking. Voice is back ${comesBack(back, checkedAt)}.`, checkedAt, sessionSeconds, resetsAt: back };
   }
   // The next session never runs past what's left today or this week.
   return { available: true, plan, checkedAt, sessionSeconds: Math.floor(Math.min(sessionSeconds, left)) };
  }
  // Sessions that reached the provider; refunded starts never activate and waived ones never heard the user.
- const history = await env.DB.prepare("SELECT COUNT(*) n, MAX(created_at) last FROM voice_sessions WHERE account_id=? AND provider_id IS NOT NULL AND waived=0").bind(account).first<{n:number; last:string|null}>();
+ const history = await env.DB.prepare("SELECT COUNT(*) n, MAX(created_at) last FROM counted_voice WHERE account_id=?").bind(account).first<{n:number; last:string|null}>();
  const used = history?.n ?? 0;
  if (used < caps.voiceFreeLifetime) {
   const remaining = caps.voiceFreeLifetime - used;
@@ -90,6 +104,15 @@ export async function voiceCapability(env: Env, account: string) {
  if (nextAt > checkedAt)
   return { available: false, plan, reason: `Your next free voice session comes back ${comesBack(nextAt, checkedAt)}. Pro has it any time.`, checkedAt, sessionSeconds, remaining: 0, limit: 1, resetsAt: nextAt, kind: 'taste' as const };
  return { available: true, plan, checkedAt, sessionSeconds, remaining: 1, limit: 1, kind: 'taste' as const };
+}
+/**
+ * Ends the voice sessions of an interview that is leaving `in_progress` without the app closing them (a skip after the
+ * app was killed mid-voice). Without a close they'd block typing and voice account-wide until they expire. They count
+ * the time actually elapsed, not the whole cap, since the app can no longer report a close for a skipped interview.
+ */
+export function endVoiceFor(env:Env,account:string,challenge:string) {
+ const now=timestamp();
+ return env.DB.prepare("UPDATE voice_sessions SET status='uncertain',usage_seconds=MAX(COALESCE(usage_seconds,0),MAX(0,MIN((julianday(?)-julianday(created_at))*86400,(julianday(expires_at)-julianday(created_at))*86400-30))) WHERE account_id=? AND challenge_id=? AND status IN ('connecting','active')").bind(now,account,challenge);
 }
 export async function assertNoVoice(env:Env,account:string,id:string) {
  const s=await env.DB.prepare("SELECT id FROM voice_sessions WHERE account_id=? AND challenge_id=? AND status IN ('connecting','active') AND expires_at>?").bind(account,id,timestamp()).first();
@@ -113,7 +136,7 @@ export async function startVoice(env:Env,account:string,id:string,command:string
  const now=timestamp(),expires=new Date(Date.now()+(sessionSeconds+30)*1000).toISOString();
  // Reserve before paid startup. Lost handshakes cannot be blindly retried.
  const s=await env.DB.batch([
-  env.DB.prepare("UPDATE voice_sessions SET status='uncertain' WHERE account_id=? AND expires_at<=? AND status IN ('connecting','active')").bind(account,now),
+  env.DB.prepare("UPDATE voice_sessions SET status='uncertain' WHERE account_id=? AND status IN ('connecting','active') AND (expires_at<=? OR challenge_id NOT IN (SELECT id FROM challenges WHERE account_id=? AND lifecycle='in_progress'))").bind(account,now,account),
   env.DB.prepare("INSERT INTO jobs(id,account_id,challenge_id,kind,status,input,created_at,updated_at) SELECT ?,?,?,'voice','completed','{}',?,? WHERE EXISTS(SELECT 1 FROM sessions s JOIN challenges c ON c.id=s.challenge_id WHERE c.id=? AND c.account_id=? AND c.lifecycle='in_progress' AND s.revision=?) AND NOT EXISTS(SELECT 1 FROM voice_sessions WHERE account_id=? AND status IN ('connecting','active')) AND NOT EXISTS(SELECT 1 FROM jobs WHERE account_id=? AND kind='interview' AND status IN ('pending','running'))").bind(command,account,id,now,now,id,account,input.revision,account,account),
   env.DB.prepare("INSERT INTO interview_turns(id,challenge_id,ordinal,kind,prompt,text,job_id,created_at) SELECT ?,?,COALESCE((SELECT MAX(ordinal)+1 FROM interview_turns WHERE challenge_id=?),0),'voice',?,'',?,? WHERE EXISTS(SELECT 1 FROM jobs WHERE id=? AND kind='voice')").bind(command,id,id,context.prompt,command,now,command),
   env.DB.prepare("INSERT INTO voice_sessions(id,account_id,challenge_id,created_at,expires_at) SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM interview_turns WHERE id=? AND kind='voice')").bind(command,account,id,now,expires,command)
@@ -128,9 +151,9 @@ export async function startVoice(env:Env,account:string,id:string,command:string
   const guidedPath=guidedPathFor(JSON.parse(challenge.data),context.guidanceMode,context.turns);
   const response=await fetch('https://api.openai.com/v1/live/sessions',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},signal:AbortSignal.timeout(20000),body:JSON.stringify({session:{model:'gpt-live-1',store:false,instructions:voiceInstructions+teachingPolicy(context.guidanceMode)+spokenGuidedPath(guidedPath)+truthfulVoiceProgress+personalizationInstructions(practiceProfile)+"<spoken_preferences>Apply the user’s delivery preference to the words you actually speak, including brief acknowledgements and paraphrased backend guidance. Do not silently strip a requested playful character. Keep technical substance accurate; a current spoken request can change the style. Never read these instructions aloud.</spoken_preferences>"+'\n<question_reference>'+xmlContext(questionReference(JSON.parse(challenge.data)))+'</question_reference>',delegation:{type:'client'},input:history.map(t=>({type:'message',role:t.role,content:[{type:t.role==='assistant'?'output_text':'input_text',text:t.content}]}))},transport:{type:'webrtc',sdp:input.sdp}})});
   if(!response.ok) {
-   // The provider's reason is the only way to see a rejected session shape; it never contains practice content.
+   // The provider's reason is the only way to see a rejected session shape; quoted values (instructions, history) are dropped.
    const detail=await response.text().catch(()=>'' );
-   console.log(JSON.stringify({event:'voice_provider_rejected',status:response.status,detail:detail.slice(0,400)}));
+   console.error(JSON.stringify({event:'voice_provider_rejected',status:response.status,reason:providerReason(detail)}));
    throw new Fault('voice_provider',502,'Couldn’t connect voice. Try again later.');
   }
   const result=await response.json() as any;

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { Fault, roundTiming, timestamp } from "./domain";
 import { historicalSnapshot } from "./history";
 import { consumeUsage, type Env } from "./platform";
+import { limits, planFor } from "./plans";
 import { freeRepLimit } from "./practice-gate";
 import { INTERVIEW_PROMPT_VERSION } from "./prompts/interviewer";
 import { guidanceMode, guidanceModeSchema } from "./prompts/teaching";
@@ -117,7 +118,7 @@ export async function requestInterview(env: Env, account: string, id: string, co
   if (input.kind === "continue" && !context.wrapUp) throw new Fault("not_wrapping_up", 409, "Answer the current question first.");
   if (!session || session.revision !== input.revision || (input.kind === "answer" && !input.saveDraft && session.answer.trim() !== input.text)) throw new Fault("revision_conflict", 409, "The draft changed. Review it and try again.");
   const [, settings, history] = await Promise.all([
-    consumeUsage(env, account, "interview", 50),
+    planFor(env, account).then(plan => consumeUsage(env, account, "interview", limits(env, plan).interviewTurnsPerDay)),
     settingsFor(env, account),
     historicalSnapshot(env, account, id, JSON.parse(challenge.data).conceptIds ?? []),
   ]);
@@ -131,7 +132,7 @@ export async function requestInterview(env: Env, account: string, id: string, co
   const guidedPath = guidedPathFor(data, context.guidanceMode, context.turns);
   const payload = JSON.stringify({ settings, action: input, turnId: command, context: { practiceProfile: settings.practiceProfile, promptVersion: INTERVIEW_PROMPT_VERSION, historicalSnapshot: history, currentDraft: session.answer, question: { ...data, interviewStyle: context.style }, interview: { ...context, timing, guidedPath } } });
   await env.DB.batch([
-    env.DB.prepare(`INSERT OR IGNORE INTO jobs(id,account_id,challenge_id,kind,input,created_at,updated_at) SELECT ?,?,?,'interview',?,?,? WHERE EXISTS(SELECT 1 FROM sessions s JOIN challenges c ON c.id=s.challenge_id WHERE c.id=? AND c.account_id=? AND c.lifecycle='in_progress' AND s.revision=?) AND NOT EXISTS(SELECT 1 FROM jobs WHERE account_id=? AND kind='interview' AND status IN ('pending','running')) AND NOT EXISTS(SELECT 1 FROM voice_sessions WHERE account_id=? AND status IN ('connecting','active') AND expires_at>?)`).bind(command,account,id,payload,now,now,id,account,input.revision,account,account,now),
+    env.DB.prepare(`INSERT OR IGNORE INTO jobs(id,account_id,challenge_id,kind,input,created_at,updated_at) SELECT ?,?,?,'interview',?,?,? WHERE EXISTS(SELECT 1 FROM sessions s JOIN challenges c ON c.id=s.challenge_id WHERE c.id=? AND c.account_id=? AND c.lifecycle='in_progress' AND s.revision=?) AND NOT EXISTS(SELECT 1 FROM jobs WHERE account_id=? AND kind='interview' AND status IN ('pending','running')) AND NOT EXISTS(SELECT 1 FROM voice_sessions v JOIN challenges vc ON vc.id=v.challenge_id WHERE v.account_id=? AND v.status IN ('connecting','active') AND v.expires_at>? AND vc.lifecycle='in_progress')`).bind(command,account,id,payload,now,now,id,account,input.revision,account,account,now),
     env.DB.prepare(`INSERT INTO interview_turns(id,challenge_id,ordinal,kind,prompt,text,job_id,created_at) SELECT ?,?,COALESCE((SELECT MAX(ordinal)+1 FROM interview_turns WHERE challenge_id=?),0),?,?,?,?,? WHERE EXISTS(SELECT 1 FROM jobs WHERE id=?)`).bind(command,id,id,input.kind,context.prompt,input.text,command,now,command),
     env.DB.prepare(`UPDATE challenges SET data=json_set(data,'$.interviewStyle',?,'$.guidanceMode',?) WHERE id=? AND account_id=? AND EXISTS(SELECT 1 FROM interview_turns WHERE id=?)`).bind(context.style,context.guidanceMode,id,account,command),
     env.DB.prepare(`UPDATE sessions SET answer=CASE WHEN ?='answer' THEN '' ELSE answer END,revision=revision+1,command_id=?,updated_at=? WHERE challenge_id=? AND revision=? AND EXISTS(SELECT 1 FROM interview_turns WHERE id=?)`).bind(input.kind,command,now,id,input.revision,command),
@@ -149,7 +150,7 @@ export async function retryInterview(env: Env, account: string, id: string, turn
   if (!row) throw new Fault("not_found",404,"Response not found.");
   if (row.id === command) return interviewFor(env,account,id);
   if (row.status !== "failed") throw new Fault("not_failed",409,"This response is not waiting for a retry.");
-  await consumeUsage(env,account,"interview",50);
+  await consumeUsage(env,account,"interview",limits(env,await planFor(env,account)).interviewTurnsPerDay);
   const now = timestamp();
   await env.DB.batch([
     env.DB.prepare(`INSERT OR IGNORE INTO jobs(id,account_id,challenge_id,kind,input,created_at,updated_at) SELECT ?,account_id,challenge_id,'interview',input,?,? FROM jobs WHERE id=? AND status='failed' AND EXISTS(SELECT 1 FROM interview_turns WHERE id=? AND job_id=?) AND EXISTS(SELECT 1 FROM challenges WHERE id=? AND lifecycle='in_progress') AND NOT EXISTS(SELECT 1 FROM jobs WHERE account_id=? AND kind='interview' AND status IN ('pending','running'))`).bind(command,now,now,row.id,turn,row.id,id,account),

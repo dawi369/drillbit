@@ -390,6 +390,7 @@ private struct VoiceOutbox: Codable {
           if let step = reply.step { interview.noteGuidedStep(step) }
           deliverGuidance(reply.text, id: id, epoch: epoch)
         } catch {
+          CrashReporting.reportUnexpected(error, operation: "voice_delegation")
           deliverGuidance(Self.guidanceMissing, id: id, epoch: epoch)
         }
       }
@@ -441,7 +442,11 @@ private struct VoiceOutbox: Codable {
       }
     } catch let error as APIError where error.status == 404 && captured.fragments.isEmpty {
       outbox = nil; try? await persist()
-    } catch { message = nil }
+    } catch {
+      // The outbox stays for the next sync; server errors were reported where they happened.
+      CrashReporting.reportUnexpected(error, operation: "voice_sync")
+      message = nil
+    }
   }
   private func finalize(confirmed:Bool) async {
     guard phase != .idle else { return }

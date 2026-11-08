@@ -109,3 +109,20 @@ it("lists voice notes once in the export, without the audio, and deletes them wi
   await bindings.DB.prepare("DELETE FROM accounts WHERE id=?").bind(id).run();
   expect((await notes(id)).results).toHaveLength(0);
 });
+
+it("stops taking voice notes from anyone once the day's total is in, without using up the person's five", async () => {
+  const { subject, id } = await person();
+  const today = new Date().toISOString().slice(0, 10);
+  const { n } = (await bindings.DB.prepare("SELECT COUNT(*) AS n FROM voice_notes WHERE created_at>=?").bind(today).first<{ n: number }>())!;
+  (bindings as { VOICE_NOTES_PER_DAY_TOTAL?: string }).VOICE_NOTES_PER_DAY_TOTAL = String(n + 1);
+  try {
+    expect((await send(subject, { audio: m4a(), durationSeconds: 4 })).status).toBe(201);
+    const full = await send(subject, { audio: m4a(), durationSeconds: 4 });
+    expect(full.status).toBe(429);
+    expect(await full.json()).toMatchObject({ error: { code: "voice_notes_full", message: "I’ve got a pile of voice notes to get through today. Send yours tomorrow?" } });
+    const used = await bindings.DB.prepare("SELECT count FROM usage WHERE account_id=? AND kind='voice_note'").bind(id).first<{ count: number }>();
+    expect(used?.count).toBe(1);
+  } finally {
+    delete (bindings as { VOICE_NOTES_PER_DAY_TOTAL?: string }).VOICE_NOTES_PER_DAY_TOTAL;
+  }
+});

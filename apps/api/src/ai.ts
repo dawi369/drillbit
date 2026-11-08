@@ -1,7 +1,9 @@
 import { z } from "zod";
 import { boundedContext, visibleQuestion, xmlContext } from "./context";
 import { FAST_MODEL_ID, FAST_PROVIDERS, Fault, managedModel, MODEL_ID, timestamp, uuid, type Settings } from "./domain";
+import { providerReason, reportFailure } from "./monitoring";
 import { consumeUsage, decrypt, type Env } from "./platform";
+import { limits, planFor } from "./plans";
 import { questionFormattingInstructions } from "./prompts/formatting";
 import { INTERVIEW_PROMPT_VERSION, interviewerPrompt, isSocialOpening, socialOpeningPrompt } from "./prompts/interviewer";
 import { personalizationInstructions } from "./prompts/personalization";
@@ -175,7 +177,7 @@ export async function provider(
   const schema = options.schema ? z.toJSONSchema(options.schema) : undefined;
   const started = Date.now();
   const { key, model } = await modelAccess(env, account, settings, options.kind);
-  await consumeUsage(env, account, "provider_attempt", 100);
+  await consumeUsage(env, account, "provider_attempt", limits(env, await planFor(env, account)).providerCallsPerDay);
   let response: Response;
   try {
     const dispatched = Date.now();
@@ -209,7 +211,9 @@ export async function provider(
       }),
     });
     console.info(JSON.stringify({event: "inference_headers", model, streaming: !!options.stream, setupMs: dispatched - started, headersMs: Date.now() - dispatched, status: response.status}));
-  } catch {
+  } catch (error) {
+    // A timeout, a dropped connection or the person cancelling (AbortError): the name tells them apart.
+    console.warn(JSON.stringify({ event: "provider_unreachable", model, kind: options.kind, error: error instanceof Error ? error.name : "NonError", afterMs: Date.now() - started }));
     throw new Fault(
       "provider_unavailable",
       503,
@@ -219,8 +223,7 @@ export async function provider(
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
     const fault = providerFault(response.status, detail, settings.aiMode === "managed");
-    // OpenRouter's error text names the policy or limit, never practice content.
-    console.error(JSON.stringify({ event: "provider_rejected", model, status: response.status, code: fault.code, detail: detail.slice(0, 300) }));
+    console.error(JSON.stringify({ event: "provider_rejected", model, kind: options.kind, status: response.status, code: fault.code, reason: providerReason(detail) }));
     throw fault;
   }
   return response;
@@ -412,8 +415,10 @@ export async function recordUsage(
       account,
     )
     .run()
-    .catch(() => {
-      console.warn("ai_usage_record_failed");
+    .catch((error) => {
+      // Cost tracking and the metrics script read ai_runs; a failing write undercounts spend.
+      console.warn(JSON.stringify({ event: "ai_usage_record_failed", kind, model }));
+      reportFailure(error, { phase: "ai_usage_record", kind });
     });
 }
 
