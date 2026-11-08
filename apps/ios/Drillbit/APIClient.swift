@@ -59,7 +59,7 @@ private let streamLog = Logger(subsystem: "dawi.drillbit", category: "stream")
     let (data, response) = try await transport(request)
     try validate(data, response)
     do { return try JSONDecoder.api.decode(T.self, from: data) }
-    catch { CrashReporting.reportServer(error, url: response.url); throw error }
+    catch { CrashReporting.reportServer(error, response: response); throw error }
   }
   func exportPage(query: String?) async throws -> Data {
     let request = try await request("account/export" + (query.map { "?" + $0 } ?? ""))
@@ -152,7 +152,7 @@ private let streamLog = Logger(subsystem: "dawi.drillbit", category: "stream")
       let failure = APIError(
         code: error?.error.code ?? "request_failed",
         message: error?.error.message ?? "That didn’t go through. Try again.", status: http.statusCode)
-      if http.statusCode >= 500 { CrashReporting.reportServer(failure, url: http.url) }
+      if http.statusCode >= 500 { CrashReporting.reportServer(failure, response: http) }
       throw failure
     }
   }

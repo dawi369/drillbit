@@ -12,13 +12,15 @@ const pathOnly = (url?: string) => url?.split(/[?#]/)[0];
 
 /**
  * Sentry (t23/drillbit-api) for failures nobody expected: bugs, provider outages and jobs that gave up. Off without
- * `SENTRY_DSN` (tests, local dev). An event keeps the route pattern, a code, the error's type and stack, and nothing
- * else: no bodies, headers, query strings, account ids, IP addresses or practice text.
+ * `SENTRY_DSN` (tests, local dev). An event keeps the route pattern, a code, the request id, the error's type and
+ * stack, and the Worker version as its release; nothing else: no bodies, headers, query strings, account ids, IP
+ * addresses or practice text. Performance tracing is deliberately off; latency lives in the `http_request` logs.
  */
 export function sentryOptions(env: Env): Sentry.CloudflareOptions {
   return {
     dsn: env.SENTRY_DSN,
     environment: env.SENTRY_ENVIRONMENT ?? "development",
+    release: env.CF_VERSION_METADATA?.id,
     // Collect nothing about people or payloads; the scrub below is the second guard.
     dataCollection: {
       userInfo: false, cookies: false, httpHeaders: false, httpBodies: [], urlQueryParams: false,

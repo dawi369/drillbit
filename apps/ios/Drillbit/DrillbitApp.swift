@@ -1,4 +1,3 @@
-import BackgroundTasks
 import ClerkKit
 import Security
 import SwiftData
@@ -73,15 +72,7 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
       PlanCoordinator.shared.start(model: appModel)
       configurationError = nil
       UNUserNotificationCenter.current().delegate = notificationRouter
-      BGTaskScheduler.shared.register(forTaskWithIdentifier: "dawi.drillbit.refresh", using: nil) {
-        task in
-        let work = Task { @MainActor in
-          await appModel.refresh()
-          BackgroundRefresh.schedule()
-          task.setTaskCompleted(success: !Task.isCancelled)
-        }
-        task.expirationHandler = { work.cancel() }
-      }
+      BackgroundRefresh.register { await appModel.refresh() }
     } catch {
       configurationError =
         "The local store could not open. Your existing files have not been deleted. \(error.localizedDescription)"
@@ -117,12 +108,4 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
       return status == errSecSuccess
     }
   #endif
-}
-
-@MainActor enum BackgroundRefresh {
-  static func schedule() {
-    let request = BGAppRefreshTaskRequest(identifier: "dawi.drillbit.refresh")
-    request.earliestBeginDate = Date().addingTimeInterval(3600)
-    try? BGTaskScheduler.shared.submit(request)
-  }
 }

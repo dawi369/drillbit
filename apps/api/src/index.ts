@@ -108,8 +108,8 @@ app.onError((error, c) => {
             "Something went wrong. Your saved answer is safe.",
           );
   if (fault.status >= 500) {
-    // The route pattern (never the path with ids) and the code group the reports.
-    reportFailure(error, { route: c.req.routePath, code: fault.code });
+    // The route pattern (never the path with ids) and the code group the reports; the request id finds the log line.
+    reportFailure(error, { route: c.req.routePath, code: fault.code, request_id: c.get("requestId") });
   }
   if (fault.status >= 500)
     console.error(

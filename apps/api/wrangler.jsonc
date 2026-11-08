@@ -9,6 +9,8 @@
   "observability": {
     "enabled": true
   },
+  // Sentry's release: the deployed version id (top level and production, since bindings don't inherit).
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
   // Run beside the D1 primary (Marseille): each request makes several sequential queries.
   "placement": { "mode": "targeted", "region": "azure:francesouth" },
   "vars": {
@@ -66,6 +68,7 @@
       "name": "drillbit-api",
       // Cloudflare creates the DNS record and certificate; the host stays stable if the Worker ever moves.
       "routes": [{ "pattern": "api.drillbit.t23.dev", "custom_domain": true }],
+      "version_metadata": { "binding": "CF_VERSION_METADATA" },
       "vars": {
         "CLERK_ISSUER": "https://clerk.drillbit.t23.dev",
         "MODEL_ID": "openai/gpt-6-luna",
