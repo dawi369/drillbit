@@ -482,3 +482,9 @@ Release **1.0 (21)** from commit `df37b0c` archived, verified against production
 - No new iOS build: this round's app change is Debug-only.
 
 **Tests:** API 225 passed (24 files, twice) and `tsc` clean; hosted `DrillbitTests` 77 and `swift test` 58 passed. Afterwards the docs were checked against the code: build 22 is now the one to submit in apple-review.md, computer-use.md and app-store-readiness.md; paywall-plan.md §3 states the daily caps inside a rep; the OpenAPI voice-note 429 names `voice_notes_full`.
+
+### Practice sheet redesign and build 23 — 9 November 2026
+
+The Bit tab's practice sheet now mirrors the map, and Next up carries Bit's pick for the next level; the constellation's hub dots sit on their vertices (architecture.md, 9 November). Tests: hosted `DrillbitTests` 81 passed (4 new `LevelPathTests`), `swift test` 58 passed, `PracticeUITests/testBitTabIsProAndMapsWhatYouKnow` passed; the opt-in `DesignShots` UI test captured the flow on the iPhone 17 simulator with fixtures. No backend change.
+
+Release **1.0 (23)** from commit `530de42` was archived, verified against production and uploaded with `scripts/release-ios.sh --upload` ("Upload succeeded"); dSYMs uploaded with `sentry-cli`. Not yet checked: Apple processing, the build on a phone, and large text sizes and light mode for the new screens. The review draft's build choice (22 or 23) is the owner's.
