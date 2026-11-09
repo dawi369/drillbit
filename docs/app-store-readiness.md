@@ -36,7 +36,7 @@ cd apps/api
 
 ## 2. Release build: one command
 
-Production values are committed in `apps/ios/Config/Production.xcconfig`, and every Release build uses them. Bump `CURRENT_PROJECT_VERSION` in `apps/ios/project.yml` for each upload. The latest upload is build 23 (9 November); use 24 next, after checking the portal. `MARKETING_VERSION` is `1.0`, matching the version record in App Store Connect; keep them equal. Then run the release script. Signing requires the login keychain to be available to that session; a signed archive succeeded from the agent session on 4 November:
+Production values are committed in `apps/ios/Config/Production.xcconfig`, and every Release build uses them. Bump `CURRENT_PROJECT_VERSION` in `apps/ios/project.yml` for each upload. The latest upload is build 24 (9 November); use 25 next, after checking the portal. `MARKETING_VERSION` is `1.0`, matching the version record in App Store Connect; keep them equal. Then run the release script. Signing requires the login keychain to be available to that session; a signed archive succeeded from the agent session on 4 November:
 
 ```sh
 scripts/release-ios.sh            # archive and verify: production API, pk_live key, privacy URL

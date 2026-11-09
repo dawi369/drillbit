@@ -174,12 +174,10 @@ struct KnowledgeMapView: View {
       let picked = path?.pick?.id == first.id ? path : nil
       let others = Array(candidates.filter { $0.id != first.id }.prefix(2))
       VStack(alignment: .leading, spacing: 12) {
-        SignalEyebrow(text: picked.map { $0.placing ? "Next up" : "Your way to \($0.level.label)" } ?? "Next up")
+        SignalEyebrow(text: "Next up")
         VStack(alignment: .leading, spacing: 16) {
           VStack(alignment: .leading, spacing: 8) {
-            if let picked {
-              PickBadge(level: picked.level.label)
-            } else {
+            if picked == nil {
               HStack(spacing: 8) {
                 NodeDot(state: first.state, size: 10, glow: false)
                 DrillbitMetadata(text: first.state == .revisit ? "Worth another go" : "Not on your map yet")
@@ -211,11 +209,6 @@ struct KnowledgeMapView: View {
           }
           .buttonStyle(PracticeButtonStyle())
           .accessibilityIdentifier("nextUp-\(first.id)")
-          if picked != nil {
-            Text("A rep holds up when its feedback finds at least as many sound calls as gaps.")
-              .font(.caption).foregroundStyle(AppPalette.secondary)
-              .fixedSize(horizontal: false, vertical: true)
-          }
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)

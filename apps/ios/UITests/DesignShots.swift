@@ -59,7 +59,16 @@ final class DesignShots: XCTestCase {
     shot("sheet-areas")
     app.swipeUp(); Thread.sleep(forTimeInterval: 0.6)
     shot("sheet-areas-scrolled")
-    app.swipeDown(); Thread.sleep(forTimeInterval: 0.6)
+    // Typing your own topic: the card scrolls up above the keyboard.
+    let custom = app.textFields["customTopic"]
+    if custom.waitForExistence(timeout: 3) {
+      custom.tap(); Thread.sleep(forTimeInterval: 1.2)
+      custom.typeText("search ranking"); Thread.sleep(forTimeInterval: 0.6)
+      shot("sheet-custom-typing")
+      app.swipeDown(); Thread.sleep(forTimeInterval: 0.6)
+    }
+    for _ in 0..<3 { app.swipeDown() }
+    Thread.sleep(forTimeInterval: 0.6)
 
     // Bit's pick from the top of the sheet, then search.
     if app.buttons["browse-pick"].waitForExistence(timeout: 3) {

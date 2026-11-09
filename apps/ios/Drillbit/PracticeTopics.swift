@@ -55,15 +55,14 @@ struct TopicAreasPage: View {
   @Binding var customTopic: String
   let useCustom: () -> Void
   @State private var search = ""
+  @FocusState private var typingTopic: Bool
 
   var body: some View {
     let areas = TopicArea.all(model.taxonomy)
+    ScrollViewReader { scroller in
     ScrollView {
       VStack(alignment: .leading, spacing: 24) {
         if search.isEmpty {
-          Text("Pick what you want to get better at. Bit writes a question on it.")
-            .font(.subheadline).foregroundStyle(AppPalette.secondary)
-            .fixedSize(horizontal: false, vertical: true)
           if let path = context.path, let pick = path.pick {
             NavigationLink(value: TopicStep.topic(pick.id)) { PickShortcut(pick: pick, level: path.level.label) }
               .buttonStyle(TicketPressStyle())
@@ -76,7 +75,8 @@ struct TopicAreasPage: View {
                 .accessibilityIdentifier("browse-area-" + area.slug)
             }
           }
-          CustomTopicCard(topic: $customTopic, use: useCustom)
+          CustomTopicCard(topic: $customTopic, focused: $typingTopic, use: useCustom)
+            .id("customTopic")
         } else {
           results
         }
@@ -85,6 +85,16 @@ struct TopicAreasPage: View {
       .frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity)
     }
     .background(AppPalette.background)
+    .scrollDismissesKeyboard(.interactively)
+    // The field sits at the bottom of the page: once the keyboard is up, bring the whole card above it.
+    .onChange(of: typingTopic) { _, typing in
+      guard typing else { return }
+      Task {
+        try? await Task.sleep(for: .milliseconds(350))
+        withAnimation(DrillbitMotion.reveal) { scroller.scrollTo("customTopic", anchor: .bottom) }
+      }
+    }
+    }
     .searchable(text: $search, prompt: "Find a topic")
     .navigationTitle("Pick a topic")
   }
@@ -116,13 +126,10 @@ private struct PickShortcut: View {
   let level: String
   var body: some View {
     HStack(spacing: 12) {
-      Image(systemName: "sparkle").font(.body.weight(.semibold)).foregroundStyle(AppPalette.accent)
-        .frame(width: 40, height: 40)
-        .background(AppPalette.accentSoft, in: RoundedRectangle(cornerRadius: 12))
-        .accessibilityHidden(true)
+      NodeDot(state: pick.state, size: 12, glow: false).frame(width: 16)
       VStack(alignment: .leading, spacing: 2) {
-        Text("Bit’s pick to reach \(level)").font(.footnote.weight(.semibold)).foregroundStyle(AppPalette.accent)
         Text(pick.label).font(.headline).foregroundStyle(AppPalette.primary)
+        Text("Bit’s pick for \(level)").font(.subheadline).foregroundStyle(AppPalette.secondary)
       }
       Spacer(minLength: 8)
       Chevron()
@@ -176,17 +183,14 @@ private struct TopicAreaCard: View {
 
 private struct CustomTopicCard: View {
   @Binding var topic: String
+  var focused: FocusState<Bool>.Binding
   let use: () -> Void
   private var trimmed: String { topic.trimmingCharacters(in: .whitespacesAndNewlines) }
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
-      VStack(alignment: .leading, spacing: 4) {
-        Text("Something else in mind?").font(.headline).foregroundStyle(AppPalette.primary)
-        Text("Name a product or system and Bit builds the question around it.")
-          .font(.subheadline).foregroundStyle(AppPalette.secondary)
-          .fixedSize(horizontal: false, vertical: true)
-      }
+      Text("Something else in mind?").font(.headline).foregroundStyle(AppPalette.primary)
       TextField("For example, search ranking", text: $topic)
+        .focused(focused)
         .submitLabel(.go)
         .onSubmit { if !trimmed.isEmpty { use() } }
         .padding(12)
@@ -260,7 +264,9 @@ private struct TopicRows: View {
           .fixedSize(horizontal: false, vertical: true)
         Text((showsArea ? concept.category + " · " : "") + (node?.statusLine ?? "Not explored yet"))
           .font(.subheadline).foregroundStyle(state == .strong || state == .revisit ? AppPalette.accent : AppPalette.secondary)
-        if let level = context.pickLevel(for: concept.id) { PickBadge(level: level).padding(.top, 4) }
+        if let level = context.pickLevel(for: concept.id) {
+          Text("Bit’s pick for \(level)").font(.subheadline).foregroundStyle(AppPalette.secondary)
+        }
       }
       Spacer(minLength: 8)
       Chevron().padding(.top, 4)
@@ -304,25 +310,14 @@ struct TopicPage: View {
           }
         }
         if let path {
-          VStack(alignment: .leading, spacing: 8) {
-            PickBadge(level: path.level.label)
-            Text(path.progressLine).font(.subheadline).foregroundStyle(AppPalette.secondary)
-              .fixedSize(horizontal: false, vertical: true)
-          }
-          .accessibilityElement(children: .combine)
+          Text("Bit’s pick for \(path.level.label). \(path.progressLine)")
+            .font(.subheadline).foregroundStyle(AppPalette.secondary)
+            .fixedSize(horizontal: false, vertical: true)
         }
         if let evidence = node?.evidence {
-          VStack(alignment: .leading, spacing: 8) {
-            SignalEyebrow(text: evidence.signal == "demonstrated" ? "What held up last time" : "What to work on")
-            Text("“\(evidence.quote)”").font(.body).foregroundStyle(AppPalette.primary)
-              .fixedSize(horizontal: false, vertical: true)
-            Text(evidence.observation).font(.subheadline).foregroundStyle(AppPalette.secondary)
-              .fixedSize(horizontal: false, vertical: true)
-          }
-          .padding(16)
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .ticketCard()
-          .accessibilityElement(children: .combine)
+          Text("Last time: \(evidence.observation)")
+            .font(.subheadline).foregroundStyle(AppPalette.secondary)
+            .fixedSize(horizontal: false, vertical: true)
         }
         VStack(alignment: .leading, spacing: 8) {
           HStack {
@@ -337,8 +332,6 @@ struct TopicPage: View {
           .padding(.horizontal, 16).padding(.vertical, 8)
           .frame(minHeight: 48)
           .ticketCard()
-          Text(levelNote(path)).font(.footnote).foregroundStyle(AppPalette.secondary)
-            .fixedSize(horizontal: false, vertical: true)
         }
       }
       .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 24)
@@ -371,18 +364,9 @@ struct TopicPage: View {
       engineeringLevel: level, replaceId: model.bootstrap?.challenge?.lifecycle == "ready" ? model.bootstrap?.challenge?.id : nil)
   }
 
-  private func levelNote(_ path: LevelPath?) -> String {
-    let name = EngineeringLevel.choices.first { $0.0 == level }?.1 ?? level
-    if let path, path.level.id == level { return "Bit writes it at \(name), the level this pick is for." }
-    return "Bit writes it at \(name). Your usual level is \(EngineeringLevel.choices.first { $0.0 == model.settings.selectedLevel }?.1 ?? "set in Settings")."
-  }
-
+  /// Only when the button can't be used: it says why.
   private var footnote: String? {
-    switch model.bootstrap?.challenge?.lifecycle {
-    case "in_progress": "Finish or skip your current interview first."
-    case "ready": "Your current question stays until the new one is ready."
-    default: nil
-    }
+    model.bootstrap?.challenge?.lifecycle == "in_progress" ? "Finish or skip your current interview first." : nil
   }
 }
 
@@ -405,18 +389,6 @@ private struct TopicSymbol: View {
       .frame(width: 44, height: 44)
       .background(AppPalette.elevated, in: RoundedRectangle(cornerRadius: 12))
       .accessibilityHidden(true)
-  }
-}
-
-/// "Bit's pick to reach Staff": the one concept the map suggests for the next level.
-struct PickBadge: View {
-  let level: String
-  var body: some View {
-    Label("Bit’s pick to reach \(level)", systemImage: "sparkle")
-      .font(.caption.weight(.semibold))
-      .foregroundStyle(AppPalette.accent)
-      .padding(.horizontal, 8).padding(.vertical, 4)
-      .background(AppPalette.accentSoft, in: Capsule())
   }
 }
 
