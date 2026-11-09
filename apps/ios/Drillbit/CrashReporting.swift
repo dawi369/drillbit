@@ -35,6 +35,7 @@ enum CrashReporting {
         event.extra = nil
         // Crashes recorded by builds up to 20 still carry the hash in their saved scope.
         event.context = withoutInstallHash(event.context)
+        quietSystemHang(event, app: info?["CFBundleExecutable"] as? String ?? "Drillbit")
         // Without this, Sentry geolocates the connection's IP (city and country) before discarding the address.
         var sdk = event.sdk ?? [:]
         sdk["settings"] = ["infer_ip": "never"]
@@ -57,6 +58,20 @@ enum CrashReporting {
     app.removeValue(forKey: "device_app_hash")
     contexts["app"] = app
     return contexts
+  }
+
+  /// A MetricKit hang whose only app frame is the `main` entry point was all system work (a cold Metal shader
+  /// compile after an install or iOS update, for one). It stays in Sentry as a warning tagged `hang: system`, so
+  /// it counts without paging as a high-priority error. Hangs that pass through Drillbit code stay errors.
+  static func quietSystemHang(_ event: Event, app: String) {
+    guard let exception = event.exceptions?.first, exception.mechanism?.type == "mx_hang_diagnostic",
+      let frames = exception.stacktrace?.frames, !frames.isEmpty
+    else { return }
+    // Outermost first: dyld, then main, then the run loop. Frames without a binary are kernel addresses.
+    let afterEntry = frames.drop { $0.package == nil || $0.package == "dyld" || $0.package == app }
+    guard !afterEntry.contains(where: { $0.package == app }) else { return }
+    event.level = .warning
+    event.tags = (event.tags ?? [:]).merging(["hang": "system"]) { _, new in new }
   }
 
   /// System and network breadcrumbs only; taps and console lines can carry on-screen or practice text.

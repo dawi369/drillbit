@@ -492,3 +492,7 @@ Release **1.0 (23)** from commit `530de42` was archived, verified against produc
 ### Build 24 — 9 November 2026
 
 Owner review of build 23's practice sheet: Bit's pick is plain text (no sparkles, badges or tinted pills), the intro line, level note, "current question stays" footnote and boxed quote are gone, and typing your own topic scrolls its card into view. `LevelPathTests` and `PracticeUITests/testBitTabIsProAndMapsWhatYouKnow` passed. Release **1.0 (24)** from commit `f8c6d03` uploaded ("Upload succeeded"); dSYMs uploaded with `sentry-cli`. Not yet checked: Apple processing and the build on a phone.
+
+### Sentry hang from build 24 — 9 November 2026
+
+Sentry issue 159882117 (`MXHangDiagnostic`, 6.5 s, the owner's phone, build 24, iOS 26.5, once): the main thread waited on a synchronous Metal shader compile inside SwiftUI's renderer (`RenderBox` → `MTLCompilerScheduler`). Apart from the `main` entry point, every frame is Apple's (the two unnamed ones are kernel addresses). That's a cold GPU shader cache after installing a build or updating iOS, and there's no app code to change. From the next build, `CrashReporting.quietSystemHang` sends a MetricKit hang whose only Drillbit frame is `main` as a warning tagged `hang: system`, so it stays searchable but doesn't page as a high-priority error. Hangs through Drillbit code stay errors. Hosted `DrillbitTests`: 82 passed. Build 24 is unchanged; there's no reason to ship a new build for this. Resolve the issue in Sentry; if it comes back on build 24 for other users, it shows as a regression.

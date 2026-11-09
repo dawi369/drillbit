@@ -1,5 +1,6 @@
 #if !canImport(DrillbitCore)
   import Foundation
+  import Sentry
   import Testing
   @testable import Drillbit
 
@@ -22,6 +23,37 @@
       #expect(CrashReporting.serverTags(response) == ["endpoint": "/v1/challenges/:id/interview", "request_id": "6a0b5c1e-request"])
       let bare = HTTPURLResponse(url: url, statusCode: 502, httpVersion: nil, headerFields: [:])
       #expect(CrashReporting.serverTags(bare) == ["endpoint": "/v1/challenges/:id/interview"])
+    }
+
+    private func hang(_ packages: [String?], mechanism: String = "mx_hang_diagnostic") -> Event {
+      let event = Event(level: .error)
+      let exception = Exception(value: "MXHangDiagnostic hangDuration:6.545 sec", type: "MXHangDiagnostic")
+      exception.mechanism = Mechanism(type: mechanism)
+      exception.stacktrace = SentryStacktrace(
+        frames: packages.map { package in
+          let frame = Frame()
+          frame.package = package
+          return frame
+        }, registers: [:])
+      event.exceptions = [exception]
+      return event
+    }
+
+    @Test func aHangInSystemCodeIsAWarningAndOneThroughOurCodeStaysAnError() {
+      // DRILLBIT-IOS: main, the run loop, Core Animation, then a synchronous Metal compile and kernel frames.
+      let shaders = hang(["dyld", "Drillbit", "UIKitCore", "QuartzCore", "RenderBox", "Metal", "libsystem_kernel.dylib", nil])
+      CrashReporting.quietSystemHang(shaders, app: "Drillbit")
+      #expect(shaders.level == .warning)
+      #expect(shaders.tags?["hang"] == "system")
+
+      let ours = hang(["dyld", "Drillbit", "UIKitCore", "SwiftUI", "Drillbit", "SwiftUI"])
+      CrashReporting.quietSystemHang(ours, app: "Drillbit")
+      #expect(ours.level == .error)
+      #expect(ours.tags == nil)
+
+      let crash = hang(["dyld", "Drillbit", "UIKitCore"], mechanism: "mx_crash_diagnostic")
+      CrashReporting.quietSystemHang(crash, app: "Drillbit")
+      #expect(crash.level == .error)
     }
   }
 #endif
