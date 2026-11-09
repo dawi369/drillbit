@@ -1,8 +1,8 @@
 # App Store Connect: listing, build and review prep (computer-use brief)
 
-Written 6 November 2026 for a computer-use agent. Everything that can be done from the repo is done; this file is what's left, which only works in the App Store Connect website. Delete it once you've reported back.
+Written 6 November 2026 for a computer-use agent. Everything that can be done from the repo is done; this file is what's left, which only works in the App Store Connect website. The owner deletes it once the report is in and the last section is done.
 
-You're on the owner's Mac, in a browser at https://appstoreconnect.apple.com, signed in as the account owner. App: **Drillbit Practice** (bundle ID `dawi.drillbit`). Work through the sections in order.
+You're on the owner's Mac, in a browser at https://appstoreconnect.apple.com, signed in as the account owner. App: **Drillbit Practice** (bundle ID `dawi.drillbit`). Work through sections 1–6 in order. The last section, **Owner: production AI accounts**, is for the owner, not you: it involves billing. Skip it.
 
 ## Rules
 
@@ -145,3 +145,70 @@ Rules for the report:
 - **Screenshots:** save one of each finished page as evidence to `~/dev/drillbit/.local/computer-use/` (create it): build selection, App Information, version page top, screenshot set, review information, and both subscriptions.
 - **Banners and blocks:** quote any banner, error or warning word for word, and give the exact button you stopped at.
 - **At the end:** list what's left before Submit for Review, as you saw it on the version page.
+
+## Owner: production AI accounts (before Submit for Review)
+
+Written 9 November 2026. The production Worker (`drillbit-api`) already has `OPENROUTER_API_KEY` and `OPENAI_API_KEY` set, so nothing in the code needs to change. What's left is the accounts behind those keys.
+
+At the moment, development and production share one OpenRouter balance: about $20 left of the $40 bought, with $19.79 spent over the whole build, all E2E runs included. Every secret command below runs from `apps/api`.
+
+### What uses what
+
+| Provider | Used for | Models | Where in the code |
+|---|---|---|---|
+| OpenRouter | Interview turns, question writing, voice reasoning | `deepseek/deepseek-v4.1-flash`, pinned to Together, then DeepInfra | `FAST_MODEL_ID` / `FAST_PROVIDERS` in `apps/api/src/domain.ts` |
+| OpenRouter | Feedback, Recall and other non-live work | `openai/gpt-6-luna`, sorted by latency | `MODEL_ID` in `apps/api/src/domain.ts` |
+| OpenAI | Live voice (WebRTC) | `gpt-live-1`, sessions created with `store: false` | `apps/api/src/voice.ts` |
+
+BYOK users bring their own OpenRouter key, so their usage never touches yours.
+
+### If something runs dry
+
+| What happens | What users see | What gets reported |
+|---|---|---|
+| OpenRouter balance hits zero | "AI is unavailable right now. Your answer is safe." | `managed_out_of_credits` (503) in Sentry `drillbit-api` |
+| OpenRouter key limit reached | Same message | `managed_budget_reached` |
+| OpenRouter key revoked | Same message | `managed_key_rejected` |
+| OpenRouter privacy settings block the models | Same message | `managed_policy_blocked` |
+| OpenAI budget, credit or rate limit hit | "Couldn't connect voice. Try again later." Typing still works | `voice_provider` (502), plus a `voice_provider_rejected` log line with the status and reason |
+
+### OpenRouter (https://openrouter.ai)
+
+1. **Credits → top up**, then turn on **auto top-up**. Pick a threshold and amount you're happy to have charged without warning. This is the one that takes the whole app down if it hits zero.
+2. **Keys → Create key**, named `drillbit-production`.
+   - Give it its own **credit limit**, high enough not to trip during launch. It's a guard against a runaway loop, not a budget. Something like $100 a month is a sane start; check after week one.
+   - Keep the existing development key at its $20 limit. That way development runs can't eat production's money.
+3. **Store the new key:** `./node_modules/.bin/wrangler secret put OPENROUTER_API_KEY --env production`, then paste the key when asked. No redeploy needed; secrets apply straight away.
+4. **Settings → Privacy:**
+   - Turn off training on your inputs, and turn off input/output logging. The privacy policy (`apps/api/src/legal.ts`) says content only goes to providers to produce a response.
+   - If you turn on a stricter filter (zero data retention only, or blocking providers), check right after that typed reps still work. If no allowed provider serves `deepseek/deepseek-v4.1-flash` or `openai/gpt-6-luna`, every request fails with `managed_policy_blocked`.
+5. **Revoke the old production key** once step 7 below passes, if it's a different key from the development one.
+
+### OpenAI (https://platform.openai.com)
+
+1. **Settings → Projects → Create project**, named `drillbit-production`. Keep development on its own project, so spend and limits are separate.
+2. **In that project, create an API key** (service account or your own).
+   - Simplest is permissions **All**.
+   - If you restrict it instead, test voice straight after, because the live sessions endpoint has to be allowed.
+3. **Project → Limits:**
+   - Allow only `gpt-live-1`, so a leaked key can't be used for anything else.
+   - Set a **monthly budget** with an email alert at about 50% and 80%.
+4. **Billing:** add prepaid credit and turn on **auto recharge**.
+5. **Limits → rate limits:** check the requests-per-minute and tokens-per-minute for `gpt-live-1` on your usage tier, because that caps how many people can talk at once. A new account starts on a low tier and moves up with spend. If the numbers look tight for launch, add credit early to move up.
+   - Voice usage caps for sizing: Pro is up to 60 minutes a day and 75 a week; Free gets one 10-minute mock.
+6. **Store the new key:** `./node_modules/.bin/wrangler secret put OPENAI_API_KEY --env production`.
+7. **Settings → Data controls:** check that sharing with OpenAI for training is off at the organization level. Sessions are already created with `store: false`.
+
+### Check production (both providers)
+
+1. **Watch the logs:** in one terminal, run `./node_modules/.bin/wrangler tail drillbit-api --format pretty` from `apps/api`.
+2. **Do one typed rep on your phone** (build 24, production): start a question, answer twice, end it and wait for feedback.
+   - The tail should show `inference_first_text` lines and no `managed_*` errors.
+3. **Do one voice rep:** talk for a minute, then end it.
+   - Look for any `voice_provider_rejected` line in the tail.
+   - Look for usage on the `drillbit-production` project in the OpenAI dashboard. It can take a few minutes to appear.
+4. **Check the OpenRouter activity page:** the requests should be on the `drillbit-production` key.
+5. **Check Sentry** (`drillbit-api` and `drillbit-ios`): no new issues from the run.
+6. **Revoke the old keys** in both dashboards once all of the above is clean.
+
+When this is done, add a dated line to `docs/operations.md` saying which keys production uses (names only, never the keys).
