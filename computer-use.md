@@ -24,13 +24,13 @@ You're on the owner's Mac, in a browser at https://appstoreconnect.apple.com, si
 
 All images are 1320 × 2868 PNG.
 
-## 1. Select build 1.0 (22)
+## 1. Select build 1.0 (24)
 
-Build 22 was uploaded on 8 November at about 14:46 CET. It has the layered app icon from build 20, the background-refresh crash fix (Sentry DRILLBIT-IOS-5) and the launch fixes, so it's the one to submit. Build 21 is superseded.
+Build 24 was uploaded on 9 November at about 15:58 CET. It has the layered app icon from build 20, the background-refresh crash fix (Sentry DRILLBIT-IOS-5), the launch fixes and the Bit tab's practice sheet, so it's the one to submit. Builds 21 to 23 are superseded.
 
-1. **Apps → Drillbit Practice → TestFlight.** Check build **1.0 (22)** is there and has finished processing (not "Processing"). If it's still processing, wait and refresh every few minutes, for up to an hour. If it never appears, report it.
+1. **Apps → Drillbit Practice → TestFlight.** Check build **1.0 (24)** is there and has finished processing (not "Processing"). If it's still processing, wait and refresh every few minutes, for up to an hour. If it never appears, report it.
 2. If it asks about export compliance, the answer is already in the build (`ITSAppUsesNonExemptEncryption = NO`). Report any question that still appears; don't answer it.
-3. **Distribution → iOS App → 1.0 Prepare for Submission → Build.** Replace the selected build (20, or 16 if this step was never done) with **1.0 (22)**. Save.
+3. **Distribution → iOS App → 1.0 Prepare for Submission → Build.** Replace the selected build (20, or 16 if this step was never done) with **1.0 (24)**. Save.
 
 ## 2. Name and subtitle
 
