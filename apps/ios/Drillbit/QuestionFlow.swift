@@ -6,7 +6,10 @@ struct QuestionFlowEntry: Identifiable {
   var recovery: PreparationInput? = nil
   var source: Challenge? = nil
   var browseTopics = false
-  var area: PracticeAreaGroup? = nil
+  /// Opens the browser on this concept, with its area and every area behind it.
+  var concept: String? = nil
+  /// The level to suggest for that concept's question (Bit's pick for your next level).
+  var level: String? = nil
 }
 struct QuestionFlow: View {
   @Bindable var model: AppModel
@@ -14,11 +17,13 @@ struct QuestionFlow: View {
   var source: Challenge? = nil
   var recovery: PreparationInput? = nil
   var browseTopics = false
-  var area: PracticeAreaGroup? = nil
+  var concept: String? = nil
+  var level: String? = nil
   var onStart: (Challenge) -> Void
-  @State private var selectedTopic: PracticeConcept?
-  @State private var selectedArea: PracticeAreaGroup?
-  @State private var topicSearch = ""
+  @State private var browsePath: [TopicStep] = []
+  /// Where the browser was when a question was asked for, so a failed one comes back to it.
+  @State private var savedPath: [TopicStep] = []
+  @State private var openedOnConcept = false
   @State private var customTopic = ""
   @State private var selectedCustomTopic: String?
   @State private var showingPreview = false
@@ -79,39 +84,9 @@ struct QuestionFlow: View {
       removal: .opacity.animation(DrillbitMotion.fast))
   }
   var body: some View {
-    NavigationStack {
-      if browseTopics && selectedTopic == nil && selectedCustomTopic == nil && !firstRep {
-        SignalList {
-          Section("Core areas") {
-            if let selectedArea {
-              ForEach(model.taxonomy.filter { selectedArea.concepts.contains($0.id) && (topicSearch.isEmpty || $0.label.localizedCaseInsensitiveContains(topicSearch)) }) { concept in
-              Button {
-                selectedTopic = concept
-                retryInput = PreparationInput(primaryConceptId: concept.id, focus: "System design", kind: "design", difficulty: model.settings.difficulty, engineeringLevel: model.settings.selectedLevel, replaceId: model.bootstrap?.challenge?.lifecycle == "ready" ? model.bootstrap?.challenge?.id : nil)
-              } label: {
-                HomeTopicRow(concept: concept, coverage: model.libraryCoverage.first(where: { $0.conceptId == concept.id }), loaded: model.libraryCoverageLoaded)
-              }.buttonStyle(DrillbitRowButtonStyle())
-              }
-            } else {
-              ForEach(PracticeAreaGroup.all.filter { topicSearch.isEmpty || $0.title.localizedCaseInsensitiveContains(topicSearch) || $0.detail.localizedCaseInsensitiveContains(topicSearch) }) { area in
-                Button { selectedArea = area } label: { PracticeAreaGroupRow(area: area) }.buttonStyle(DrillbitRowButtonStyle())
-                  .accessibilityIdentifier("browse-area-" + area.id)
-              }
-            }
-          }
-          Section("Your own topic") {
-            TextField("For example, search ranking", text: $customTopic)
-            Button("Continue") { selectedCustomTopic = customTopic.trimmingCharacters(in: .whitespacesAndNewlines) }
-              .disabled(customTopic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-          }
-        }.searchable(text: $topicSearch, prompt: "Find a core area")
-          .navigationTitle(selectedArea?.title ?? "System design").navigationBarTitleDisplayMode(.inline)
-          .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-              if selectedArea != nil { Button("Back") { selectedArea = nil; topicSearch = "" } }
-              else { Button("Close") { dismiss() } }
-            }
-          }.task { await model.loadTaxonomy() }
+    NavigationStack(path: $browsePath) {
+      if browseTopics && !showingPreview && selectedCustomTopic == nil && !firstRep {
+        browser
       } else if showingPreview {
         ScrollView {
           VStack(alignment: .leading, spacing: 16) {
@@ -125,7 +100,12 @@ struct QuestionFlow: View {
             if let failure {
               Text(failure).foregroundStyle(.secondary).transition(.opacity)
               if firstRep { Button("Try again") { prepare(nil) } }
-              else { Button("Back to preparation") { showingPreview = false } }
+              else {
+                Button("Back to preparation") {
+                  showingPreview = false
+                  if browseTopics { browsePath = savedPath }
+                }
+              }
             }
           }.frame(maxWidth: .infinity, alignment: .leading).padding(24)
         }.frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -195,7 +175,7 @@ struct QuestionFlow: View {
       guard !initialized else { return }
       initialized = true
       account = model.bootstrap?.account.id
-      selectedArea = area
+      if browseTopics { openOnConcept() }
       if let initial { question = initial; showingPreview = true; instantReveal = true; revealed = true; bitMounted = false; bitVisible = false }
       else if firstRep { prepare(nil) }
     }
@@ -204,6 +184,43 @@ struct QuestionFlow: View {
     .onDisappear { visible = false }
     .onChange(of: scenePhase) { _, phase in if phase == .background { visible = false; dismiss() } }
     .onChange(of: model.bootstrap?.account.id) { _, value in if value != account { dismiss() } }
+  }
+  /// Every area, then an area, then a concept: the map's own structure, pushed like any other navigation.
+  @ViewBuilder private var browser: some View {
+    let context = TopicContext(model: model)
+    TopicAreasPage(model: model, context: context, customTopic: $customTopic) {
+      selectedCustomTopic = customTopic.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    .navigationDestination(for: TopicStep.self) { step in
+      switch step {
+      case .area(let id):
+        if let area = TopicArea.all(model.taxonomy).first(where: { $0.id == id }) { TopicAreaPage(area: area, context: context) }
+      case .topic(let id):
+        if let found = model.taxonomy.first(where: { $0.id == id }) {
+          TopicPage(model: model, concept: found, context: context,
+                    suggestedLevel: id == concept ? level : (context.path?.pick?.id == id ? context.path?.level.id : nil)) { input in
+            savedPath = browsePath
+            retryInput = input
+            browsePath = []
+            prepare(input)
+          }
+        }
+      }
+    }
+    .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }
+    .task {
+      await model.loadTaxonomy()
+      if !model.libraryCoverageLoaded { await model.preloadLibrary() }
+      openOnConcept()
+    }
+  }
+  /// From a concept on the map: its page, with its area and every area behind it, without animating the pushes.
+  private func openOnConcept() {
+    guard !openedOnConcept, let concept, let found = model.taxonomy.first(where: { $0.id == concept }) else { return }
+    openedOnConcept = true
+    var quiet = Transaction()
+    quiet.disablesAnimations = true
+    withTransaction(quiet) { browsePath = [.area(found.category), .topic(concept)] }
   }
   /// During the first rep the model turns a nil input into the first question's request.
   private func prepare(_ input: PreparationInput?) {

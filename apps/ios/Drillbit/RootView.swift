@@ -4,7 +4,8 @@ import SwiftUI
 struct RootView: View {
   @Bindable var model: AppModel
   @State private var settingsOpen = false
-  @State private var selectedTab = ProcessInfo.processInfo.arguments.contains("--fixture-recall") ? "recall" : "home"
+  @State private var selectedTab = ProcessInfo.processInfo.arguments.contains("--fixture-recall") ? "recall"
+    : ProcessInfo.processInfo.arguments.contains("--fixture-bit") ? "bit" : "home"
   @AppStorage("appearance") private var appearance = "dark"
   @Environment(\.scenePhase) private var scenePhase
   @Environment(\.colorScheme) private var systemColorScheme

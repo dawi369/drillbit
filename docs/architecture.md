@@ -782,3 +782,15 @@ Observability (Sentry stays error-only):
 - `reconcile` reports jobs still `pending` ten minutes after creation (`jobs_stuck_pending`, with their count and kinds): the signal for a Workflows or dispatch outage. Each tick looks at jobs that crossed ten minutes since the last one, so a stuck job is counted in one report, not every five minutes forever.
 - SSE failures after the 200 (coach stream, interview and question polling streams) are reported like a 5xx with route, code and `request_id`; aborts, cancellations and 4xx faults aren't.
 - iOS: `CrashReporting.reportStore` reports StoreKit failures at purchase and restore (not cancellation or network). `reportUnexpected` now covers voice transcript sync and voice delegation failures.
+
+## Bit tab: practice sheet and the next-level pick — 9 November 2026
+
+- **The sheet mirrors the map.** "Practise this" and the Next up picks open `QuestionFlow` with `browseTopics` on that concept (`QuestionFlowEntry.concept`). The browser (`PracticeTopics.swift`) is a real `NavigationStack` path: Pick a topic → an area → a concept, with native push and swipe back.
+  - From the map it opens on the concept, with its area and every area behind it.
+  - Areas are the taxonomy's categories, with the map's names, order and all 24 concepts. Each area and concept carries the map's state dots and status lines ("Held up · 2 reps", "Worth another go").
+  - The curated ten-concept `PracticeAreaGroup` list stays for onboarding only. The sheet used to use it, so a pick outside the ten, such as Transactions, opened a list that didn't contain it.
+- **Concept page:** the map's status, the concept's description, the last rep's quote and observation, a question level (Bit's pick suggests its level), and "Write my question". It builds the same `PreparationInput` as the preparation form: session style from the last real session, and it replaces a ready question. "Something else in mind?" on the first page keeps the custom-topic preparation. Search finds concepts by label, alias or description.
+- **The next-level pick:** `LevelPath` names the next rung above the level estimate (or the target level before you're placed). It counts reps at or above that rung by the estimate's own rule: two holding up, and at least three in five.
+  - **Pick order:** the newest gap from your highest-level reps, then any concept worth another go, then an unexplored concept from the least-touched area, then the practised concept with the fewest reps.
+  - **Bit tab:** Next up becomes "Your way to Staff", with "Bit's pick to reach Staff", the reason ("Last time: …"), a two-step progress bar, "Practise this at Staff" and a line on what holding up means. At the top of the ladder it falls back to plain Next up.
+  - **Sheet:** the same pick sits at the top of the first page and is badged in its area.

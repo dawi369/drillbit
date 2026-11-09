@@ -56,7 +56,7 @@ struct KnowledgeMapView: View {
     }
     .refreshable { await model.loadMemory(); await model.preloadLibrary(force: true) }
     .sheet(item: $flow, onDismiss: { if let started { model.presented = started; self.started = nil } }) { entry in
-      QuestionFlow(model: model, browseTopics: entry.browseTopics, area: entry.area, onStart: { started = $0 })
+      QuestionFlow(model: model, browseTopics: entry.browseTopics, concept: entry.concept, level: entry.level, onStart: { started = $0 })
     }
   }
 
@@ -165,39 +165,65 @@ struct KnowledgeMapView: View {
 
   // MARK: Next up
 
-  /// One clear pick with the reason it's next, then a quiet list of the alternatives.
+  /// Bit's pick for your next level, why, and how far along you are by the estimate's own rule; then a quiet list of
+  /// alternatives. Before you're placed, or at the top of the ladder, it's simply what's worth practising next.
   @ViewBuilder private func nextUp(_ nodes: [KnowledgeNode]) -> some View {
-    let revisit = nodes.filter { $0.state == .revisit }
-    let fresh = nodes.filter { $0.state == .unexplored && PracticeAreaCatalog.ids.contains($0.id) }
-    let picks = Array((revisit + fresh).prefix(3))
-    if let first = picks.first {
+    let path = LevelPath.from(model: model, nodes: nodes)
+    let candidates = nodes.filter { $0.state == .revisit } + nodes.filter { $0.state == .unexplored }
+    if let first = path?.pick ?? candidates.first {
+      let picked = path?.pick?.id == first.id ? path : nil
+      let others = Array(candidates.filter { $0.id != first.id }.prefix(2))
       VStack(alignment: .leading, spacing: 12) {
-        SignalEyebrow(text: "Next up")
+        SignalEyebrow(text: picked.map { $0.placing ? "Next up" : "Your way to \($0.level.label)" } ?? "Next up")
         VStack(alignment: .leading, spacing: 16) {
-          VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-              NodeDot(state: first.state, size: 10, glow: false)
-              DrillbitMetadata(text: first.state == .revisit ? "Worth another go" : "Not on your map yet")
+          VStack(alignment: .leading, spacing: 8) {
+            if let picked {
+              PickBadge(level: picked.level.label)
+            } else {
+              HStack(spacing: 8) {
+                NodeDot(state: first.state, size: 10, glow: false)
+                DrillbitMetadata(text: first.state == .revisit ? "Worth another go" : "Not on your map yet")
+              }
+              .accessibilityElement(children: .combine)
             }
-            .accessibilityElement(children: .combine)
             Text(first.label).font(.title2.weight(.semibold)).foregroundStyle(AppPalette.primary)
-            if let reason = first.state == .revisit ? first.evidence?.observation : first.description {
+            if let picked, let reason = picked.reason {
+              // Where the reason came from: the last rep on it, or what it is when it's new.
+              Text(first.state == .revisit ? "Last time: \(reason)" : reason).font(.subheadline).foregroundStyle(AppPalette.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            } else if let reason = first.state == .revisit ? first.evidence?.observation : first.description {
               Text(reason).font(.subheadline).foregroundStyle(AppPalette.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             }
           }
-          Button("Practise \(first.label)") { practise(first) }
-            .buttonStyle(PracticeButtonStyle())
-            .accessibilityIdentifier("nextUp-\(first.id)")
+          if let picked {
+            VStack(alignment: .leading, spacing: 8) {
+              PathProgress(lit: picked.placing ? picked.rated : picked.held,
+                           total: picked.placing ? LevelEstimate.needed : LevelPath.heldNeeded)
+              Text(picked.progressLine).font(.footnote).foregroundStyle(AppPalette.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("levelPath")
+          }
+          Button(picked.map { $0.placing ? "Practise \(first.label)" : "Practise this at \($0.level.label)" } ?? "Practise \(first.label)") {
+            practise(first, level: picked?.level.id)
+          }
+          .buttonStyle(PracticeButtonStyle())
+          .accessibilityIdentifier("nextUp-\(first.id)")
+          if picked != nil {
+            Text("A rep holds up when its feedback finds at least as many sound calls as gaps.")
+              .font(.caption).foregroundStyle(AppPalette.secondary)
+              .fixedSize(horizontal: false, vertical: true)
+          }
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppPalette.ticket, in: RoundedRectangle(cornerRadius: 12))
-        .overlay { RoundedRectangle(cornerRadius: 12).stroke(AppPalette.ticketEdge, lineWidth: 1) }
-        if picks.count > 1 {
+        .ticketCard()
+        if !others.isEmpty {
           VStack(spacing: 0) {
-            ForEach(Array(picks.dropFirst().enumerated()), id: \.element.id) { index, node in
-              if index > 0 { Divider().overlay(AppPalette.hairline).padding(.leading, 38) }
+            ForEach(others) { node in
+              if node.id != others.first?.id { Divider().overlay(AppPalette.hairline).padding(.leading, 38) }
               Button { practise(node) } label: {
                 HStack(spacing: 12) {
                   NodeDot(state: node.state, size: 10, glow: false).frame(width: 14)
@@ -219,16 +245,38 @@ struct KnowledgeMapView: View {
               .accessibilityIdentifier("nextUp-\(node.id)")
             }
           }
-          .background(AppPalette.ticket.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
-          .overlay { RoundedRectangle(cornerRadius: 12).stroke(AppPalette.ticketEdge, lineWidth: 1) }
+          .ticketCard(quiet: true)
         }
       }
     }
   }
 
-  private func practise(_ node: KnowledgeNode) {
-    let area = PracticeAreaGroup.all.first { $0.concepts.contains(node.id) }
-    flow = QuestionFlowEntry(browseTopics: true, area: area)
+  /// Opens the practice sheet on this concept, at a level when Bit's pick asks for one.
+  private func practise(_ node: KnowledgeNode, level: String? = nil) {
+    flow = QuestionFlowEntry(browseTopics: true, concept: node.id, level: level)
+  }
+}
+
+/// Segments for a short count: lit for each one done.
+private struct PathProgress: View {
+  let lit: Int
+  let total: Int
+  @State private var filled = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  var body: some View {
+    HStack(spacing: 8) {
+      ForEach(0..<total, id: \.self) { index in
+        ZStack(alignment: .leading) {
+          Capsule().fill(AppPalette.hairline)
+          Capsule().fill(AppPalette.action)
+            .scaleEffect(x: filled && index < lit ? 1 : 0, anchor: .leading)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.32).delay(0.2 + Double(index) * 0.12), value: filled)
+        }
+        .frame(height: 8)
+      }
+    }
+    .onAppear { filled = true }
+    .accessibilityHidden(true)
   }
 }
 
@@ -285,13 +333,7 @@ struct LevelEstimate {
   var rated = 0
 
   static func from(_ sessions: [Challenge]) -> LevelEstimate {
-    let rated = sessions.compactMap { rep -> (rank: Int, heldUp: Bool)? in
-      guard rep.lifecycle == "completed", !rep.isWarmUp, let evidence = rep.reflection?.evidence, !evidence.isEmpty,
-            let rank = ladder.firstIndex(where: { $0.0 == rep.engineeringLevel }) else { return nil }
-      let shown = evidence.filter { $0.signal == "demonstrated" }.count
-      let gaps = evidence.filter { $0.signal == "needs_practice" }.count
-      return (rank, shown > 0 && shown >= gaps)
-    }
+    let rated = rate(sessions)
     guard rated.count >= needed else {
       let left = needed - rated.count
       return LevelEstimate(level: nil, basis: "\(left) more \(left == 1 ? "rep" : "reps") and Bit places you.", rated: rated.count)
@@ -304,6 +346,82 @@ struct LevelEstimate {
       }
     }
     return LevelEstimate(level: ladder.first?.0, basis: "Your decisions are still settling. Keep going and this firms up fast.", rated: rated.count)
+  }
+
+  /// Finished reps with grounded feedback, each with its rung on the ladder and whether it held up.
+  static func rate(_ sessions: [Challenge]) -> [(rank: Int, heldUp: Bool, rep: Challenge)] {
+    sessions.compactMap { rep in
+      guard rep.lifecycle == "completed", !rep.isWarmUp, let evidence = rep.reflection?.evidence, !evidence.isEmpty,
+            let rank = ladder.firstIndex(where: { $0.0 == rep.engineeringLevel }) else { return nil }
+      let shown = evidence.filter { $0.signal == "demonstrated" }.count
+      let gaps = evidence.filter { $0.signal == "needs_practice" }.count
+      return (rank, shown > 0 && shown >= gaps, rep)
+    }
+  }
+}
+
+/// The next rung and what it takes, by the estimate's own rule (two reps at that level or above holding up, and at
+/// least three in five of them), plus the one concept Bit would practise for it.
+struct LevelPath {
+  /// The level the path leads to, and whether it's about getting placed at all.
+  let level: (id: String, label: String)
+  let placing: Bool
+  /// Reps at or above the level that held up, and all reps there.
+  let held: Int
+  let tried: Int
+  /// Reps that count towards an estimate at all: getting placed takes `LevelEstimate.needed` of them.
+  let rated: Int
+  let pick: KnowledgeNode?
+  /// Why this concept: what the last rep on it said, or what it is when it's new.
+  let reason: String?
+
+  static let heldNeeded = 2
+
+  var progressLine: String {
+    if placing {
+      let left = max(0, LevelEstimate.needed - rated)
+      return left == 1 ? "1 more rep with real design calls and Bit places you." : "\(left) more reps with real design calls and Bit places you."
+    }
+    if held < Self.heldNeeded { return "\(held) of \(Self.heldNeeded) reps at \(level.label) held up so far." }
+    return "\(held) of \(tried) reps at \(level.label) held up. Most of them need to."
+  }
+
+  @MainActor static func from(model: AppModel, nodes: [KnowledgeNode]) -> LevelPath? {
+    let ladder = LevelEstimate.ladder
+    let sessions = model.memory.sessions
+    let estimate = LevelEstimate.from(sessions)
+    let rated = LevelEstimate.rate(sessions)
+    let placing = estimate.level == nil
+    let next: Int
+    if let current = estimate.level.flatMap({ level in ladder.firstIndex { $0.0 == level } }) {
+      guard current + 1 < ladder.count else { return nil }
+      next = current + 1
+    } else {
+      next = ladder.firstIndex { $0.0 == model.settings.selectedLevel } ?? 2
+    }
+    let atOrAbove = rated.filter { $0.rank >= next }
+    let (pick, reason) = choose(nodes: nodes, rated: rated)
+    return LevelPath(level: ladder[next], placing: placing, held: atOrAbove.filter(\.heldUp).count, tried: atOrAbove.count,
+                     rated: rated.count, pick: pick, reason: reason)
+  }
+
+  /// A gap your highest, newest reps showed first; then any concept worth another go; then one you haven't tried, from
+  /// the area you've touched least; then the practised concept with the fewest reps.
+  static func choose(nodes: [KnowledgeNode], rated: [(rank: Int, heldUp: Bool, rep: Challenge)]) -> (KnowledgeNode?, String?) {
+    let byId = Dictionary(nodes.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    let newestHighest = rated.sorted { ($0.rank, $0.rep.completedAt ?? "") > ($1.rank, $1.rep.completedAt ?? "") }
+    for entry in newestHighest {
+      for evidence in entry.rep.reflection?.evidence ?? [] where evidence.signal == "needs_practice" {
+        if let node = byId[evidence.conceptId], node.state == .revisit { return (node, evidence.observation) }
+      }
+    }
+    if let node = nodes.first(where: { $0.state == .revisit }) { return (node, node.evidence?.observation) }
+    let touched = Dictionary(grouping: nodes, by: \.category).mapValues { group in group.filter { $0.state != .unexplored }.count }
+    if let node = nodes.filter({ $0.state == .unexplored }).min(by: { (touched[$0.category] ?? 0) < (touched[$1.category] ?? 0) }) {
+      return (node, node.description)
+    }
+    if let node = nodes.filter({ $0.state == .practised }).min(by: { $0.reps < $1.reps }) { return (node, node.description) }
+    return (nil, nil)
   }
 }
 
@@ -512,18 +630,21 @@ struct ConstellationMap: View {
 
         ForEach(Array(categories.enumerated()), id: \.element) { index, category in
           if let hub = layout.hubs.first(where: { $0.0 == category })?.1 {
-            VStack(spacing: 4) {
-              Circle().fill(AppPalette.secondary.opacity(0.6)).frame(width: 6, height: 6)
-              // A halo in the page colour keeps the name legible over the spokes without boxing it in.
-              Text(category).font(.caption2.weight(.semibold)).foregroundStyle(AppPalette.secondary)
-                .multilineTextAlignment(.center).lineLimit(2)
-                .shadow(color: AppPalette.background, radius: 1.5)
-                .shadow(color: AppPalette.background, radius: 3)
-                .frame(width: 96)
-            }
-            .position(hub)
-            .opacity(appeared ? 1 : 0)
-            .accessibilityHidden(true)
+            // The dot sits exactly on the hub, where the spoke and the category's edges meet; the name hangs below it.
+            Circle().fill(AppPalette.secondary.opacity(0.6)).frame(width: 6, height: 6)
+              .overlay(alignment: .top) {
+                // A halo in the page colour keeps the name legible over the spokes without boxing it in.
+                Text(category).font(.caption2.weight(.semibold)).foregroundStyle(AppPalette.secondary)
+                  .multilineTextAlignment(.center).lineLimit(2)
+                  .shadow(color: AppPalette.background, radius: 1.5)
+                  .shadow(color: AppPalette.background, radius: 3)
+                  .frame(width: 96)
+                  .fixedSize(horizontal: false, vertical: true)
+                  .offset(y: 10)
+              }
+              .position(hub)
+              .opacity(appeared ? 1 : 0)
+              .accessibilityHidden(true)
           }
         }
 

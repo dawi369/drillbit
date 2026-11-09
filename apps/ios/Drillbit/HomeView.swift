@@ -130,7 +130,7 @@ struct HomeView: View {
       withAnimation(reduceMotion ? nil : .easeOut(duration: 0.45)) { ticketSettled = true }
       if let started { model.presented = started; self.started = nil }
     }) { entry in
-      QuestionFlow(model: model, initial: entry.challenge, source: entry.source, recovery: entry.recovery, browseTopics: entry.browseTopics, area: entry.area, onStart: { started = $0 })
+      QuestionFlow(model: model, initial: entry.challenge, source: entry.source, recovery: entry.recovery, browseTopics: entry.browseTopics, concept: entry.concept, level: entry.level, onStart: { started = $0 })
         .navigationTransition(.zoom(sourceID: "today", in: zoom))
     }
     .task {
