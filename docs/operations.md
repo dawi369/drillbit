@@ -488,3 +488,7 @@ Release **1.0 (21)** from commit `df37b0c` archived, verified against production
 The Bit tab's practice sheet now mirrors the map, and Next up carries Bit's pick for the next level; the constellation's hub dots sit on their vertices (architecture.md, 9 November). Tests: hosted `DrillbitTests` 81 passed (4 new `LevelPathTests`), `swift test` 58 passed, `PracticeUITests/testBitTabIsProAndMapsWhatYouKnow` passed; the opt-in `DesignShots` UI test captured the flow on the iPhone 17 simulator with fixtures. No backend change.
 
 Release **1.0 (23)** from commit `530de42` was archived, verified against production and uploaded with `scripts/release-ios.sh --upload` ("Upload succeeded"); dSYMs uploaded with `sentry-cli`. Not yet checked: Apple processing, the build on a phone, and large text sizes and light mode for the new screens. The review draft's build choice (22 or 23) is the owner's.
+
+### Build 24 — 9 November 2026
+
+Owner review of build 23's practice sheet: Bit's pick is plain text (no sparkles, badges or tinted pills), the intro line, level note, "current question stays" footnote and boxed quote are gone, and typing your own topic scrolls its card into view. `LevelPathTests` and `PracticeUITests/testBitTabIsProAndMapsWhatYouKnow` passed. Release **1.0 (24)** from commit `f8c6d03` uploaded ("Upload succeeded"); dSYMs uploaded with `sentry-cli`. Not yet checked: Apple processing and the build on a phone.
