@@ -212,3 +212,53 @@ BYOK users bring their own OpenRouter key, so their usage never touches yours.
 6. **Revoke the old keys** in both dashboards once all of the above is clean.
 
 When this is done, add a dated line to `docs/operations.md` saying which keys production uses (names only, never the keys).
+
+## Owner: confirm customers get Pro and you get paid (after approval)
+
+Written 10 November 2026, after 1.0 (24) was approved. Pro is sold only through Apple (StoreKit subscriptions `dawi.drillbit.pro.weekly` and `dawi.drillbit.pro.yearly`). The production Worker grants Pro from Apple-signed transactions: the app sends one to `/v1/entitlement` right after a purchase, and Apple's webhook `/apple/notifications` keeps renewals, cancellations and refunds in step.
+
+**Checked from the repo on 10 November:**
+- Production's bundle ID and product IDs match the app.
+- Both endpoints are up: `/health` returns ok, and `/apple/notifications` rejects junk with 400.
+- Production D1 has no real purchases yet, only your manual Pro override.
+- The app wasn't on the App Store yet: the lookup by ID found nothing and the store page returned 404.
+
+### 1. App Store Connect (5 minutes)
+
+1. **Business** (Agreements, Tax, and Banking):
+   - the **Paid Apps** agreement is **Active**;
+   - the bank account and tax forms show no warnings.
+
+   Without an active agreement, the subscriptions don't sell at all.
+2. **Apps → Drillbit Practice → App Information → App Store Server Notifications:**
+   - the **Production** URL and the **Sandbox** URL are both `https://api.drillbit.t23.dev/apple/notifications`;
+   - both are set to **Version 2**.
+
+   Without this, new purchases still unlock Pro, but cancellations and refunds never reach the server, so people keep Pro.
+3. **Distribution → iOS App 1.0:**
+   - if it says **Pending Developer Release**, press **Release This Version**;
+   - **Subscriptions** shows both plans as **Approved**.
+
+### 2. One real purchase (once the App Store page is live)
+
+TestFlight and Xcode builds always buy in the sandbox. Only the App Store build charges real money.
+
+1. **Prepare the phone:** on the iPhone, go to **Settings → Developer → Sandbox Apple Account** and sign out, so the purchase uses your real Apple ID. Delete the TestFlight build, then install Drillbit from the App Store.
+2. **Use a fresh account:** sign in with an account that isn't your owner account. That one already has Pro through the manual override, so the purchase would prove nothing.
+3. **Watch the logs:** in a terminal, run `./node_modules/.bin/wrangler tail drillbit-api --format pretty` from `apps/api`.
+4. **Buy:** see Pro, then buy **weekly**, which charges the $1.99 first week.
+   - The app turns Pro without a relaunch.
+   - The tail shows `apple_notification` with `SUBSCRIBED` and `applied: true`. That proves the webhook is wired up.
+5. **Check the database row:** run `./node_modules/.bin/wrangler d1 execute drillbit-production --remote --env production --command "SELECT product_id, status, active_until FROM entitlements WHERE environment='Production'"`. It should show one active weekly row.
+6. **Check cancelling:** cancel in **Settings → Manage subscription**.
+   - The tail shows `DID_CHANGE_RENEWAL_STATUS`.
+   - Pro stays until the week ends.
+7. **Optional, check refunds:** request a refund at https://reportaproblem.apple.com. When Apple approves it (hours to days), a `REFUND` notification turns the account back to Free.
+
+### 3. The money
+
+**Sales and Trends** shows the sale the next day. Apple pays out monthly, roughly 33 days after the end of its fiscal month, once you're over the payment threshold. Check **Payments and Financial Reports**.
+
+### Known trade-off
+
+Production also accepts sandbox purchases, because App Review buys in the sandbox. A TestFlight tester's sandbox purchase therefore gives Pro on production for free, but sandbox subscriptions stop renewing after a few hours. Keep it this way while App Review checks updates.

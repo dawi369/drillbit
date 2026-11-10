@@ -500,3 +500,13 @@ Sentry issue 159882117 (`MXHangDiagnostic`, 6.5 s, the owner's phone, build 24, 
 ### Production AI accounts — 10 November 2026
 
 The owner set up production OpenRouter and OpenAI as described in `computer-use.md` (Owner: production AI accounts), and tested typed and voice reps on a phone against production: both work. Build 24 is in App Review. The system-hang change (`f247910`) waits for the next version (1.0.1); there's no new upload while 1.0 is in review.
+
+### Approved; purchase path check — 10 November 2026
+
+1.0 (24) was approved. Checked from the repo:
+- Production's `APPLE_BUNDLE_ID` and `APPLE_PRODUCT_IDS` match the app.
+- `/health` is ok, and `/apple/notifications` rejects junk with 400.
+- Production `entitlements` holds only the owner's `Manual` override, so no real or sandbox purchase is on record.
+- The store page wasn't live yet (iTunes lookup for id 6810226020 found nothing, and the page returned 404).
+
+The notification URL setting, Paid Apps agreement and banking can't be read without App Store Connect credentials. The owner checklist and the first real-money purchase test are in `computer-use.md` (Owner: confirm customers get Pro and you get paid).
