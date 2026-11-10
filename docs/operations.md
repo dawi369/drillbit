@@ -496,3 +496,7 @@ Owner review of build 23's practice sheet: Bit's pick is plain text (no sparkles
 ### Sentry hang from build 24 — 9 November 2026
 
 Sentry issue 159882117 (`MXHangDiagnostic`, 6.5 s, the owner's phone, build 24, iOS 26.5, once): the main thread waited on a synchronous Metal shader compile inside SwiftUI's renderer (`RenderBox` → `MTLCompilerScheduler`). Apart from the `main` entry point, every frame is Apple's (the two unnamed ones are kernel addresses). That's a cold GPU shader cache after installing a build or updating iOS, and there's no app code to change. From the next build, `CrashReporting.quietSystemHang` sends a MetricKit hang whose only Drillbit frame is `main` as a warning tagged `hang: system`, so it stays searchable but doesn't page as a high-priority error. Hangs through Drillbit code stay errors. Hosted `DrillbitTests`: 82 passed. Build 24 is unchanged; there's no reason to ship a new build for this. Resolve the issue in Sentry; if it comes back on build 24 for other users, it shows as a regression.
+
+### Production AI accounts — 10 November 2026
+
+The owner set up production OpenRouter and OpenAI as described in `computer-use.md` (Owner: production AI accounts), and tested typed and voice reps on a phone against production: both work. Build 24 is in App Review. The system-hang change (`f247910`) waits for the next version (1.0.1); there's no new upload while 1.0 is in review.
