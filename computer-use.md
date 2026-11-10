@@ -248,10 +248,10 @@ TestFlight and Xcode builds always buy in the sandbox. Only the App Store build 
 3. **Watch the logs:** in a terminal, run `./node_modules/.bin/wrangler tail drillbit-api --format pretty` from `apps/api`.
 4. **Buy:** see Pro, then buy **weekly**, which charges the $1.99 first week.
    - The app turns Pro without a relaunch.
-   - The tail shows `apple_notification` with `SUBSCRIBED` and `applied: true`. That proves the webhook is wired up.
+   - The tail shows an `apple_notification` line with `SUBSCRIBED`. That proves the webhook is wired up. `applied` can be `false` if Apple's notification beat the app's own report, which is fine.
 5. **Check the database row:** run `./node_modules/.bin/wrangler d1 execute drillbit-production --remote --env production --command "SELECT product_id, status, active_until FROM entitlements WHERE environment='Production'"`. It should show one active weekly row.
 6. **Check cancelling:** cancel in **Settings → Manage subscription**.
-   - The tail shows `DID_CHANGE_RENEWAL_STATUS`.
+   - The tail shows `DID_CHANGE_RENEWAL_STATUS` with `applied: true`.
    - Pro stays until the week ends.
 7. **Optional, check refunds:** request a refund at https://reportaproblem.apple.com. When Apple approves it (hours to days), a `REFUND` notification turns the account back to Free.
 
