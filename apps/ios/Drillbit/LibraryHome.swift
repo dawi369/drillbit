@@ -33,8 +33,7 @@ struct LibraryHomeView: View {
           EmptyTabState(title: "Nothing here yet", message: "Finish a rep and it lands here, with the one thing worth fixing next time.")
             .accessibilityIdentifier("libraryEmpty")
         } else {
-          LibraryActivity(reps: reps, total: model.memory.statistics?.completed ?? reps.count,
-                          thisWeek: model.memory.statistics?.lastSevenDays ?? 0)
+          LibraryActivity(reps: reps, total: model.memory.statistics?.completed ?? reps.count)
             .signalEntrance(0)
           if !areas.isEmpty { areaStrip }
           if !worthAnotherGo.isEmpty { worthSection }
@@ -44,8 +43,7 @@ struct LibraryHomeView: View {
       .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 40)
       .frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity)
     }
-    .background(AppPalette.background)
-    .containerBackground(AppPalette.background, for: .navigation)
+    .pageBackdrop()
     .navigationTitle("Library")
     .navigationBarTitleDisplayMode(.large)
     .modifier(LibrarySearch(text: $search, shown: !reps.isEmpty))
@@ -352,7 +350,6 @@ struct QuestionRetrySheet: View {
 private struct LibraryActivity: View {
   let reps: [Challenge]
   let total: Int
-  let thisWeek: Int
   @State private var risen = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.calendar) private var calendar
@@ -368,6 +365,7 @@ private struct LibraryActivity: View {
 
   var body: some View {
     let counts = weeks
+    let thisWeek = counts.last ?? 0
     let peak = max(counts.max() ?? 1, 1)
     HStack(alignment: .bottom, spacing: 16) {
       VStack(alignment: .leading, spacing: 2) {

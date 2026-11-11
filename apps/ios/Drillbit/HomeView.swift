@@ -58,7 +58,7 @@ struct HomeView: View {
   }
   private var todaysSession: Challenge? {
     model.memory.sessions.first { session in
-      !session.isWarmUp && session.completedAt.flatMap(Date.fromAPI).map(Calendar.current.isDateInToday) == true
+      !session.isWarmUp && session.completedAt.flatMap(Date.fromAPI).map(model.practiceCalendar.isDateInToday) == true
     }
   }
 
@@ -122,7 +122,7 @@ struct HomeView: View {
     ])
     .navigationTitle("Home").navigationBarTitleDisplayMode(.inline)
     .toolbar(.hidden, for: .navigationBar)
-    .background { TicketRollBackdrop() }
+    .background { PageBackdrop() }
     .refreshable { await model.refresh() }
     .onChange(of: flow != nil) { _, presenting in if presenting { ticketSettled = false } }
     .sheet(item: $flow, onDismiss: {
@@ -145,7 +145,7 @@ struct HomeView: View {
   private var header: some View {
     VStack(alignment: .leading, spacing: 4) {
       HStack(alignment: .center) {
-        Text(Date.now.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)))
+        Text(today(.dateTime.weekday(.abbreviated).day().month(.abbreviated)))
           .font(.subheadline).foregroundStyle(AppPalette.secondary)
         Spacer()
         Button("Settings", systemImage: AppIcon.settings.rawValue, action: openSettings)
@@ -154,7 +154,7 @@ struct HomeView: View {
           .tint(AppPalette.primary)
           .accessibilityIdentifier("homeSettings")
       }
-      Text(Date.now.formatted(.dateTime.weekday(.wide)))
+      Text(today(.dateTime.weekday(.wide)))
         .font(.largeTitle.weight(.semibold)).tracking(-0.6)
         .accessibilityAddTraits(.isHeader)
       HStack(alignment: .top, spacing: 0) {
@@ -171,6 +171,7 @@ struct HomeView: View {
         }
       }
       HomeWeekStrip(days: repDays).padding(.top, 20)
+        .environment(\.calendar, model.practiceCalendar)
     }
     // Today's dot filling is the cue for Bit's hop; a fresh launch that finds it already filled stays still.
     .onChange(of: model.bootstrap?.todayPlan?.completedToday) { old, new in
@@ -179,7 +180,7 @@ struct HomeView: View {
   }
   /// Days this week (and before) with a finished rep, from the same history Home's done ticket reads.
   private var repDays: Set<Date> {
-    let calendar = Calendar.current
+    let calendar = model.practiceCalendar
     var days = Set(model.memory.sessions.filter { !$0.isWarmUp && $0.lifecycle == "completed" }
       .compactMap { $0.completedAt.flatMap(Date.fromAPI).map(calendar.startOfDay) })
     if (model.bootstrap?.todayPlan?.completedToday ?? 0) > 0 { days.insert(calendar.startOfDay(for: .now)) }
@@ -460,7 +461,12 @@ struct HomeView: View {
 
   // MARK: Pieces
 
-  private var shortDate: String { Date.now.formatted(.dateTime.day().month(.abbreviated)) }
+  private var shortDate: String { today(.dateTime.day().month(.abbreviated)) }
+  private func today(_ style: Date.FormatStyle) -> String {
+    var style = style
+    style.timeZone = model.practiceCalendar.timeZone
+    return Date.now.formatted(style)
+  }
   private var nextNumber: String {
     model.bootstrap?.todayPlan?.nextTicket.map { String(format: "No. %03d", $0) } ?? "Today"
   }

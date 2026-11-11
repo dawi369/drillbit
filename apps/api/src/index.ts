@@ -325,6 +325,7 @@ app.put("/v1/settings", async (c) => {
   settings.learningPlan ??= previous.learningPlan;
   settings.engineeringLevel ??= previous.engineeringLevel;
   settings.questionFormatting ??= previous.questionFormatting;
+  settings.voice ??= previous.voice;
   // Onboarding only ever finishes: a client replaying setup must never send a finished account back through it.
   if (previous.onboardingComplete) settings.onboardingComplete = true;
   if (settings.learningPlan?.targetDate !== previous.learningPlan?.targetDate)

@@ -25,7 +25,9 @@ struct PracticeProvider: TimelineProvider {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         if let (data, response) = try? await URLSession.shared.data(for: request),
           (response as? HTTPURLResponse)?.statusCode == 200,
-          let fresh = try? JSONDecoder.api.decode(WidgetSnapshot.self, from: data)
+          let fresh = try? JSONDecoder.api.decode(WidgetSnapshot.self, from: data),
+          // Signed out while this was in flight: the app already cleared the snapshot, so don't bring it back.
+          SharedStore.secret("widgetToken") == token
         {
           snapshot = fresh
           try? SharedStore.save(fresh)

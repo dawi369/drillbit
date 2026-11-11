@@ -71,6 +71,8 @@ struct PracticeSettings: Codable, Equatable, Sendable {
     get { questionFormatting ?? true }
     set { questionFormatting = newValue }
   }
+  /// The interviewer's GPT-Live voice; absent means OpenAI's default, Marin.
+  var voice: String? = nil
 }
 struct SessionDraft: Codable, Sendable {
   var answer: String

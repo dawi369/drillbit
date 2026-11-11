@@ -24,6 +24,9 @@ struct InterviewView: View {
   @State private var assistanceGated = false
   @State private var assistanceClock = RevealClock()
   @State private var assistanceSettled = false
+  /// The popup's measured height, so the sheet opens only as tall as what's in it.
+  @State private var assistanceHeight: CGFloat = 0
+  @State private var assistanceTextHeight: CGFloat = 0
   @State private var requestingAssistance = false
   let model: AppModel
   let challenge: Challenge
@@ -412,8 +415,9 @@ struct InterviewView: View {
             clock: assistanceClock, segments: [StreamSegment(style: .body, text: AttributedString(assistanceText), identifier: "assistanceText")],
             finished: !requestingAssistance, paused: assistanceSettled,
             settled: { assistanceSettled = true })
+          .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { assistanceTextHeight = $0 }
         }
-        .frame(maxHeight: 240)
+        .frame(height: min(max(assistanceTextHeight, 24), 240))
         .transition(.opacity)
       } else if requestingAssistance {
         HStack(spacing: 8) {
@@ -441,7 +445,8 @@ struct InterviewView: View {
     .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: assistanceText == nil)
     .padding(24)
     .frame(maxWidth: 420)
-    .presentationDetents([requestingAssistance && assistanceText == nil ? .height(220) : .height(360)])
+    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { assistanceHeight = $0 }
+    .presentationDetents([.height(assistanceHeight > 0 ? assistanceHeight : 220)])
     .presentationDragIndicator(.visible)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("assistancePopup")
@@ -594,6 +599,8 @@ struct InterviewView: View {
     assistanceText = nil
     assistanceError = nil
     requestingAssistance = false
+    assistanceHeight = 0
+    assistanceTextHeight = 0
   }
   /// The interviewer thinks the question is answered: finishing is one tap, or keep going with an extra angle.
   private var coveredBanner: some View {

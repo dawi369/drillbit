@@ -128,7 +128,7 @@ struct SessionDetailView: View {
       }
       .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 40)
       .frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity)
-    }.background(AppPalette.background).containerBackground(AppPalette.background, for: .navigation).navigationTitle("Attempt").navigationBarTitleDisplayMode(.inline)
+    }.pageBackdrop().navigationTitle("Attempt").navigationBarTitleDisplayMode(.inline)
       .sheet(isPresented: $preparing, onDismiss: { if let started { model.presented = started; self.started = nil } }) {
         QuestionFlow(model: model, source: challenge, onStart: { started = $0 })
       }
@@ -293,14 +293,14 @@ struct LibraryView: View {
             Button(model.taxonomy.first { $0.id == id }?.label ?? id) { tags = [id] }
               .font(.caption).buttonStyle(.borderless).foregroundStyle(AppPalette.secondary)
           }
-        }.padding(.vertical, 8).listRowBackground(AppPalette.background)
+        }.padding(.vertical, 8).listRowBackground(Color.clear)
       }
       if let failure { Text(failure).font(.footnote).foregroundStyle(.secondary); Button("Retry") { Task { await load() } } }
       if cursor != nil { Button("Load more") { Task { await load(more: true) } }.disabled(loading) }
     }
     .listStyle(.plain)
     .scrollContentBackground(.hidden)
-    .containerBackground(AppPalette.background, for: .navigation)
+    .pageBackdrop()
     .navigationTitle(skipped ? "Skipped questions" : "Library")
     .searchable(text: $search)
     .toolbar {

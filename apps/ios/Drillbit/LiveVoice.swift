@@ -4,7 +4,7 @@ import OSLog
 @preconcurrency import WebRTC
 
 private struct VoiceConnection: Decodable { var id: String; var sdp: String; var expiresAt: String; var sessionSeconds: Int? }
-private struct VoiceStart: Encodable { var sdp: String; var revision: Int; var guidanceMode: GuidanceMode; var practiceProfile: PracticeProfile? }
+private struct VoiceStart: Encodable { var sdp: String; var revision: Int; var guidanceMode: GuidanceMode; var practiceProfile: PracticeProfile?; var voice: String? }
 private struct VoiceEvents: Codable { var fragments: [VoiceFragment]; var closed: Bool; var finalized: Bool; var usageSeconds: Double? }
 private struct VoiceAck: Decodable { var accepted: [String] }
 private struct VoiceDelegation: Encodable { var id: String }
@@ -176,7 +176,7 @@ private struct VoiceOutbox: Codable {
       guard generation == epoch else { link.close(); return }
       link.onEvent = { [weak self] data in self?.enqueue(data,epoch:epoch) }
       link.onFailure = { [weak self] in self?.interrupt("Voice dropped. Everything you said is saved.") }
-      let result: VoiceConnection = try await interview.model.api.send("challenges/\(interview.challenge.id)/voice",method:"POST",body:VoiceStart(sdp:offer,revision:draft.revision,guidanceMode:interview.mode,practiceProfile:interview.model.settings.practiceProfile),command:id)
+      let result: VoiceConnection = try await interview.model.api.send("challenges/\(interview.challenge.id)/voice",method:"POST",body:VoiceStart(sdp:offer,revision:draft.revision,guidanceMode:interview.mode,practiceProfile:interview.model.settings.practiceProfile,voice:interview.model.settings.voice),command:id)
       guard generation == epoch else { link.close(); abandon(id); return }
       if let seconds = result.sessionSeconds { sessionLimit = TimeInterval(seconds) }
       try await link.answer(result.sdp)

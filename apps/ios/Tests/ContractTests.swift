@@ -24,9 +24,9 @@ struct ContractTests {
   }
 
   @Test func recallSessionRevealsAndRequeuesWithoutClaimingMastery() {
-    var session = RecallSession(area: .swift, depth: .foundations)
+    var session = RecallSession(area: .systemDesign, depth: .foundations)
     #expect(session.remainingCount == 1)
-    #expect(session.current?.id == "swift-value-reference")
+    #expect(session.current?.id == "sd-load-balancer")
 
     session.markKnown()
     #expect(session.remainingCount == 1)
@@ -43,11 +43,11 @@ struct ContractTests {
   }
 
   @Test func recallFiltersProduceStableTemporaryDecks() {
-    let swift = RecallSession(area: .swift, depth: .all)
-    #expect(swift.remainingCount == 3)
-    #expect(swift.current?.area == .swift)
+    let storage = RecallSession(area: .storage, depth: .all)
+    #expect(storage.remainingCount == 3)
+    #expect(storage.current?.area == .storage)
     let deep = RecallSession(area: .all, depth: .deep)
-    #expect(deep.remainingCount == 5)
+    #expect(deep.remainingCount == 3)
     #expect(deep.current?.depth == .deep)
   }
 

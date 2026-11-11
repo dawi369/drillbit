@@ -132,3 +132,32 @@ it("deleting a question keeps its waived silent look: a free account still gets 
     mock.mockRestore();
   }
 });
+
+it("uses the voice picked in Settings, lets the app's pick win, and leaves OpenAI's default alone otherwise", async () => {
+  const { a } = await person(), real = globalThis.fetch.bind(globalThis), sent: any[] = [];
+  const mock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    if (!String(input instanceof Request ? input.url : input).startsWith("https://api.openai.com/")) return real(input, init);
+    sent.push(JSON.parse(String(init?.body)).session);
+    return new Response(JSON.stringify({ session: { id: "live_" + crypto.randomUUID() }, transport: { sdp: "answer" } }), { status: 201 });
+  });
+  // One question in progress per account: finish each before the next.
+  const close = async (id: string, voice: string) => {
+    await (await import("../src/voice")).voiceEvents(bindings, a, id, voice, { fragments: [], closed: true, finalized: true, usageSeconds: 5 });
+    await bindings.DB.prepare("UPDATE challenges SET lifecycle='completed' WHERE id=?").bind(id).run();
+  };
+  try {
+    let id = await question(a);
+    await close(id, (await startVoice(bindings, a, id, crypto.randomUUID(), { sdp: "offer", revision: 2 })).id);
+    expect(sent.at(-1).audio).toBeUndefined();
+    await bindings.DB.prepare("UPDATE settings SET data=json_set(data,'$.voice','cedar') WHERE account_id=?").bind(a).run();
+    id = await question(a);
+    await close(id, (await startVoice(bindings, a, id, crypto.randomUUID(), { sdp: "offer", revision: 2 })).id);
+    expect(sent.at(-1).audio).toEqual({ output: { voice: "cedar" } });
+    id = await question(a);
+    await close(id, (await startVoice(bindings, a, id, crypto.randomUUID(), { sdp: "offer", revision: 2, voice: "vesper" })).id);
+    expect(sent.at(-1).audio).toEqual({ output: { voice: "vesper" } });
+    await expect(startVoice(bindings, a, await question(a), crypto.randomUUID(), { sdp: "offer", revision: 2, voice: "fable" })).rejects.toThrow();
+  } finally {
+    mock.mockRestore();
+  }
+});

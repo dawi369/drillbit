@@ -229,7 +229,14 @@ struct RootView: View {
     .onOpenURL { url in
       if url.scheme == "dawi.drillbit" && url.host == "callback" { return }
       selectedTab = "home"
-      Task { await model.refresh() }
+      Task {
+        await model.refresh()
+        // The widget's "Resume practice" goes straight back into the interview; a fresh question opens on Home.
+        if url.host == "challenge", model.presented == nil, let current = model.bootstrap?.challenge,
+           current.id == url.lastPathComponent, current.lifecycle == "in_progress" {
+          await model.open(current)
+        }
+      }
     }
     .environment(\.formatsQuestions, model.settings.formatsQuestions)
   }

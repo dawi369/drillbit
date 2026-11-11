@@ -40,6 +40,9 @@ export type LearningPlan = z.infer<typeof learningPlanSchema>;
 export const defaultLearningPlan = (): LearningPlan => ({
   version: 1, objective: "learn", roleTrack: "general", weakAreas: [], dailyGoalMinutes: 10,
 });
+/** GPT-Live's English voices; the app ships a recorded preview of each. `marin` is OpenAI's default. */
+export const liveVoices = ["marin", "cedar", "alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse", "gleam", "meridian", "delta", "cinder", "vesper", "willow", "stone", "quartz", "ripple", "beacon"] as const;
+export const liveVoiceSchema = z.enum(liveVoices);
 export const settingsSchema = z.object({
   practiceProfile: practiceProfileSchema.optional(),
   learningPlan: learningPlanSchema.optional(),
@@ -64,6 +67,8 @@ export const settingsSchema = z.object({
   model: z.enum([MODEL_ID, "google/gemini-3.1-flash-lite", "google/gemini-2.5-flash-lite"]).default(MODEL_ID),
   // Absent means on; optional so older clients never reset it.
   questionFormatting: z.boolean().optional(),
+  // Absent means OpenAI's default; optional so older clients never reset it.
+  voice: liveVoiceSchema.optional(),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 export const challengeSchema = z.object({

@@ -275,15 +275,11 @@ struct SetupView: View {
     default: "Brave, and right. Out loud is where most people wobble, so that’s where we practise."
     }
   }
-  /// Reps a week each pace roughly works out to; used for an honest estimate, never a promise.
-  static func repsPerWeek(minutes: Int) -> Int { minutes >= 20 ? 3 : minutes >= 10 ? 5 : 6 }
   static func paceReaction(minutes: Int, targetDate: Date?, now: Date = .now, calendar: Calendar = .current) -> String {
-    let perWeek = repsPerWeek(minutes: minutes)
     if let targetDate {
       let days = daysUntil(targetDate, now: now, calendar: calendar)
       if days >= 2 {
-        let reps = max(1, Int((Double(days) / 7 * Double(perWeek)).rounded()))
-        return "\(days) days out. Keep that up and that’s about \(reps) rep\(reps == 1 ? "" : "s") before the interview."
+        return "\(days) days out. A rep most days and you walk in warmed up."
       }
       return "Tight. One good rep now beats five rushed ones."
     }
@@ -455,7 +451,7 @@ private struct PlanTicket: View {
           VStack(alignment: .leading, spacing: 8) {
             row("map", "Start with", areas.isEmpty ? "Whatever you’re weakest at. Drillbit picks." : areas.enumerated().map { $0.offset == 0 ? $0.element.title : $0.element.title.lowercased() }.joined(separator: ", then "))
             row("mic", "Practice", SetupView.modes.first { $0.id == draft.mode }?.title ?? "Talking it out")
-            row("clock", "Pace", "\(draft.minutes) min · about \(SetupView.repsPerWeek(minutes: draft.minutes)) reps a week")
+            row("clock", "Pace", "\(draft.minutes) min a rep")
             if draft.objective == "interview", let date = draft.targetDate {
               row("calendar", "Interview", SetupView.daysUntil(date) >= 2 ? "\(SetupView.daysUntil(date)) days away" : SetupView.countdown(to: date))
             }

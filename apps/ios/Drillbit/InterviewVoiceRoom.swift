@@ -170,12 +170,14 @@ struct InterviewVoiceRoom<Question: View>: View {
           .frame(width: 88)
           .padding(.trailing, 16)
         }
-        // The free allowance shows under the button for a moment, then gets out of the way.
-        if let allowance, !allowanceFaded {
+        // The free allowance shows under the button for a moment, then fades. It keeps its line so the controls
+        // don't drop onto it mid-fade.
+        if let allowance {
           Text(allowance)
             .font(.footnote).foregroundStyle(AppPalette.secondary)
             .multilineTextAlignment(.center)
-            .transition(.opacity)
+            .opacity(allowanceFaded ? 0 : 1)
+            .accessibilityHidden(allowanceFaded)
             .accessibilityIdentifier("voiceAllowance")
         }
         #if DEBUG

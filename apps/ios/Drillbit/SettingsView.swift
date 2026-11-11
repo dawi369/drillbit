@@ -13,6 +13,7 @@ struct SettingsView: View {
   @State private var recordingVoiceNote = false
   @State private var reportingBug = false
   @AppStorage("appearance") private var appearance = "dark"
+  @AppStorage(Backdrop.storageKey) private var backdrop = Backdrop.rails.rawValue
   private var time: Binding<Date> {
     Binding(
       get: {
@@ -54,6 +55,9 @@ struct SettingsView: View {
             }), in: Calendar.current.startOfDay(for: Date())..., displayedComponents: .date)
           }
         }
+        NavigationLink { InterviewerVoiceView(selection: $model.settings.voice) } label: {
+          LabeledContent("Interviewer voice", value: InterviewerVoice.name(model.settings.voice))
+        }.accessibilityIdentifier("settingsVoice")
         Toggle("Daily reminder", isOn: Binding(
           get: { model.settings.reminderEnabled },
           set: { enabled in
@@ -75,6 +79,9 @@ struct SettingsView: View {
           DatePicker("Reminder time", selection: time, displayedComponents: .hourAndMinute)
         }
         ReminderPermissionRow()
+        NavigationLink { BackdropPickerView() } label: {
+          LabeledContent("Background", value: (Backdrop(rawValue: backdrop) ?? .rails).title)
+        }.accessibilityIdentifier("settingsBackground")
       }
       Section("Plan") {
         LabeledContent("Plan") {

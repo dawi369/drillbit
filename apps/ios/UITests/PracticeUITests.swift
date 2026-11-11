@@ -67,7 +67,8 @@ final class PracticeUITests: XCTestCase {
     app.tabBars.buttons["Library"].tap()
     // At a glance: totals, the areas worked, what's worth another go, then reps as tickets by week.
     XCTAssertTrue(app.descendants(matching: .any)["worth-library-completed-attempt"].waitForExistence(timeout: 10))
-    XCTAssertTrue(app.descendants(matching: .any)["libraryActivity"].label.contains("12 reps, 4 this week"))
+    // The fixture's one recent rep finished yesterday, so it's in this calendar week except on Sundays.
+    XCTAssertTrue(app.descendants(matching: .any)["libraryActivity"].label.contains("12 reps"))
     XCTAssertTrue(app.buttons["libraryArea-Queues & streams"].exists)
     XCTAssertTrue(app.staticTexts["Say what a retry does when the first delivery already went out."].exists)
     XCTAssertTrue(app.staticTexts["This week"].exists)
@@ -283,6 +284,44 @@ final class PracticeUITests: XCTestCase {
     app.buttons["Settings"].tap()
     XCTAssertFalse(app.buttons["Retry sync"].exists)
     capture("Settings retained offline", app)
+  }
+  func testInterviewerVoicePickerKeepsTheChoice() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures"]
+    app.launch()
+    XCTAssertTrue(app.buttons["Settings"].waitForExistence(timeout: 10))
+    app.buttons["Settings"].tap()
+    let row = app.buttons["settingsVoice"]
+    XCTAssertTrue(row.waitForExistence(timeout: 5))
+    XCTAssertTrue(row.label.contains("Marin"))
+    row.tap()
+    let cedar = app.buttons["voice-cedar"]
+    XCTAssertTrue(cedar.waitForExistence(timeout: 5))
+    cedar.tap()
+    XCTAssertEqual(cedar.value as? String, "Selected")
+    capture("Interviewer voice", app)
+    app.navigationBars.buttons.firstMatch.tap()
+    XCTAssertTrue(app.buttons["settingsVoice"].label.contains("Cedar"))
+  }
+  func testBackgroundPickerAppliesTheChoice() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--fixtures"]
+    app.launch()
+    XCTAssertTrue(app.buttons["Settings"].waitForExistence(timeout: 10))
+    app.buttons["Settings"].tap()
+    let row = app.buttons["settingsBackground"]
+    XCTAssertTrue(row.waitForExistence(timeout: 5))
+    for _ in 0..<4 where !row.isHittable { app.swipeUp() }
+    row.tap()
+    let stars = app.buttons["backdrop-stars"]
+    XCTAssertTrue(stars.waitForExistence(timeout: 5))
+    stars.tap()
+    XCTAssertEqual(stars.value as? String, "Selected")
+    capture("Background picker", app)
+    app.navigationBars.buttons.firstMatch.tap()
+    XCTAssertTrue(app.buttons["settingsBackground"].label.contains("Night sky"))
+    app.buttons["settingsBackground"].tap()
+    app.buttons["backdrop-rails"].tap()
   }
   func testPracticeProfileEditingAndReset() throws {
     let app = XCUIApplication()

@@ -132,6 +132,12 @@ import WidgetKit
     let minutes = settings.dailyMinutes
     return Calendar.current.date(from: DateComponents(hour: minutes / 60, minute: minutes % 60))?.formatted(date: .omitted, time: .shortened) ?? "12:30"
   }
+  /// The day as the server counts it: the saved time zone, which only differs from the phone's when travelling.
+  var practiceCalendar: Calendar {
+    var calendar = Calendar.current
+    calendar.timeZone = TimeZone(identifier: settings.timezone) ?? .current
+    return calendar
+  }
   /// Shown once when a receipt belongs to another account.
   var entitlementNotice: String?
   var isPro: Bool { bootstrap?.account.plan == "pro" || bootstrap?.practice?.freeReps == false }

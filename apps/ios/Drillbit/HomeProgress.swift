@@ -20,7 +20,7 @@ struct HomeWeekStrip: View {
         let done = days.contains(day)
         let isToday = day == today
         VStack(spacing: 8) {
-          Text(day.formatted(.dateTime.weekday(.narrow)))
+          Text(day.formatted(weekday(.narrow)))
             .font(.caption2.weight(isToday ? .semibold : .medium))
             .foregroundStyle(isToday ? AppPalette.primary : AppPalette.secondary)
           ZStack {
@@ -42,8 +42,14 @@ struct HomeWeekStrip: View {
   private var spoken: String {
     let done = week.filter { days.contains($0) }
     guard !done.isEmpty else { return "This week: no reps yet" }
-    let names = done.map { calendar.isDateInToday($0) ? "today" : $0.formatted(.dateTime.weekday(.wide)) }
+    let names = done.map { calendar.isDateInToday($0) ? "today" : $0.formatted(weekday(.wide)) }
     return "This week: \(done.count) \(done.count == 1 ? "rep day" : "rep days"), " + names.formatted(.list(type: .and))
+  }
+  /// Day names in the calendar's time zone, so the labels sit over the days they mark.
+  private func weekday(_ width: Date.FormatStyle.Symbol.Weekday) -> Date.FormatStyle {
+    var style = Date.FormatStyle.dateTime.weekday(width)
+    style.timeZone = calendar.timeZone
+    return style
   }
 }
 

@@ -3,9 +3,7 @@ import SwiftUI
 enum RecallArea: String, CaseIterable, Identifiable {
   case all = "All areas"
   case systemDesign = "System design"
-  case swift = "Swift"
-  case typeScript = "TypeScript"
-  case sql = "SQL"
+  case storage = "Data & storage"
   case networking = "Networking"
 
   var id: Self { self }
@@ -71,6 +69,13 @@ struct RecallSession: Equatable {
     isRevealed = false
   }
 
+  /// Undoes `finishCurrent` when the review didn't save.
+  mutating func putBack(_ card: RecallCard, again: Bool) {
+    queue.insert(card, at: 0)
+    if again { againCount -= 1 } else { knownCount -= 1 }
+    isRevealed = false
+  }
+
   mutating func reset(area: RecallArea, depth: RecallDepth) {
     self = RecallSession(area: area, depth: depth)
   }
@@ -93,31 +98,13 @@ enum RecallCatalog {
     .init(id: "sd-backpressure", area: .systemDesign, depth: .deep,
           question: "How does backpressure keep an overloaded system stable?",
           answer: "It makes producers slow down, shed work or wait when consumers cannot keep up. Bounded queues, admission control and explicit retry signals prevent unbounded memory growth and cascading timeouts.", conceptId: "backpressure"),
-    .init(id: "swift-value-reference", area: .swift, depth: .foundations,
-          question: "How do value and reference semantics differ in Swift?",
-          answer: "Structs and enums are copied as independent values, while classes share identity through references. Swift collections use copy-on-write so value semantics usually avoid an immediate full copy."),
-    .init(id: "swift-actor", area: .swift, depth: .practical,
-          question: "What does actor isolation protect?",
-          answer: "An actor serializes access to its isolated mutable state. Calls from outside its isolation domain generally cross an async boundary, preventing unsynchronized concurrent mutation."),
-    .init(id: "swift-sendable", area: .swift, depth: .deep,
-          question: "Why does Swift use Sendable checking?",
-          answer: "Sendable marks values that can safely cross concurrency domains. Strict checking catches references or mutable state that could otherwise be shared across tasks without synchronization."),
-    .init(id: "ts-unknown", area: .typeScript, depth: .foundations,
-          question: "Why prefer unknown over any?",
-          answer: "Unknown accepts any input but forces you to narrow its type before use. Any disables those checks and lets unsafe operations pass through the type system."),
-    .init(id: "ts-discriminated-union", area: .typeScript, depth: .practical,
-          question: "What makes a discriminated union useful?",
-          answer: "A shared literal field lets TypeScript narrow each variant reliably. This models state transitions clearly and enables exhaustive handling with a never check."),
-    .init(id: "ts-variance", area: .typeScript, depth: .deep,
-          question: "What does variance describe in a generic type?",
-          answer: "Variance describes how assignability changes when a generic parameter becomes more or less specific. Producers tend to be covariant, consumers contravariant and mutable containers often invariant."),
-    .init(id: "sql-index", area: .sql, depth: .foundations,
+    .init(id: "sql-index", area: .storage, depth: .foundations,
           question: "What does a database index trade?",
           answer: "It trades extra storage and write maintenance for faster reads. The useful index shape follows actual filters, joins and ordering rather than simply indexing every column."),
-    .init(id: "sql-composite", area: .sql, depth: .practical,
+    .init(id: "sql-composite", area: .storage, depth: .practical,
           question: "Why does column order matter in a composite index?",
           answer: "A B-tree is ordered from its leading columns onward. Queries can efficiently use a matching leftmost prefix, so equality filters usually precede range or ordering columns."),
-    .init(id: "sql-isolation", area: .sql, depth: .deep,
+    .init(id: "sql-isolation", area: .storage, depth: .deep,
           question: "What anomaly does serializable isolation prevent?",
           answer: "Serializable isolation prevents outcomes that could not occur if transactions ran one at a time. It covers anomalies such as write skew that snapshot isolation can still allow."),
     .init(id: "net-tcp", area: .networking, depth: .foundations,
@@ -167,9 +154,7 @@ struct RecallView: View {
   // Authored sets follow the catalog, so every path opens with real cards.
   private let paths = [
     LearningPath(id: "system-design", title: "System design essentials", detail: "Load balancing, cache-aside and backpressure.", area: .systemDesign),
-    LearningPath(id: "swift", title: "Swift", detail: "Value semantics, actors and Sendable.", area: .swift),
-    LearningPath(id: "typescript", title: "TypeScript", detail: "Narrowing, discriminated unions and variance.", area: .typeScript),
-    LearningPath(id: "sql", title: "SQL", detail: "Indexes, composite keys and isolation.", area: .sql),
+    LearningPath(id: "storage", title: "Data & storage", detail: "Indexes, composite keys and isolation.", area: .storage),
     LearningPath(id: "networking", title: "Networking", detail: "TCP, TLS and HTTP/3.", area: .networking),
   ]
 
@@ -191,7 +176,7 @@ struct RecallView: View {
       .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 40)
       .frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity)
     }
-    .background(AppPalette.groupedBackground)
+    .pageBackdrop()
     .navigationTitle("Recall")
     .navigationSubtitle(selectedPath == nil && session.current != nil ? statusLine : "")
     .animation(reduceMotion ? nil : DrillbitMotion.disclosure, value: session.isRevealed)
@@ -454,7 +439,14 @@ struct RecallView: View {
       outcomes.append(again)
       if let cloud = model.recall.cards.first(where: { $0.id == card.id }) {
         session.finishCurrent(again: again)
-        Task { await model.perform { try await model.reviewRecall(cloud, rating: again ? "again" : "got_it", responseMs: responseMs) } }
+        Task {
+          var saved = true
+          await model.perform {
+            do { try await model.reviewRecall(cloud, rating: again ? "again" : "got_it", responseMs: responseMs) }
+            catch { saved = false; throw error }
+          }
+          if !saved { session.putBack(card, again: again); outcomes.removeLast() }
+        }
       } else if again { session.markAgain() } else { session.markKnown() }
       if !again { feedbackPulse += 1 }
     }

@@ -561,25 +561,104 @@ struct PerforationLoader: View {
   }
 }
 
-/// Home's backdrop: two faint perforated rails beside the content, like the edges of a ticket roll. They never move.
-struct TicketRollBackdrop: View {
+/// The pattern behind Home, Recall and Library, picked in Settings → Background. Static and faint so text reads over it.
+enum Backdrop: String, CaseIterable, Identifiable {
+  case rails, contours, stars
+  static let storageKey = "backdrop"
+  var id: String { rawValue }
+  var title: String {
+    switch self { case .rails: "Ticket roll"; case .contours: "Contours"; case .stars: "Night sky" }
+  }
+}
+
+/// Home, Recall and Library's floor: the base colour plus the chosen backdrop.
+struct PageBackdrop: View {
+  @AppStorage(Backdrop.storageKey) private var stored = Backdrop.rails.rawValue
+  var body: some View { BackdropArt(backdrop: Backdrop(rawValue: stored) ?? .rails) }
+}
+
+struct BackdropArt: View {
+  let backdrop: Backdrop
+  /// Picker tiles turn the ink up so a thumbnail reads; pages keep it at 1.
+  var strength: Double = 1
+
   var body: some View {
     Canvas { context, size in
-      let inset = max(10, (size.width - 640) / 2 - 10)
-      for x in [inset, size.width - inset] {
-        var rail = Path()
-        rail.move(to: CGPoint(x: x, y: 0))
-        rail.addLine(to: CGPoint(x: x, y: size.height))
-        context.stroke(rail, with: .color(AppPalette.primary.opacity(0.07)), style: StrokeStyle(lineWidth: 1, dash: [4, 5]))
+      switch backdrop {
+      case .rails: Self.rails(context, size, strength)
+      case .contours: Self.contours(context, size, strength)
+      case .stars: Self.stars(context, size, strength)
       }
     }
-    .mask(LinearGradient(stops: [.init(color: .clear, location: 0.08), .init(color: .black, location: 0.24),
-                                 .init(color: .black, location: 0.72), .init(color: .clear, location: 0.92)],
-                         startPoint: .top, endPoint: .bottom))
     .background(AppPalette.background)
     .ignoresSafeArea()
     .allowsHitTesting(false)
     .accessibilityHidden(true)
+  }
+
+  /// Fades a stroke out at the top and above the tab bar.
+  private static func fade(_ color: Color, _ size: CGSize) -> GraphicsContext.Shading {
+    .linearGradient(Gradient(stops: [.init(color: color.opacity(0), location: 0.08), .init(color: color, location: 0.24),
+                                     .init(color: color, location: 0.72), .init(color: color.opacity(0), location: 0.92)]),
+                    startPoint: .zero, endPoint: CGPoint(x: 0, y: size.height))
+  }
+
+  /// Two perforated rails beside the content, like the edges of a ticket roll.
+  private static func rails(_ context: GraphicsContext, _ size: CGSize, _ strength: Double) {
+    let inset = max(min(10, size.width * 0.04), (size.width - 640) / 2 - 10)
+    for x in [inset, size.width - inset] {
+      var rail = Path()
+      rail.move(to: CGPoint(x: x, y: 0))
+      rail.addLine(to: CGPoint(x: x, y: size.height))
+      context.stroke(rail, with: fade(AppPalette.primary.opacity(0.07 * strength), size), style: StrokeStyle(lineWidth: 1, dash: [4, 5]))
+    }
+  }
+
+  /// Slow overlapping waves, like contour lines on a map, barely there.
+  private static func contours(_ context: GraphicsContext, _ size: CGSize, _ strength: Double) {
+    let spacing = max(18, size.height / 22)
+    for index in 0...Int(size.height / spacing) + 2 {
+      let base = CGFloat(index) * spacing, phase = CGFloat(index) * 0.55
+      var line = Path()
+      for step in 0...48 {
+        let x = size.width * CGFloat(step) / 48, t = x / max(size.width, 1)
+        let y = base + sin(t * 2.6 * .pi + phase) * spacing * 0.9 + sin(t * 5.1 * .pi - phase * 1.7) * spacing * 0.25 - t * spacing * 1.5
+        step == 0 ? line.move(to: CGPoint(x: x, y: y)) : line.addLine(to: CGPoint(x: x, y: y))
+      }
+      let gold = index % 7 == 3
+      context.stroke(line, with: fade((gold ? AppPalette.accent : AppPalette.primary).opacity((gold ? 0.07 : 0.045) * strength), size), lineWidth: 0.75)
+    }
+  }
+
+  /// A thin field of small stars, a few warm and a few with a faint halo. Seeded, so it never shuffles.
+  private static func stars(_ context: GraphicsContext, _ size: CGSize, _ strength: Double) {
+    var seed: UInt64 = 0x5EED_D21B
+    func next() -> CGFloat {
+      seed &+= 0x9E37_79B9_7F4A_7C15
+      var z = seed
+      z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
+      z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
+      return CGFloat((z ^ (z >> 31)) >> 11) / CGFloat(1 << 53)
+    }
+    let count = min(420, max(36, Int(size.width * size.height / 1400)))
+    for _ in 0..<count {
+      let point = CGPoint(x: next() * size.width, y: next() * size.height)
+      let radius = 0.35 + pow(next(), 3) * 1.0, brightness = 0.10 + next() * 0.32, kind = next()
+      let color = kind > 0.92 ? AppPalette.accent : AppPalette.primary
+      if kind > 0.975 {
+        context.fill(Path(ellipseIn: CGRect(x: point.x - 4, y: point.y - 4, width: 8, height: 8)), with: .color(color.opacity(0.05 * strength)))
+      }
+      context.fill(Path(ellipseIn: CGRect(x: point.x - radius, y: point.y - radius, width: radius * 2, height: radius * 2)),
+                   with: .color(color.opacity(min(1, brightness * strength))))
+    }
+  }
+}
+
+extension View {
+  /// Paints the page floor with the chosen backdrop, including behind navigation containers.
+  func pageBackdrop() -> some View {
+    background { PageBackdrop() }
+      .containerBackground(for: .navigation) { PageBackdrop() }
   }
 }
 
@@ -958,10 +1037,8 @@ struct ProWordmark: View {
 enum MakersNote {
   static let line = "Made by one developer in Europe."
   static let love = "Built with love for everyone finding tech hard right now."
-  /// The sheet's rise plus four words a second: an unhurried read of both lines, no longer.
-  static var readingTime: Double {
-    0.4 + Double((line + " " + love).split(separator: " ").count) / 4
-  }
+  /// The first look: long enough to read both lines.
+  static let readingTime = 3.5
   /// Later visits: a beat to recognise it, not a flash.
   static let glanceTime = 2.0
 }

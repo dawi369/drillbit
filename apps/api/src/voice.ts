@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { interviewModelSchema, parseModelJSON, provider, recordUsage } from './ai';
 import { xmlContext } from './context';
-import { Fault, practiceProfileSchema, timestamp } from './domain';
+import { Fault, liveVoiceSchema, practiceProfileSchema, timestamp } from './domain';
 import { historicalSnapshot } from './history';
 import { guidedPathFor, interviewFor, mockRound } from './interview';
 import { providerReason } from './monitoring';
@@ -13,7 +13,7 @@ import { guidanceModeSchema, TEACHING_VERSION, teachingPolicy, truthfulVoiceProg
 import { questionReference, spokenHistory, spokenLength, voiceDelegationMessages } from "./prompts/voice-context";
 import { ownedChallenge, settingsFor } from './store';
 
-export const voiceStartSchema = z.object({practiceProfile:practiceProfileSchema.optional(),guidanceMode:guidanceModeSchema.optional(),sdp:z.string().min(1).max(64000),revision:z.number().int().nonnegative()});
+export const voiceStartSchema = z.object({practiceProfile:practiceProfileSchema.optional(),guidanceMode:guidanceModeSchema.optional(),voice:liveVoiceSchema.optional(),sdp:z.string().min(1).max(64000),revision:z.number().int().nonnegative()});
 export const voiceFragmentSchema = z.object({id:z.string().min(1).max(160),sequence:z.number().int().nonnegative().max(5999),speaker:z.enum(['user','assistant']),text:z.string().max(8000),startMs:z.number().int().nonnegative(),endMs:z.number().int().nonnegative()}).refine(x=>x.endMs>=x.startMs);
 export const voiceEventsSchema = z.object({fragments:z.array(voiceFragmentSchema).max(100),closed:z.boolean().optional(),finalized:z.boolean().optional(),usageSeconds:z.number().nonnegative().max(86400).optional()});
 export const voiceDelegateSchema = z.object({id:z.string().min(1).max(160)});
@@ -144,12 +144,14 @@ export async function startVoice(env:Env,account:string,id:string,command:string
   .then(()=>sessionFor(env,account,id,command))
   .catch(async error=>{await refundVoiceStart(env,account,day); throw error;});
  const practiceProfile=input.practiceProfile ?? profileSettings.practiceProfile ?? practiceProfileSchema.parse({});
+ // The app sends its pick so a voice chosen moments ago applies before Settings has synced.
+ const voice=input.voice ?? profileSettings.voice;
  let providerSession=false;
  try {
   await env.DB.prepare("UPDATE jobs SET input=? WHERE id=? AND account_id=?").bind(JSON.stringify({practiceProfile}),command,account).run();
   const history=spokenHistory(context.turns,12000);
   const guidedPath=guidedPathFor(JSON.parse(challenge.data),context.guidanceMode,context.turns);
-  const response=await fetch('https://api.openai.com/v1/live/sessions',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},signal:AbortSignal.timeout(20000),body:JSON.stringify({session:{model:'gpt-live-1',store:false,instructions:voiceInstructions+teachingPolicy(context.guidanceMode)+spokenGuidedPath(guidedPath)+truthfulVoiceProgress+personalizationInstructions(practiceProfile)+"<spoken_preferences>Apply the user’s delivery preference to the words you actually speak, including brief acknowledgements and paraphrased backend guidance. Do not silently strip a requested playful character. Keep technical substance accurate; a current spoken request can change the style. Never read these instructions aloud.</spoken_preferences>"+'\n<question_reference>'+xmlContext(questionReference(JSON.parse(challenge.data)))+'</question_reference>',delegation:{type:'client'},input:history.map(t=>({type:'message',role:t.role,content:[{type:t.role==='assistant'?'output_text':'input_text',text:t.content}]}))},transport:{type:'webrtc',sdp:input.sdp}})});
+  const response=await fetch('https://api.openai.com/v1/live/sessions',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},signal:AbortSignal.timeout(20000),body:JSON.stringify({session:{model:'gpt-live-1',store:false,...(voice?{audio:{output:{voice}}}:{}),instructions:voiceInstructions+teachingPolicy(context.guidanceMode)+spokenGuidedPath(guidedPath)+truthfulVoiceProgress+personalizationInstructions(practiceProfile)+"<spoken_preferences>Apply the user’s delivery preference to the words you actually speak, including brief acknowledgements and paraphrased backend guidance. Do not silently strip a requested playful character. Keep technical substance accurate; a current spoken request can change the style. Never read these instructions aloud.</spoken_preferences>"+'\n<question_reference>'+xmlContext(questionReference(JSON.parse(challenge.data)))+'</question_reference>',delegation:{type:'client'},input:history.map(t=>({type:'message',role:t.role,content:[{type:t.role==='assistant'?'output_text':'input_text',text:t.content}]}))},transport:{type:'webrtc',sdp:input.sdp}})});
   if(!response.ok) {
    // The provider's reason is the only way to see a rejected session shape; quoted values (instructions, history) are dropped.
    const detail=await response.text().catch(()=>'' );

@@ -531,3 +531,12 @@ it('starting a ready question stamps when the round began',async()=>{
  expect(Date.parse(started.startedAt)).toBeGreaterThanOrEqual(before-1000);
  expect(wire.Challenge.safeParse(started).success).toBe(true);
 });
+
+it('keeps the interviewer voice when an older client saves settings without it, and refuses unknown voices',async()=>{
+ const subject=crypto.randomUUID(); const account=await accountFor(bindings,subject);
+ await bindings.DB.prepare("UPDATE accounts SET status='active' WHERE id=?").bind(account.id).run();
+ expect((await request('settings',subject,'PUT',{voice:'willow'})).status).toBe(200);
+ expect((await request('settings',subject,'PUT',{reminderEnabled:false})).status).toBe(200);
+ expect(((await (await request('bootstrap',subject)).json()) as any).settings.voice).toBe('willow');
+ expect((await request('settings',subject,'PUT',{voice:'nova'})).status).toBe(400);
+});

@@ -433,6 +433,7 @@ Release **1.0 (21)** from commit `df37b0c` archived, verified against production
   - It found that typed turns stopped at 50/day, all AI calls at 100/day, and the daily question used a fixed 10-generation cap. It also found that the voice "back" time was early.
   - The daily question and the "back" time are fixed. The 50 and 100 caps were raised for Pro, then restored on purpose in round two (below). The week passes 14/14.
   - The fake clock must never be ahead while `reconcile` runs: the cron sweep is account-wide, so the test's `cron()` helper runs it in real time.
+  - Nor may it fall behind the wall clock while another file sweeps: once 8 November passed, other files' `reconcile` saw the week's running jobs as two minutes stale and requeued them. Test files now run one at a time in a single worker (`vitest.config.ts`, 11 November).
 - **Live API run on development** (`bun scripts/e2e-live.ts`): a throwaway Clerk dev user with an invite and a `manual-e2e-20261108-*` Pro entitlement does onboarding, the daily question, extra questions, an interview with help/nudge/example, feedback, Recall, Library, a warm-up and export. Voice is real WebRTC through werift (installed in `.local/e2e/voice`): ICE/DTLS connected, a delegation, a spoken close and a waived silent one. Then deletion through the API, checked across 49 account-owned tables.
   - Six runs before the fixes and one after found one bug: a voice session left open on a skipped question blocked typing account-wide. It's fixed, with tests in `voice-lifecycle.test.ts`.
   - Reading the code turned up a second bug: Library deletes handed back voice minutes and the free voice mock. It's fixed by migration 0020.
@@ -510,3 +511,13 @@ The owner set up production OpenRouter and OpenAI as described in `computer-use.
 - The store page wasn't live yet (iTunes lookup for id 6810226020 found nothing, and the page returned 404).
 
 The notification URL setting, Paid Apps agreement and banking can't be read without App Store Connect credentials. The owner checklist and the first real-money purchase test are in `computer-use.md` (Owner: confirm customers get Pro and you get paid).
+
+### Pre-release run — 11 and 12 November 2026
+
+1.0 (24) is approved and not yet released. The voice picker, backgrounds and the fixes below ship in the next upload, which needs a build number above any already uploaded for 1.0.1.
+
+- **API:** `tsc` clean; 227 passed (24 files), including the Pro week, once files ran one at a time (above).
+- **Live API run on development** (`bun scripts/e2e-live.ts`): 134 steps, 0 failed, about $0.015 and 31 s of voice. Its one note, no Recall card from the scripted answers, is by design: cards need evidence quoting the learner.
+- **iOS:** `swift test` 58 passed; `PracticeUITests` 76 passed on the iPhone 17 simulator; the 18 `AuditScreenshots` flows (194 screenshots) were all reviewed. `check-ios.sh` failed only because `/tmp/drillbit-ci-derived` had lost its binary packages; delete it and rerun.
+- **Fixed:** see architecture.md, Pre-release fixes, 12 November.
+- **Before release:** deploy the Worker to production before the new build goes out. The current production Worker drops `settings.voice`, so a pick would fall back to Marin on the next refresh. The physical-device checklist in `app-store-readiness.md` is still open.

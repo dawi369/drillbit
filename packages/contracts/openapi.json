@@ -6427,6 +6427,31 @@
               "mock_interview"
             ]
           },
+          "voice": {
+            "type": "string",
+            "enum": [
+              "marin",
+              "cedar",
+              "alloy",
+              "ash",
+              "ballad",
+              "coral",
+              "echo",
+              "sage",
+              "shimmer",
+              "verse",
+              "gleam",
+              "meridian",
+              "delta",
+              "cinder",
+              "vesper",
+              "willow",
+              "stone",
+              "quartz",
+              "ripple",
+              "beacon"
+            ]
+          },
           "sdp": {
             "type": "string",
             "minLength": 1,
@@ -8604,6 +8629,31 @@
               },
               "questionFormatting": {
                 "type": "boolean"
+              },
+              "voice": {
+                "type": "string",
+                "enum": [
+                  "marin",
+                  "cedar",
+                  "alloy",
+                  "ash",
+                  "ballad",
+                  "coral",
+                  "echo",
+                  "sage",
+                  "shimmer",
+                  "verse",
+                  "gleam",
+                  "meridian",
+                  "delta",
+                  "cinder",
+                  "vesper",
+                  "willow",
+                  "stone",
+                  "quartz",
+                  "ripple",
+                  "beacon"
+                ]
               }
             },
             "required": [
@@ -11101,6 +11151,31 @@
           },
           "questionFormatting": {
             "type": "boolean"
+          },
+          "voice": {
+            "type": "string",
+            "enum": [
+              "marin",
+              "cedar",
+              "alloy",
+              "ash",
+              "ballad",
+              "coral",
+              "echo",
+              "sage",
+              "shimmer",
+              "verse",
+              "gleam",
+              "meridian",
+              "delta",
+              "cinder",
+              "vesper",
+              "willow",
+              "stone",
+              "quartz",
+              "ripple",
+              "beacon"
+            ]
           }
         },
         "required": [
@@ -13623,6 +13698,31 @@
               },
               "questionFormatting": {
                 "type": "boolean"
+              },
+              "voice": {
+                "type": "string",
+                "enum": [
+                  "marin",
+                  "cedar",
+                  "alloy",
+                  "ash",
+                  "ballad",
+                  "coral",
+                  "echo",
+                  "sage",
+                  "shimmer",
+                  "verse",
+                  "gleam",
+                  "meridian",
+                  "delta",
+                  "cinder",
+                  "vesper",
+                  "willow",
+                  "stone",
+                  "quartz",
+                  "ripple",
+                  "beacon"
+                ]
               }
             },
             "required": [
