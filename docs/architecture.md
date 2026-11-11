@@ -794,3 +794,7 @@ Observability (Sentry stays error-only):
   - **Pick order:** the newest gap from your highest-level reps, then any concept worth another go, then an unexplored concept from the least-touched area, then the practised concept with the fewest reps.
   - **Bit tab:** Next up shows the pick, the reason ("Last time: …"), a two-step progress bar ("0 of 2 reps at Staff held up so far.") and "Practise this at Staff". At the top of the ladder it falls back to plain Next up.
   - **Sheet:** the same pick is a plain row at the top of the first page ("Bit's pick for Staff") and a grey line in its area and on its page. No badges, sparkles or tinted pills (owner, 9 November: they read as flashy next to the rest of the app).
+
+## Dark only for launch — 11 November 2026
+
+The app is dark only. `RootView` forces `.dark` on the app and the Settings sheet, `UIUserInterfaceStyle` is `Dark` so system alerts, share and purchase sheets match, and the Appearance picker in Settings is commented out. The light palette and the `appearance` setting stay in code for when light mode returns. The widget still follows the system appearance. Checkpoint before the polish pass: tag `pre-polish-2026-11-11`.

@@ -53,6 +53,7 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLSchemes: [drillbit, dawi.drillbit]
         UILaunchStoryboardName: LaunchScreen
+        UIUserInterfaceStyle: Dark
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIBackgroundModes: [fetch]
         BGTaskSchedulerPermittedIdentifiers: [dawi.drillbit.refresh]

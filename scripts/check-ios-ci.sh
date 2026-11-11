@@ -31,4 +31,4 @@ xcodebuild -quiet -project apps/ios/Drillbit.xcodeproj -scheme Drillbit \
   -only-testing:DrillbitUITests/PracticeUITests/testInterviewJourney \
   -only-testing:DrillbitUITests/PracticeUITests/testUnavailableVoicePreservesReply \
   -only-testing:DrillbitUITests/PracticeUITests/testLibraryAndSkippedQuestionRecovery \
-  -only-testing:DrillbitUITests/PracticeUITests/testSettingsSaveOfflineAndThemeImmediately
+  -only-testing:DrillbitUITests/PracticeUITests/testSettingsSaveOffline

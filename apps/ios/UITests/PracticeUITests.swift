@@ -266,21 +266,17 @@ final class PracticeUITests: XCTestCase {
     }
     XCTAssertTrue(ticket.isHittable)
   }
-  func testSettingsSaveOfflineAndThemeImmediately() throws {
+  func testSettingsSaveOffline() throws {
     let app = XCUIApplication()
     app.launchArguments = ["--fixtures", "--fixture-settings-offline"]
     app.launch()
     XCTAssertTrue(app.buttons["Settings"].waitForExistence(timeout: 10))
     app.buttons["Settings"].tap()
-    app.buttons["appearancePicker"].tap(); app.buttons["Light"].tap()
-    capture("Settings immediate light", app)
-    app.buttons["appearancePicker"].tap(); app.buttons["Dark"].tap()
-    XCTAssertTrue(app.buttons["appearancePicker"].label.contains("Dark"))
-    capture("Settings immediate dark", app)
+    // Dark only for launch: no appearance choice.
+    XCTAssertFalse(app.buttons["appearancePicker"].exists)
     app.navigationBars["Settings"].buttons["Done"].tap()
     XCTAssertTrue(app.buttons["homeSettings"].waitForExistence(timeout: 3))
     app.buttons["Settings"].tap()
-    XCTAssertTrue(app.buttons["appearancePicker"].label.contains("Dark"))
     XCTAssertFalse(app.buttons["Retry sync"].exists)
     capture("Settings retained offline", app)
   }
@@ -579,24 +575,12 @@ final class PracticeUITests: XCTestCase {
     XCTAssertEqual(editor.value as? String, "Keep my written draft.")
   }
 
-  func testAppearancePersistsAndLibraryMenuIsSkippedOnly() throws {
+  func testLibraryMenuIsSkippedOnly() throws {
     continueAfterFailure = false
     let app = XCUIApplication()
     app.launchArguments = ["--fixtures", "--fixture-dashboard", "--fixture-evidence"]
     app.launch()
     XCTAssertTrue(app.buttons["Settings"].waitForExistence(timeout: 10))
-    app.buttons["Settings"].tap()
-    let appearance = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Appearance,")).firstMatch
-    for _ in 0..<5 where !appearance.isHittable { app.swipeUp() }
-    appearance.tap(); app.buttons["Dark"].tap()
-    capture("Appearance dark", app)
-    app.buttons["Done"].tap()
-    app.terminate(); app.launch()
-    app.buttons["Settings"].tap()
-    for _ in 0..<5 where !appearance.isHittable { app.swipeUp() }
-    XCTAssertTrue(appearance.label.contains("Dark"))
-    // Leave the shared preference on the app's default, dark.
-    appearance.tap(); app.buttons["Dark"].tap(); app.buttons["Done"].tap()
     // Library's menu is just the skipped list, developers included.
     app.tabBars.buttons["Library"].tap()
     app.buttons["Library menu"].tap()

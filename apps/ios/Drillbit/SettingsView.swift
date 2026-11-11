@@ -96,11 +96,12 @@ struct SettingsView: View {
         }
       }
       Section("Account") {
-        Picker("Appearance", selection: $appearance) {
-          Text("System").tag("system")
-          Text("Light").tag("light")
-          Text("Dark").tag("dark")
-        }.pickerStyle(.menu).accessibilityIdentifier("appearancePicker")
+        // Dark only for launch (RootView forces it). Restore with the light palette.
+        // Picker("Appearance", selection: $appearance) {
+        //   Text("System").tag("system")
+        //   Text("Light").tag("light")
+        //   Text("Dark").tag("dark")
+        // }.pickerStyle(.menu).accessibilityIdentifier("appearancePicker")
         Button("Sign out") {
           Task {
             await model.perform {

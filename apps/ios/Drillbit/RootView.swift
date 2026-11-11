@@ -6,9 +6,7 @@ struct RootView: View {
   @State private var settingsOpen = false
   @State private var selectedTab = ProcessInfo.processInfo.arguments.contains("--fixture-recall") ? "recall"
     : ProcessInfo.processInfo.arguments.contains("--fixture-bit") ? "bit" : "home"
-  @AppStorage("appearance") private var appearance = "dark"
   @Environment(\.scenePhase) private var scenePhase
-  @Environment(\.colorScheme) private var systemColorScheme
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   /// Device-local progress through the first run: nothing needs an account until the first question.
   @AppStorage("firstRun.stage") private var firstRunStage = FirstRunStage.welcome.rawValue
@@ -158,7 +156,8 @@ struct RootView: View {
     // Signing in after setup: apply the saved draft and open the first question without another tap.
     .onChange(of: signedIn) { _, now in if now { Task { await openFirstQuestionIfPending() } } else { resetFirstRunIfSignedOut() } }
     .task(id: signedIn) { if signedIn { await openFirstQuestionIfPending() } }
-    .preferredColorScheme(model.fixture && ProcessInfo.processInfo.arguments.contains("--dark") ? .dark : appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
+    // Dark only for launch. The light palette and the "appearance" setting are kept for when it comes back.
+    .preferredColorScheme(.dark)
     .background(WindowFloorColor().allowsHitTesting(false))
     .onReceive(NotificationCenter.default.publisher(for: .init("OpenPractice"))) { _ in
       selectedTab = "home"
@@ -189,8 +188,7 @@ struct RootView: View {
     .sheet(isPresented: $settingsOpen) {
       NavigationStack { SettingsView(model: model) }
         .presentationBackground(AppPalette.background)
-        .environment(\.colorScheme, appearance == "dark" ? .dark : appearance == "light" ? .light : systemColorScheme)
-        .preferredColorScheme(appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
+        .preferredColorScheme(.dark)
         .interactiveDismissDisabled()
     }
     .fullScreenCover(item: $model.presented) { challenge in
