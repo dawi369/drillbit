@@ -422,22 +422,29 @@ struct BitGeometry {
     pose.dots = min(1, max(0, self[.dots].value))
     pose.orbit = orbit
 
-    let geometry = BitGeometry(pose: pose)
-    if burstPending { burstPending = false; burst(geometry) }
-    if m.chips {
-      chipCarry += dt * 24
-      while chipCarry >= 1 { chipCarry -= 1; chip(geometry) }
+    // Geometry only matters for particles: idle frames skip building it.
+    if burstPending || m.chips {
+      let geometry = BitGeometry(pose: pose)
+      if burstPending { burstPending = false; burst(geometry) }
+      if m.chips {
+        chipCarry += dt * 24
+        while chipCarry >= 1 { chipCarry -= 1; chip(geometry) }
+      } else {
+        chipCarry = 0
+      }
     } else {
       chipCarry = 0
     }
-    particles = particles.compactMap { particle in
-      var p = particle
-      p.age += dt
-      guard p.age < p.life else { return nil }
-      p.vy += p.gravity * dt
-      p.x += p.vx * dt
-      p.y += p.vy * dt
-      return p
+    if !particles.isEmpty {
+      particles = particles.compactMap { particle in
+        var p = particle
+        p.age += dt
+        guard p.age < p.life else { return nil }
+        p.vy += p.gravity * dt
+        p.x += p.vx * dt
+        p.y += p.vy * dt
+        return p
+      }
     }
     pose.particles = particles
     current = pose

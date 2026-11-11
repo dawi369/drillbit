@@ -152,6 +152,10 @@ struct RecallView: View {
   @State private var revealedAt: Date?
   @State private var feedbackPulse = 0
   @State private var selectedPath: LearningPath?
+  /// This sitting's answers in order, true for Again; drives the progress bar and the caught-up tally.
+  @State private var outcomes: [Bool] = []
+  /// How the last card left: Got it throws it away, Again drops it back under the deck.
+  @State private var lastAgain = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   init(model: AppModel) {
@@ -200,6 +204,7 @@ struct RecallView: View {
     .onDisappear {
       guard selectedPath == nil else { return }
       deckSignature = Self.signature(model.recall)
+      outcomes = []
       session = RecallSession(cards: cardsForSelection())
     }
   }
@@ -221,11 +226,14 @@ struct RecallView: View {
       }
       if let card = session.current {
         if selectedPath != nil { pathStatus }
+        RecallProgress(outcomes: outcomes, remaining: session.remainingCount)
         cardView(card)
           .id(card.id)
           .transition(.asymmetric(
-            insertion: .opacity.combined(with: .offset(x: reduceMotion ? 0 : 24)),
-            removal: .opacity.combined(with: .offset(x: reduceMotion ? 0 : -24))))
+            insertion: .opacity.combined(with: .scale(scale: reduceMotion ? 1 : 0.95, anchor: .top)),
+            removal: reduceMotion ? .opacity
+              : lastAgain ? .opacity.combined(with: .offset(y: 32)).combined(with: .scale(scale: 0.92, anchor: .bottom))
+              : .opacity.combined(with: .offset(x: 360)).combined(with: .scale(scale: 0.9))))
       } else {
         completion
       }
@@ -326,6 +334,24 @@ struct RecallView: View {
       .frame(maxWidth: .infinity, alignment: .leading)
       .background(AppPalette.ticket, in: RoundedRectangle(cornerRadius: 12))
       .overlay { RoundedRectangle(cornerRadius: 12).stroke(AppPalette.ticketEdge, lineWidth: 1) }
+      // The rest of the deck peeks out underneath, one edge per card still to come (at most two).
+      .background(alignment: .bottom) {
+        ZStack(alignment: .bottom) {
+          ForEach(Array((0..<min(2, max(0, session.remainingCount - 1))).reversed()), id: \.self) { depth in
+            RoundedRectangle(cornerRadius: 12)
+              .fill(AppPalette.ticket.opacity(depth == 0 ? 0.7 : 0.4))
+              .overlay { RoundedRectangle(cornerRadius: 12).stroke(AppPalette.ticketEdge, lineWidth: 1) }
+              .frame(height: 40)
+              .padding(.horizontal, CGFloat(depth + 1) * 10)
+              .offset(y: CGFloat(depth + 1) * 7)
+          }
+        }
+        .accessibilityHidden(true)
+      }
+      .padding(.bottom, session.remainingCount > 1 ? 14 : 0)
+      .contentShape(RoundedRectangle(cornerRadius: 12))
+      // Tapping the card turns it over, like the button under it.
+      .onTapGesture { if !session.isRevealed { revealedAt = Date(); session.reveal() } }
 
       if session.isRevealed {
         HStack(spacing: 12) {
@@ -358,7 +384,7 @@ struct RecallView: View {
         Text("Leave the path to get back to your own cards.")
       }
     } else if !model.recallLoaded && !model.fixture {
-      ProgressView().frame(maxWidth: .infinity).padding(.vertical, 48).accessibilityLabel("Loading Recall")
+      LoadingStatus("Pulling your cards…", centered: true).padding(.vertical, 48).accessibilityLabel("Loading Recall")
     } else if model.recall.cards.isEmpty && session.knownCount + session.againCount == 0 {
       // Cards come from quotable design calls, so finished reps alone don't guarantee any.
       EmptyTabState(title: "Nothing to recall yet", message: (model.bootstrap?.todayPlan?.completedTotal ?? 0) > 0
@@ -366,7 +392,7 @@ struct RecallView: View {
         : "Finish a rep and the bits worth remembering land here as quick cards.")
         .accessibilityIdentifier("recallEmpty")
     } else {
-      EmptyTabState(title: "You’re caught up", message: nextDueLine)
+      RecallCaughtUp(gotIt: outcomes.filter { !$0 }.count, again: outcomes.filter { $0 }.count, next: nextDueLine)
         .accessibilityIdentifier("recallCaughtUp")
     }
   }
@@ -387,6 +413,7 @@ struct RecallView: View {
 
   private func resetSession() {
     selectedPath = nil
+    outcomes = []
     session = RecallSession(cards: cardsForSelection())
   }
 
@@ -395,6 +422,7 @@ struct RecallView: View {
     guard currentSignature != deckSignature, selectedPath == nil,
       !session.isRevealed, session.knownCount == 0, session.againCount == 0 else { return }
     deckSignature = currentSignature
+    outcomes = []
     session = RecallSession(cards: cardsForSelection())
   }
 
@@ -420,11 +448,16 @@ struct RecallView: View {
   private func review(_ card: RecallCard, again: Bool) {
     let responseMs = revealedAt.map { Int(Date().timeIntervalSince($0) * 1000) }
     revealedAt = nil
-    if let cloud = model.recall.cards.first(where: { $0.id == card.id }) {
-      session.finishCurrent(again: again)
-      Task { await model.perform { try await model.reviewRecall(cloud, rating: again ? "again" : "got_it", responseMs: responseMs) } }
-    } else if again { session.markAgain() } else { session.markKnown() }
-    if !again { feedbackPulse += 1 }
+    // The leaving card reads its exit from its last render, so set the direction a beat before it goes.
+    lastAgain = again
+    Task { @MainActor in
+      outcomes.append(again)
+      if let cloud = model.recall.cards.first(where: { $0.id == card.id }) {
+        session.finishCurrent(again: again)
+        Task { await model.perform { try await model.reviewRecall(cloud, rating: again ? "again" : "got_it", responseMs: responseMs) } }
+      } else if again { session.markAgain() } else { session.markKnown() }
+      if !again { feedbackPulse += 1 }
+    }
   }
 
   private var skillMap: some View {
@@ -489,6 +522,82 @@ struct RecallView: View {
           if path.id != paths.last?.id { Divider() }
         }
       }
+    }
+  }
+}
+
+/// This sitting as a row of segments: gold for Got it, a gold outline for Again, the current card lit, the rest dim.
+private struct RecallProgress: View {
+  let outcomes: [Bool]
+  let remaining: Int
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+  var body: some View {
+    let total = outcomes.count + remaining
+    HStack(spacing: 12) {
+      HStack(spacing: 4) {
+        ForEach(0..<total, id: \.self) { index in
+          let done = index < outcomes.count
+          let again = done && outcomes[index]
+          Capsule()
+            .fill(done ? (again ? Color.clear : AppPalette.action) : index == outcomes.count ? AppPalette.primary.opacity(0.85) : AppPalette.hairline)
+            .overlay { if again { Capsule().stroke(AppPalette.action, lineWidth: 1.5) } }
+            .frame(height: index == outcomes.count ? 6 : 4)
+        }
+      }
+      Text("\(min(outcomes.count + 1, total))/\(total)")
+        .font(.caption.weight(.semibold).monospacedDigit()).foregroundStyle(AppPalette.secondary)
+        .contentTransition(.numericText(value: Double(outcomes.count)))
+    }
+    .frame(height: 16)
+    .animation(reduceMotion ? nil : DrillbitMotion.selection, value: outcomes.count)
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel("Card \(min(outcomes.count + 1, total)) of \(total)")
+    .accessibilityIdentifier("recallProgress")
+  }
+}
+
+/// The end of the deck: a ring that closes around a check, this sitting's tally, and when the next card is back.
+private struct RecallCaughtUp: View {
+  let gotIt: Int
+  let again: Int
+  let next: String
+  @State private var drawn = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+  var body: some View {
+    VStack(spacing: 20) {
+      ZStack {
+        Circle().stroke(AppPalette.hairline, lineWidth: 3)
+        Circle().trim(from: 0, to: drawn || reduceMotion ? 1 : 0)
+          .stroke(AppPalette.action, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+          .rotationEffect(.degrees(-90))
+        Image(systemName: "checkmark").font(.title.weight(.bold)).foregroundStyle(AppPalette.action)
+          .scaleEffect(drawn || reduceMotion ? 1 : 0.3).opacity(drawn ? 1 : 0)
+      }
+      .frame(width: 72, height: 72)
+      Text("You’re caught up").font(.title3.weight(.semibold)).foregroundStyle(AppPalette.primary)
+      if gotIt + again > 0 {
+        HStack(spacing: 32) {
+          tally(gotIt, "got it", lit: true)
+          tally(again, "again", lit: false)
+        }
+      }
+      Text(next).font(.subheadline).foregroundStyle(AppPalette.secondary).multilineTextAlignment(.center)
+    }
+    .frame(maxWidth: .infinity)
+    .padding(.top, 64)
+    .onAppear {
+      withAnimation(reduceMotion ? .easeOut(duration: 0.2) : .easeOut(duration: 0.7)) { drawn = true }
+    }
+    .accessibilityElement(children: .combine)
+  }
+
+  private func tally(_ count: Int, _ label: String, lit: Bool) -> some View {
+    VStack(spacing: 2) {
+      Text("\(count)").font(.system(.title, design: .rounded, weight: .semibold)).monospacedDigit()
+        .foregroundStyle(lit ? AppPalette.accent : AppPalette.primary)
+      Text(label).font(.footnote).foregroundStyle(AppPalette.secondary)
     }
   }
 }

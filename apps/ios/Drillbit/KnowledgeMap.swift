@@ -22,7 +22,7 @@ struct KnowledgeMapView: View {
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("knowledgeMap")
             .padding(.horizontal, 4)
-          legend.padding(.horizontal, 20)
+          MapLegend().padding(.horizontal, 20)
           Group {
             if let id = selected, let node = nodes.first(where: { $0.id == id }) {
               nodeDetail(node).transition(.opacity.combined(with: .offset(y: reduceMotion ? 0 : 8)))
@@ -35,8 +35,7 @@ struct KnowledgeMapView: View {
         VStack(alignment: .leading, spacing: 32) {
           LevelCard(estimate: LevelEstimate.from(model.memory.sessions), target: model.settings.selectedLevel)
             .signalEntrance(1)
-          stats(nodes).signalEntrance(2)
-          nextUp(nodes).signalEntrance(3)
+          nextUp(nodes).signalEntrance(2)
         }
         .padding(.horizontal, 20)
       }
@@ -75,67 +74,6 @@ struct KnowledgeMapView: View {
     .frame(maxWidth: .infinity, alignment: .leading)
     .accessibilityElement(children: .combine)
     .accessibilityIdentifier("lastRepChange")
-  }
-
-  // MARK: Stats
-
-  /// Only what's already true: a count that's still zero is left out rather than shown as a score.
-  @ViewBuilder private func stats(_ nodes: [KnowledgeNode]) -> some View {
-    let reps = model.bootstrap?.todayPlan?.completedTotal ?? model.memory.statistics?.completed ?? 0
-    let explored = nodes.filter { $0.state != .unexplored }.count
-    let strong = nodes.filter { $0.state == .strong }.count
-    let tiles = [
-      reps > 0 ? (value: "\(reps)", label: reps == 1 ? "rep" : "reps") : nil,
-      explored > 0 ? (value: "\(explored)", label: "of \(nodes.count) areas explored") : nil,
-      strong > 0 ? (value: "\(strong)", label: strong == 1 ? "decision held up" : "decisions held up") : nil,
-    ].compactMap { $0 }
-    if !tiles.isEmpty {
-      // Side by side normally; stacked at accessibility sizes so the numbers and labels read in full.
-      // The tiles share one height, so a label that wraps doesn't knock its tile out of line.
-      let row = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 12)) : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
-      row {
-        ForEach(tiles, id: \.label) { tile in statTile(value: tile.value, label: tile.label) }
-      }
-      .fixedSize(horizontal: false, vertical: true)
-      .accessibilityElement(children: .combine)
-      .accessibilityIdentifier("mapStats")
-    }
-  }
-
-  private func statTile(value: String, label: String) -> some View {
-    VStack(alignment: .leading, spacing: 4) {
-      Text(value).font(.title.weight(.semibold).monospacedDigit()).foregroundStyle(AppPalette.primary)
-        .lineLimit(1).minimumScaleFactor(0.7)
-      Text(label).font(.footnote).foregroundStyle(AppPalette.secondary).lineLimit(2).fixedSize(horizontal: false, vertical: true)
-    }
-    .padding(16)
-    .frame(maxWidth: .infinity, minHeight: 88, maxHeight: .infinity, alignment: .topLeading)
-    .background(AppPalette.ticket, in: RoundedRectangle(cornerRadius: 12))
-    .overlay { RoundedRectangle(cornerRadius: 12).stroke(AppPalette.ticketEdge, lineWidth: 1) }
-  }
-
-  private var legend: some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(spacing: 16) { legendItems }
-      Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
-        GridRow { legendItem(.strong, "Held up"); legendItem(.revisit, "Revisit") }
-        GridRow { legendItem(.practised, "Practised"); legendItem(.unexplored, "Not yet") }
-      }
-    }
-    .font(.caption)
-    .foregroundStyle(AppPalette.secondary)
-    .frame(maxWidth: .infinity)
-    .accessibilityHidden(true)
-  }
-
-  @ViewBuilder private var legendItems: some View {
-    legendItem(.strong, "Held up")
-    legendItem(.revisit, "Revisit")
-    legendItem(.practised, "Practised")
-    legendItem(.unexplored, "Not yet")
-  }
-  private func legendItem(_ state: KnowledgeNode.State, _ title: String) -> some View {
-    HStack(spacing: 6) { NodeDot(state: state, size: 10, glow: false); Text(title).fixedSize() }
   }
 
   // MARK: Detail
@@ -250,6 +188,33 @@ struct KnowledgeMapView: View {
   }
 }
 
+/// What the dots mean, shared by the Pro map and the free Bit tab.
+struct MapLegend: View {
+  var body: some View {
+    ViewThatFits(in: .horizontal) {
+      HStack(spacing: 16) { items }
+      Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
+        GridRow { item(.strong, "Held up"); item(.revisit, "Revisit") }
+        GridRow { item(.practised, "Practised"); item(.unexplored, "Not yet") }
+      }
+    }
+    .font(.caption)
+    .foregroundStyle(AppPalette.secondary)
+    .frame(maxWidth: .infinity)
+    .accessibilityHidden(true)
+  }
+
+  @ViewBuilder private var items: some View {
+    item(.strong, "Held up")
+    item(.revisit, "Revisit")
+    item(.practised, "Practised")
+    item(.unexplored, "Not yet")
+  }
+  private func item(_ state: KnowledgeNode.State, _ title: String) -> some View {
+    HStack(spacing: 6) { NodeDot(state: state, size: 10, glow: false); Text(title).fixedSize() }
+  }
+}
+
 /// Segments for a short count: lit for each one done.
 private struct PathProgress: View {
   let lit: Int
@@ -299,12 +264,21 @@ struct KnowledgeNode: Identifiable {
   @MainActor static func build(model: AppModel) -> [KnowledgeNode] {
     let sessions = model.memory.sessions.filter { $0.lifecycle == "completed" && !$0.isWarmUp }
       .sorted { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
+    // One pass over the reps instead of one per concept: rep counts, and each concept's freshest grounded quote.
+    var counts: [String: Int] = [:]
+    var latest: [String: LearningEvidence] = [:]
+    for session in sessions {
+      for id in Set((session.conceptIds ?? []) + [session.primaryConceptId].compactMap { $0 }) { counts[id, default: 0] += 1 }
+      for evidence in session.reflection?.evidence ?? [] where latest[evidence.conceptId] == nil { latest[evidence.conceptId] = evidence }
+    }
+    var summary: [String: LearningEvidence] = [:]
+    for evidence in model.memory.evidence ?? [] where summary[evidence.conceptId] == nil { summary[evidence.conceptId] = evidence }
+    var coverage: [String: Int] = [:]
+    for entry in model.libraryCoverage where coverage[entry.conceptId] == nil { coverage[entry.conceptId] = entry.completedAttempts }
     return model.taxonomy.map { concept in
-      let coverage = model.libraryCoverage.first { $0.conceptId == concept.id }?.completedAttempts
-      let reps = coverage ?? sessions.filter { ($0.conceptIds ?? []).contains(concept.id) || $0.primaryConceptId == concept.id }.count
+      let reps = coverage[concept.id] ?? counts[concept.id] ?? 0
       // The latest grounded quote for this concept: the freshest rep's feedback first, then the account summary.
-      let evidence = sessions.lazy.compactMap { $0.reflection?.evidence?.first { $0.conceptId == concept.id } }.first
-        ?? model.memory.evidence?.first { $0.conceptId == concept.id }
+      let evidence = latest[concept.id] ?? summary[concept.id]
       let state: State = evidence?.signal == "demonstrated" ? .strong
         : evidence?.signal == "needs_practice" ? .revisit
         : reps > 0 ? .practised : .unexplored
@@ -594,25 +568,14 @@ struct ConstellationMap: View {
       let center = CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
       let layout = positions(side: side, center: center)
       ZStack {
-        Canvas { context, _ in
-          // Two faint orbits, hubs on the inner one and concepts on the outer, so the map reads as one system.
-          for radius in [side * 0.25, side * 0.42] {
-            let orbit = Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2))
-            context.stroke(orbit, with: .color(AppPalette.hairline.opacity(0.35)), style: StrokeStyle(lineWidth: 1, dash: [2, 5]))
-          }
-          for (category, hub) in layout.hubs {
-            var spoke = Path(); spoke.move(to: center); spoke.addLine(to: hub)
-            context.stroke(spoke, with: .color(AppPalette.hairline), lineWidth: 1)
-            for node in nodes where node.category == category {
-              guard let point = layout.nodes[node.id] else { continue }
-              var edge = Path(); edge.move(to: hub); edge.addLine(to: point)
-              let lit = node.state != .unexplored
-              context.stroke(edge, with: .color(lit ? AppPalette.action.opacity(node.state == .strong ? 0.55 : 0.3) : AppPalette.hairline),
-                             lineWidth: lit ? 1.5 : 1)
-            }
-          }
-        }
-        .opacity(appeared ? 1 : 0)
+        OrbitEcho(side: side)
+          .frame(width: side * 1.8, height: side * 1.8)
+          .position(center)
+          .opacity(appeared ? 1 : 0)
+        // The wires grow out from Bit on first appearance: spokes to the hubs, then the hubs' edges to each concept.
+        MapWires(nodes: nodes, hubs: layout.hubs, points: layout.nodes, center: center, side: side,
+                 progress: appeared || reduceMotion ? 1 : 0)
+          .opacity(appeared ? 1 : 0)
 
         BitGlow(color: AppPalette.action, opacity: 0.16)
           .frame(width: side * 0.3, height: side * 0.3)
@@ -685,6 +648,63 @@ struct ConstellationMap: View {
 
   private func positions(side: CGFloat, center: CGPoint) -> (hubs: [(String, CGPoint)], nodes: [String: CGPoint]) {
     ConstellationLayout.positions(nodes: nodes, side: side, center: center)
+  }
+}
+
+/// The map's orbits, spokes and edges. `progress` runs 0 to 1: spokes draw out from Bit in the first half, each
+/// hub's edges to its concepts in the second.
+private struct MapWires: View, @preconcurrency Animatable {
+  let nodes: [KnowledgeNode]
+  let hubs: [(String, CGPoint)]
+  let points: [String: CGPoint]
+  let center: CGPoint
+  let side: CGFloat
+  var progress: Double
+  var animatableData: Double {
+    get { progress }
+    set { progress = newValue }
+  }
+
+  var body: some View {
+    let spokes = min(1, progress * 2)
+    let edges = max(0, progress * 2 - 1)
+    Canvas { context, _ in
+      // Two faint orbits, hubs on the inner one and concepts on the outer, so the map reads as one system.
+      for radius in [side * 0.25, side * 0.42] {
+        let orbit = Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2))
+        context.stroke(orbit, with: .color(AppPalette.hairline.opacity(0.35 * progress)), style: StrokeStyle(lineWidth: 1, dash: [2, 5]))
+      }
+      for (category, hub) in hubs {
+        var spoke = Path(); spoke.move(to: center); spoke.addLine(to: hub)
+        context.stroke(spoke.trimmedPath(from: 0, to: spokes), with: .color(AppPalette.hairline), lineWidth: 1)
+        guard edges > 0 else { continue }
+        for node in nodes where node.category == category {
+          guard let point = points[node.id] else { continue }
+          var edge = Path(); edge.move(to: hub); edge.addLine(to: point)
+          let lit = node.state != .unexplored
+          context.stroke(edge.trimmedPath(from: 0, to: edges),
+                         with: .color(lit ? AppPalette.action.opacity(node.state == .strong ? 0.55 : 0.3) : AppPalette.hairline),
+                         lineWidth: lit ? 1.5 : 1)
+        }
+      }
+    }
+  }
+}
+
+/// The map's orbits carried on past its edge, fading out, so the diagram sits in a larger system. Never moves.
+private struct OrbitEcho: View {
+  let side: CGFloat
+  var body: some View {
+    Canvas { context, size in
+      let center = CGPoint(x: size.width / 2, y: size.height / 2)
+      for radius in [side * 0.58, side * 0.74, side * 0.9] {
+        let orbit = Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2))
+        context.stroke(orbit, with: .color(AppPalette.primary.opacity(0.06)), style: StrokeStyle(lineWidth: 1, dash: [2, 6]))
+      }
+    }
+    .mask(RadialGradient(colors: [.black, .black.opacity(0.6), .clear], center: .center, startRadius: side * 0.4, endRadius: side * 0.9))
+    .allowsHitTesting(false)
+    .accessibilityHidden(true)
   }
 }
 

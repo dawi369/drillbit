@@ -93,15 +93,14 @@ struct HomeView: View {
             Button("Retry") { Task { await model.retry(job) } }.frame(minHeight: 44)
           }
         }
-        if let plan = model.bootstrap?.todayPlan, plan.dueRecallCount > 0, model.firstUse.stage == .complete {
-          recallRow(plan)
-        }
+        glance
       }
       .frame(maxWidth: 640, alignment: .leading).frame(maxWidth: .infinity)
       .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 40)
     }
     .drillbitTabClearance()
     .task(id: model.bootstrap?.account.id) { await model.ensureHomeQuestion() }
+    .task { await model.loadTaxonomy() }
     // The end of onboarding: the first rep is done, so ask once about a daily nudge. Settings has it after that.
     .task(id: model.offersReminder && !model.reminderHeldBack && model.firstUse.stage == .complete) {
       guard model.offersReminder, !model.reminderHeldBack, model.firstUse.stage == .complete else { return }
@@ -123,7 +122,7 @@ struct HomeView: View {
     ])
     .navigationTitle("Home").navigationBarTitleDisplayMode(.inline)
     .toolbar(.hidden, for: .navigationBar)
-    .background(AppPalette.background)
+    .background { TicketRollBackdrop() }
     .refreshable { await model.refresh() }
     .onChange(of: flow != nil) { _, presenting in if presenting { ticketSettled = false } }
     .sheet(item: $flow, onDismiss: {
@@ -152,6 +151,7 @@ struct HomeView: View {
         Button("Settings", systemImage: AppIcon.settings.rawValue, action: openSettings)
           .labelStyle(.iconOnly)
           .buttonStyle(.glass).buttonBorderShape(.circle).controlSize(.large)
+          .tint(AppPalette.primary)
           .accessibilityIdentifier("homeSettings")
       }
       Text(Date.now.formatted(.dateTime.weekday(.wide)))
@@ -163,7 +163,7 @@ struct HomeView: View {
         // Accessibility sizes give the title and subtitle the full width.
         if !typeSize.isAccessibilitySize {
           Spacer(minLength: 8)
-          BitView(mood: bitMood, cheers: bitCheers)
+          BitView(mood: bitMood, cheers: bitCheers, covered: flow != nil || model.presented != nil)
             .frame(height: 72)
             .padding(.top, -32)
             .padding(.horizontal, -8)
@@ -384,7 +384,9 @@ struct HomeView: View {
     // The ticket opens today's attempt; its stub carries the next move, so nothing hangs underneath.
     return Ticket(foil: milestone != nil) {
       VStack(alignment: .leading, spacing: 16) {
-        NavigationLink { SessionDetailView(model: model, initial: session) } label: {
+        NavigationLink {
+          SessionDetailView(model: model, initial: session).navigationTransition(.zoom(sourceID: "done-\(session.id)", in: zoom))
+        } label: {
           VStack(alignment: .leading, spacing: 8) {
             TicketHeader(number: session.ticketLabel(next: nil), detail: "Done \(time)")
             Text(session.title).font(.title3.weight(.semibold)).foregroundStyle(AppPalette.secondary)
@@ -447,38 +449,13 @@ struct HomeView: View {
         }
       }
     }
+    // Between the number and the time, where a conductor's punch would go.
+    .overlay(alignment: .top) { TicketPunch(ticket: session.ticket).padding(.top, 20) }
+    .matchedTransitionSource(id: "done-\(session.id)", in: zoom) { $0.clipShape(RoundedRectangle(cornerRadius: 12)) }
   }
 
-  private func recallRow(_ plan: TodayPlan) -> some View {
-    let now = Date.now
-    let quote = model.recall.cards.first { Date.fromAPI($0.dueAt).map { $0 <= now } ?? false }?.evidence?.quote
-    // The first rep's cards get one plain introduction instead of a tab tour.
-    let introducing = model.firstUse.firstRepID != nil && !model.firstUse.recallIntroduced
-    let count = plan.dueRecallCount
-    return Button {
-      if introducing { Task { await model.markRecallIntroduced() } }
-      NotificationCenter.default.post(name: .init("OpenRecall"), object: nil)
-    } label: {
-      HStack(alignment: .center, spacing: 12) {
-        VStack(alignment: .leading, spacing: 4) {
-          Text("Recall").font(.subheadline.weight(.semibold)).foregroundStyle(AppPalette.primary)
-          Text(introducing ? "\(count) \(count == 1 ? "card" : "cards") from your first rep. A quick check now makes it stick." : quote.map { "“\($0)”" } ?? "A few things from past sessions, ready to test.")
-            .font(.subheadline).foregroundStyle(AppPalette.secondary).lineLimit(introducing ? 3 : 2).multilineTextAlignment(.leading)
-        }
-        Spacer(minLength: 8)
-        Text("\(plan.dueRecallCount) due").font(.subheadline).foregroundStyle(AppPalette.secondary)
-        Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary).accessibilityHidden(true)
-      }
-      .padding(16)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .background(AppPalette.elevated, in: RoundedRectangle(cornerRadius: 12))
-      .contentShape(RoundedRectangle(cornerRadius: 12))
-    }
-    .buttonStyle(TicketPressStyle())
-    .accessibilityElement(children: .combine)
-    .accessibilityLabel("Recall, \(plan.dueRecallCount) due")
-    .accessibilityIdentifier("homeRecall")
-    .task { if model.recall.cards.isEmpty { await model.loadRecall() } }
+  @ViewBuilder private var glance: some View {
+    if model.firstUse.stage == .complete { HomeGlanceHost(model: model, flow: $flow) }
   }
 
   // MARK: Pieces

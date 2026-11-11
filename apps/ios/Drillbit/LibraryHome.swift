@@ -12,6 +12,7 @@ struct LibraryHomeView: View {
   @State private var retryFailure: String?
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.dynamicTypeSize) private var typeSize
+  @Namespace private var zoom
 
   /// Finished reps, newest first. Warm-ups never counted, so they don't show either.
   private var reps: [Challenge] {
@@ -32,6 +33,9 @@ struct LibraryHomeView: View {
           EmptyTabState(title: "Nothing here yet", message: "Finish a rep and it lands here, with the one thing worth fixing next time.")
             .accessibilityIdentifier("libraryEmpty")
         } else {
+          LibraryActivity(reps: reps, total: model.memory.statistics?.completed ?? reps.count,
+                          thisWeek: model.memory.statistics?.lastSevenDays ?? 0)
+            .signalEntrance(0)
           if !areas.isEmpty { areaStrip }
           if !worthAnotherGo.isEmpty { worthSection }
           history
@@ -43,7 +47,6 @@ struct LibraryHomeView: View {
     .background(AppPalette.background)
     .containerBackground(AppPalette.background, for: .navigation)
     .navigationTitle("Library")
-    .navigationSubtitle(statsLine ?? "")
     .navigationBarTitleDisplayMode(.large)
     .modifier(LibrarySearch(text: $search, shown: !reps.isEmpty))
     .toolbar {
@@ -60,14 +63,6 @@ struct LibraryHomeView: View {
     .alert("Couldn’t open that question", isPresented: Binding(get: { retryFailure != nil }, set: { if !$0 { retryFailure = nil } })) {
       Button("OK") { retryFailure = nil }
     } message: { Text(retryFailure ?? "") }
-  }
-
-  // MARK: Stats
-
-  private var statsLine: String? {
-    guard let stats = model.memory.statistics, stats.completed > 0 else { return nil }
-    let total = "\(stats.completed) \(stats.completed == 1 ? "rep" : "reps")"
-    return stats.lastSevenDays > 0 ? "\(total) · \(stats.lastSevenDays) this week" : total
   }
 
   // MARK: Areas
@@ -145,7 +140,27 @@ struct LibraryHomeView: View {
   private var worthSection: some View {
     VStack(alignment: .leading, spacing: 12) {
       SignalEyebrow(text: "Worth another go")
-      ForEach(worthAnotherGo) { item in worthCard(item) }
+      if typeSize.isAccessibilitySize || worthAnotherGo.count == 1 {
+        ForEach(worthAnotherGo) { item in worthCard(item) }
+      } else {
+        // A short swipeable row; cards off to the side shrink back a little so the one in front reads first.
+        ScrollView(.horizontal) {
+          HStack(spacing: 12) {
+            ForEach(worthAnotherGo) { item in
+              worthCard(item)
+                .containerRelativeFrame(.horizontal) { width, _ in width * 0.86 }
+                .scrollTransition(axis: .horizontal) { card, phase in
+                  card.scaleEffect(phase.isIdentity ? 1 : 0.94).opacity(phase.isIdentity ? 1 : 0.6)
+                }
+            }
+          }
+          .scrollTargetLayout()
+        }
+        .scrollTargetBehavior(.viewAligned)
+        .scrollIndicators(.hidden)
+        .contentMargins(.horizontal, 20, for: .scrollContent)
+        .padding(.horizontal, -20)
+      }
     }
   }
 
@@ -154,12 +169,10 @@ struct LibraryHomeView: View {
       if let area = areaLabel(item.rep) { DrillbitMetadata(text: area) }
       Text(item.fix).font(.body.weight(.medium)).foregroundStyle(AppPalette.primary)
         .lineLimit(typeSize.isAccessibilitySize ? nil : 4).fixedSize(horizontal: false, vertical: true)
-      // Side by side normally; stacked at accessibility sizes so neither the title nor the button gets squeezed.
-      let row = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12)) : AnyLayout(HStackLayout(alignment: .center, spacing: 12))
-      row {
-        Text(item.rep.title).font(.subheadline).foregroundStyle(AppPalette.secondary)
-          .lineLimit(typeSize.isAccessibilitySize ? nil : 2).fixedSize(horizontal: false, vertical: true)
-        if !typeSize.isAccessibilitySize { Spacer(minLength: 8) }
+      Spacer(minLength: 0)
+      HStack(spacing: 12) {
+        RepTrail(states: verdicts(item.rep), size: 8, delay: 0.2)
+        Spacer(minLength: 8)
         Button { openRetry(item.rep) } label: {
           HStack(spacing: 8) {
             if loadingRetry == item.rep.id { ProgressView().controlSize(.small) }
@@ -178,11 +191,16 @@ struct LibraryHomeView: View {
       }
     }
     .padding(16)
-    .frame(maxWidth: .infinity, alignment: .leading)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .background(AppPalette.ticket, in: RoundedRectangle(cornerRadius: 12))
     .overlay { RoundedRectangle(cornerRadius: 12).stroke(AppPalette.ticketEdge, lineWidth: 1) }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("worth-" + item.rep.id)
+  }
+
+  /// What a rep's feedback said, one dot per call: gold where it held up, ringed where it's worth another go.
+  private func verdicts(_ rep: Challenge) -> [KnowledgeNode.State] {
+    Array((rep.reflection?.evidence ?? []).prefix(6).map { $0.signal == "demonstrated" ? .strong : $0.signal == "needs_practice" ? .revisit : .practised })
   }
 
   private func openRetry(_ rep: Challenge) {
@@ -198,17 +216,21 @@ struct LibraryHomeView: View {
   // MARK: History
 
   private var history: some View {
-    VStack(alignment: .leading, spacing: 24) {
+    // Lazy: a long history builds its tickets as they scroll in, not all hundred at once.
+    LazyVStack(alignment: .leading, spacing: 24) {
       if shown.isEmpty {
         Text(search.isEmpty ? "Nothing in this area yet." : "No questions match “\(search)”.")
           .font(.subheadline).foregroundStyle(AppPalette.secondary)
       }
       ForEach(weeks, id: \.title) { week in
-        VStack(alignment: .leading, spacing: 12) {
+        LazyVStack(alignment: .leading, spacing: 12) {
           SignalEyebrow(text: week.title)
           ForEach(week.reps) { rep in
-            NavigationLink { SessionDetailView(model: model, initial: rep) } label: { repCard(rep) }
+            NavigationLink {
+              SessionDetailView(model: model, initial: rep).navigationTransition(.zoom(sourceID: rep.id, in: zoom))
+            } label: { repCard(rep) }
               .buttonStyle(TicketPressStyle())
+              .matchedTransitionSource(id: rep.id, in: zoom) { $0.clipShape(RoundedRectangle(cornerRadius: 12)) }
               .accessibilityIdentifier("library-rep-" + rep.id)
           }
         }
@@ -228,9 +250,15 @@ struct LibraryHomeView: View {
       }
       Text(rep.title).font(.headline).foregroundStyle(AppPalette.primary)
         .multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
-      if let line, !line.isEmpty {
-        Text(line).font(.subheadline).foregroundStyle(AppPalette.secondary)
-          .multilineTextAlignment(.leading).lineLimit(2).fixedSize(horizontal: false, vertical: true)
+      let calls = verdicts(rep)
+      if !calls.isEmpty || !(line ?? "").isEmpty {
+        HStack(spacing: 10) {
+          if !calls.isEmpty { RepTrail(states: calls, size: 8, delay: 0.1) }
+          if let line, !line.isEmpty {
+            Text(line).font(.subheadline).foregroundStyle(AppPalette.secondary)
+              .multilineTextAlignment(.leading).lineLimit(1)
+          }
+        }
       }
     }
     .padding(16)
@@ -316,6 +344,60 @@ struct QuestionRetrySheet: View {
       .toolbar { Button("Close", action: close) }
     }
     .presentationBackground(AppPalette.background)
+  }
+}
+
+/// Library's header: your total reps, large, beside the last twelve weeks as bars, this week's in gold.
+/// The bars rise once, the first time the tab shows.
+private struct LibraryActivity: View {
+  let reps: [Challenge]
+  let total: Int
+  let thisWeek: Int
+  @State private var risen = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @Environment(\.calendar) private var calendar
+
+  private var weeks: [Int] {
+    guard let current = calendar.dateInterval(of: .weekOfYear, for: .now)?.start else { return [] }
+    return (0..<12).reversed().map { back in
+      guard let start = calendar.date(byAdding: .weekOfYear, value: -back, to: current),
+            let end = calendar.date(byAdding: .weekOfYear, value: 1, to: start) else { return 0 }
+      return reps.filter { rep in rep.completedAt.flatMap(Date.fromAPI).map { $0 >= start && $0 < end } ?? false }.count
+    }
+  }
+
+  var body: some View {
+    let counts = weeks
+    let peak = max(counts.max() ?? 1, 1)
+    HStack(alignment: .bottom, spacing: 16) {
+      VStack(alignment: .leading, spacing: 2) {
+        Text("\(total)").font(.system(.largeTitle, design: .rounded, weight: .semibold)).monospacedDigit()
+          .foregroundStyle(AppPalette.primary)
+          .contentTransition(.numericText(value: Double(total)))
+        Text(total == 1 ? "rep" : "reps").font(.footnote).foregroundStyle(AppPalette.secondary)
+        if thisWeek > 0 {
+          Text("+\(thisWeek) this week").font(.footnote.weight(.semibold)).foregroundStyle(AppPalette.accent)
+        }
+      }
+      Spacer(minLength: 8)
+      HStack(alignment: .bottom, spacing: 4) {
+        ForEach(Array(counts.enumerated()), id: \.offset) { index, count in
+          Capsule()
+            .fill(index == counts.count - 1 ? AppPalette.action : count > 0 ? AppPalette.primary.opacity(0.55) : AppPalette.hairline)
+            .frame(width: 8, height: risen || reduceMotion ? max(4, 48 * CGFloat(count) / CGFloat(peak)) : 4)
+            .animation(reduceMotion ? nil : DrillbitMotion.pop.delay(0.2 + Double(index) * 0.03), value: risen)
+        }
+      }
+      .frame(height: 48, alignment: .bottom)
+    }
+    .padding(16)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(AppPalette.elevated, in: RoundedRectangle(cornerRadius: 12))
+    .overlay { RoundedRectangle(cornerRadius: 12).stroke(AppPalette.ticketEdge, lineWidth: 1) }
+    .onAppear { risen = true }
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel("\(total) \(total == 1 ? "rep" : "reps")" + (thisWeek > 0 ? ", \(thisWeek) this week" : ""))
+    .accessibilityIdentifier("libraryActivity")
   }
 }
 

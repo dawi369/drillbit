@@ -67,7 +67,7 @@ final class PracticeUITests: XCTestCase {
     app.tabBars.buttons["Library"].tap()
     // At a glance: totals, the areas worked, what's worth another go, then reps as tickets by week.
     XCTAssertTrue(app.descendants(matching: .any)["worth-library-completed-attempt"].waitForExistence(timeout: 10))
-    XCTAssertTrue(app.staticTexts["12 reps · 4 this week"].exists)
+    XCTAssertTrue(app.descendants(matching: .any)["libraryActivity"].label.contains("12 reps, 4 this week"))
     XCTAssertTrue(app.buttons["libraryArea-Queues & streams"].exists)
     XCTAssertTrue(app.staticTexts["Say what a retry does when the first delivery already went out."].exists)
     XCTAssertTrue(app.staticTexts["This week"].exists)
@@ -160,15 +160,19 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.staticTexts["See what you actually know."].exists)
     XCTAssertTrue(app.descendants(matching: .any)["showcaseMap"].exists)
     capture("Bit tab showcase", app)
-    // The plans, the first-week story and the terms App Review wants next to the button.
-    let subscribe = app.buttons["showcaseSubscribe"]
-    for _ in 0..<6 where !(subscribe.exists && subscribe.isHittable) { app.swipeUp() }
-    XCTAssertTrue(subscribe.waitForExistence(timeout: 10))
-    XCTAssertTrue(app.descendants(matching: .any)["showcaseTerms"].exists)
-    app.buttons["showcasePlan-weekly"].tap()
-    XCTAssertTrue(app.staticTexts["How your first week works"].waitForExistence(timeout: 3))
-    XCTAssertEqual(subscribe.label, "Start for $1.99")
-    capture("Bit tab showcase plans", app)
+    // The free map can be touched: a dot shows what it holds, the same as Pro's.
+    let freeNode = app.buttons["mapNode-queues"]
+    XCTAssertTrue(freeNode.waitForExistence(timeout: 3))
+    freeNode.tap()
+    XCTAssertTrue(app.descendants(matching: .any)["showcaseDetail"].waitForExistence(timeout: 3))
+    capture("Bit tab showcase detail", app)
+    // What Pro reads from it is locked; one See Pro opens the plans, with the terms App Review wants by the button.
+    let seePro = app.buttons["showcaseSeePro"]
+    for _ in 0..<6 where !(seePro.exists && seePro.isHittable) { app.swipeUp() }
+    XCTAssertTrue(seePro.waitForExistence(timeout: 5))
+    seePro.tap()
+    XCTAssertTrue(app.descendants(matching: .any)["paywall"].waitForExistence(timeout: 5))
+    capture("Bit tab See Pro", app)
     app.terminate()
 
     app = XCUIApplication()
@@ -309,6 +313,10 @@ final class PracticeUITests: XCTestCase {
     app.launchArguments = ["--fixtures", "--fixture-home-rich"] + extra
     app.launch()
     XCTAssertTrue(app.buttons["startPractice"].waitForExistence(timeout: 10))
+    // The newest gap from feedback sits under the ticket, in the person's own words.
+    let fix = app.buttons["homeFixNext"]
+    XCTAssertTrue(fix.waitForExistence(timeout: 5))
+    XCTAssertTrue(fix.label.contains("Queues"))
     capture("Home next session", app)
     app.buttons["startPractice"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1)).press(forDuration: 1)
     XCTAssertTrue(app.buttons["Choose focus or level"].waitForExistence(timeout: 3))
@@ -573,6 +581,12 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(gate.buttons["See Pro"].exists)
     gate.buttons["Keep typing"].tap()
     XCTAssertEqual(editor.value as? String, "Keep my written draft.")
+    // See Pro from the gate opens the Pro sheet over the interview.
+    app.buttons["liveVoice"].tap()
+    XCTAssertTrue(gate.waitForExistence(timeout: 5))
+    gate.buttons["See Pro"].tap()
+    XCTAssertTrue(app.descendants(matching: .any)["paywall"].waitForExistence(timeout: 5))
+    capture("Voice gate See Pro", app)
   }
 
   func testLibraryMenuIsSkippedOnly() throws {

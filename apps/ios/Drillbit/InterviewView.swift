@@ -417,7 +417,7 @@ struct InterviewView: View {
         .transition(.opacity)
       } else if requestingAssistance {
         HStack(spacing: 8) {
-          ProgressView().controlSize(.small)
+          PerforationLoader()
           Text(assistanceTitle == "Example" ? "Writing one up…" : "Thinking of a good one…")
             .font(.subheadline).foregroundStyle(AppPalette.secondary)
         }
@@ -736,7 +736,7 @@ struct InterviewView: View {
       if let reply = turn.result?.text ?? turn.partial, !reply.isEmpty {
         Text(reply).font(.subheadline).fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
       } else if turn.status != "failed" {
-        ProgressView().controlSize(.small).accessibilityLabel("Interviewer is answering")
+        PerforationLoader().padding(.vertical, 8).accessibilityLabel("Interviewer is answering")
       }
       if turn.status == "failed" { recovery(turn.error ?? "The response couldn’t load.") }
     }

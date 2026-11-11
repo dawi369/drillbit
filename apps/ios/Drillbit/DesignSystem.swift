@@ -513,7 +513,7 @@ struct LoadingStatus: View {
   var body: some View {
     if centered {
       VStack(spacing: 12) {
-        ProgressView().controlSize(.small).accessibilityHidden(true)
+        PerforationLoader().accessibilityHidden(true)
         Text(message).font(.subheadline).foregroundStyle(.secondary)
           .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
       }
@@ -521,7 +521,7 @@ struct LoadingStatus: View {
       .accessibilityElement(children: .combine)
     } else {
       HStack(spacing: 12) {
-        ProgressView().controlSize(.small).accessibilityHidden(true)
+        PerforationLoader().accessibilityHidden(true)
         Text(message).font(.subheadline).foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
       }
@@ -529,6 +529,57 @@ struct LoadingStatus: View {
       .padding(.vertical, 12)
       .accessibilityElement(children: .combine)
     }
+  }
+}
+
+/// The app's spinner: a ticket's tear line that feeds while a request is in flight. It stays hidden for the first
+/// 300 ms so quick answers never flash it; Reduce Motion shows the line still.
+struct PerforationLoader: View {
+  var width: CGFloat = 28
+  var color: Color = AppPalette.accent
+  @State private var shown = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  var body: some View {
+    TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion || !shown)) { timeline in
+      let phase = reduceMotion ? 0 : -timeline.date.timeIntervalSinceReferenceDate * 18
+      Canvas { context, size in
+        var line = Path()
+        line.move(to: CGPoint(x: 0, y: size.height / 2))
+        line.addLine(to: CGPoint(x: size.width, y: size.height / 2))
+        context.stroke(line, with: .color(color), style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: [3, 4], dashPhase: phase))
+      }
+    }
+    .frame(width: width, height: 4)
+    .mask(LinearGradient(colors: [.clear, .black, .black, .clear], startPoint: .leading, endPoint: .trailing))
+    .opacity(shown ? 1 : 0)
+    .animation(DrillbitMotion.fast, value: shown)
+    .task {
+      try? await Task.sleep(for: .milliseconds(300))
+      shown = true
+    }
+    .accessibilityLabel("Loading")
+  }
+}
+
+/// Home's backdrop: two faint perforated rails beside the content, like the edges of a ticket roll. They never move.
+struct TicketRollBackdrop: View {
+  var body: some View {
+    Canvas { context, size in
+      let inset = max(10, (size.width - 640) / 2 - 10)
+      for x in [inset, size.width - inset] {
+        var rail = Path()
+        rail.move(to: CGPoint(x: x, y: 0))
+        rail.addLine(to: CGPoint(x: x, y: size.height))
+        context.stroke(rail, with: .color(AppPalette.primary.opacity(0.07)), style: StrokeStyle(lineWidth: 1, dash: [4, 5]))
+      }
+    }
+    .mask(LinearGradient(stops: [.init(color: .clear, location: 0.08), .init(color: .black, location: 0.24),
+                                 .init(color: .black, location: 0.72), .init(color: .clear, location: 0.92)],
+                         startPoint: .top, endPoint: .bottom))
+    .background(AppPalette.background)
+    .ignoresSafeArea()
+    .allowsHitTesting(false)
+    .accessibilityHidden(true)
   }
 }
 
@@ -874,6 +925,14 @@ struct EmptyTabState: View {
   let message: String
   var body: some View {
     VStack(spacing: 8) {
+      // A blank ticket, drawn in outline: this is where your reps will land.
+      VStack(spacing: 0) {
+        TicketHalf(perforation: .bottom).stroke(AppPalette.hairline, style: StrokeStyle(lineWidth: 1, dash: [4, 4])).frame(height: 56)
+        TicketHalf(perforation: .top).stroke(AppPalette.hairline, style: StrokeStyle(lineWidth: 1, dash: [4, 4])).frame(height: 28)
+      }
+      .frame(width: 132)
+      .padding(.bottom, 16)
+      .accessibilityHidden(true)
       Text(title).font(.title3.weight(.semibold)).foregroundStyle(AppPalette.primary)
       Text(message).foregroundStyle(AppPalette.secondary)
     }

@@ -798,3 +798,30 @@ Observability (Sentry stays error-only):
 ## Dark only for launch — 11 November 2026
 
 The app is dark only. `RootView` forces `.dark` on the app and the Settings sheet, `UIUserInterfaceStyle` is `Dark` so system alerts, share and purchase sheets match, and the Appearance picker in Settings is commented out. The light palette and the `appearance` setting stay in code for when light mode returns. The widget still follows the system appearance. Checkpoint before the polish pass: tag `pre-polish-2026-11-11`.
+
+## Polish pass — 11 November 2026
+
+- **Home: the glance.** Under the ticket, read at a glance rather than in sentences (`HomeGlance` in `HomeProgress.swift`, owner on 11 November: the first text version read as too much and too AI):
+  - **Drill next tile:** the concept from the newest gap your feedback found (`FixNext`) and its last five reps as map dots (gold held up, ringed worth another go). It reads "Fixed" with a check once a later rep on that concept holds up. The observation and your quote are spoken to VoiceOver and live on the topic page it opens; free accounts out of reps get Pro instead.
+  - **Recall tile:** the due count, large and rolling, beside a small deck that fans out once. It replaces the old Recall row.
+  - **Your map:** the whole map as one bar, a cell per concept grouped by area, lit like the Bit tab and filling left to right on first show. It opens the Bit tab (`OpenBit`).
+- **Zoom into a rep.** Home's done ticket and Library's rep cards zoom into the attempt (`matchedTransitionSource` with `navigationTransition(.zoom)`).
+- **Fewer sentences, more components (owner, 11 November).**
+  - **Topic page:** the "Bit's pick for Staff. 0 of 2 reps…" line and the per-row "Bit's pick" lines are gone. The concept's status is its last reps as dots (`RepTrail`); "Last time" sits on a short spine; the level is a ladder of six rising rungs (`LevelLadder`), the chosen one gold and sliding, Bit's suggestion marked with a small gold dot.
+  - **Recall:** a segmented progress bar for the sitting (gold Got it, outlined Again, the current card lit); the rest of the deck peeks under the card; Got it throws the card off to the right and Again drops it under the deck; tapping the card reveals it; caught up is a ring that closes around a check with the sitting's tally.
+  - **Library:** the totals subtitle becomes a header with the rep count and twelve weekly bars (this week gold) that rise once. "Worth another go" is a swipeable row when there's more than one; each card shows its feedback as dots in place of the question title. Rep tickets show the same dots and a one-line takeaway.
+  - **Free Bit tab:** no subtitle; a small "Tap" hint sits on the map until the first dot is tapped (`bit.tapHintSeen`).
+- **Performance, same look.**
+  - `KnowledgeNode.build` reads the reps once (counts and each concept's freshest quote) instead of once per concept.
+  - Home's glance lives in `HomeGlanceHost`, which reads only reps, taxonomy, Recall and first use, so a streaming question title no longer rebuilds the map; it builds the map once for the tile, the trail and the bar.
+  - `BitView` freezes (and resumes where it left off) when a scroll view moves it out of sight, and when told it's `covered`: Home passes that while a sheet or the interview is over it. Idle frames skip building geometry that only particles need.
+  - `PaperGrain` draws its flecks once into a 96-point tile and repeats it, instead of a few thousand rects per ticket.
+  - Library's history is lazy, so a long history builds tickets as they scroll in.
+- **Confirm dialogs run their choice after they close.** `drillbitConfirm` keeps the chosen action and runs it in the cover's `onDismiss`. See Pro from the voice gate used to present the Pro sheet on the dialog's own cover, which then dismissed it, leaving `PlanCoordinator.presenting` set so every later See Pro did nothing. `register` now also clears a paywall that's no longer in a window.
+- **Home backdrop.** `TicketRollBackdrop`: two faint dashed rails beside the content, like the edges of a ticket roll, fading out at the top and above the tab bar. Static. No lines on reading surfaces (interview, Recall, Library, Settings).
+- **Ticket.** Static paper grain (`PaperGrain`, deterministic) and a 1-point top highlight on both halves. A finished ticket gets a conductor's punch (`TicketPunch`) between the number and the time, landing once per ticket with a medium haptic the first time Home shows it done (`home.punchedTicket`). The ticket number and Recall's due count roll with `numericText`.
+- **Bit tab, Pro.** The three stat tiles are gone (dashboard filler). The map's wires grow out from Bit on first appearance (`MapWires`: spokes, then each hub's edges), and faint orbit echoes continue past the map's edge (`OrbitEcho`).
+- **Bit tab, free.** Reverses 3 November: the plans, the first-week timeline and checkout leave the tab. The free map is touchable: a practised dot shows its quote and observation, a new one its description. "What Pro reads from it" lists level, Next up and the morning question as locked rows, and one See Pro opens the Pro sheet (placement `knowledge_map`, recorded by the sheet).
+- **Loading.** `PerforationLoader` replaces the system spinner in `LoadingStatus`, Recall's first load, help and the interviewer's clarification wait: a short tear line that feeds while a request is in flight, hidden for its first 300 ms, still under Reduce Motion. Spinners inside filled buttons stay.
+- **Chrome.** Home's settings button and Settings' Done use the primary ink instead of gold; gold stays for the action, the selection and the map.
+- **Empty states.** Library and Recall show a blank ticket in dashed outline above their text.

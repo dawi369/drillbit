@@ -62,6 +62,33 @@ struct Perforation: View {
   }
 }
 
+/// Matte card stock: a fixed scatter of faint flecks, drawn once into a tile and repeated, so the ticket reads as paper
+/// under glass without redrawing thousands of dots per ticket.
+struct PaperGrain: View {
+  private static let tile: Image = {
+    let side: CGFloat = 96
+    let image = UIGraphicsImageRenderer(size: CGSize(width: side, height: side)).image { context in
+      var seed: UInt64 = 0x9E37_79B9_7F4A_7C15
+      func next() -> CGFloat {
+        seed = seed &* 6364136223846793005 &+ 1442695040888963407
+        return CGFloat(seed >> 33) / CGFloat(UInt32.max >> 1)
+      }
+      for _ in 0..<Int(side * side / 36) {
+        let point = CGPoint(x: next() * side, y: next() * side)
+        (next() > 0.5 ? UIColor.white.withAlphaComponent(0.035) : UIColor.black.withAlphaComponent(0.05)).setFill()
+        context.fill(CGRect(x: point.x, y: point.y, width: 1, height: 1))
+      }
+    }
+    return Image(uiImage: image)
+  }()
+
+  var body: some View {
+    Rectangle().fill(ImagePaint(image: Self.tile))
+      .allowsHitTesting(false)
+      .accessibilityHidden(true)
+  }
+}
+
 /// Today's question as an object: a body for the question and a stub below the perforation for what you do with it.
 struct Ticket<Content: View, Stub: View>: View {
   /// Off when the caller draws the shadow itself: Home's zoom source clips the ticket, so its shadow lives outside the clip.
@@ -81,13 +108,16 @@ struct Ticket<Content: View, Stub: View>: View {
             .fill(LinearGradient(colors: foil ? [AppPalette.accentSoft, AppPalette.ticketLower] : [AppPalette.ticket, AppPalette.ticketLower],
                                  startPoint: foil ? .topLeading : .top, endPoint: foil ? .bottomTrailing : .bottom))
             .overlay { if foil { FoilSheen().clipShape(TicketHalf(perforation: .bottom)) } }
+            .overlay { PaperGrain().clipShape(TicketHalf(perforation: .bottom)) }
             .overlay { TicketHalf(perforation: .bottom).stroke(foil ? AppPalette.accent.opacity(0.5) : AppPalette.ticketEdge, lineWidth: 1) }
+            .overlay { TicketHalf(perforation: .bottom).stroke(LinearGradient(colors: [.white.opacity(0.12), .clear], startPoint: .top, endPoint: UnitPoint(x: 0.5, y: 0.3)), lineWidth: 1) }
         }
       stub()
         .padding(.horizontal, 20).padding(.vertical, 16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
           TicketHalf(perforation: .top).fill(AppPalette.ticketStub)
+            .overlay { PaperGrain().clipShape(TicketHalf(perforation: .top)) }
             .overlay { TicketHalf(perforation: .top).stroke(AppPalette.ticketEdge, lineWidth: 1) }
         }
         .overlay(alignment: .top) { Perforation() }
@@ -126,7 +156,7 @@ struct TicketHeader: View {
     let font: Font = typeSize.isAccessibilitySize ? .caption.weight(.semibold) : .caption.weight(.medium).monospaced()
     ViewThatFits(in: .horizontal) {
       HStack(alignment: .firstTextBaseline, spacing: 12) {
-        Text(number).foregroundStyle(AppPalette.accent)
+        Text(number).foregroundStyle(AppPalette.accent).contentTransition(.numericText())
         Spacer(minLength: 8)
         Text(detail).foregroundStyle(AppPalette.secondary).lineLimit(1)
       }

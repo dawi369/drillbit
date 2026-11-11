@@ -59,7 +59,7 @@ struct HelpView: View {
           if let latest = currentHelp { result(latest) }
           if let running = practice.running {
             HStack {
-              ProgressView("Preparing help")
+              LoadingStatus("Preparing help")
               Spacer()
               Button("Stop") { Task { await practice.stop() } }
             }

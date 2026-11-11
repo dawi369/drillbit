@@ -44,7 +44,6 @@ struct TopicContext {
     path = LevelPath.from(model: model, nodes: built)
   }
   func state(_ id: String) -> KnowledgeNode.State { nodes[id]?.state ?? .unexplored }
-  func pickLevel(for id: String) -> String? { path?.pick?.id == id ? path?.level.label : nil }
 }
 
 // MARK: - Every area
@@ -264,9 +263,6 @@ private struct TopicRows: View {
           .fixedSize(horizontal: false, vertical: true)
         Text((showsArea ? concept.category + " · " : "") + (node?.statusLine ?? "Not explored yet"))
           .font(.subheadline).foregroundStyle(state == .strong || state == .revisit ? AppPalette.accent : AppPalette.secondary)
-        if let level = context.pickLevel(for: concept.id) {
-          Text("Bit’s pick for \(level)").font(.subheadline).foregroundStyle(AppPalette.secondary)
-        }
       }
       Spacer(minLength: 8)
       Chevron().padding(.top, 4)
@@ -291,48 +287,35 @@ struct TopicPage: View {
   var body: some View {
     let node = context.nodes[concept.id]
     let state = node?.state ?? .unexplored
-    let path = context.path?.pick?.id == concept.id ? context.path : nil
     let busy = model.busy || model.bootstrap?.challenge?.lifecycle == "in_progress"
     ScrollView {
       VStack(alignment: .leading, spacing: 24) {
         VStack(alignment: .leading, spacing: 12) {
           PageHeader(title: concept.label)
-          HStack(spacing: 8) {
-            NodeDot(state: state, size: 10, glow: false)
-            Text(concept.category + " · " + (node?.statusLine ?? "Not explored yet"))
-              .font(.subheadline.weight(.medium))
-              .foregroundStyle(state == .strong || state == .revisit ? AppPalette.accent : AppPalette.secondary)
+          HStack(spacing: 10) {
+            if let node, state != .unexplored { RepTrail(states: FixNext.trail(node, reps: completedReps), delay: 0.2) }
+            else { NodeDot(state: state, size: 10, glow: false) }
+            DrillbitMetadata(text: concept.category)
           }
-          .accessibilityElement(children: .combine)
+          .accessibilityElement(children: .ignore)
+          .accessibilityLabel(concept.category + ", " + (node?.statusLine ?? "Not explored yet"))
           if let description = concept.description {
             Text(description).font(.body).foregroundStyle(AppPalette.primary)
               .fixedSize(horizontal: false, vertical: true)
           }
         }
-        if let path {
-          Text("Bit’s pick for \(path.level.label). \(path.progressLine)")
-            .font(.subheadline).foregroundStyle(AppPalette.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-        }
         if let evidence = node?.evidence {
-          Text("Last time: \(evidence.observation)")
-            .font(.subheadline).foregroundStyle(AppPalette.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-        VStack(alignment: .leading, spacing: 8) {
-          HStack {
-            Text("Question level").font(.body).foregroundStyle(AppPalette.primary)
-            Spacer(minLength: 8)
-            Picker("Question level", selection: $level) {
-              ForEach(EngineeringLevel.choices, id: \.0) { Text($0.1).tag($0.0) }
-            }
-            .pickerStyle(.menu).labelsHidden().tint(AppPalette.accent)
-            .accessibilityIdentifier("prepareLevel")
+          VStack(alignment: .leading, spacing: 6) {
+            Text(evidence.signal == "demonstrated" ? "Held up last time" : "Last time").font(.footnote.weight(.semibold))
+              .foregroundStyle(AppPalette.secondary)
+            Text(evidence.observation).font(.subheadline).foregroundStyle(AppPalette.primary)
+              .lineLimit(3).fixedSize(horizontal: false, vertical: true)
           }
-          .padding(.horizontal, 16).padding(.vertical, 8)
-          .frame(minHeight: 48)
-          .ticketCard()
+          .padding(.leading, 14)
+          .overlay(alignment: .leading) { Capsule().fill(evidence.signal == "demonstrated" ? AppPalette.action : AppPalette.hairline).frame(width: 2) }
+          .accessibilityElement(children: .combine)
         }
+        LevelLadder(selection: $level, suggested: suggestedLevel)
       }
       .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 24)
       .frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity)
@@ -356,6 +339,11 @@ struct TopicPage: View {
     .onAppear { if level.isEmpty { level = suggestedLevel ?? model.settings.selectedLevel } }
   }
 
+  private var completedReps: [Challenge] {
+    model.memory.sessions.filter { $0.lifecycle == "completed" && !$0.isWarmUp }
+      .sorted { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
+  }
+
   private var input: PreparationInput {
     // Session style follows the last real session, like the daily question; the interview's own menu still changes it.
     PreparationInput(
@@ -371,6 +359,62 @@ struct TopicPage: View {
 }
 
 // MARK: - Pieces
+
+/// The question's level as the ladder itself: six rungs, the chosen one lit gold and sliding as you pick. Bit's
+/// suggestion carries a small gold dot instead of a sentence.
+private struct LevelLadder: View {
+  @Binding var selection: String
+  let suggested: String?
+  @Namespace private var lit
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+  var body: some View {
+    let levels = EngineeringLevel.choices
+    let chosen = levels.firstIndex { $0.0 == selection } ?? 0
+    VStack(alignment: .leading, spacing: 12) {
+      HStack(alignment: .firstTextBaseline) {
+        Text("Question level").font(.footnote.weight(.semibold)).foregroundStyle(AppPalette.secondary)
+        Spacer(minLength: 8)
+        Text(levels[chosen].1).font(.headline).foregroundStyle(AppPalette.primary)
+          .contentTransition(.opacity)
+      }
+      HStack(alignment: .bottom, spacing: 4) {
+        ForEach(Array(levels.enumerated()), id: \.element.0) { index, level in
+          Button { selection = level.0 } label: {
+            VStack(spacing: 6) {
+              Circle().fill(AppPalette.action).frame(width: 5, height: 5)
+                .opacity(level.0 == suggested ? 1 : 0)
+              ZStack {
+                RoundedRectangle(cornerRadius: 4).fill(index <= chosen ? AppPalette.elevated : AppPalette.inset)
+                if index == chosen {
+                  RoundedRectangle(cornerRadius: 4).fill(AppPalette.action)
+                    .matchedGeometryEffect(id: "rung", in: lit)
+                }
+              }
+              // Each rung a little taller than the last: the ladder reads as a climb.
+              .frame(height: 14 + CGFloat(index) * 5)
+              Text(level.1).font(.caption2.weight(index == chosen ? .semibold : .regular))
+                .foregroundStyle(index == chosen ? AppPalette.primary : AppPalette.secondary)
+                .lineLimit(1).minimumScaleFactor(0.7)
+            }
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .contentShape(Rectangle())
+          }
+          .buttonStyle(.plain)
+          .accessibilityLabel(level.1 + (level.0 == suggested ? ", Bit’s pick" : ""))
+          .accessibilityAddTraits(index == chosen ? .isSelected : [])
+          .accessibilityIdentifier("level-" + level.0)
+        }
+      }
+    }
+    .padding(16)
+    .ticketCard()
+    .animation(reduceMotion ? nil : DrillbitMotion.selection, value: selection)
+    .sensoryFeedback(.selection, trigger: selection)
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("prepareLevel")
+  }
+}
 
 /// A page title that wraps: concept and area names run long, and a large navigation title cuts them off.
 private struct PageHeader: View {

@@ -181,6 +181,7 @@ struct SettingsView: View {
               }
             }
           }.disabled(saving || reminderPermissionPending)
+            .tint(AppPalette.primary)
         }
       }
   }

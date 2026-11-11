@@ -167,6 +167,7 @@ struct RootView: View {
       selectedTab = "recall"
       Task { await model.loadRecall() }
     }
+    .onReceive(NotificationCenter.default.publisher(for: .init("OpenBit"))) { _ in selectedTab = "bit" }
     .task {
       await model.launch()
       #if DEBUG

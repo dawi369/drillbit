@@ -11,9 +11,13 @@ struct BitView: View {
   var greets = false
   /// Each change is one happy hop, for a result that just arrived. No haptic: only taps play one.
   var cheers = 0
+  /// Freezes on the current frame while something covers Bit (a sheet over Home); resumes where it left off.
+  var covered = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.scenePhase) private var scenePhase
   @State private var visible = false
+  /// False once a scroll view has moved Bit out of sight; views outside a scroll view never hear otherwise.
+  @State private var onScreen = true
   @State private var dynamics = BitDynamics()
   @State private var taps = 0
   @State private var hops = 0
@@ -21,7 +25,7 @@ struct BitView: View {
 
   var body: some View {
     let style = finish.style
-    let paused = reduceMotion || !visible || scenePhase == .background
+    let paused = reduceMotion || !visible || !onScreen || covered || scenePhase == .background
     TimelineView(.animation(minimumInterval: interval, paused: paused)) { timeline in
       let pose = reduceMotion ? BitPose.rest(mood)
         : paused ? dynamics.current : dynamics.advance(to: timeline.date, mood: mood, level: levels?.output)
@@ -49,6 +53,7 @@ struct BitView: View {
       if greets { hop() }
     }
     .onDisappear { visible = false }
+    .onScrollVisibilityChange(threshold: 0.01) { onScreen = $0 }
     .accessibilityHidden(true)
   }
 

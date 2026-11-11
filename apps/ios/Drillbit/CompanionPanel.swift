@@ -37,7 +37,7 @@ struct CompanionPanel: View {
       if companion.context.paused {
         Button("Resume") { Task { await practice.pauseCompanion(false) } }.font(.subheadline)
       } else if companion.showProgress {
-        ProgressView().controlSize(.small).accessibilityLabel("Preparing help")
+        PerforationLoader().accessibilityLabel("Preparing help")
       }
     }
     .padding(.horizontal, 24).padding(.vertical, 12)
