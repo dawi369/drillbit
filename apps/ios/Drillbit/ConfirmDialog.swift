@@ -26,6 +26,7 @@ private struct DrillbitConfirmModifier: ViewModifier {
   @Binding var isPresented: Bool
   let actions: [ConfirmAction]
   @State private var shown = false
+  @State private var chosen: ConfirmAction?
 
   func body(content: Content) -> some View {
     content
@@ -34,13 +35,18 @@ private struct DrillbitConfirmModifier: ViewModifier {
         var quiet = Transaction(); quiet.disablesAnimations = true
         withTransaction(quiet) { shown = now }
       }
-      .fullScreenCover(isPresented: $shown, onDismiss: { isPresented = false }) {
-        ConfirmDialog(title: title, message: message, actions: actions) { chosen in
+      // The choice runs once the cover is gone, so anything it presents (the Pro sheet) isn't torn down with it.
+      .fullScreenCover(isPresented: $shown, onDismiss: {
+        let action = chosen?.action
+        chosen = nil
+        // The action first: some read the state that `isPresented` is bound to.
+        action?()
+        isPresented = false
+      }) {
+        ConfirmDialog(title: title, message: message, actions: actions) { choice in
+          chosen = choice
           var quiet = Transaction(); quiet.disablesAnimations = true
           withTransaction(quiet) { shown = false }
-          // The action first: some read the state that `isPresented` is bound to.
-          chosen?.action()
-          isPresented = false
         }
         .presentationBackground(.clear)
       }

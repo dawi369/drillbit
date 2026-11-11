@@ -63,6 +63,8 @@ private struct EntitlementReceipt: Decodable { var plan: String }
       return
     }
     #endif
+    // A paywall dismissed along with whatever it was presented on never reports back; don't let it block every See Pro.
+    if presenting != nil, let paywallController, paywallController.viewIfLoaded?.window == nil { closePaywall() }
     guard presenting == nil else { return }
     pendingFeature = feature
     presenting = placement
