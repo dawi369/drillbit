@@ -173,12 +173,16 @@ struct InterviewVoiceRoom<Question: View>: View {
         // The free allowance shows under the button for a moment, then fades. It keeps its line so the controls
         // don't drop onto it mid-fade.
         if let allowance {
-          Text(allowance)
-            .font(.footnote).foregroundStyle(AppPalette.secondary)
-            .multilineTextAlignment(.center)
-            .opacity(allowanceFaded ? 0 : 1)
-            .accessibilityHidden(allowanceFaded)
-            .accessibilityIdentifier("voiceAllowance")
+          ZStack {
+            Text(allowance).font(.footnote).multilineTextAlignment(.center).hidden()
+            if !allowanceFaded {
+              Text(allowance)
+                .font(.footnote).foregroundStyle(AppPalette.secondary)
+                .multilineTextAlignment(.center)
+                .transition(.opacity)
+                .accessibilityIdentifier("voiceAllowance")
+            }
+          }
         }
         #if DEBUG
         if phase == .active, interview.model.fixture, ProcessInfo.processInfo.arguments.contains("--fixture-voice") {
