@@ -521,3 +521,9 @@ The notification URL setting, Paid Apps agreement and banking can't be read with
 - **iOS:** `swift test` 58 passed; `PracticeUITests` 76 passed on the iPhone 17 simulator; the 18 `AuditScreenshots` flows (194 screenshots) were all reviewed. `check-ios.sh` failed only because `/tmp/drillbit-ci-derived` had lost its binary packages; delete it and rerun.
 - **Fixed:** see architecture.md, Pre-release fixes, 12 November.
 - **Before release:** deploy the Worker to production before the new build goes out. The current production Worker drops `settings.voice`, so a pick would fall back to Marin on the next refresh. The physical-device checklist in `app-store-readiness.md` is still open.
+
+### Free voice start cap — 12 November 2026
+
+Workers deployed: development `39dbafe1-f41a-4777-b058-0a279b623456`, production `7395584c-7974-4b5b-9a37-dc4f7d0e62c2` (no migration; `/health` 200, unauthenticated bootstrap 401). API 228 passed. Free voice starts per day now default to the free mock count plus two, and the voice capability reports the daily cap (architecture.md, TestFlight pass). Optional override: `FREE_VOICE_STARTS_PER_DAY`.
+
+Owner test account on production (`baf9629a…`), by hand for TestFlight testing: the manual Pro entitlement was added and removed again, and the account's practice, voice sessions, spent records and usage counters were deleted so it reads as a fresh Free account. Settings and the expired sandbox entitlement were kept.

@@ -1,4 +1,5 @@
 import AVFAudio
+import AuthenticationServices
 import ClerkKit
 import Network
 import OSLog
@@ -70,12 +71,14 @@ import WidgetKit
     guard bootstrap?.account.id == account else { throw CancellationError() }
     firstUse = value
   }
-  /// The one reminder offer, under the first rep's feedback.
+  /// The reminder offer, under the first rep's feedback and, if that was a no, once more after the third.
   func answerReminderOffer(_ accepted: Bool) async {
     var progress = firstUse
+    if progress.reminderOffered { progress.reminderAskedAgain = true }
     progress.reminderOffered = true
     try? await setFirstUse(progress)
     guard accepted, await requestReminderPermission() else { return }
+    settings.dailyMinutes = suggestedReminderMinutes
     settings.reminderEnabled = true
     do { try await saveSettingsLocally(); try await reconcileReminder() } catch let failure { error = failure.localizedDescription }
   }
@@ -123,14 +126,29 @@ import WidgetKit
     progress.recallIntroduced = true
     try? await setFirstUse(progress)
   }
-  /// The first finished rep earns one reminder offer: a popup on Home once they're back from the feedback.
-  var offersReminder: Bool { firstUse.firstRepID != nil && !firstUse.reminderOffered && !settings.reminderEnabled }
+  /// The first finished rep earns a reminder offer: a popup on Home once they're back from the feedback. A no gets one
+  /// more ask after the third rep, while they can still practise.
+  var offersReminder: Bool {
+    guard firstUse.firstRepID != nil, !settings.reminderEnabled else { return false }
+    if !firstUse.reminderOffered { return true }
+    let finished = memory.sessions.filter { $0.lifecycle == "completed" && !$0.isWarmUp }.count
+    return !firstUse.reminderAskedAgain && finished >= 3 && mayStartRep()
+  }
+  /// When the offer suggests: the time of their latest rep, which is when they've shown they practise.
+  var suggestedReminderMinutes: Int {
+    let latest = memory.sessions.filter { $0.lifecycle == "completed" && !$0.isWarmUp }
+      .compactMap { $0.completedAt.flatMap(Date.fromAPI) }.max() ?? .now
+    return reminderMinutes(practisedAt: latest, timezone: settings.timezone)
+  }
+  var suggestedReminderTimeText: String { Self.timeText(suggestedReminderMinutes) }
+  /// Lifetime free reps are all used: a daily "one quick rep?" would be for something they can't do. Back with Pro.
+  var remindersPaused: Bool { lifetimeFreeReps && freeRepsSpent }
   /// Set while Pro was just offered after a first rep, so the reminder waits for the next visit to Home instead
   /// of stacking on top. Cleared when the app goes to the background.
   var reminderHeldBack = false
-  var reminderTimeText: String {
-    let minutes = settings.dailyMinutes
-    return Calendar.current.date(from: DateComponents(hour: minutes / 60, minute: minutes % 60))?.formatted(date: .omitted, time: .shortened) ?? "12:30"
+  var reminderTimeText: String { Self.timeText(settings.dailyMinutes) }
+  static func timeText(_ minutes: Int) -> String {
+    Calendar.current.date(from: DateComponents(hour: minutes / 60, minute: minutes % 60))?.formatted(date: .omitted, time: .shortened) ?? "12:30"
   }
   /// The day as the server counts it: the saved time zone, which only differs from the phone's when travelling.
   var practiceCalendar: Calendar {
@@ -571,7 +589,14 @@ import WidgetKit
   }
   func signIn() async {
     await perform {
-      try await Clerk.shared.auth.signInWithApple()
+      do { try await Clerk.shared.auth.signInWithApple() }
+      catch let failure as NSError where failure.domain == ASAuthorizationError.errorDomain {
+        // Backing out of Apple's sheet isn't a failure; anything else is on Apple's side, so say it plainly.
+        guard failure.code != ASAuthorizationError.canceled.rawValue else { return }
+        CrashReporting.reportAppleSignIn(failure)
+        self.error = "Apple didn’t let that sign-in through. Check you’re signed in to iCloud in Settings, then try again."
+        return
+      }
       await refresh()
     }
   }
@@ -1469,7 +1494,7 @@ import WidgetKit
     let center = UNUserNotificationCenter.current()
     // "daily-practice" alone is the old repeating reminder; the dated ones carry the day after it.
     let scheduled = await center.pendingNotificationRequests().map(\.identifier).filter { $0.hasPrefix("daily-practice") }
-    guard settings.reminderEnabled else {
+    guard settings.reminderEnabled, !remindersPaused else {
       center.removePendingNotificationRequests(withIdentifiers: scheduled)
       return
     }
@@ -1484,7 +1509,9 @@ import WidgetKit
       return
     }
     center.removePendingNotificationRequests(withIdentifiers: scheduled)
-    for reminder in reminderSchedule(minutes: settings.dailyMinutes, timezone: settings.timezone) {
+    // Today's rep is done, so today's nudge would only nag.
+    let practisedToday = (bootstrap?.todayPlan?.completedToday ?? 0) > 0
+    for reminder in reminderSchedule(minutes: settings.dailyMinutes, timezone: settings.timezone, skippingToday: practisedToday) {
       let content = UNMutableNotificationContent()
       content.title = reminder.title
       content.body = reminder.body
@@ -1502,6 +1529,11 @@ import WidgetKit
       status = await center.notificationSettings().authorizationStatus
     }
     return status == .authorized || status == .provisional
+  }
+  /// iOS won't show its prompt again once it's been refused, so the offer stays quiet.
+  func notificationsRefused() async -> Bool {
+    guard !fixture else { return false }
+    return await UNUserNotificationCenter.current().notificationSettings().authorizationStatus == .denied
   }
   func retry(_ job: Job) async {
     await perform {

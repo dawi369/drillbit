@@ -151,6 +151,20 @@ struct ContractTests {
     // Rescheduling later the same morning keeps each day's line.
     let later = reminderSchedule(minutes: 750, timezone: "Europe/Prague", from: now.addingTimeInterval(3600))
     #expect(later.map(\.title) == schedule.map(\.title))
+    // Today's rep done: tomorrow onwards, same lines on the same days.
+    let practised = reminderSchedule(minutes: 750, timezone: "Europe/Prague", from: now, skippingToday: true)
+    #expect(practised.first?.id == "daily-practice-2026-11-04")
+    #expect(practised.count == 28)
+    #expect(practised.first?.title == schedule.dropFirst().first?.title)
+  }
+
+  @Test func reminderSuggestionFollowsWhenTheyPractised() throws {
+    let at = { (time: String) in ISO8601DateFormatter().date(from: "2026-11-03T" + time + "Z")! }
+    // Prague is UTC+1 in November.
+    #expect(reminderMinutes(practisedAt: at("20:07:00"), timezone: "Europe/Prague") == 21 * 60)
+    #expect(reminderMinutes(practisedAt: at("17:08:00"), timezone: "Europe/Prague") == 18 * 60 + 15)
+    #expect(reminderMinutes(practisedAt: at("04:00:00"), timezone: "Europe/Prague") == 8 * 60, "Never before eight")
+    #expect(reminderMinutes(practisedAt: at("22:30:00"), timezone: "Europe/Prague") == 21 * 60, "Never after nine")
   }
 
   @Test func decodeHelpAndAdoption() throws {

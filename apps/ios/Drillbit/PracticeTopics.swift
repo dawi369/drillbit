@@ -365,8 +365,10 @@ struct TopicPage: View {
 private struct LevelLadder: View {
   @Binding var selection: String
   let suggested: String?
-  @Namespace private var lit
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  private static let gap: CGFloat = 4
+  /// Each rung a little taller than the last: the ladder reads as a climb.
+  private static func height(_ index: Int) -> CGFloat { 14 + CGFloat(index) * 5 }
 
   var body: some View {
     let levels = EngineeringLevel.choices
@@ -378,38 +380,58 @@ private struct LevelLadder: View {
         Text(levels[chosen].1).font(.headline).foregroundStyle(AppPalette.primary)
           .contentTransition(.opacity)
       }
-      HStack(alignment: .bottom, spacing: 4) {
-        ForEach(Array(levels.enumerated()), id: \.element.0) { index, level in
-          Button { selection = level.0 } label: {
-            VStack(spacing: 6) {
-              Circle().fill(AppPalette.action).frame(width: 5, height: 5)
-                .opacity(level.0 == suggested ? 1 : 0)
-              ZStack {
-                RoundedRectangle(cornerRadius: 4).fill(index <= chosen ? AppPalette.elevated : AppPalette.inset)
-                if index == chosen {
-                  RoundedRectangle(cornerRadius: 4).fill(AppPalette.action)
-                    .matchedGeometryEffect(id: "rung", in: lit)
-                }
-              }
-              // Each rung a little taller than the last: the ladder reads as a climb.
-              .frame(height: 14 + CGFloat(index) * 5)
-              Text(level.1).font(.caption2.weight(index == chosen ? .semibold : .regular))
-                .foregroundStyle(index == chosen ? AppPalette.primary : AppPalette.secondary)
-                .lineLimit(1).minimumScaleFactor(0.7)
-            }
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .contentShape(Rectangle())
+      VStack(spacing: 6) {
+        HStack(spacing: Self.gap) {
+          ForEach(levels, id: \.0) { level in
+            Circle().fill(AppPalette.action).frame(width: 5, height: 5)
+              .opacity(level.0 == suggested ? 1 : 0)
+              .frame(maxWidth: .infinity)
           }
-          .buttonStyle(.plain)
-          .accessibilityLabel(level.1 + (level.0 == suggested ? ", Bit’s pick" : ""))
-          .accessibilityAddTraits(index == chosen ? .isSelected : [])
-          .accessibilityIdentifier("level-" + level.0)
+        }
+        // The rungs never change shape; one gold piece slides and resizes over them, so nothing fades in or out.
+        HStack(alignment: .bottom, spacing: Self.gap) {
+          ForEach(Array(levels.indices), id: \.self) { index in
+            RoundedRectangle(cornerRadius: 4).fill(index < chosen ? AppPalette.elevated : AppPalette.inset)
+              .frame(maxWidth: .infinity)
+              .frame(height: Self.height(index))
+          }
+        }
+        .overlay(alignment: .bottomLeading) {
+          GeometryReader { proxy in
+            let width = (proxy.size.width - Self.gap * CGFloat(levels.count - 1)) / CGFloat(levels.count)
+            RoundedRectangle(cornerRadius: 4).fill(AppPalette.action)
+              .frame(width: width, height: Self.height(chosen))
+              .offset(x: CGFloat(chosen) * (width + Self.gap), y: proxy.size.height - Self.height(chosen))
+          }
+        }
+        HStack(spacing: Self.gap) {
+          ForEach(Array(levels.enumerated()), id: \.element.0) { index, level in
+            // One weight for every label, so the chosen one changes colour without reflowing.
+            Text(level.1).font(.caption2.weight(.medium))
+              .foregroundStyle(index == chosen ? AppPalette.primary : AppPalette.secondary)
+              .lineLimit(1).minimumScaleFactor(0.7)
+              .frame(maxWidth: .infinity)
+          }
+        }
+      }
+      .animation(reduceMotion ? nil : .smooth(duration: 0.32), value: chosen)
+      // Whole columns are the tap targets, laid over the drawing.
+      .overlay {
+        HStack(spacing: Self.gap) {
+          ForEach(Array(levels.enumerated()), id: \.element.0) { index, level in
+            Button { selection = level.0 } label: {
+              Color.clear.frame(maxWidth: .infinity, minHeight: 44, maxHeight: .infinity).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(level.1 + (level.0 == suggested ? ", Bit’s pick" : ""))
+            .accessibilityAddTraits(index == chosen ? .isSelected : [])
+            .accessibilityIdentifier("level-" + level.0)
+          }
         }
       }
     }
     .padding(16)
     .ticketCard()
-    .animation(reduceMotion ? nil : DrillbitMotion.selection, value: selection)
     .sensoryFeedback(.selection, trigger: selection)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("prepareLevel")

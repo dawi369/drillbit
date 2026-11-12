@@ -620,16 +620,6 @@ struct ConstellationMap: View {
                 .contentShape(Circle())
             }
             .buttonStyle(.plain)
-            .overlay(alignment: .top) {
-              if isSelected {
-                Text(node.label).font(.caption.weight(.semibold)).foregroundStyle(AppPalette.primary)
-                  .fixedSize()
-                  .padding(.horizontal, 8).padding(.vertical, 4)
-                  .background(AppPalette.elevated, in: Capsule())
-                  .offset(y: -26)
-                  .transition(.opacity)
-              }
-            }
             .position(point)
             .scaleEffect(appeared || reduceMotion ? 1 : 0.4)
             .opacity(appeared ? 1 : 0)
@@ -638,6 +628,21 @@ struct ConstellationMap: View {
             .accessibilityAddTraits(isSelected ? .isSelected : [])
             .accessibilityIdentifier("mapNode-\(node.id)")
           }
+        }
+
+        // The selected name floats above its dot, nudged in from the map's edges so it's never cut off.
+        if let id = selected, let node = nodes.first(where: { $0.id == id }), let point = layout.nodes[id] {
+          EdgeClampedLabel(anchor: CGPoint(x: point.x, y: point.y - 24), margin: 12) {
+            Text(node.label).font(.caption.weight(.semibold)).foregroundStyle(AppPalette.primary)
+              .fixedSize()
+              .padding(.horizontal, 8).padding(.vertical, 4)
+              .background(AppPalette.elevated, in: Capsule())
+          }
+          .frame(width: proxy.size.width, height: proxy.size.height)
+          .allowsHitTesting(false)
+          .accessibilityHidden(true)
+          .id(id)
+          .transition(.opacity)
         }
       }
     }
@@ -648,6 +653,24 @@ struct ConstellationMap: View {
 
   private func positions(side: CGFloat, center: CGPoint) -> (hubs: [(String, CGPoint)], nodes: [String: CGPoint]) {
     ConstellationLayout.positions(nodes: nodes, side: side, center: center)
+  }
+}
+
+/// Places its one subview with its bottom centre on `anchor`, shifted sideways just enough to stay `margin` inside the
+/// bounds.
+private struct EdgeClampedLabel: Layout {
+  let anchor: CGPoint
+  let margin: CGFloat
+  func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+    proposal.replacingUnspecifiedDimensions()
+  }
+  func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+    for subview in subviews {
+      let half = subview.sizeThatFits(.unspecified).width / 2
+      let lowest = bounds.minX + margin + half, highest = bounds.maxX - margin - half
+      let x = lowest > highest ? bounds.midX : min(max(bounds.minX + anchor.x, lowest), highest)
+      subview.place(at: CGPoint(x: x, y: bounds.minY + anchor.y), anchor: .bottom, proposal: .unspecified)
+    }
   }
 }
 

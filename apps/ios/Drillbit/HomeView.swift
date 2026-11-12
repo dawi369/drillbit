@@ -105,10 +105,13 @@ struct HomeView: View {
     .task(id: model.offersReminder && !model.reminderHeldBack && model.firstUse.stage == .complete) {
       guard model.offersReminder, !model.reminderHeldBack, model.firstUse.stage == .complete else { return }
       try? await Task.sleep(for: .milliseconds(700))
-      if !Task.isCancelled { askingReminder = true }
+      guard !Task.isCancelled else { return }
+      // Refused in iOS: count the ask as answered so nothing waits on it (the tab tour does).
+      if await model.notificationsRefused() { await model.answerReminderOffer(false); return }
+      askingReminder = true
     }
     .drillbitConfirm("Want a nudge tomorrow?", isPresented: $askingReminder,
-                     message: "Every day at \(model.reminderTimeText). Change it in Settings.", actions: [
+                     message: "Every day at \(model.suggestedReminderTimeText), around when you just practised. Change it in Settings.", actions: [
       ConfirmAction("Remind me", style: .primary) { Task { await model.answerReminderOffer(true) } },
       ConfirmAction("No thanks") { Task { await model.answerReminderOffer(false) } },
     ])

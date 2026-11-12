@@ -22,6 +22,8 @@ struct FirstUseProgress: Codable, Equatable, Sendable {
   /// The first counted rep, once finished: its feedback offers the reminder, and Home points at its Recall card.
   var firstRepID: String? = nil
   var reminderOffered = false
+  /// Said no the first time: asked once more after the third finished rep, then never again.
+  var reminderAskedAgain = false
   var recallIntroduced = false
   init(stage: Stage = .complete) { self.stage = stage }
   init(from decoder: Decoder) throws {
@@ -30,6 +32,7 @@ struct FirstUseProgress: Codable, Equatable, Sendable {
     stage = (try? container.decode(Stage.self, forKey: .stage)) ?? .complete
     firstRepID = try container.decodeIfPresent(String.self, forKey: .firstRepID)
     reminderOffered = try container.decodeIfPresent(Bool.self, forKey: .reminderOffered) ?? false
+    reminderAskedAgain = try container.decodeIfPresent(Bool.self, forKey: .reminderAskedAgain) ?? false
     recallIntroduced = try container.decodeIfPresent(Bool.self, forKey: .recallIntroduced) ?? false
   }
 }
@@ -588,13 +591,14 @@ struct ScheduledReminder: Equatable, Sendable {
 
 /// The reminders for the next `days` days at the chosen time. A repeating trigger can't change its text, so each day
 /// gets its own dated request, topped up after every bootstrap. The line is picked by calendar day, so rescheduling
-/// never reshuffles a day's text and two days in a row never repeat.
-func reminderSchedule(minutes: Int, timezone: String, from now: Date = .now, days: Int = 28) -> [ScheduledReminder] {
+/// never reshuffles a day's text and two days in a row never repeat. `skippingToday` leaves out today, once today's
+/// rep is done.
+func reminderSchedule(minutes: Int, timezone: String, from now: Date = .now, days: Int = 28, skippingToday: Bool = false) -> [ScheduledReminder] {
   var calendar = Calendar(identifier: .gregorian)
   calendar.timeZone = TimeZone(identifier: timezone) ?? .current
   let today = calendar.startOfDay(for: now)
   var reminders: [ScheduledReminder] = []
-  for offset in 0...days where reminders.count < days {
+  for offset in (skippingToday ? 1 : 0)...days where reminders.count < days {
     guard let day = calendar.date(byAdding: .day, value: offset, to: today),
           let fire = calendar.date(bySettingHour: minutes / 60, minute: minutes % 60, second: 0, of: day), fire > now,
           let ordinal = calendar.ordinality(of: .day, in: .era, for: day) else { continue }
@@ -604,6 +608,16 @@ func reminderSchedule(minutes: Int, timezone: String, from now: Date = .now, day
     reminders.append(ScheduledReminder(id: "daily-practice-" + stamp, date: date, title: line.title, body: line.body))
   }
   return reminders
+}
+
+/// The reminder time to suggest: when they just practised, to the nearest quarter hour, kept between 8:00 and 21:00.
+func reminderMinutes(practisedAt date: Date, timezone: String) -> Int {
+  var calendar = Calendar(identifier: .gregorian)
+  calendar.timeZone = TimeZone(identifier: timezone) ?? .current
+  let parts = calendar.dateComponents([.hour, .minute], from: date)
+  let minutes = (parts.hour ?? 12) * 60 + (parts.minute ?? 30)
+  let rounded = Int((Double(minutes) / 15).rounded()) * 15
+  return min(max(rounded, 8 * 60), 21 * 60)
 }
 
 enum GuidanceMode: String, CaseIterable, Codable, Identifiable, Sendable {

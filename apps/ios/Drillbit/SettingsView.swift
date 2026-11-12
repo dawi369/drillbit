@@ -78,6 +78,11 @@ struct SettingsView: View {
         // The reminder time only matters while reminders are on; the time zone also sets the practice day.
         if model.settings.reminderEnabled {
           DatePicker("Reminder time", selection: time, displayedComponents: .hourAndMinute)
+          if model.remindersPaused {
+            Text("Paused while your free reps are used up. They pick up again with Pro.")
+              .font(.footnote).foregroundStyle(.secondary)
+              .accessibilityIdentifier("remindersPaused")
+          }
         }
         ReminderPermissionRow()
         NavigationLink { BackdropPickerView() } label: {

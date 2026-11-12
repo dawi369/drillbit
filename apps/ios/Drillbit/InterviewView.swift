@@ -831,6 +831,8 @@ struct InterviewView: View {
     // A transcript stuck waiting to sync (unavailable) keeps Talk live: tapping it retries the sync.
     let voiceDisabled = checkingVoice || liveVoice == nil || interview.locked
       || (interview.voice?.blocksText == true && interview.voice?.phase != .unavailable)
+    // Out of voice for now: it reads as off, but a tap still says why (and, on Free, offers Pro).
+    let voiceClosed = model.bootstrap?.capabilities?.voice?.available == false
     return Button { Task { await enterVoice() } } label: {
       Label("Talk", systemImage: AppIcon.voice.rawValue)
         .font(.subheadline.weight(.semibold))
@@ -842,7 +844,7 @@ struct InterviewView: View {
         .contentShape(Capsule())
     }
       .buttonStyle(DrillbitPressStyle())
-      .opacity(voiceDisabled ? 0.42 : 1)
+      .opacity(voiceDisabled || voiceClosed ? 0.42 : 1)
       .disabled(voiceDisabled).accessibilityLabel("Talk it through").accessibilityHint("Switch to live voice. Your writing stays here.").accessibilityIdentifier("liveVoice")
   }
   private var sendButton: some View {

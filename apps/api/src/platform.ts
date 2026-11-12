@@ -31,6 +31,7 @@ export interface Env {
   /** When set, free accounts get this many reps in total instead of a daily allowance. */
   FREE_REPS_LIFETIME?: string;
   FREE_VOICE_LIFETIME?: string;
+  FREE_VOICE_STARTS_PER_DAY?: string;
   FREE_VOICE_TASTE_DAYS?: string;
   FREE_VOICE_SESSION_MINUTES?: string;
   PRO_REPS_PER_DAY?: string;

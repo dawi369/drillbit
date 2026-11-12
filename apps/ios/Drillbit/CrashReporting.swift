@@ -138,4 +138,14 @@ enum CrashReporting {
     guard SentrySDK.isEnabled, !(error is CancellationError), !(error is URLError), !(error is APIError), !(error is DecodingError) else { return }
     SentrySDK.capture(error: error) { scope in scope.setTag(value: operation, key: "operation") }
   }
+
+  /// Apple's sign-in sheet failing for a reason other than Cancel. Usually the Apple ID or iCloud state on the device,
+  /// so a warning to count, not an issue to page on.
+  static func reportAppleSignIn(_ error: NSError) {
+    guard SentrySDK.isEnabled else { return }
+    SentrySDK.capture(error: error) { scope in
+      scope.setLevel(.warning)
+      scope.setTag(value: "sign_in_apple", key: "operation")
+    }
+  }
 }

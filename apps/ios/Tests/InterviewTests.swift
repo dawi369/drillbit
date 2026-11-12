@@ -310,10 +310,16 @@ struct PlanCopyTests {
     #expect(model.settings.onboardingComplete)
     #expect(model.completionNoticeAccount == "a")
     #expect(model.memory.sessions.first?.id == finished.id)
-    // The reminder is offered once, whatever the answer.
+    // A no is asked once more, after the third rep, and never after that.
     await model.answerReminderOffer(false)
     #expect(model.firstUse.reminderOffered)
     #expect(!model.settings.reminderEnabled)
+    #expect(!model.offersReminder, "Not again until the third rep")
+    model.memory.sessions = (1...3).map { var rep = finished; rep.id = "rep-\($0)"; return rep }
+    #expect(model.offersReminder)
+    await model.answerReminderOffer(false)
+    #expect(model.firstUse.reminderAskedAgain)
+    #expect(!model.offersReminder)
     // Skipping a fresh first rep also ends onboarding.
     try await model.setFirstUse(FirstUseProgress(stage: .firstRep))
     let skipped = try await model.generateForPreview()

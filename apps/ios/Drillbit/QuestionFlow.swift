@@ -60,6 +60,8 @@ struct QuestionFlow: View {
   /// which on device can flash as a black square while it fades.
   @State private var bitMounted = true
   @State private var bitVisible = true
+  /// The bottom bar has Bit or the buttons in it.
+  private var previewBarShown: Bool { (question != nil && revealed) || (bitMounted && !typeSize.isAccessibilitySize) }
   private var previewSegments: [StreamSegment] {
     var segments = [
       // The empty title keeps a caret while a question is on its way; after a failure there is nothing to wait for.
@@ -152,7 +154,11 @@ struct QuestionFlow: View {
               BitView(mood: .drilling).frame(height: 56).opacity(bitVisible ? 1 : 0).allowsHitTesting(false)
             }
           }
-          .padding(16).background(AppPalette.background)
+          .padding(previewBarShown ? 16 : 0)
+          // Full width when it holds something, nothing at all before: an empty bar was a small page-coloured square
+          // that hid the question's words as they streamed past it.
+          .frame(maxWidth: .infinity)
+          .background(previewBarShown ? AppPalette.background : .clear)
           .onChange(of: writing) { _, now in
             if now {
               bitMounted = true

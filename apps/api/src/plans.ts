@@ -31,7 +31,8 @@ export function limits(env: Env, plan: Plan) {
       repsLifetime: Number(env.FREE_REPS_LIFETIME) > 0 ? Number(env.FREE_REPS_LIFETIME) : undefined,
       // Failed and refunded preparations also count here, so this sits above the rep allowance.
       generationsPerDay: 10,
-      voiceStartsPerDay: n(env.FREE_VOICE_LIFETIME, 3),
+      // Room for a retry after a dropped or silent start, which don't spend the free sessions.
+      voiceStartsPerDay: n(env.FREE_VOICE_STARTS_PER_DAY, n(env.FREE_VOICE_LIFETIME, 3) + 2),
       voiceSessionSeconds: n(env.FREE_VOICE_SESSION_MINUTES, 3) * 60,
       voiceSecondsPerDay: Infinity,
       voiceSecondsPerWeek: Infinity,

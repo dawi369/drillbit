@@ -194,8 +194,7 @@ struct HomeGlanceHost: View {
                introducingRecall: introducing,
                fresh: !model.memory.sessions.contains { $0.lifecycle == "completed" && !$0.isWarmUp }, nodes: nodes,
                drill: {
-                 // Nothing to drill yet: the map shows what's out there.
-                 guard let fix else { NotificationCenter.default.post(name: .init("OpenBit"), object: nil); return }
+                 guard let fix else { return }
                  // Free accounts out of reps meet Pro here, the same as every other rep-starting action.
                  if model.mayStartRep() { flow = QuestionFlowEntry(browseTopics: true, concept: fix.conceptID) }
                  else { PlanCoordinator.shared.register(.practiceRep) { await model.refresh() } }
@@ -237,34 +236,46 @@ struct HomeGlance: View {
   }
 }
 
-/// One glance tile: a small label with an arrow, then whatever the tile shows. The whole tile is the button.
+/// One glance tile: a small label with an arrow, then whatever the tile shows. The whole tile is the button; without an
+/// action it's a plain card with no arrow, since there's nowhere to go yet.
 private struct GlanceTile<Content: View>: View {
   let title: String
   let spoken: String
   let identifier: String
-  let action: () -> Void
+  let action: (() -> Void)?
   @ViewBuilder var content: () -> Content
 
   var body: some View {
-    Button(action: action) {
-      VStack(alignment: .leading, spacing: 12) {
-        HStack(spacing: 4) {
-          Text(title).font(.footnote.weight(.semibold)).foregroundStyle(AppPalette.secondary)
-            .contentTransition(.opacity)
-          Spacer(minLength: 4)
+    if let action {
+      Button(action: action) { tile(arrow: true) }
+        .buttonStyle(TicketPressStyle())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(spoken)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier(identifier)
+    } else {
+      tile(arrow: false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(spoken)
+        .accessibilityIdentifier(identifier)
+    }
+  }
+
+  private func tile(arrow: Bool) -> some View {
+    VStack(alignment: .leading, spacing: 12) {
+      HStack(spacing: 4) {
+        Text(title).font(.footnote.weight(.semibold)).foregroundStyle(AppPalette.secondary)
+          .contentTransition(.opacity)
+        Spacer(minLength: 4)
+        if arrow {
           Image(systemName: "arrow.up.right").font(.caption.weight(.bold)).foregroundStyle(AppPalette.secondary)
         }
-        content()
       }
-      .padding(16)
-      .frame(maxWidth: .infinity, minHeight: 128, maxHeight: .infinity, alignment: .topLeading)
-      .glanceSurface()
+      content()
     }
-    .buttonStyle(TicketPressStyle())
-    .accessibilityElement(children: .ignore)
-    .accessibilityLabel(spoken)
-    .accessibilityAddTraits(.isButton)
-    .accessibilityIdentifier(identifier)
+    .padding(16)
+    .frame(maxWidth: .infinity, minHeight: 128, maxHeight: .infinity, alignment: .topLeading)
+    .glanceSurface()
   }
 }
 
@@ -306,7 +317,7 @@ private struct DrillTile: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
-    GlanceTile(title: fix?.fixed == true ? "Fixed" : "Drill next", spoken: spoken, identifier: "homeFixNext", action: action) {
+    GlanceTile(title: fix?.fixed == true ? "Fixed" : "Drill next", spoken: spoken, identifier: "homeFixNext", action: fix == nil ? nil : action) {
       if let fix {
         Text(fix.area).font(.title3.weight(.semibold)).foregroundStyle(AppPalette.primary)
           .multilineTextAlignment(.leading).lineLimit(3).minimumScaleFactor(0.8)

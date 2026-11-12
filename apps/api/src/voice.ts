@@ -5,8 +5,8 @@ import { Fault, liveVoiceSchema, practiceProfileSchema, timestamp } from './doma
 import { historicalSnapshot } from './history';
 import { guidedPathFor, interviewFor, mockRound } from './interview';
 import { providerReason } from './monitoring';
-import { consumeUsage, type Env } from './platform';
 import { limits, nextUtcMidnight, planFor, utcDayStart } from './plans';
+import { consumeUsage, type Env } from './platform';
 import { practicePersonality, questionTerminology } from "./prompts/interviewer";
 import { personalizationInstructions } from "./prompts/personalization";
 import { guidanceModeSchema, TEACHING_VERSION, teachingPolicy, truthfulVoiceProgress } from "./prompts/teaching";
@@ -94,6 +94,9 @@ export async function voiceCapability(env: Env, account: string) {
  // Sessions that reached the provider; refunded starts never activate and waived ones never heard the user.
  const history = await env.DB.prepare("SELECT COUNT(*) n, MAX(created_at) last FROM counted_voice WHERE account_id=?").bind(account).first<{n:number; last:string|null}>();
  const used = history?.n ?? 0;
+ // The start cap is checked here too, so Talk never looks open for a start the server would refuse.
+ if ((today?.count ?? 0) >= caps.voiceStartsPerDay && used < caps.voiceFreeLifetime)
+  return { available: false, plan, reason: 'That’s enough voice tries for today. Your free mock is still there tomorrow.', checkedAt, sessionSeconds, remaining: caps.voiceFreeLifetime - used, limit: caps.voiceFreeLifetime, resetsAt: nextUtcMidnight(checkedAt), kind: 'intro' as const };
  if (used < caps.voiceFreeLifetime) {
   const remaining = caps.voiceFreeLifetime - used;
   return { available: true, plan, checkedAt, sessionSeconds, remaining, limit: caps.voiceFreeLifetime, kind: 'intro' as const };

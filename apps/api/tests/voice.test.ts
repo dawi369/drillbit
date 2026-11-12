@@ -1,10 +1,10 @@
-import {env} from 'cloudflare:test';
-import {beforeAll,it,expect,vi} from 'vitest';
-import {initializeDatabase} from './migrations';
-import {accountFor,complete,detail,settingsFor} from '../src/store';
-import {startVoice,voiceEvents,delegateVoice,voiceCapability} from '../src/voice';
-import {interviewFor,requestInterview} from '../src/interview';
-import type {Env} from '../src/platform';
+import { env } from 'cloudflare:test';
+import { beforeAll, expect, it, vi } from 'vitest';
+import { interviewFor, requestInterview } from '../src/interview';
+import type { Env } from '../src/platform';
+import { accountFor, complete, detail, settingsFor } from '../src/store';
+import { delegateVoice, startVoice, voiceCapability, voiceEvents } from '../src/voice';
+import { initializeDatabase } from './migrations';
 const e={...env,VOICE_ENABLED:'true',OPENAI_API_KEY:'test',MANAGED_AI_ENABLED:'true',OPENROUTER_API_KEY:'test',JOBS:{create:async()=>({id:'test'})}} as unknown as Env;
 beforeAll(()=>initializeDatabase(e.DB));
 async function fixture(){const account=await accountFor(e,crypto.randomUUID()),id=crypto.randomUUID();await e.DB.prepare("UPDATE accounts SET status='active' WHERE id=?").bind(account.id).run();await e.DB.prepare("INSERT INTO challenges(id,account_id,lifecycle,data,created_at,available_at) VALUES(?,?,'in_progress',?,'now','now')").bind(id,account.id,JSON.stringify({title:'Queue',prompt:'Design a job queue',topic:'System design'})).run();await e.DB.prepare("INSERT INTO sessions(challenge_id,answer,revision,updated_at) VALUES(?,'Unfinished typed answer',2,'now')").bind(id).run();return {a:account.id,id};}
@@ -246,6 +246,19 @@ it('launch config: one free 10-minute voice mock, then Pro', async()=>{
  expect(await voiceCapability(launch,a)).toMatchObject({available:true,remaining:1,limit:1,kind:'intro',sessionSeconds:600});
  await spentSessions(a,id,1,40);
  expect(await voiceCapability(launch,a)).toMatchObject({available:false,plan:'free',remaining:0,limit:1,kind:'intro',reason:'That was your free voice mock. Pro has voice any time.'});
+ await expect(startVoice(launch,a,id,crypto.randomUUID(),{sdp:'offer',revision:2})).rejects.toMatchObject({code:'voice_gate',status:402});
+});
+
+it('free voice: the daily start cap shows in the capability, and sits above the free mock', async()=>{
+ const {a,id}=await fixture(), launch={...free,FREE_VOICE_TASTE_DAYS:'0',FREE_VOICE_LIFETIME:'1',FREE_VOICE_SESSION_MINUTES:'10'} as Env;
+ // A waived or dropped start leaves the mock unspent; the next tries still fit in the day.
+ await e.DB.prepare("INSERT INTO usage(account_id,day,kind,count) VALUES(?,?,'voice_start',2)").bind(a,day()).run();
+ expect(await voiceCapability(launch,a)).toMatchObject({available:true,remaining:1});
+ await e.DB.prepare("UPDATE usage SET count=3 WHERE account_id=? AND day=? AND kind='voice_start'").bind(a,day()).run();
+ const capped=await voiceCapability(launch,a);
+ expect(capped).toMatchObject({available:false,plan:'free',remaining:1,limit:1,kind:'intro'});
+ expect(capped.resetsAt).toBeTruthy();
+ // Talk said no, and Start agrees: a paywall answer, not a surprise 429.
  await expect(startVoice(launch,a,id,crypto.randomUUID(),{sdp:'offer',revision:2})).rejects.toMatchObject({code:'voice_gate',status:402});
 });
 

@@ -22,6 +22,9 @@ struct InterviewVoiceRoom<Question: View>: View {
   var dismissCoach: (CoachMark) -> Void = { _ in }
   @State private var warned = false
   @State private var allowanceFaded = false
+  /// One caption line plus the gap above it: how far the controls rise while the allowance shows.
+  @ScaledMetric(relativeTo: .caption) private var allowanceLift: CGFloat = 24
+  private var showsAllowance: Bool { allowance != nil && !allowanceFaded }
   /// The mute hint shows for the first muted stretch only; after they've unmuted once it stays quiet.
   @State private var unmutedOnce = false
   /// Set on the way out: the room keeps the face it had while it fades, instead of flashing through ending states.
@@ -178,23 +181,24 @@ struct InterviewVoiceRoom<Question: View>: View {
           .frame(width: 88)
           .padding(.trailing, 16)
         }
-        // Nothing transient takes layout space here, so the controls never move: notices hang above the row and the
-        // free allowance sits on one line in the margin under it, then fades.
+        // Notices hang above the row instead of pushing it. While the free allowance shows, the controls rise one line
+        // to make room for it underneath, then settle back as it fades. An offset, so the bar's height never changes.
         .overlay(alignment: .top) {
           notice.allowsHitTesting(false)
             .alignmentGuide(.top) { $0[.bottom] + 8 }
         }
+        .offset(y: showsAllowance ? -allowanceLift : 0)
         .overlay(alignment: .bottom) {
-          if let allowance, !allowanceFaded {
+          if showsAllowance, let allowance {
             Text(allowance)
               .font(.caption).foregroundStyle(AppPalette.secondary)
               .lineLimit(1).minimumScaleFactor(0.75)
               .allowsHitTesting(false)
-              .alignmentGuide(.bottom) { $0[.top] - 2 }
               .transition(.opacity)
               .accessibilityIdentifier("voiceAllowance")
           }
         }
+        .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: showsAllowance)
         #if DEBUG
         if phase == .active, interview.model.fixture, ProcessInfo.processInfo.arguments.contains("--fixture-voice") {
           Button("Simulate speech") { Task { await voice.fixtureSpeech() } }.font(.footnote).accessibilityIdentifier("voiceFixtureSpeech")
