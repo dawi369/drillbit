@@ -455,9 +455,8 @@ struct HomeView: View {
     .matchedTransitionSource(id: "done-\(session.id)", in: zoom) { $0.clipShape(RoundedRectangle(cornerRadius: 12)) }
   }
 
-  @ViewBuilder private var glance: some View {
-    if model.firstUse.stage == .complete { HomeGlanceHost(model: model, flow: $flow) }
-  }
+  /// From day one, empty or not: a new account sees what its reps will fill.
+  private var glance: some View { HomeGlanceHost(model: model, flow: $flow) }
 
   // MARK: Pieces
 

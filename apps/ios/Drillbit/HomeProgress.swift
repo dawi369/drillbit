@@ -191,9 +191,11 @@ struct HomeGlanceHost: View {
     // The first rep's cards get one plain introduction instead of a tab tour.
     let introducing = model.firstUse.firstRepID != nil && !model.firstUse.recallIntroduced
     HomeGlance(fix: fix, recallDue: model.bootstrap?.todayPlan?.dueRecallCount ?? 0,
-               introducingRecall: introducing, nodes: nodes,
+               introducingRecall: introducing,
+               fresh: !model.memory.sessions.contains { $0.lifecycle == "completed" && !$0.isWarmUp }, nodes: nodes,
                drill: {
-                 guard let fix else { return }
+                 // Nothing to drill yet: the map shows what's out there.
+                 guard let fix else { NotificationCenter.default.post(name: .init("OpenBit"), object: nil); return }
                  // Free accounts out of reps meet Pro here, the same as every other rep-starting action.
                  if model.mayStartRep() { flow = QuestionFlowEntry(browseTopics: true, concept: fix.conceptID) }
                  else { PlanCoordinator.shared.register(.practiceRep) { await model.refresh() } }
@@ -212,6 +214,8 @@ struct HomeGlance: View {
   let fix: FixNext?
   let recallDue: Int
   let introducingRecall: Bool
+  /// No finished rep yet, so the tiles say what will fill them.
+  var fresh = false
   let nodes: [KnowledgeNode]
   let drill: () -> Void
   let openRecall: () -> Void
@@ -220,15 +224,13 @@ struct HomeGlance: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
-      if fix != nil || recallDue > 0 {
-        let row = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 12)) : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
-        row {
-          if let fix { DrillTile(fix: fix, action: drill).signalEntrance(1) }
-          if recallDue > 0 { RecallTile(due: recallDue, introducing: introducingRecall, action: openRecall).signalEntrance(2) }
-        }
-        .fixedSize(horizontal: false, vertical: true)
+      let row = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 12)) : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
+      row {
+        DrillTile(fix: fix, action: drill).signalEntrance(1)
+        RecallTile(due: recallDue, introducing: introducingRecall, fresh: fresh, action: openRecall).signalEntrance(2)
       }
-      if nodes.contains(where: { $0.state != .unexplored }) {
+      .fixedSize(horizontal: false, vertical: true)
+      if !nodes.isEmpty {
         MapStrip(nodes: nodes, action: openMap).signalEntrance(3)
       }
     }
@@ -295,32 +297,41 @@ struct RepTrail: View {
   }
 }
 
-/// The concept to drill next and its last few reps as dots: gold held up, ringed worth another go.
+/// The concept to drill next and its last few reps as dots: gold held up, ringed worth another go. Before any feedback
+/// has found a gap, it says what will land here.
 private struct DrillTile: View {
-  let fix: FixNext
+  let fix: FixNext?
   let action: () -> Void
   @State private var lit = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
-    GlanceTile(title: fix.fixed ? "Fixed" : "Drill next", spoken: spoken, identifier: "homeFixNext", action: action) {
-      Text(fix.area).font(.title3.weight(.semibold)).foregroundStyle(AppPalette.primary)
-        .multilineTextAlignment(.leading).lineLimit(3).minimumScaleFactor(0.8)
-        .fixedSize(horizontal: false, vertical: true)
-      Spacer(minLength: 0)
-      HStack(spacing: 6) {
-        RepTrail(states: fix.trail)
-        if fix.fixed {
-          Image(systemName: "checkmark").font(.caption.weight(.bold)).foregroundStyle(AppPalette.success)
-            .symbolEffect(.bounce, value: lit)
+    GlanceTile(title: fix?.fixed == true ? "Fixed" : "Drill next", spoken: spoken, identifier: "homeFixNext", action: action) {
+      if let fix {
+        Text(fix.area).font(.title3.weight(.semibold)).foregroundStyle(AppPalette.primary)
+          .multilineTextAlignment(.leading).lineLimit(3).minimumScaleFactor(0.8)
+          .fixedSize(horizontal: false, vertical: true)
+        Spacer(minLength: 0)
+        HStack(spacing: 6) {
+          RepTrail(states: fix.trail)
+          if fix.fixed {
+            Image(systemName: "checkmark").font(.caption.weight(.bold)).foregroundStyle(AppPalette.success)
+              .symbolEffect(.bounce, value: lit)
+          }
         }
+      } else {
+        Text("Nothing yet").font(.title3.weight(.semibold)).foregroundStyle(AppPalette.primary)
+        Spacer(minLength: 0)
+        Text("Your feedback picks the gap worth fixing.").font(.footnote).foregroundStyle(AppPalette.secondary)
+          .multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
       }
     }
     .onAppear { lit = true }
   }
 
   private var spoken: String {
-    fix.fixed ? "Fixed: \(fix.area). Your last rep on it held up."
+    guard let fix else { return "Drill next: nothing yet. Your feedback picks the gap worth fixing." }
+    return fix.fixed ? "Fixed: \(fix.area). Your last rep on it held up."
       : "Drill next: \(fix.area). Last time: \(fix.fix)" + (fix.quote.map { " You said \($0)" } ?? "")
   }
 }
@@ -329,19 +340,23 @@ private struct DrillTile: View {
 private struct RecallTile: View {
   let due: Int
   let introducing: Bool
+  var fresh = false
   let action: () -> Void
   @State private var fanned = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+  private var caption: String { fresh ? "Cards from your reps land here" : due == 1 ? "card due" : "cards due" }
+
   var body: some View {
-    GlanceTile(title: introducing ? "From your first rep" : "Recall", spoken: "Recall, \(due) due", identifier: "homeRecall", action: action) {
+    GlanceTile(title: introducing ? "From your first rep" : "Recall", spoken: fresh ? "Recall. Cards from your reps land here." : "Recall, \(due) due", identifier: "homeRecall", action: action) {
       Spacer(minLength: 0)
       HStack(alignment: .bottom) {
         VStack(alignment: .leading, spacing: 0) {
           Text("\(due)").font(.system(.largeTitle, design: .rounded, weight: .semibold)).monospacedDigit()
-            .foregroundStyle(AppPalette.primary)
+            .foregroundStyle(fresh ? AppPalette.secondary : AppPalette.primary)
             .contentTransition(.numericText(value: Double(due)))
-          Text(due == 1 ? "card due" : "cards due").font(.footnote).foregroundStyle(AppPalette.secondary)
+          Text(caption).font(.footnote).foregroundStyle(AppPalette.secondary)
+            .fixedSize(horizontal: false, vertical: true)
         }
         Spacer(minLength: 8)
         ZStack {

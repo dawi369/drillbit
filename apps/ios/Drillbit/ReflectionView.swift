@@ -12,11 +12,30 @@ struct RepDoneMoment: View {
     ("Shipped.", "Straight to production, zero rollbacks."),
     ("Achievement unlocked.", "Thought about failure modes on purpose."),
     ("That’s a wrap.", "The servers stayed up. Mostly thanks to you."),
+    ("Merged.", "Clean diff, no reviewer nitpicks."),
+    ("Level up.", "Plus one design call in the skill tree."),
+    ("Cache warmed.", "Next time this comes up, it’s a hit."),
+    ("Load handled.", "Ten thousand users, zero tears."),
+    ("Checkpoint saved.", "Progress kept. Close the app guilt-free."),
+    ("Build passed.", "Green checks all the way down."),
+    ("Nailed it.", "Your interviewer would’ve nodded at least twice."),
+    ("Combo extended.", "Another rep stacked on the pile."),
+    ("100% uptime.", "Your brain stayed up the whole rep."),
+    ("Quest complete.", "Reward: one fewer thing to panic about."),
+    ("Ticket closed.", "Done before standup. Legend."),
+    ("Bottleneck found.", "And for once it wasn’t you."),
+    ("Saved to disk.", "Not just memory. This one’s staying."),
   ]
-  @State private var pick = RepDoneMoment.lines.randomElement() ?? RepDoneMoment.lines[0]
+  @AppStorage("repDone.lastTitle") private var lastTitle = ""
+  @State private var pick: (title: String, line: String)?
   @State private var shown = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  /// Any pair but the last one shown, so a rep never ends on the same joke twice running.
+  static func next(after last: String) -> (title: String, line: String) {
+    lines.filter { $0.title != last }.randomElement() ?? lines[0]
+  }
   var body: some View {
+    let pick = pick ?? Self.lines[0]
     VStack(spacing: 8) {
       BitView(mood: .happy, greets: true).frame(height: 88).padding(.bottom, 12)
       Text(pick.title).font(.largeTitle.weight(.semibold)).tracking(-0.8).foregroundStyle(AppPalette.primary)
@@ -30,7 +49,14 @@ struct RepDoneMoment: View {
     .background(AppPalette.background.ignoresSafeArea())
     .accessibilityElement(children: .combine)
     .accessibilityIdentifier("repDone")
-    .onAppear { withAnimation(reduceMotion ? nil : .easeOut(duration: 0.3)) { shown = true } }
+    .onAppear {
+      if self.pick == nil {
+        let chosen = Self.next(after: lastTitle)
+        self.pick = chosen
+        lastTitle = chosen.title
+      }
+      withAnimation(reduceMotion ? nil : .easeOut(duration: 0.3)) { shown = true }
+    }
   }
 }
 

@@ -6,6 +6,7 @@ struct SettingsView: View {
   @Bindable var model: AppModel
   @Environment(\.dismiss) private var dismiss
   @State private var deleting = false
+  @State private var deletingForSure = false
   @State private var showingManageSubscriptions = false
   @State private var discarding = false
   @State private var saving = false
@@ -132,18 +133,26 @@ struct SettingsView: View {
         Button("Delete account", role: .destructive) { deleting = true }
           .drillbitConfirm("Delete your account?", isPresented: $deleting,
                            message: "This permanently deletes your account, practice, feedback, Recall and saved key. There’s no undo.", actions: [
-            ConfirmAction("Delete", style: .destructive) {
-              Task {
-                await model.perform {
-                  let _: [String: String] = try await model.api.send(
-                    "account", method: "DELETE", command: UUID().uuidString)
-                  try await model.signOut(discard: true, deleting: true)
-                  dismiss()
-                }
-              }
-            },
+            ConfirmAction("Delete", style: .destructive) { deletingForSure = true },
             ConfirmAction("Cancel"),
           ])
+          // One cover per view, so the second ask hangs off the row's background.
+          .background {
+            Color.clear.drillbitConfirm("Sure sure?", isPresented: $deletingForSure,
+                                        message: "Last check. Your reps, feedback and Recall cards go for good, and we can’t bring them back.", actions: [
+              ConfirmAction("Delete everything", style: .destructive) {
+                Task {
+                  await model.perform {
+                    let _: [String: String] = try await model.api.send(
+                      "account", method: "DELETE", command: UUID().uuidString)
+                    try await model.signOut(discard: true, deleting: true)
+                    dismiss()
+                  }
+                }
+              },
+              ConfirmAction("Keep my account"),
+            ])
+          }
       }
       // Fixtures carry the capability too, except customer ones, which show what a subscriber sees.
       if model.bootstrap?.capabilities?.developerTools == true {

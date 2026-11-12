@@ -580,7 +580,7 @@ final class PracticeUITests: XCTestCase {
     XCTAssertTrue(app.buttons["voiceMute"].waitForExistence(timeout:5))
     XCTAssertFalse(app.buttons["voiceStart"].exists)
     let allowance = app.descendants(matching: .any)["voiceAllowance"]
-    XCTAssertEqual(allowance.label, "Your free voice mock runs up to 10 minutes. It counts once you speak.")
+    XCTAssertEqual(allowance.label, "Free mock: up to 10 minutes. Counts once you talk.")
     // It says its piece, then gets out of the way.
     XCTAssertTrue(allowance.waitForNonExistence(timeout: 6))
     // Live: Transcript, Mute and End sit in one dock; the keyboard waits in the toolbar.

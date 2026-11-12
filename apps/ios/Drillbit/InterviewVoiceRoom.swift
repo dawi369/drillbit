@@ -6,7 +6,7 @@ import SwiftUI
 struct InterviewVoiceRoom<Question: View>: View {
   let voice: LiveVoice
   let interview: InterviewController
-  /// "Your free voice mock runs up to 10 minutes…", when the account is on the free plan.
+  /// "Free mock: up to 10 minutes…", when the account is on the free plan.
   var allowance: String? = nil
   /// True while the shell is about to start voice itself; the room reads as connecting until it does.
   var opening = false
@@ -100,23 +100,31 @@ struct InterviewVoiceRoom<Question: View>: View {
 
   // MARK: Dock
 
-  @ViewBuilder private var dock: some View {
-    VStack(spacing: 8) {
+  /// Live notices float above the controls instead of pushing them up.
+  @ViewBuilder private var notice: some View {
+    Group {
       if warned, phase == .active, voice.message == nil {
-        Text("Thirty seconds left. Land the point.").font(.footnote).foregroundStyle(AppPalette.primary)
+        Text("Thirty seconds left. Land the point.").foregroundStyle(AppPalette.primary)
           .accessibilityIdentifier("voiceClosing")
       } else if voice.hearsNothing, phase == .active, voice.message == nil {
-        Text("Can’t hear you yet. Check your mic is on and Drillbit is allowed to use it.").font(.footnote)
-          .foregroundStyle(AppPalette.primary).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+        Text("Can’t hear you yet. Check your mic is on and Drillbit is allowed to use it.")
+          .foregroundStyle(AppPalette.primary)
           .accessibilityIdentifier("voiceNoInput")
       } else if voice.idleWarning, phase == .active, voice.message == nil {
-        Text("Still there? Voice ends in 30 seconds if it stays quiet.").font(.footnote).foregroundStyle(AppPalette.primary)
+        Text("Still there? Voice ends in 30 seconds if it stays quiet.").foregroundStyle(AppPalette.primary)
           .accessibilityIdentifier("voiceIdle")
+      } else if let message = voice.message {
+        Text(message).foregroundStyle(AppPalette.secondary)
       }
-      if let message = voice.message {
-        Text(message).font(.footnote).foregroundStyle(AppPalette.secondary)
-          .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
-      }
+    }
+    .font(.footnote)
+    .multilineTextAlignment(.center)
+    .fixedSize(horizontal: false, vertical: true)
+  }
+
+  @ViewBuilder private var dock: some View {
+    VStack(spacing: 8) {
+      if phase == .unavailable || phase == .ending { notice }
       switch phase {
       case .idle, .connecting, .active:
         // The microphone sits dead centre in every state; Bit keeps it company on the left, and the way out hangs off
@@ -170,18 +178,21 @@ struct InterviewVoiceRoom<Question: View>: View {
           .frame(width: 88)
           .padding(.trailing, 16)
         }
-        // The free allowance shows under the button for a moment, then fades. It keeps its line so the controls
-        // don't drop onto it mid-fade.
-        if let allowance {
-          ZStack {
-            Text(allowance).font(.footnote).multilineTextAlignment(.center).hidden()
-            if !allowanceFaded {
-              Text(allowance)
-                .font(.footnote).foregroundStyle(AppPalette.secondary)
-                .multilineTextAlignment(.center)
-                .transition(.opacity)
-                .accessibilityIdentifier("voiceAllowance")
-            }
+        // Nothing transient takes layout space here, so the controls never move: notices hang above the row and the
+        // free allowance sits on one line in the margin under it, then fades.
+        .overlay(alignment: .top) {
+          notice.allowsHitTesting(false)
+            .alignmentGuide(.top) { $0[.bottom] + 8 }
+        }
+        .overlay(alignment: .bottom) {
+          if let allowance, !allowanceFaded {
+            Text(allowance)
+              .font(.caption).foregroundStyle(AppPalette.secondary)
+              .lineLimit(1).minimumScaleFactor(0.75)
+              .allowsHitTesting(false)
+              .alignmentGuide(.bottom) { $0[.top] - 2 }
+              .transition(.opacity)
+              .accessibilityIdentifier("voiceAllowance")
           }
         }
         #if DEBUG

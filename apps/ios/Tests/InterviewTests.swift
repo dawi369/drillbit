@@ -131,7 +131,7 @@ struct InterviewTests {
     var last = intro; last.remaining = 1
     #expect(last.allowanceLine(locale: locale) == "Last free voice session. Make it count.")
     var mock = intro; mock.remaining = 1; mock.limit = 1; mock.sessionSeconds = 600
-    #expect(mock.allowanceLine(locale: locale) == "Your free voice mock runs up to 10 minutes. It counts once you speak.")
+    #expect(mock.allowanceLine(locale: locale) == "Free mock: up to 10 minutes. Counts once you talk.")
     mock.remaining = 0
     #expect(mock.allowanceLine(locale: locale) == nil)
     let taste = VoiceCapability(available: true, plan: "free", checkedAt: "2026-09-12T10:00:00.000Z", sessionSeconds: 180, remaining: 1, limit: 1, kind: "taste")

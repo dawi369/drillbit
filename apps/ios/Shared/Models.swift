@@ -262,7 +262,7 @@ struct VoiceCapability: Codable, Sendable {
     // Launch config: one longer free mock rather than a few short tries.
     if limit == 1 {
       guard remaining > 0 else { return nil }
-      return "Your free voice mock runs up to \(max(1, (sessionSeconds ?? 600) / 60)) minutes. It counts once you speak."
+      return "Free mock: up to \(max(1, (sessionSeconds ?? 600) / 60)) minutes. Counts once you talk."
     }
     switch remaining {
     case 0: return nil
@@ -547,6 +547,7 @@ struct CompanionUpdate: Codable {
  }
 
 /// The daily reminder's title/line pairs, in the voice of `RepDoneMoment`. None of them promise a question is ready.
+/// One per scheduled day: with 28, nobody sees a line twice inside the 28-day schedule.
 let reminderLines: [(title: String, body: String)] = [
   ("Your next boss fight", "A few minutes, one good design call."),
   ("Rep o’clock", "One question, a few minutes. Interview-day you says thanks."),
@@ -556,6 +557,26 @@ let reminderLines: [(title: String, body: String)] = [
   ("Daily quest", "Small rep, real tradeoffs. No grinding required."),
   ("Your interviewer’s warmed up", "Are you? A few minutes is plenty."),
   ("Practise now, panic less later", "One system design rep. That’s the whole ask."),
+  ("Cache miss", "Your brain’s, not the server’s. One rep warms it back up."),
+  ("The load balancer misses you", "It’s been routing traffic all day. Your turn to make a call."),
+  ("Side quest available", "Small rep, decent XP. Back to your day after."),
+  ("Your database called", "It wants to talk about its feelings. And its indexes."),
+  ("Ten thousand users incoming", "Hypothetically. One rep and you’ll know what breaks first."),
+  ("Health check", "Ping. Is your design brain responding? One rep finds out."),
+  ("Retry with backoff", "No pressure, just a gentle retry. One quick rep?"),
+  ("New challenger approaching", "It’s a system design question. Bring your tradeoffs."),
+  ("Queue position: you", "You’re next. One rep, then back to whatever you were doing."),
+  ("Single point of failure", "Skipping practice. Let’s add some redundancy."),
+  ("Interview prep, but tiny", "One question. A few minutes. Zero suits required."),
+  ("Bit’s bored", "He’s been drilling holes in your home screen. Give him something to do."),
+  ("Low on XP", "One design rep tops you up. Potions not included."),
+  ("Stack overflow", "Too many tabs open in your head? One focused rep closes a few."),
+  ("Consistency is eventual", "Like your database. A rep at a time gets you there."),
+  ("The whiteboard is waiting", "Metaphorically. Your phone is the whiteboard now."),
+  ("Speedrun time", "Any% system design. One rep, no glitches needed."),
+  ("Plot twist", "The bottleneck was the database all along. Come prove it."),
+  ("Deploy yourself", "One rep to production. Rollback not needed."),
+  ("Your read replica is lagging", "One quick rep and it’s caught up."),
 ]
 
 struct ScheduledReminder: Equatable, Sendable {
