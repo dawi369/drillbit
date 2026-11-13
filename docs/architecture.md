@@ -855,6 +855,26 @@ From the full-week run on 11 November (operations, "Pre-release run"):
 - **Reminders follow the person.** The offer suggests the time of their latest rep, to the nearest quarter hour and kept between 8:00 and 21:00 (`reminderMinutes`), and saying yes saves it. A no is asked once more after the third finished rep while they can still practise (`FirstUseProgress.reminderAskedAgain`), then only Settings has it. If iOS has refused notifications the offer is skipped and counted as answered. Once today's rep is done, today's reminder is dropped (`reminderSchedule(skippingToday:)`). Free accounts whose lifetime reps are spent get no reminders; Settings says they're paused, and they resume with Pro.
 - **Free voice: Talk never promises what Start refuses.** Free voice starts per UTC day default to the free mock count plus two (`FREE_VOICE_STARTS_PER_DAY`), so a dropped or silent start (which doesn't spend the mock) leaves room to try again. `voiceCapability` now reports that daily cap too ("That's enough voice tries for today…", `resetsAt` UTC midnight), so the start is refused as `voice_gate` 402 with See Pro instead of a bare 429. Talk reads as off (dimmed) whenever the capability says voice isn't available, and a tap still explains why.
 - **Apple sign-in errors.** Cancelling Apple's sheet (`ASAuthorizationError.canceled`, 1001) is silent and unreported. Any other Apple error (1000 is Apple's "unknown", usually the device's Apple ID or iCloud state) shows "Apple didn't let that sign-in through…" and goes to Sentry as a warning tagged `sign_in_apple`, not as an error.
+- **System hangs from the SDK watchdog.** `quietSystemHang` now also covers Sentry's own `AppHang` events, not only MetricKit's: a hang whose main-thread stack has no Drillbit frame past `main` (the run loop idle, typically the app resuming after a long suspension) is a warning tagged `hang: system`. Binary names are compared by last path component, since the watchdog reports full image paths.
+
+### Pre-1.0 fixes — 13 November 2026
+
+From the end-to-end sweep after build 29:
+
+- **AI permission is per account.** The consent flag is stored under `aiConsent.v1:<account>`. The old device-wide flag can't say whose it was, so it's dropped and everyone is asked once more after updating. Deleting an account removes its flag, so the next person on the phone is asked again.
+- **Deleting an account says what it can't cancel.** The first confirmation adds that a Pro subscription keeps billing until it's cancelled in App Store settings (or, on Free, to cancel one there if they ever subscribed).
+- **A stalled deletion finishes itself.** `reconcile` reruns `delete_account` jobs while the account is still `deleting`: a failed one at once, then 10, 20, 40… minutes after each try (counted in the job's `input.retries`, claimed by `updated_at` so overlapping runs don't both take it), least recently tried first, five per run. After six tries it logs `account_deletion_stuck` and stops; that one needs a person.
+- **Retrying a failed swap never spends a second free rep.** Only a fresh question takes a new `freeRepAt`; a swap keeps the one it had.
+- **A client post can't end a grace period early.** An `expired` restore doesn't overwrite a `grace` entitlement whose `active_until` is still ahead; the App Store notification decides.
+- **A voice transcript waiting to sync doesn't lock the rep.** While it sits in the outbox offline, the answer box stays usable and a note says Send and Skip wait for the sync (Skip would close the interview and strand the transcript). The sync retries on coming back to the app and when the network returns (`DrillbitOnline`).
+- **The first question survives backgrounding.** On returning to the app during first run, a pending generate job is awaited and the question (including a `ready` one) reopens.
+- **Links opened before sign-in wait.** `onOpenURL` keeps the link until the app stage is reached, then opens it.
+- **Home turns over at midnight** in the practice calendar's zone without a relaunch.
+- **Finishing a rep offline** saves the cleared bootstrap to disk, so a relaunch doesn't bring the done question back.
+- **Errors speak plainly.** `Error.userMessage` shows the API's message, an offline line for network errors, or "That didn't work. Your work is safe, so give it another go." No raw `localizedDescription` reaches the screen.
+- **Voice limits say when, in local time.** The day-cap reasons no longer say "tomorrow" (UTC midnight can be this evening); `VoiceCapability.explanation()` adds "Voice is back later today, at 8:00 PM." or "tomorrow at …" from `resetsAt`. Free: "That's enough voice tries for one day. Your free mock is still waiting."
+- **Accessibility.** The Recall card has a "Reveal answer" VoiceOver action alongside its button; with Reduce Motion the sign-in screen fades in instead of sliding.
+- **Copy.** The sign-in step after setup reads "Your plan's set." (the question doesn't exist yet). Library says "reps", like the rest of the app ("All reps").
 
 ## Backgrounds — 11 November 2026
 

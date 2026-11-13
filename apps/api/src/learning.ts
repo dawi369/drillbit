@@ -119,6 +119,8 @@ export async function retryMoment(env: Env, account: string, sourceId: string, t
   return detail(env,account,command);
 }
 
+/** The provider's sound cues ("[scoff]", "(tongue click)"), dropped once the streamed pieces are joined. */
+const speechOnly = (text: string) => text.replace(/\s*(\[[^\]\n]{1,40}\]|\([^)\n]{1,40}\)|\*[^*\n]{1,40}\*)/g, "").replace(/ {2,}/g, " ").trim();
 /** A quote must actually occur in user work; the model cannot certify authorship. */
 export function groundReflection(raw: unknown, context: any) {
   const result = reflectionSchema.parse(raw);
@@ -127,7 +129,7 @@ export function groundReflection(raw: unknown, context: any) {
     { id: undefined as string|undefined, text: context.answer },
     { id: undefined as string|undefined, text: context.session?.answer },
     ...turns.flatMap((t: any) => t.kind === "voice"
-      ? [{id:t.id as string|undefined,text:(t.voice ?? []).filter((f:any)=>f.speaker === "user").map((f:any)=>f.text).join("")}]
+      ? [{id:t.id as string|undefined,text:speechOnly((t.voice ?? []).filter((f:any)=>f.speaker === "user").map((f:any)=>f.text).join(""))}]
       : t.kind === "answer" ? [{id:t.id as string|undefined,text:t.answer ?? t.text}] : []),
   ].filter((source): source is {id:string|undefined;text:string} => typeof source.text === "string" && source.text.trim().length > 0);
   const answers = sources.map(source => source.text);

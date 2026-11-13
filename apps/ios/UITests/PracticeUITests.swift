@@ -1948,7 +1948,7 @@ final class PracticeUITests: XCTestCase {
     for _ in 0..<6 { app.buttons["Continue"].tap() }
     XCTAssertTrue(app.buttons["Show me my first question"].waitForExistence(timeout: 5))
     app.buttons["Show me my first question"].tap()
-    XCTAssertTrue(app.staticTexts["Your question’s ready."].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.staticTexts["Your plan’s set."].waitForExistence(timeout: 5))
     // Sign-in comes straight up; the AI permission waits for the first question to be written.
     XCTAssertTrue(app.buttons["Sign in with Apple"].waitForExistence(timeout: 5))
     XCTAssertFalse(app.descendants(matching: .any)["aiDisclosure"].exists)

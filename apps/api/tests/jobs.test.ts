@@ -1,12 +1,12 @@
 import { env, fetchMock } from "cloudflare:test";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { partialJSONString, partialJSONStrings, textDeltas } from "../src/ai";
-import { normalizeQuestionMarkup } from "../src/prompts/formatting";
 import { boundedContext } from "../src/context";
 import { roundTiming } from "../src/domain";
 import { reconcile, runJob } from "../src/jobs";
 import { learningEvidence, todayPlan } from "../src/learning";
 import type { Env } from "../src/platform";
+import { normalizeQuestionMarkup } from "../src/prompts/formatting";
 import { accountFor, complete, createJob, detail, settingsFor } from "../src/store";
 import { initializeDatabase } from "./migrations";
 const bindings = {
@@ -317,6 +317,55 @@ it("deletes a redeemed invitation and all account data after Clerk deletion", as
   expect(await bindings.DB.prepare("SELECT COUNT(*) AS n FROM deleted_subjects").first<{ n: number }>()).toEqual({ n: 0 });
   expect((await accountFor(bindings, "delete-test-person")).status).not.toBe("deleting");
   await bindings.DB.prepare("DELETE FROM accounts WHERE subject='delete-test-person'").run();
+});
+it("retries a deletion the Workflow gave up on, so the account isn't stranded", async () => {
+  const account = await accountFor(bindings, "stranded-delete");
+  await bindings.DB.prepare("UPDATE accounts SET status='deleting' WHERE id=?").bind(account.id).run();
+  const id = crypto.randomUUID();
+  await createJob(bindings, account.id, id, "delete_account", null, {});
+  // Clerk was down for every Workflow attempt.
+  await bindings.DB.prepare("UPDATE jobs SET status='failed' WHERE id=?").bind(id).run();
+  fetchMock.get("https://api.clerk.com").intercept({ path: "/v1/users/stranded-delete", method: "DELETE" }).reply(200, {});
+  await reconcile({ ...bindings, CLERK_SECRET_KEY: "test-only" });
+  expect(await bindings.DB.prepare("SELECT id FROM accounts WHERE id=?").bind(account.id).first()).toBeNull();
+  expect(await bindings.DB.prepare("SELECT id FROM jobs WHERE id=?").bind(id).first()).toBeNull();
+});
+it("backs off a deletion that keeps failing, then stops and reports it, without holding up the next one", async () => {
+  const stuck = await accountFor(bindings, "always-failing-delete");
+  await bindings.DB.prepare("UPDATE accounts SET status='deleting' WHERE id=?").bind(stuck.id).run();
+  const id = crypto.randomUUID();
+  await createJob(bindings, stuck.id, id, "delete_account", null, {});
+  await bindings.DB.prepare("UPDATE jobs SET status='failed' WHERE id=?").bind(id).run();
+  const job = () => bindings.DB.prepare("SELECT status, json_extract(input,'$.retries') AS retries FROM jobs WHERE id=?").bind(id).first<{ status: string; retries: number }>();
+  const ago = (minutes: number) => bindings.DB.prepare("UPDATE jobs SET updated_at=? WHERE id=?").bind(new Date(Date.now() - minutes * 60000).toISOString(), id).run();
+  const clerk = () => fetchMock.get("https://api.clerk.com").intercept({ path: "/v1/users/always-failing-delete", method: "DELETE" }).reply(500, {});
+  const env = { ...bindings, CLERK_SECRET_KEY: "test-only" } as Env;
+  // A failed deletion is retried at once, then waits 20 minutes after its first retry.
+  clerk(); await reconcile(env);
+  expect(await job()).toEqual({ status: "failed", retries: 1 });
+  await ago(15); await reconcile(env);
+  expect((await job())?.retries).toBe(1);
+  await ago(21); clerk(); await reconcile(env);
+  expect((await job())?.retries).toBe(2);
+  // The last try reports it, and after that the cron leaves it alone.
+  const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+  await bindings.DB.prepare("UPDATE jobs SET input=json_set(input,'$.retries',5) WHERE id=?").bind(id).run();
+  await ago(400); clerk(); await reconcile(env);
+  expect((await job())?.retries).toBe(6);
+  expect(errors.mock.calls.some(([line]) => String(line).includes("account_deletion_stuck"))).toBe(true);
+  errors.mockRestore();
+  await ago(100000); await reconcile(env);
+  expect((await job())?.retries).toBe(6);
+  // A newer deletion behind it still runs.
+  const next = await accountFor(bindings, "next-delete");
+  await bindings.DB.prepare("UPDATE accounts SET status='deleting' WHERE id=?").bind(next.id).run();
+  const nextJob = crypto.randomUUID();
+  await createJob(bindings, next.id, nextJob, "delete_account", null, {});
+  await bindings.DB.prepare("UPDATE jobs SET status='failed' WHERE id=?").bind(nextJob).run();
+  fetchMock.get("https://api.clerk.com").intercept({ path: "/v1/users/next-delete", method: "DELETE" }).reply(200, {});
+  await reconcile(env);
+  expect(await bindings.DB.prepare("SELECT id FROM accounts WHERE id=?").bind(next.id).first()).toBeNull();
+  await bindings.DB.prepare("DELETE FROM accounts WHERE id=?").bind(stuck.id).run();
 });
 it("returns durable job intent before slow workflow dispatch completes", async () => {
   const account = await accountFor(bindings, crypto.randomUUID());

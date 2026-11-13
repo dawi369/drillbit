@@ -34,7 +34,7 @@ struct HistoryView: View {
       }
       if let failure { Text(failure).foregroundStyle(.secondary) }
       if cursor != nil { Button("Load more") { Task { await load(more: true) } }.disabled(loading) }
-    }.navigationTitle("All sessions").searchable(text: $search).task(id: search) {
+    }.navigationTitle("All reps").searchable(text: $search).task(id: search) {
       try? await Task.sleep(for: .milliseconds(300))
       if !Task.isCancelled { await load(more: false) }
     }
@@ -415,7 +415,7 @@ struct LibraryQuestionView: View {
           .listRowSeparator(.hidden)
           .accessibilityIdentifier("practiseQuestion")
         if !question.eligible, detail?.attempts.contains(where: { $0.lifecycle == "skipped" }) == true {
-          Button("Add back to your questions") { Task { busy = true; defer { busy = false }; do { try await model.queueEligibility(question, eligible: true); if let account = model.bootstrap?.account.id { detail = model.libraryDetailSnapshots["library-detail:" + account + ":" + initial.id] ?? detail } } catch { failure = error.localizedDescription } } }.disabled(busy)
+          Button("Add back to your questions") { Task { busy = true; defer { busy = false }; do { try await model.queueEligibility(question, eligible: true); if let account = model.bootstrap?.account.id { detail = model.libraryDetailSnapshots["library-detail:" + account + ":" + initial.id] ?? detail } } catch { failure = error.userMessage } } }.disabled(busy)
         }
       }
       if developer {

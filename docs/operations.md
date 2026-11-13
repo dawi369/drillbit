@@ -344,7 +344,7 @@ Checked:
 
 Not yet seen live: a real Worker 5xx or job failure, and a crash from a Release build. The Worker report path is covered by unit tests only.
 
-Triage: `sentry issue list t23/drillbit-api` or `t23/drillbit-ios`. Crash stacks need the build's dSYMs: `scripts/release-ios.sh` uploads them when `SENTRY_AUTH_TOKEN` is set.
+Triage: `sentry issue list t23/drillbit-api` or `t23/drillbit-ios`. Crash stacks need the build's dSYMs: `scripts/release-ios.sh` uploads them whenever `sentry-cli` is authenticated (`sentry-cli info` succeeds, from `SENTRY_AUTH_TOKEN` or its own login).
 
 ### Bug reports — 1 November 2026
 
@@ -527,3 +527,7 @@ The notification URL setting, Paid Apps agreement and banking can't be read with
 Workers deployed: development `39dbafe1-f41a-4777-b058-0a279b623456`, production `7395584c-7974-4b5b-9a37-dc4f7d0e62c2` (no migration; `/health` 200, unauthenticated bootstrap 401). API 228 passed. Free voice starts per day now default to the free mock count plus two, and the voice capability reports the daily cap (architecture.md, TestFlight pass). Optional override: `FREE_VOICE_STARTS_PER_DAY`.
 
 Owner test account on production (`baf9629a…`), by hand for TestFlight testing: the manual Pro entitlement was added and removed again, and the account's practice, voice sessions, spent records and usage counters were deleted so it reads as a fresh Free account. Settings and the expired sandbox entitlement were kept.
+
+### Pre-1.0 fixes — 13 November 2026
+
+Workers deployed: development `afa8e208-b4f1-4965-bea7-c1abed787119`, production `f3e9e49a-0f15-4269-a57f-ad8f7fdb8a71`, then with the deletion retry backoff development `fc2e623d-c3b9-424e-98f6-414157864be7`, production `69b6882c-b35f-4782-941c-1dc0e7c06581` (no migration; `/health` 200, unauthenticated bootstrap 401). API 231 passed, `tsc` clean; `swift test` 61 passed; `PracticeUITests` 76 passed (7 first-rep tests after a fix); live API run on development 135 steps, 0 failed; the Release simulator build launched. A deletion that logs `account_deletion_stuck` has failed six tries over about ten hours: check Clerk and the job's error, then rerun it by hand. Changes: architecture.md, Pre-1.0 fixes. The app side needs build 30. Installed 1.0 builds now show the day voice cap without "tomorrow", since only new builds add the local reopening time.

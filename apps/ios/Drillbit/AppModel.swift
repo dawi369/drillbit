@@ -80,7 +80,7 @@ import WidgetKit
     guard accepted, await requestReminderPermission() else { return }
     settings.dailyMinutes = suggestedReminderMinutes
     settings.reminderEnabled = true
-    do { try await saveSettingsLocally(); try await reconcileReminder() } catch let failure { error = failure.localizedDescription }
+    do { try await saveSettingsLocally(); try await reconcileReminder() } catch let failure { error = failure.userMessage }
   }
   /// After the first free rep's feedback, Pro is offered once while the rest are still free. An offer, never a
   /// gate: Not now goes Home with the next rep untouched, and the server's limits don't change. Once per account on this
@@ -236,6 +236,7 @@ import WidgetKit
       if path.status == .satisfied {
         Task { @MainActor in
           guard let self else { return }
+          NotificationCenter.default.post(name: .init("DrillbitOnline"), object: nil)
           await self.sync()
           if self.bootstrap != nil { await self.refresh() }
         }
@@ -465,7 +466,7 @@ import WidgetKit
   }
   func perform(_ action: () async throws -> Void) async {
     do { try await action() } catch is CancellationError {} catch let error as URLError where error.code == .cancelled {} catch {
-      self.error = error.localizedDescription
+      self.error = error.userMessage
       logger.error("Operation failed; details shown in UI")
       CrashReporting.reportUnexpected(error, operation: "perform")
     }
@@ -684,7 +685,7 @@ import WidgetKit
       } else {
         error = "Sign in again to continue. Your local draft is safe."
       }
-    } catch { if bootstrap == nil { self.error = error.localizedDescription } }
+    } catch { if bootstrap == nil { self.error = error.userMessage } }
   }
   func loadMemory() async {
     guard let account = bootstrap?.account.id, !fixture else { return }
@@ -970,7 +971,7 @@ import WidgetKit
     }
   }
   func failPreparation(_ error: Error) {
-    preparationFailure = error.localizedDescription
+    preparationFailure = error.userMessage
     preparationLimited = ["practice_limit", "usage_limit"].contains((error as? APIError)?.code)
   }
   func generate(_ preparation: PreparationInput? = nil) async {
@@ -1186,7 +1187,7 @@ import WidgetKit
   func localAnswer(_ challenge: Challenge) async -> String {
     guard let account = bootstrap?.account.id else { return challenge.session?.answer ?? "" }
     do { return try await disk.load(account: account, challenge: challenge).answer } catch {
-      self.error = "Your draft could not be opened. \(error.localizedDescription)"
+      self.error = "Couldn’t open your draft just now. It’s still saved on this phone; give it another go."
       return challenge.session?.answer ?? ""
     }
   }
@@ -1387,6 +1388,8 @@ import WidgetKit
       }
     }
     bootstrap?.challenge = nil
+    // Kept on disk too: finished offline and closed before the sync, a relaunch mustn't reopen this rep as in progress.
+    if let current = bootstrap { try? await disk.cache(key: "bootstrap:" + current.account.id, data: JSONEncoder().encode(current)) }
     // Uncounted legacy warm-ups never become Home's completion notice.
     if !challenge.isWarmUp { completionNoticeAccount = bootstrap?.account.id }
     if firstUse.stage == .firstRep {
@@ -1405,7 +1408,7 @@ import WidgetKit
     UserDefaults.standard.set(true, forKey: CoachMark.tourReadyKey)
     // Setup's answers are applied; a kept draft could only replay setup over a finished account.
     UserDefaults.standard.removeObject(forKey: SetupView.draftKey)
-    do { try await saveSettingsLocally() } catch let failure { error = failure.localizedDescription }
+    do { try await saveSettingsLocally() } catch let failure { error = failure.userMessage }
     try? await disk.cache(key: "onboarding-v2:" + account, data: Data())
   }
   func skip(_ id: String, answer: String? = nil) async {
@@ -1564,6 +1567,8 @@ import WidgetKit
     }
     settingsSyncTask?.cancel(); settingsSyncTask = nil; settingsSyncID = nil; pendingSettings = nil; settingsSyncError = nil
     try await disk.clear()
+    // A deleted account's AI permission goes with it.
+    if deleting, let account = SharedStore.secret("account") { try? SharedStore.setSecret(nil, key: "aiConsent.v1:" + account) }
     for key in ["account", "subject", "widgetToken", "widgetTokenExpires", "deviceID", "apiURL"] {
       try SharedStore.setSecret(nil, key: key)
     }

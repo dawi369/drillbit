@@ -150,6 +150,20 @@ it("includes exactly one swap of a free rep's question", async () => {
   expect((await prepare(subject, { replaceId: swapped })).status).toBe(402);
 });
 
+it("retries a failed swap on the same rep, never a second one", async () => {
+  const { subject, id } = await person();
+  const spentAt = new Date().toISOString();
+  const original = await readyQuestion(id, { freeRepAt: spentAt });
+  expect((await prepare(subject, { replaceId: original })).status).toBe(202);
+  const failed = (await generations(id)).results[0];
+  await bindings.DB.prepare("UPDATE jobs SET status='failed' WHERE id=?").bind(failed.id).run();
+  const retried = await request("jobs/" + failed.id + "/retry", subject, "POST", undefined, crypto.randomUUID());
+  expect(retried.status).toBe(202);
+  const fresh = (await generations(id)).results.find(j => j.status === "pending")!;
+  expect(JSON.parse(fresh.input)).toMatchObject({ freeRepAt: spentAt, swapped: true });
+  expect((await access(subject)).remaining).toBe(2);
+});
+
 it("prepares one question when two preparations race for the last free rep", async () => {
   const { subject, id } = await person();
   await spentToday(id, 2);

@@ -75,7 +75,7 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
       BackgroundRefresh.register { await appModel.refresh() }
     } catch {
       configurationError =
-        "The local store could not open. Your existing files have not been deleted. \(error.localizedDescription)"
+        "Drillbit couldn’t open its storage on this phone. Your files are untouched. Restart the app, and if it keeps happening, reinstalling fixes it once your work has synced."
     }
   }
   var body: some Scene {

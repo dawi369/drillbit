@@ -2,8 +2,11 @@
 // question, rerolls, reps with interview turns, feedback, Recall, voice minutes, renewal, export and deletion.
 // Only Date is faked, so provider streams and timeouts keep their real timers. The AI and voice providers, Clerk
 // and the JWKS are answered locally; the network is off.
-import { createExecutionContext, env, fetchMock, waitOnExecutionContext } from "cloudflare:test";
+// @peculiar/x509 needs the Reflect polyfill first; its own import group keeps import sorting from moving it.
+import "reflect-metadata";
+
 import { X509CertificateGenerator } from "@peculiar/x509";
+import { createExecutionContext, env, fetchMock, waitOnExecutionContext } from "cloudflare:test";
 import { CompactSign, SignJWT, exportJWK, generateKeyPair } from "jose";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { app } from "../src/index";
@@ -459,10 +462,10 @@ describe("a Pro subscriber's week (America/Los_Angeles, UTC-8, no DST change)", 
     voice.s3 = await voiceSession(A, id, { seconds: 1169, reported: 1170, said: ["Retries carry the same key."] });
     expect(voice.s3.sessionSeconds).toBe(1170);
     expect(Date.parse(voice.s3.expiresAt) - Date.parse(voice.s3.createdAt)).toBe((1170 + 30) * 1000);
-    expect(await voiceCapability(A)).toMatchObject({ available: false, plan: "pro", reason: "That’s a lot of talking for one day. Voice is back tomorrow.", resetsAt: "2026-11-10T00:00:00.000Z" });
+    expect(await voiceCapability(A)).toMatchObject({ available: false, plan: "pro", reason: "That’s a lot of talking for one day.", resetsAt: "2026-11-10T00:00:00.000Z" });
     const refused = await startVoice(A, id);
     expect(refused.status).toBe(429);
-    expect(refused.body.error).toMatchObject({ code: "usage_limit", message: "That’s a lot of talking for one day. Voice is back tomorrow." });
+    expect(refused.body.error).toMatchObject({ code: "usage_limit", message: "That’s a lot of talking for one day." });
     expect(await usage(A.id, "voice_start", today)).toBe(4);
 
     // The spoken rep gets feedback quoting what was said; this time the idea held up.

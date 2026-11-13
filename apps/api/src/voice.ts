@@ -83,7 +83,7 @@ export async function voiceCapability(env: Env, account: string) {
   const [day, week] = await Promise.all([voiceSecondsSince(env, account, utcDayStart(checkedAt)), voiceSecondsSince(env, account, weekStart)]);
   const left = Math.min(caps.voiceSecondsPerDay - day.seconds, caps.voiceSecondsPerWeek - week.seconds);
   if ((today?.count ?? 0) >= caps.voiceStartsPerDay || caps.voiceSecondsPerDay - day.seconds < 60)
-   return { available: false, plan, reason: 'That’s a lot of talking for one day. Voice is back tomorrow.', checkedAt, sessionSeconds, resetsAt: nextUtcMidnight(checkedAt) };
+   return { available: false, plan, reason: 'That’s a lot of talking for one day.', checkedAt, sessionSeconds, resetsAt: nextUtcMidnight(checkedAt) };
   if (left < 60) {
    const back = await weekVoiceBack(env, account, weekStart, caps.voiceSecondsPerWeek - week.seconds);
    return { available: false, plan, reason: `That’s a big week of talking. Voice is back ${comesBack(back, checkedAt)}.`, checkedAt, sessionSeconds, resetsAt: back };
@@ -96,7 +96,7 @@ export async function voiceCapability(env: Env, account: string) {
  const used = history?.n ?? 0;
  // The start cap is checked here too, so Talk never looks open for a start the server would refuse.
  if ((today?.count ?? 0) >= caps.voiceStartsPerDay && used < caps.voiceFreeLifetime)
-  return { available: false, plan, reason: 'That’s enough voice tries for today. Your free mock is still there tomorrow.', checkedAt, sessionSeconds, remaining: caps.voiceFreeLifetime - used, limit: caps.voiceFreeLifetime, resetsAt: nextUtcMidnight(checkedAt), kind: 'intro' as const };
+  return { available: false, plan, reason: 'That’s enough voice tries for one day. Your free mock is still waiting.', checkedAt, sessionSeconds, remaining: caps.voiceFreeLifetime - used, limit: caps.voiceFreeLifetime, resetsAt: nextUtcMidnight(checkedAt), kind: 'intro' as const };
  if (used < caps.voiceFreeLifetime) {
   const remaining = caps.voiceFreeLifetime - used;
   return { available: true, plan, checkedAt, sessionSeconds, remaining, limit: caps.voiceFreeLifetime, kind: 'intro' as const };

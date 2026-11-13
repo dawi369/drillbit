@@ -337,6 +337,7 @@ struct RecallView: View {
       .contentShape(RoundedRectangle(cornerRadius: 12))
       // Tapping the card turns it over, like the button under it.
       .onTapGesture { if !session.isRevealed { revealedAt = Date(); session.reveal() } }
+      .accessibilityAction(named: "Reveal answer") { if !session.isRevealed { revealedAt = Date(); session.reveal() } }
 
       if session.isRevealed {
         HStack(spacing: 12) {
@@ -372,7 +373,7 @@ struct RecallView: View {
       LoadingStatus("Pulling your cards…", centered: true).padding(.vertical, 48).accessibilityLabel("Loading Recall")
     } else if model.recall.cards.isEmpty && session.knownCount + session.againCount == 0 {
       // Cards come from quotable design calls, so finished reps alone don't guarantee any.
-      EmptyTabState(title: "Nothing to recall yet", message: (model.bootstrap?.todayPlan?.completedTotal ?? 0) > 0
+      EmptyTabState(art: .cards, title: "Nothing to recall yet", message: (model.bootstrap?.todayPlan?.completedTotal ?? 0) > 0
         ? "Cards come from the design calls you make in a rep. Commit to a few next time and they’ll land here."
         : "Finish a rep and the bits worth remembering land here as quick cards.")
         .accessibilityIdentifier("recallEmpty")

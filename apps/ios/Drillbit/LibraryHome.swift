@@ -30,7 +30,7 @@ struct LibraryHomeView: View {
     ScrollView {
       VStack(alignment: .leading, spacing: 28) {
         if reps.isEmpty {
-          EmptyTabState(title: "Nothing here yet", message: "Finish a rep and it lands here, with the one thing worth fixing next time.")
+          EmptyTabState(art: .book, title: "Nothing here yet", message: "Finish a rep and it lands here, with the one thing worth fixing next time.")
             .accessibilityIdentifier("libraryEmpty")
         } else {
           LibraryActivity(reps: reps, total: model.memory.statistics?.completed ?? reps.count)
@@ -326,7 +326,7 @@ struct QuestionRetrySheet: View {
               _ = try await model.disk.load(account: account, challenge: attempt)
               model.bootstrap?.challenge = attempt
               onStarted(attempt)
-            } catch { failure = error.localizedDescription }
+            } catch { failure = error.userMessage }
           }
         } label: {
           HStack(spacing: 8) {

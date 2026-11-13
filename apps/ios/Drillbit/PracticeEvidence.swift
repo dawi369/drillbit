@@ -13,12 +13,12 @@ struct PracticeEvidenceView: View {
   var body: some View {
     SignalList {
       Section {
-        Text("What your last 100 sessions showed, each linked to the answer behind it. Counts show how often you practised, so read them as a rough guide.")
+        Text("What your last 100 reps showed, each linked to the answer behind it. Counts show how often you practised, so read them as a rough guide.")
           .foregroundStyle(.secondary)
       }
       if concepts.isEmpty {
         ContentUnavailableView("Nothing here yet", systemImage: AppIcon.books.rawValue,
-          description: Text("Finish a session and what you showed will land here."))
+          description: Text("Finish a rep and what you showed will land here."))
       }
       ForEach(concepts, id: \.id) { concept in
         let observations = (model.memory.evidence ?? []).filter { $0.conceptId == concept.id }
@@ -37,7 +37,7 @@ struct PracticeEvidenceView: View {
               Text(evidence.assistance == "assisted" ? "Help was on hand" : "Not tried solo yet")
                 .font(.caption).foregroundStyle(.secondary)
               if let id = evidence.sessionId, let session = model.memory.sessions.first(where: { $0.id == id }) {
-                NavigationLink("View session") { SessionDetailView(model: model, initial: session) }
+                NavigationLink("View rep") { SessionDetailView(model: model, initial: session) }
               }
             }
           }
@@ -84,13 +84,13 @@ struct PracticeExportView: View {
             } while cursor != nil
             document = PracticeExportDocument(data: try JSONSerialization.data(withJSONObject: ["version": 1, "pages": pages], options: [.prettyPrinted, .sortedKeys]))
             exporting = true
-          } catch { failure = error.localizedDescription }
+          } catch { failure = error.userMessage }
         }
       }.disabled(working || model.fixture)
       if let failure { Text(failure).foregroundStyle(.secondary) }
     }.navigationTitle("Export data")
       .fileExporter(isPresented: $exporting, document: document, contentType: .json, defaultFilename: "Drillbit-practice") { result in
-        if case .failure(let error) = result { failure = error.localizedDescription }
+        if case .failure = result { failure = "Couldn’t save the export. Give it another go." }
         document = nil
       }
   }

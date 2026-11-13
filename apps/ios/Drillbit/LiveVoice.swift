@@ -56,6 +56,9 @@ private struct VoiceOutbox: Codable {
   private var idleWatch: Task<Void,Never>?
   var isOpen: Bool { phase != .idle }
   var blocksText: Bool { [.connecting,.active,.ending].contains(phase) || outbox != nil }
+  /// Voice is over but its transcript hasn't reached the server (offline after a relaunch). Typing and skipping go on;
+  /// only sending waits, so the spoken turn lands first.
+  var holdsUnsyncedTranscript: Bool { phase == .unavailable && outbox != nil }
   let levels = VoiceLevels()
   private var meter: Task<Void, Never>?
   private let interview: InterviewController
@@ -204,7 +207,7 @@ private struct VoiceOutbox: Codable {
       cleanup()
       // Startup may have created a server reservation even when its answer was lost.
       if outbox != nil { outbox?.closed = true; try? await persist(); await sync() }
-      phase = .unavailable; message = error.localizedDescription
+      phase = .unavailable; message = (error as? APIError)?.message ?? "Voice couldn’t connect. Your writing is safe; try again or keep typing."
     }
   }
   func toggleMute() {

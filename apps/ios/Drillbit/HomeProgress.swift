@@ -188,9 +188,10 @@ struct HomeGlanceHost: View {
   var body: some View {
     let nodes = KnowledgeNode.build(model: model)
     let fix = FixNext.from(model, nodes: nodes)
-    // The first rep's cards get one plain introduction instead of a tab tour.
-    let introducing = model.firstUse.firstRepID != nil && !model.firstUse.recallIntroduced
-    HomeGlance(fix: fix, recallDue: model.bootstrap?.todayPlan?.dueRecallCount ?? 0,
+    // The first rep's cards get one plain introduction instead of a tab tour, once there are cards to introduce.
+    let due = model.bootstrap?.todayPlan?.dueRecallCount ?? 0
+    let introducing = model.firstUse.firstRepID != nil && !model.firstUse.recallIntroduced && due > 0
+    HomeGlance(fix: fix, recallDue: due,
                introducingRecall: introducing,
                fresh: !model.memory.sessions.contains { $0.lifecycle == "completed" && !$0.isWarmUp }, nodes: nodes,
                drill: {

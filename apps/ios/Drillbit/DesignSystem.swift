@@ -998,18 +998,22 @@ extension EnvironmentValues {
   @Entry var formatsQuestions = true
 }
 
-/// An empty tab: what lands here, and when. Library and Recall share it.
+/// An empty tab: what lands here, and when. The outline is the tab's own icon, drawn blank: a book for Library, a
+/// stack of cards for Recall.
 struct EmptyTabState: View {
+  enum Art { case book, cards }
+  let art: Art
   let title: String
   let message: String
+  private static let dashed = StrokeStyle(lineWidth: 1, dash: [4, 4])
   var body: some View {
     VStack(spacing: 8) {
-      // A blank ticket, drawn in outline: this is where your reps will land.
-      VStack(spacing: 0) {
-        TicketHalf(perforation: .bottom).stroke(AppPalette.hairline, style: StrokeStyle(lineWidth: 1, dash: [4, 4])).frame(height: 56)
-        TicketHalf(perforation: .top).stroke(AppPalette.hairline, style: StrokeStyle(lineWidth: 1, dash: [4, 4])).frame(height: 28)
+      Group {
+        switch art {
+        case .book: book
+        case .cards: cards
+        }
       }
-      .frame(width: 132)
       .padding(.bottom, 16)
       .accessibilityHidden(true)
       Text(title).font(.title3.weight(.semibold)).foregroundStyle(AppPalette.primary)
@@ -1021,6 +1025,45 @@ struct EmptyTabState: View {
     .frame(maxWidth: .infinity)
     .padding(.top, 96)
     .accessibilityElement(children: .combine)
+  }
+
+  /// A closed book with its spine and a ribbon: where finished reps are kept.
+  private var book: some View {
+    ZStack(alignment: .leading) {
+      RoundedRectangle(cornerRadius: 8).stroke(AppPalette.hairline, style: Self.dashed)
+      Rectangle().fill(AppPalette.hairline).frame(width: 1).padding(.vertical, 6).offset(x: 14)
+      BookRibbon().fill(AppPalette.hairline)
+        .frame(width: 16, height: 34).offset(x: 70, y: -47)
+    }
+    .frame(width: 104, height: 128)
+  }
+
+  /// Three cards fanned from the bottom, like Recall's deck.
+  private var cards: some View {
+    ZStack {
+      ForEach(0..<3, id: \.self) { index in
+        RoundedRectangle(cornerRadius: 8)
+          .fill(AppPalette.background)
+          .overlay { RoundedRectangle(cornerRadius: 8).stroke(AppPalette.hairline, style: Self.dashed) }
+          .frame(width: 84, height: 112)
+          .rotationEffect(.degrees(Double(index - 1) * 10), anchor: .bottom)
+          .offset(x: CGFloat(index - 1) * 14)
+      }
+    }
+    .frame(width: 140, height: 128)
+  }
+}
+
+/// A bookmark ribbon hanging from the top edge, notched at the bottom.
+private struct BookRibbon: Shape {
+  func path(in rect: CGRect) -> Path {
+    var path = Path()
+    path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+    path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+    path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY - rect.width * 0.5))
+    path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+    path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+    return path
   }
 }
 

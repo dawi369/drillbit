@@ -376,6 +376,7 @@ export class PracticeWorkflow extends WorkflowEntrypoint<
     }
   }
 }
+const DELETION_RETRIES = 6;
 export async function reconcile(env: Env) {
   if ((await env.DB.prepare("SELECT enabled FROM practice_epoch WHERE id=1").first<{enabled:number}>())?.enabled === 0) return;
   // Retire queued legacy timer-driven generation. Cron still recovers user-started jobs.
@@ -390,6 +391,25 @@ export async function reconcile(env: Env) {
     "SELECT id FROM jobs WHERE status='pending' ORDER BY created_at LIMIT 30",
   ).all<{ id: string }>();
   for (const row of pending.results) await dispatch(env, row.id);
+  // A deletion the Workflow gave up on leaves the person locked out (every request is refused while the account is
+  // "deleting") with nothing to retry from. A Workflow id can't be reused, so the cron runs it again here: at once if
+  // it failed, then waiting 10, 20, 40… minutes between tries, and after six it stops and reports.
+  const stalledDeletions = await env.DB.prepare("SELECT j.id, j.status, j.updated_at, COALESCE(json_extract(j.input,'$.retries'),0) AS retries FROM jobs j JOIN accounts a ON a.id=j.account_id WHERE j.kind='delete_account' AND a.status='deleting' AND COALESCE(json_extract(j.input,'$.retries'),0)<? ORDER BY j.updated_at LIMIT 50")
+    .bind(DELETION_RETRIES).all<{ id: string; status: string; updated_at: string; retries: number }>();
+  let rerun = 0;
+  for (const job of stalledDeletions.results) {
+    if (rerun >= 5) break;
+    const due = (job.retries === 0 && job.status === "failed") || Date.parse(job.updated_at) < Date.now() - 600000 * 2 ** job.retries;
+    if (!due) continue;
+    // Claiming the row by its old updated_at means an overlapping reconcile skips it instead of running it twice.
+    const claimed = await env.DB.prepare("UPDATE jobs SET input=json_set(input,'$.retries',?),updated_at=? WHERE id=? AND updated_at=?")
+      .bind(job.retries + 1, timestamp(), job.id, job.updated_at).run();
+    if (!claimed.meta.changes) continue;
+    rerun++;
+    await runJobSafely(env, job.id);
+    if (job.retries + 1 === DELETION_RETRIES && await env.DB.prepare("SELECT 1 FROM jobs WHERE id=?").bind(job.id).first())
+      console.error(JSON.stringify({ event: "account_deletion_stuck", jobId: job.id, retries: DELETION_RETRIES }));
+  }
   // Jobs that crossed ten minutes since the last tick: dispatch keeps failing (or Workflows are down). Each job falls in
   // this five-minute window once, so a lasting outage reports per stuck job, not every tick forever.
   const stuck = await env.DB.prepare("SELECT COUNT(*) AS n, GROUP_CONCAT(DISTINCT kind) AS kinds FROM jobs WHERE status='pending' AND created_at<? AND created_at>=?")

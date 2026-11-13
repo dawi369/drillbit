@@ -22,9 +22,12 @@ struct InterviewVoiceRoom<Question: View>: View {
   var dismissCoach: (CoachMark) -> Void = { _ in }
   @State private var warned = false
   @State private var allowanceFaded = false
+  /// Set a beat after the allowance fades, so the controls drop into a space that's already empty.
+  @State private var allowanceSettled = false
   /// One caption line plus the gap above it: how far the controls rise while the allowance shows.
   @ScaledMetric(relativeTo: .caption) private var allowanceLift: CGFloat = 24
   private var showsAllowance: Bool { allowance != nil && !allowanceFaded }
+  private var liftedForAllowance: Bool { allowance != nil && !allowanceSettled }
   /// The mute hint shows for the first muted stretch only; after they've unmuted once it stays quiet.
   @State private var unmutedOnce = false
   /// Set on the way out: the room keeps the face it had while it fades, instead of flashing through ending states.
@@ -71,11 +74,15 @@ struct InterviewVoiceRoom<Question: View>: View {
       .onChange(of: voice.muted) { _, muted in if !muted { unmutedOnce = true } }
       .task(id: allowance) {
         allowanceFaded = false
+        allowanceSettled = false
         guard let allowance else { return }
         AccessibilityNotification.Announcement(allowance).post()
         try? await Task.sleep(for: .seconds(3))
         guard !Task.isCancelled else { return }
-        withAnimation(reduceMotion ? nil : DrillbitMotion.reveal) { allowanceFaded = true }
+        withAnimation(reduceMotion ? nil : DrillbitMotion.fast) { allowanceFaded = true }
+        try? await Task.sleep(for: .milliseconds(reduceMotion ? 0 : 220))
+        guard !Task.isCancelled else { return }
+        withAnimation(reduceMotion ? nil : DrillbitMotion.reveal) { allowanceSettled = true }
       }
       .onChange(of: voice.hearsNothing) { _, now in if now { AccessibilityNotification.Announcement("Can’t hear you yet. Check your microphone.").post() } }
       .onChange(of: voice.idleWarning) { _, now in if now { AccessibilityNotification.Announcement("Still there? Voice ends in thirty seconds if it stays quiet.").post() } }
@@ -187,7 +194,7 @@ struct InterviewVoiceRoom<Question: View>: View {
           notice.allowsHitTesting(false)
             .alignmentGuide(.top) { $0[.bottom] + 8 }
         }
-        .offset(y: showsAllowance ? -allowanceLift : 0)
+        .offset(y: liftedForAllowance ? -allowanceLift : 0)
         .overlay(alignment: .bottom) {
           if showsAllowance, let allowance {
             Text(allowance)
@@ -198,7 +205,7 @@ struct InterviewVoiceRoom<Question: View>: View {
               .accessibilityIdentifier("voiceAllowance")
           }
         }
-        .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: showsAllowance)
+        .animation(reduceMotion ? nil : DrillbitMotion.reveal, value: liftedForAllowance)
         #if DEBUG
         if phase == .active, interview.model.fixture, ProcessInfo.processInfo.arguments.contains("--fixture-voice") {
           Button("Simulate speech") { Task { await voice.fixtureSpeech() } }.font(.footnote).accessibilityIdentifier("voiceFixtureSpeech")

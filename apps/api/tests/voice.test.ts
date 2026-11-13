@@ -41,7 +41,7 @@ it('voice capability is read-only, account-scoped and pauses Pro at the fair-use
  expect(await voiceCapability(e,a)).not.toHaveProperty('remaining');
  expect((await voiceCapability({...e,VOICE_ENABLED:'false'},a)).available).toBe(false);
  await e.DB.prepare("INSERT INTO usage(account_id,day,kind,count) VALUES(?,?,'voice_start',20)").bind(a,day()).run();
- expect(await voiceCapability(e,a)).toMatchObject({available:false,reason:expect.stringContaining('back tomorrow')});
+ expect(await voiceCapability(e,a)).toMatchObject({available:false,reason:'That’s a lot of talking for one day.',resetsAt:expect.stringMatching(/T00:00:00\.000Z$/)});
  expect((await voiceCapability(e,other.a)).available).toBe(true);
  expect((await e.DB.prepare("SELECT count FROM usage WHERE account_id=? AND day=? AND kind='voice_start'").bind(a,day()).first<any>()).count).toBe(20);
 });
@@ -218,7 +218,7 @@ it('Pro voice is metered in minutes: today, the rolling week, and the next sessi
  await session(null, Math.min(0.4, hoursToday), {waived:true});
  expect(await voiceCapability(pro,a)).toMatchObject({sessionSeconds:15*60});
  await session(null, Math.min(0.3, hoursToday), {capMinutes:15});
- expect(await voiceCapability(pro,a)).toMatchObject({available:false,reason:expect.stringContaining('back tomorrow')});
+ expect(await voiceCapability(pro,a)).toMatchObject({available:false,reason:'That’s a lot of talking for one day.',resetsAt:expect.stringMatching(/T00:00:00\.000Z$/)});
  // The week: 150 minutes across earlier days pauses voice until the oldest rolls off.
  const other=await fixture();
  for(const days of [2,3,4]){

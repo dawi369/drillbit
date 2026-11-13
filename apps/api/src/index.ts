@@ -1,3 +1,4 @@
+import { instrumentWorkflowWithSentry, withSentry } from "@sentry/cloudflare";
 import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { streamSSE } from "hono/streaming";
@@ -15,18 +16,19 @@ import {
     parseJSON, practiceProfileSchema, requireCommand, settingsSchema, timestamp,
     uuid, validateLearningPlanDate
 } from "./domain";
+import { applyAppleNotification, recordEntitlement } from "./entitlements";
 import { exportPage } from "./export";
 import { cancelInterviewAssistance, interviewInputSchema, interviewStreamSnapshot, requestInterview, retryInterview } from "./interview";
-import { reconcile, runJobInline } from "./jobs";
+import { PracticeWorkflow as PracticeWorkflowBase, reconcile, runJobInline } from "./jobs";
 import { learningEvidence, recallDeck, retryMoment, reviewRecall, todayPlan } from "./learning";
+import { privacyPolicy, supportPage } from "./legal";
 import { coverage, libraryPage, questionDetail, setEligibility, startQuestion } from "./library";
+import { reportFailure, sentryOptions } from "./monitoring";
+import { recordPaywallView } from "./paywall";
+import { limits, planFor, planOverride } from "./plans";
 import { consumeUsage, encrypt, hash, identity, type Env } from "./platform";
 import { adopt, requestHelp } from "./practice";
 import { abandonedUnused, assertProRepAvailable, freeRepTaken, onFreeReps, practiceAccess, practiceGateFault } from "./practice-gate";
-import { limits, planFor, planOverride } from "./plans";
-
-const developerPlanSchema = z.object({ plan: z.enum(["free", "pro"]).nullable() });
-import { applyAppleNotification, recordEntitlement } from "./entitlements";
 import {
     accountFor,
     activeChallenge,
@@ -44,11 +46,8 @@ import {
 } from "./store";
 import { concepts } from "./taxonomy";
 import { delegateVoice, endVoiceFor, startVoice, voiceCapability, voiceEvents } from "./voice";
-import { privacyPolicy, supportPage } from "./legal";
-import { recordPaywallView } from "./paywall";
-import { PracticeWorkflow as PracticeWorkflowBase } from "./jobs";
-import { instrumentWorkflowWithSentry, withSentry } from "@sentry/cloudflare";
-import { reportFailure, sentryOptions } from "./monitoring";
+
+const developerPlanSchema = z.object({ plan: z.enum(["free", "pro"]).nullable() });
 // Workflow failures reach Sentry too; wrangler binds the class by this export name.
 export const PracticeWorkflow = instrumentWorkflowWithSentry(sentryOptions, PracticeWorkflowBase);
 type AppEnv = { Bindings: Env; Variables: { account: Account; requestId: string } };
@@ -651,8 +650,9 @@ app.post("/v1/jobs/:id/retry", async (c) => {
     throw new Fault("not_retryable", 409, "This operation cannot be retried.");
   const id = requireCommand(c.req.header("Idempotency-Key"));
   const input = parseJSON<{ freeRepAt?: string; swapped?: boolean }>(old.input);
-  // A retried preparation is a fresh rep; the failed one never counted.
-  const unless = old.kind === "generate" && await onFreeReps(c.env, a) ? freeRepTaken(c.env, a) : undefined;
+  // A retried preparation is a fresh rep; the failed one never counted. A swap's preparation rides on the rep of the
+  // question it replaces, so retrying it keeps that same rep instead of taking a second.
+  const unless = old.kind === "generate" && !input.swapped && await onFreeReps(c.env, a) ? freeRepTaken(c.env, a) : undefined;
   if (unless && await c.env.DB.prepare("SELECT 1 WHERE " + unless.sql).bind(...unless.binds).first()) throw practiceGateFault(c.env);
   await consumeUsage(c.env, a, old.kind, old.kind === "summarize" ? 20 : 10);
   const { swapped: _swapped, ...rest } = input;

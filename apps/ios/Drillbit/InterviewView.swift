@@ -202,8 +202,9 @@ struct InterviewView: View {
     .onChange(of: phase) { _, value in
       if value != .active { interview.acceptsVoiceInput = false; interview.voice?.discardPreparation(); interview.voice?.interrupt("Voice stopped while the app was inactive.") }
       if value == .background { persistReading(); Task { if !interview.locked { try? await interview.flush() } } }
-      if value == .active { interview.acceptsVoiceInput = true; Task { await interview.refresh() } }
+      if value == .active { interview.acceptsVoiceInput = true; Task { await interview.refresh(); await retryVoiceSync() } }
     }
+    .onReceive(NotificationCenter.default.publisher(for: .init("DrillbitOnline"))) { _ in Task { await retryVoiceSync() } }
     .drillbitConfirm("Voice", isPresented: Binding(get: { voiceExplanation != nil }, set: { if !$0 { voiceExplanation = nil } }),
                      message: voiceExplanation, actions: voiceActions)
     .onChange(of: completedAssistance) { _, value in
@@ -255,7 +256,7 @@ struct InterviewView: View {
                   GrowingInterviewEditor(text: Binding(get: { interview.answer }, set: { interview.edit($0) }),
                     focused: Binding(get: { focused }, set: { focused = $0 }),
                     accessibilityLabel: "Your reply or question",
-                    enabled: !interview.locked && interview.failedTurn == nil && interview.voice?.blocksText != true,
+                    enabled: !interview.locked && interview.failedTurn == nil && (interview.voice?.blocksText != true || interview.voice?.holdsUnsyncedTranscript == true),
                     revealCaret: revealCaret)
                     .fixedSize(horizontal: false, vertical: true)
                     .coachAnchor(.composer)
@@ -536,7 +537,7 @@ struct InterviewView: View {
       if let capability, !capability.available {
         // A free-plan limit opens the way to Pro; anything else is just news.
         voiceGated = capability.plan == "free" && capability.remaining != nil
-        voiceExplanation = capability.reason ?? "Live voice is currently unavailable. You can continue in text."; return
+        voiceExplanation = capability.explanation() ?? "Live voice is currently unavailable. You can continue in text."; return
       }
       if !model.fixture {
         let allowed = await AVAudioApplication.requestRecordPermission()
@@ -818,11 +819,24 @@ struct InterviewView: View {
     let snapshot = reading
     Task { try? await model.disk.cache(key: interview.key + ":reading", data: JSONEncoder().encode(snapshot)) }
   }
+  private func retryVoiceSync() async {
+    guard let voice = interview.voice, voice.holdsUnsyncedTranscript else { return }
+    await voice.retrySync()
+  }
   private var footer: some View {
-    HStack(spacing: 16) {
-      talkButton
-      Spacer(minLength: 0)
-      sendButton
+    VStack(spacing: 8) {
+      if interview.voice?.holdsUnsyncedTranscript == true {
+        Text("Your voice transcript is still on this phone. Keep typing; Send and Skip work once it syncs.")
+          .font(.footnote).foregroundStyle(AppPalette.secondary)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .fixedSize(horizontal: false, vertical: true)
+          .accessibilityIdentifier("voiceSyncPending")
+      }
+      HStack(spacing: 16) {
+        talkButton
+        Spacer(minLength: 0)
+        sendButton
+      }
     }
     .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 4)
       .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { footerFrame = $0; if followingLiveEnd, sheet == nil, let lastCaret { revealCaret(lastCaret) } }

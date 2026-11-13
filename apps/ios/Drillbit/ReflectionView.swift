@@ -270,7 +270,7 @@ struct ReflectionView: View {
                 let started = try await model.retryMoment(challenge: challenge, turn: turn)
                 onLeave?(.newRep)
                 model.presented = started
-              } catch { retryFailure = error.localizedDescription }
+              } catch { retryFailure = error.userMessage }
             }
           } label: {
             HStack(spacing: 8) {

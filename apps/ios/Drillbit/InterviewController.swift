@@ -109,14 +109,14 @@ import UIKit
       loaded = true
       if pending != nil { await recover() }
       else { await refresh() }
-    } catch { loaded = true; failure = error.localizedDescription }
+    } catch { loaded = true; failure = error.userMessage }
   }
   func selectMode(_ mode: GuidanceMode) async {
     guard !locked, voice?.blocksText != true, currentAccount else { return }
     do {
       try await model.disk.cache(key: key + ":guidanceMode", data: JSONEncoder().encode(mode))
       selectedMode = mode
-    } catch { failure = error.localizedDescription }
+    } catch { failure = error.userMessage }
   }
   func edit(_ value: String) {
     guard !locked else { return }
@@ -127,7 +127,7 @@ import UIKit
       do {
         try await Task.sleep(for: .milliseconds(300))
         try await flush()
-      } catch is CancellationError {} catch { failure = error.localizedDescription }
+      } catch is CancellationError {} catch { failure = error.userMessage }
     }
   }
   func flush() async throws {
@@ -190,7 +190,7 @@ import UIKit
         try await persistPending()
       }
       retrySubmission = nil
-    } catch { outgoing = nil; failure = error.localizedDescription; busy = false; return }
+    } catch { outgoing = nil; failure = error.userMessage; busy = false; return }
     onAccepted?()
     busy = false
     await recover()
@@ -336,13 +336,13 @@ import UIKit
       outgoing = nil
       pending = nil
       try? await persistPending()
-      failure = error.localizedDescription
+      failure = error.message
       failureCode = error.code
       if error.code == "revision_conflict", currentAccount {
         try? await model.disk.markConflict(account: account, id: challenge.id)
         model.conflict = try? await model.api.send("challenges/" + challenge.id)
       }
-    } catch { failure = error.localizedDescription }
+    } catch { failure = error.userMessage }
   }
   func retry() async {
     if pending != nil { await recover(); return }
@@ -350,7 +350,7 @@ import UIKit
     if let submission = retrySubmission { await submit(submission.kind, text: submission.text, command: submission.command); return }
     guard let turn = failedTurn, !busy else { await refresh(); return }
     pending = PendingInterviewCommand(command: UUID().uuidString, input: InterviewInput(kind: turn.kind, revision: challenge.session?.revision ?? 0), retryTurn: turn.id)
-    do { try await persistPending(); await recover() } catch { failure = error.localizedDescription }
+    do { try await persistPending(); await recover() } catch { failure = error.userMessage }
   }
   func finish() async {
     guard canFinish else { return }
@@ -364,6 +364,6 @@ import UIKit
       challenge.guidanceMode = mode
       // The view ends onboarding after the rep-done moment, so the first rep's moment isn't cut short.
       finished = try await model.finish(challenge, answer: answer, completesOnboarding: false)
-    } catch { failure = error.localizedDescription }
+    } catch { failure = error.userMessage }
   }
 }

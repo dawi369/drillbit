@@ -14,6 +14,10 @@ struct RootView: View {
   @State private var showingQuestion = false
   @State private var startedFirstRep: Challenge?
   @State private var applyingDraft = false
+  /// A widget link that arrived before the app was ready for it.
+  @State private var pendingLink: URL?
+  /// The first question written while the app was away, reopened as is instead of writing another.
+  @State private var resumedQuestion: Challenge?
   @AppStorage(CoachMark.tourReadyKey) private var tourReady = false
   @AppStorage(CoachMark.tabs.storageKey) private var seenTabs = false
   @AppStorage(CoachMark.recallPage.storageKey) private var seenRecallPage = false
@@ -88,6 +92,21 @@ struct RootView: View {
     }
     showingQuestion = true
   }
+  /// Leaving the app closes the first question's sheet. Coming back reopens it: the question it was writing (once the
+  /// job lands), or the interview if it had started, never a second question.
+  private func resumeFirstQuestion() async {
+    guard stage == .setup, signedIn, model.firstUse.stage == .firstRep, !showingQuestion, model.presented == nil, !applyingDraft,
+          FirstRunStage(rawValue: firstRunStage) == .done else { return }
+    await model.refresh()
+    if let job = model.bootstrap?.jobs.first(where: { $0.kind == "generate" && ["pending", "running"].contains($0.status) }) {
+      try? await model.waitForJob(job.id)
+      await model.refresh()
+    }
+    guard !showingQuestion, model.presented == nil else { return }
+    if let current = model.bootstrap?.challenge, current.lifecycle == "in_progress" { await model.open(current); return }
+    resumedQuestion = model.bootstrap?.challenge.flatMap { $0.lifecycle == "ready" ? $0 : nil }
+    showingQuestion = true
+  }
   var body: some View {
     Group {
       if model.restoringSession || model.launchError != nil {
@@ -101,11 +120,12 @@ struct RootView: View {
           .transition(.opacity)
           // The first question rises over setup and the interview replaces it; Home appears once the rep is done.
           .sheet(isPresented: $showingQuestion, onDismiss: {
+            resumedQuestion = nil
             guard let started = startedFirstRep else { return }
             startedFirstRep = nil
             model.presented = started
           }) {
-            QuestionFlow(model: model, initial: model.bootstrap?.challenge.flatMap { $0.lifecycle == "in_progress" ? $0 : nil }) { startedFirstRep = $0 }
+            QuestionFlow(model: model, initial: model.bootstrap?.challenge.flatMap { $0.lifecycle == "in_progress" ? $0 : nil } ?? resumedQuestion) { startedFirstRep = $0 }
           }
       } else if stage == .signIn {
         NavigationStack { SignInView(model: model) }
@@ -149,7 +169,7 @@ struct RootView: View {
         }
       } else {
         NavigationStack { SignInView(model: model) }
-          .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .opacity))
+          .transition(reduceMotion ? .opacity : .asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .opacity))
       }
     }
     .animation(DrillbitMotion.page, value: stage)
@@ -168,6 +188,16 @@ struct RootView: View {
       Task { await model.loadRecall() }
     }
     .onReceive(NotificationCenter.default.publisher(for: .init("OpenBit"))) { _ in selectedTab = "bit" }
+    // Midnight in the account's own time zone: Home's day, week strip and Recall move on even if the app stays open.
+    .task(id: model.practiceCalendar.timeZone.identifier) {
+      while !Task.isCancelled {
+        let calendar = model.practiceCalendar
+        guard let midnight = calendar.nextDate(after: .now, matching: DateComponents(hour: 0, minute: 0, second: 5), matchingPolicy: .nextTime) else { return }
+        try? await Task.sleep(for: .seconds(max(1, midnight.timeIntervalSinceNow)))
+        guard !Task.isCancelled else { return }
+        await model.refresh()
+      }
+    }
     .task {
       await model.launch()
       #if DEBUG
@@ -178,7 +208,7 @@ struct RootView: View {
     }
     .onChange(of: scenePhase) { _, phase in
       if phase == .active {
-        Task { await model.refresh(); await model.ensureHomeQuestion() }
+        Task { await model.refresh(); await model.ensureHomeQuestion(); await resumeFirstQuestion() }
       } else if phase == .background {
         // A reminder held back behind the first-rep Pro offer waits for this: the next visit to Home asks.
         model.reminderHeldBack = false
@@ -228,17 +258,27 @@ struct RootView: View {
     }
     .onOpenURL { url in
       if url.scheme == "dawi.drillbit" && url.host == "callback" { return }
-      selectedTab = "home"
-      Task {
-        await model.refresh()
-        // The widget's "Resume practice" goes straight back into the interview; a fresh question opens on Home.
-        if url.host == "challenge", model.presented == nil, let current = model.bootstrap?.challenge,
-           current.id == url.lastPathComponent, current.lifecycle == "in_progress" {
-          await model.open(current)
-        }
-      }
+      // Signed out or still setting up: the link waits for the app instead of being dropped.
+      guard stage == .app else { pendingLink = url; return }
+      open(url)
+    }
+    .onChange(of: stage == .app) { _, ready in
+      guard ready, let url = pendingLink else { return }
+      pendingLink = nil
+      open(url)
     }
     .environment(\.formatsQuestions, model.settings.formatsQuestions)
+  }
+  private func open(_ url: URL) {
+    selectedTab = "home"
+    Task {
+      await model.refresh()
+      // The widget's "Resume practice" goes straight back into the interview; a fresh question opens on Home.
+      if url.host == "challenge", model.presented == nil, let current = model.bootstrap?.challenge,
+         current.id == url.lastPathComponent, current.lifecycle == "in_progress" {
+        await model.open(current)
+      }
+    }
   }
 }
 

@@ -137,7 +137,9 @@ struct SettingsView: View {
         }
         Button("Delete account", role: .destructive) { deleting = true }
           .drillbitConfirm("Delete your account?", isPresented: $deleting,
-                           message: "This permanently deletes your account, practice, feedback, Recall and saved key. There’s no undo.", actions: [
+                           message: model.isPro
+                             ? "This permanently deletes your account, practice, feedback, Recall and saved key. There’s no undo. Your Pro subscription keeps billing until you cancel it in App Store settings."
+                             : "This permanently deletes your account, practice, feedback, Recall and saved key. There’s no undo. If you ever subscribed, cancel it in App Store settings too.", actions: [
             ConfirmAction("Delete", style: .destructive) { deletingForSure = true },
             ConfirmAction("Cancel"),
           ])

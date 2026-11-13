@@ -50,13 +50,14 @@ fail=false
 $fail && exit 1
 echo "Archive verified: $archive"
 
-# Readable crash stacks: Sentry needs this build's dSYMs. Uses SENTRY_AUTH_TOKEN (sentry-cli) when it's set.
-if command -v sentry-cli >/dev/null && [ -n "${SENTRY_AUTH_TOKEN:-}" ]; then
+# Readable crash stacks: Sentry needs this build's dSYMs. sentry-cli authenticates from SENTRY_AUTH_TOKEN or its own
+# login (~/.sentryclirc); `sentry-cli info` fails when it has neither.
+if command -v sentry-cli >/dev/null && sentry-cli info >/dev/null 2>&1; then
   sentry-cli debug-files upload --org t23 --project drillbit-ios "$archive/dSYMs" >"$out/sentry-dsyms.log" 2>&1 \
     && echo "Uploaded dSYMs to Sentry (t23/drillbit-ios)." \
     || echo "warning: dSYM upload to Sentry failed (see $out/sentry-dsyms.log); crash stacks will be unreadable until it's uploaded" >&2
 else
-  echo "warning: dSYMs not uploaded to Sentry; set SENTRY_AUTH_TOKEN, then run: sentry-cli debug-files upload --org t23 --project drillbit-ios \"$archive/dSYMs\"" >&2
+  echo "warning: dSYMs not uploaded to Sentry; run sentry-cli login (or set SENTRY_AUTH_TOKEN), then: sentry-cli debug-files upload --org t23 --project drillbit-ios \"$archive/dSYMs\"" >&2
 fi
 
 if $upload; then

@@ -1,7 +1,9 @@
 // @peculiar/x509 resolves its internals through tsyringe, which needs the Reflect polyfill loaded first.
+// Keep it in its own import group (the blank line) so import sorting can't move it below x509.
 import "reflect-metadata";
+
 import { X509Certificate } from "@peculiar/x509";
-import { decodeProtectedHeader, compactVerify } from "jose";
+import { compactVerify, decodeProtectedHeader } from "jose";
 import { z } from "zod";
 import { Fault, timestamp } from "./domain";
 import type { Env } from "./platform";
@@ -99,10 +101,11 @@ async function upsert(env: Env, account: string | null, t: AppleTransaction, sta
   if (account) {
     const owner = await env.DB.prepare("SELECT account_id FROM entitlements WHERE original_transaction_id=?").bind(t.originalTransactionId).first<{ account_id: string }>();
     if (owner && owner.account_id !== account) throw new Fault("entitlement_taken", 409, "This subscription is already linked to another Drillbit account.");
-    // Newest signed statement wins; a replayed older receipt changes nothing.
+    // Newest signed statement wins; a replayed older receipt changes nothing. A client's transaction carries no renewal
+    // info, so it can't see a billing grace period: it never downgrades a grace that Apple's notification set.
     await env.DB.prepare(
-      "INSERT INTO entitlements(original_transaction_id,account_id,product_id,environment,status,active_until,signed_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(original_transaction_id) DO UPDATE SET product_id=excluded.product_id,status=excluded.status,active_until=excluded.active_until,signed_at=excluded.signed_at,updated_at=excluded.updated_at WHERE excluded.signed_at>=entitlements.signed_at",
-    ).bind(t.originalTransactionId, account, t.productId, t.environment, state.status, state.activeUntil, signedAt, now, now).run();
+      "INSERT INTO entitlements(original_transaction_id,account_id,product_id,environment,status,active_until,signed_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(original_transaction_id) DO UPDATE SET product_id=excluded.product_id,status=excluded.status,active_until=excluded.active_until,signed_at=excluded.signed_at,updated_at=excluded.updated_at WHERE excluded.signed_at>=entitlements.signed_at AND NOT (excluded.status='expired' AND entitlements.status='grace' AND entitlements.active_until>?)",
+    ).bind(t.originalTransactionId, account, t.productId, t.environment, state.status, state.activeUntil, signedAt, now, now, now).run();
     return true;
   }
   const result = await env.DB.prepare(

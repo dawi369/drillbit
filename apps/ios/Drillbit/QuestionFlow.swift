@@ -128,7 +128,7 @@ struct QuestionFlow: View {
                       model.talkOnOpen = !resuming && model.voiceFirst ? opened.id : nil
                       onStart(opened); dismiss()
                     }
-                  } catch { failure = error.localizedDescription }
+                  } catch { failure = error.userMessage }
                   starting = false
                 }
               } label: {
@@ -285,11 +285,11 @@ struct QuestionFlow: View {
           dismiss()
           return
         }
-        failure = started.localizedDescription
+        failure = started.userMessage
       } catch {
         guard capturedAccount == model.bootstrap?.account.id else { return }
         holding = false
-        failure = error.localizedDescription
+        failure = error.userMessage
         model.failPreparation(error)
         model.failedPreparation = input
         model.failedPreparationSource = source

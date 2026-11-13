@@ -60,16 +60,19 @@ enum CrashReporting {
     return contexts
   }
 
-  /// A MetricKit hang whose only app frame is the `main` entry point was all system work (a cold Metal shader
-  /// compile after an install or iOS update, for one). It stays in Sentry as a warning tagged `hang: system`, so
-  /// it counts without paging as a high-priority error. Hangs that pass through Drillbit code stay errors.
+  /// A hang whose only app frame is the `main` entry point was all system work (a cold Metal shader compile after an
+  /// install or iOS update, or the main thread sitting idle in its run loop as the app resumes from a long suspension).
+  /// Both MetricKit's and the SDK's own watchdog (`AppHang`) report these. It stays in Sentry as a warning tagged
+  /// `hang: system`, so it counts without paging as a high-priority error. Hangs that pass through Drillbit code stay errors.
   static func quietSystemHang(_ event: Event, app: String) {
-    guard let exception = event.exceptions?.first, exception.mechanism?.type == "mx_hang_diagnostic",
+    guard let exception = event.exceptions?.first, ["mx_hang_diagnostic", "AppHang"].contains(exception.mechanism?.type ?? ""),
       let frames = exception.stacktrace?.frames, !frames.isEmpty
     else { return }
-    // Outermost first: dyld, then main, then the run loop. Frames without a binary are kernel addresses.
-    let afterEntry = frames.drop { $0.package == nil || $0.package == "dyld" || $0.package == app }
-    guard !afterEntry.contains(where: { $0.package == app }) else { return }
+    // Outermost first: dyld, then main, then the run loop. Frames without a binary are kernel addresses. MetricKit
+    // names the binary; the SDK's watchdog gives its full path.
+    let binary = { (frame: Frame) in frame.package.map { ($0 as NSString).lastPathComponent } }
+    let afterEntry = frames.drop { binary($0) == nil || binary($0) == "dyld" || binary($0) == app }
+    guard !afterEntry.contains(where: { binary($0) == app }) else { return }
     event.level = .warning
     event.tags = (event.tags ?? [:]).merging(["hang": "system"]) { _, new in new }
   }

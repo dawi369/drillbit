@@ -1,11 +1,14 @@
-import { createExecutionContext, env, fetchMock, waitOnExecutionContext } from "cloudflare:test";
+// @peculiar/x509 needs the Reflect polyfill first; its own import group keeps import sorting from moving it.
+import "reflect-metadata";
+
 import { X509CertificateGenerator } from "@peculiar/x509";
+import { createExecutionContext, env, fetchMock, waitOnExecutionContext } from "cloudflare:test";
 import { CompactSign, SignJWT, exportJWK, generateKeyPair } from "jose";
 import { afterAll, beforeAll, expect, it } from "vitest";
-import { app } from "../src/index";
 import { entitlementState, verifyAppleJWS } from "../src/entitlements";
-import type { Env } from "../src/platform";
+import { app } from "../src/index";
 import { planFor } from "../src/plans";
+import type { Env } from "../src/platform";
 import { accountFor } from "../src/store";
 import { initializeDatabase } from "./migrations";
 
@@ -147,6 +150,9 @@ it("applies App Store notifications to a known subscription and ignores unknown 
   // Billing retry with a grace period keeps Pro until the grace ends.
   response = await notify({ notificationType: "DID_FAIL_TO_RENEW", subtype: "GRACE_PERIOD", data: { signedTransactionInfo: await apple.sign({ ...claims, expiresDate: Date.now() - 1000, signedDate: Date.now() + 1 }), signedRenewalInfo: await apple.sign({ autoRenewStatus: 1, gracePeriodExpiresDate: Date.now() + 86_400_000 }) } });
   expect(await response.json()).toMatchObject({ applied: true });
+  expect(await planFor(bindings, id)).toBe("pro");
+  // A restore during the grace can't see the renewal info, so its lapsed transaction doesn't end Pro early.
+  expect((await post(subject, { signedTransaction: await apple.sign({ ...claims, expiresDate: Date.now() - 1000, signedDate: Date.now() + 1 }) })).status).toBe(200);
   expect(await planFor(bindings, id)).toBe("pro");
   // Renewal extends it; refund revokes it.
   await notify({ notificationType: "DID_RENEW", data: { signedTransactionInfo: await apple.sign({ ...claims, expiresDate: Date.now() + 30 * 86_400_000, signedDate: Date.now() + 2 }) } });

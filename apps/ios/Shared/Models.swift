@@ -248,6 +248,18 @@ struct VoiceCapability: Codable, Sendable {
     guard let date = Date.fromAPI(checkedAt) else { return false }
     return (0..<60).contains(now.timeIntervalSince(date))
   }
+  /// Why voice is closed, plus when it reopens in the person's own time if the server left that out. The server's day
+  /// ends at UTC midnight, which can be later today here.
+  func explanation(timeZone: TimeZone = .current, locale: Locale = .current, now: Date = Date()) -> String? {
+    guard let reason else { return nil }
+    guard !reason.contains(" back "), let back = resetsAt.flatMap(Date.fromAPI) else { return reason }
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = timeZone
+    var time = Date.FormatStyle(date: .omitted, time: .shortened, locale: locale)
+    time.timeZone = timeZone
+    let when = calendar.isDate(back, inSameDayAs: now) ? "later today, at \(back.formatted(time))" : "tomorrow at \(back.formatted(time))"
+    return reason + " Voice is back " + when + "."
+  }
   /// What a free account sees under Start: the intro count, the taste (if the server offers one), or when it's back. Nothing on Pro.
   func allowanceLine(timeZone: TimeZone = .current, locale: Locale = .current, now: Date = Date()) -> String? {
     guard let remaining, let limit else { return nil }
@@ -398,6 +410,16 @@ struct APIError: Error, LocalizedError, Sendable {
   var message: String
   var status: Int
   var errorDescription: String? { message }
+}
+extension Error {
+  /// What a person reads when something fails: the app's or the server's own words, never a system error's.
+  var userMessage: String {
+    if let api = self as? APIError { return api.message }
+    if let url = self as? URLError, [.notConnectedToInternet, .networkConnectionLost, .dataNotAllowed, .timedOut, .cannotFindHost, .cannotConnectToHost].contains(url.code) {
+      return "You look offline. Your work is saved on this phone, so try again once you’re back."
+    }
+    return "That didn’t work. Your work is safe, so give it another go."
+  }
 }
 struct ErrorEnvelope: Decodable {
   struct Detail: Decodable {

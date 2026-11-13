@@ -28,7 +28,18 @@ enum VoiceTranscript {
         rows.append(VoiceRow(id: fragment.id, speaker: fragment.speaker, text: fragment.text, endMs: fragment.endMs))
       }
     }
-    return rows
+    // Cues are cleaned once the pieces are joined: the provider streams "[tongue" and " click]" separately.
+    return rows.map { var row = $0; row.text = speechOnly(row.text); return row }.filter { !$0.text.isEmpty }
+  }
+  /// Drops the provider's sound cues ("[scoff]", "(tongue click)", "*laughs*") and one still arriving at the end.
+  static func speechOnly(_ text: String) -> String {
+    let cue = #"\s*(\[[^\]\n]{1,40}\]|\([^)\n]{1,40}\)|\*[^*\n]{1,40}\*)"#
+    let unclosed = #"\s*[\[(*][^\])*\n]{0,40}$"#
+    return text
+      .replacingOccurrences(of: cue, with: "", options: .regularExpression)
+      .replacingOccurrences(of: unclosed, with: "", options: .regularExpression)
+      .replacingOccurrences(of: #" {2,}"#, with: " ", options: .regularExpression)
+      .trimmingCharacters(in: .whitespaces)
   }
 }
 

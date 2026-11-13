@@ -149,6 +149,19 @@ struct InterviewTests {
     #expect(legacy.sessionSeconds == nil && legacy.allowanceLine() == nil)
   }
 
+  @Test func voiceLimitSaysWhenItReopensInLocalTime() {
+    let now = Date.fromAPI("2026-09-12T20:00:00.000Z")!
+    let locale = Locale(identifier: "en_US")
+    let capped = VoiceCapability(available: false, plan: "pro", reason: "That’s a lot of talking for one day.", checkedAt: "2026-09-12T20:00:00.000Z", resetsAt: "2026-09-13T00:00:00.000Z")
+    // UTC midnight is still today in New York, and tomorrow in Oslo. (Times use a narrow no-break space before AM/PM.)
+    let said = { (zone: String) in capped.explanation(timeZone: TimeZone(identifier: zone)!, locale: locale, now: now)?.replacingOccurrences(of: "\u{202F}", with: " ") }
+    #expect(said("America/New_York") == "That’s a lot of talking for one day. Voice is back later today, at 8:00 PM.")
+    #expect(said("Europe/Oslo") == "That’s a lot of talking for one day. Voice is back tomorrow at 2:00 AM.")
+    // A reason that already says when is left alone.
+    let week = VoiceCapability(available: false, plan: "pro", reason: "That’s a big week of talking. Voice is back Thursday.", checkedAt: "2026-09-12T20:00:00.000Z", resetsAt: "2026-09-17T09:00:00.000Z")
+    #expect(week.explanation(now: now) == "That’s a big week of talking. Voice is back Thursday.")
+  }
+
   @Test func voiceFragmentsPreserveSpacesOverlapAndStableRows() {
     let first = VoiceFragment(id:"one",sequence:0,speaker:"user",text:"Use a",startMs:0,endMs:500)
     let overlapping = VoiceFragment(id:"two",sequence:1,speaker:"assistant",text:"Mm-hm.",startMs:300,endMs:600)
@@ -157,6 +170,17 @@ struct InterviewTests {
     #expect(rows.map(\.id) == ["one","two"])
     #expect(rows[0].text == "Use a queue.")
     #expect(rows[1].text == "Mm-hm.")
+  }
+
+  @Test func soundCuesLeaveTheTranscriptEvenWhenSplitAcrossPieces() {
+    let pieces = ["I'd shard", " [tongue", " click] by user", " (scoffs)", " ID."].enumerated().map { index, text in
+      VoiceFragment(id: "p\(index)", sequence: index, speaker: "user", text: text, startMs: index * 100, endMs: index * 100 + 100)
+    }
+    #expect(VoiceTranscript.rows(pieces).map(\.text) == ["I'd shard by user ID."])
+    // Still arriving: the open cue stays hidden until it closes.
+    #expect(VoiceTranscript.rows(Array(pieces.prefix(2))).map(\.text) == ["I'd shard"])
+    // A line that was only a cue isn't shown at all.
+    #expect(VoiceTranscript.rows([VoiceFragment(id: "c", sequence: 0, speaker: "user", text: "[sigh]", startMs: 0, endMs: 100)]).isEmpty)
   }
 
   @Test func atomicInterviewSubmissionRetainsTextUntilAcknowledged() async throws {

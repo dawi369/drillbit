@@ -245,7 +245,7 @@ enum WorkspaceSheet: String, Identifiable {
     } catch {
       companion.unavailable = "Connection unavailable. Your writing is safe."
       companion.requestingSince = nil
-      failure = trigger == "explicit" ? error.localizedDescription : nil
+      failure = trigger == "explicit" ? error.userMessage : nil
       await refreshHelp()
     }
   }
@@ -292,7 +292,7 @@ enum WorkspaceSheet: String, Identifiable {
       await accept(current)
       undoEvent = current.adoptions?.first(where: { $0.id == command })
     } catch {
-      failure = error.localizedDescription
+      failure = error.userMessage
       if locked { await reconcileAdoption() }
     }
   }
@@ -315,7 +315,7 @@ enum WorkspaceSheet: String, Identifiable {
       }
       return true
     } catch {
-      failure = error.localizedDescription
+      failure = error.userMessage
       return false
     }
   }
@@ -341,7 +341,7 @@ enum WorkspaceSheet: String, Identifiable {
       await accept(current)
       undoEvent = nil
     } catch {
-      failure = error.localizedDescription
+      failure = error.userMessage
       await reconcileAdoption()
     }
   }
@@ -387,7 +387,7 @@ enum WorkspaceSheet: String, Identifiable {
       result.help = help
       result.adoptions = challenge.adoptions
       finished = result
-    } catch { failure = error.localizedDescription }
+    } catch { failure = error.userMessage }
   }
 }
 
@@ -550,7 +550,7 @@ struct PracticeView: View {
             do {
               if !practice.locked { try await practice.flush() }
               model.presented = nil
-            } catch { practice.failure = error.localizedDescription }
+            } catch { practice.failure = error.userMessage }
           }
         }.disabled(practice.working)
       }
@@ -599,7 +599,7 @@ struct PracticeView: View {
           do {
             try await practice.flush()
             await model.skip(challenge.id)
-          } catch { practice.failure = error.localizedDescription }
+          } catch { practice.failure = error.userMessage }
         }
       }
     }

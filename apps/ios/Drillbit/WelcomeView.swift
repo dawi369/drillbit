@@ -282,9 +282,9 @@ struct SignInView: View {
         VStack(spacing: 16) {
           BitView().frame(width: 76, height: 84).signalEntrance(0)
           VStack(spacing: 8) {
-            Text(inviting ? "One last step." : "Your question’s ready.")
+            Text(inviting ? "One last step." : "Your plan’s set.")
               .font(.title2.weight(.semibold))
-            Text(inviting ? "Enter your invite code to open it." : "Sign in so your reps and feedback are kept.")
+            Text(inviting ? "Enter your invite code to open it." : "Sign in and Bit writes your first question. Your reps and feedback stay yours.")
               .font(.subheadline).foregroundStyle(AppPalette.secondary)
           }
           .multilineTextAlignment(.center)
@@ -357,15 +357,25 @@ struct SignInView: View {
 
 /// Permission to send practice content to third-party AI (App Review 5.1.2(i)). Asked the first time something
 /// would actually go to an AI model (writing a question, opening an interview), never as a screen of its own. The
-/// answer lives in the Keychain, so it outlives a reinstall like the session does. Settings shows the words again.
+/// answer belongs to the account and lives in the Keychain, so it outlives a reinstall like the session does, and a
+/// second account on the same phone is asked for itself. Settings shows the words again.
 /// Fixtures keep it in memory: signed-in fixtures start agreed, signed-out ones start fresh.
 @MainActor @Observable final class AIConsent {
   static let shared = AIConsent()
   private static let key = "aiConsent.v1"
-  private(set) var granted: Bool
   private let fixture: Bool
+  private var fixtureGranted: Bool
+  /// Bumped when an answer is stored, so views reading `granted` update.
+  private var revision = 0
   private var waiting: [CheckedContinuation<Bool, Never>] = []
   private weak var sheet: UIViewController?
+  /// The signed-in account's own answer; nobody signed in has none.
+  var granted: Bool {
+    _ = revision
+    if fixture { return fixtureGranted }
+    guard let account = SharedStore.secret("account") else { return false }
+    return SharedStore.secret(Self.key + ":" + account) == "granted"
+  }
 
   private init() {
     var fixture = false
@@ -378,24 +388,17 @@ struct SignInView: View {
     unitTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     #endif
     self.fixture = fixture || unitTests
-    if unitTests {
-      granted = true
-    } else if fixture {
-      granted = !arguments.contains("--fixture-signed-out") && !arguments.contains("--fixture-no-ai-consent")
-    } else {
-      let stored = SharedStore.secret(Self.key) == "granted"
-      let legacy = UserDefaults.standard.bool(forKey: Self.key)
-      granted = stored || legacy
-      // Agreed before the Keychain held it: carry it over so a reinstall doesn't ask again.
-      if legacy, !stored { try? SharedStore.setSecret("granted", key: Self.key) }
-    }
+    fixtureGranted = unitTests || (fixture && !arguments.contains("--fixture-signed-out") && !arguments.contains("--fixture-no-ai-consent"))
+    guard !self.fixture else { return }
+    // Earlier builds kept one answer per device, with no record of whose it was: everyone is asked again once.
+    try? SharedStore.setSecret(nil, key: Self.key)
+    UserDefaults.standard.removeObject(forKey: Self.key)
   }
 
   func grant() {
-    granted = true
-    guard !fixture else { return }
-    try? SharedStore.setSecret("granted", key: Self.key)
-    UserDefaults.standard.set(true, forKey: Self.key)
+    if fixture { fixtureGranted = true }
+    else if let account = SharedStore.secret("account") { try? SharedStore.setSecret("granted", key: Self.key + ":" + account) }
+    revision += 1
   }
 
   /// True once there's permission. Without it, asks in a sheet over whatever is on screen and waits for the answer.
