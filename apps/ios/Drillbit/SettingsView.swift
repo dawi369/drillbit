@@ -136,30 +136,6 @@ struct SettingsView: View {
           }
         }
         Button("Delete account", role: .destructive) { deleting = true }
-          .drillbitConfirm("Delete your account?", isPresented: $deleting,
-                           message: model.isPro
-                             ? "This permanently deletes your account, practice, feedback, Recall and saved key. There’s no undo. Your Pro subscription keeps billing until you cancel it in App Store settings."
-                             : "This permanently deletes your account, practice, feedback, Recall and saved key. There’s no undo. If you ever subscribed, cancel it in App Store settings too.", actions: [
-            ConfirmAction("Delete", style: .destructive) { deletingForSure = true },
-            ConfirmAction("Cancel"),
-          ])
-          // One cover per view, so the second ask hangs off the row's background.
-          .background {
-            Color.clear.drillbitConfirm("Sure sure?", isPresented: $deletingForSure,
-                                        message: "Last check. Your reps, feedback and Recall cards go for good, and we can’t bring them back.", actions: [
-              ConfirmAction("Delete everything", style: .destructive) {
-                Task {
-                  await model.perform {
-                    let _: [String: String] = try await model.api.send(
-                      "account", method: "DELETE", command: UUID().uuidString)
-                    try await model.signOut(discard: true, deleting: true)
-                    dismiss()
-                  }
-                }
-              },
-              ConfirmAction("Keep my account"),
-            ])
-          }
       }
       // Fixtures carry the capability too, except customer ones, which show what a subscriber sees.
       if model.bootstrap?.capabilities?.developerTools == true {
@@ -192,6 +168,31 @@ struct SettingsView: View {
         MakersNoteFooter().padding(.top, 16)
       }
     }.navigationTitle("Settings")
+      // From the screen, not the row: a cover presented from inside a list row slid up, dimmed backdrop and all.
+      .drillbitConfirm("Delete your account?", isPresented: $deleting,
+                       message: model.isPro
+                         ? "This permanently deletes your account, practice, feedback, Recall and saved key. There’s no undo. Your Pro subscription keeps billing until you cancel it in App Store settings."
+                         : "This permanently deletes your account, practice, feedback, Recall and saved key. There’s no undo. If you ever subscribed, cancel it in App Store settings too.", actions: [
+        ConfirmAction("Delete", style: .destructive) { deletingForSure = true },
+        ConfirmAction("Cancel"),
+      ])
+      // One cover per view, so the second ask hangs off the background.
+      .background {
+        Color.clear.drillbitConfirm("Sure sure?", isPresented: $deletingForSure,
+                                    message: "Last check. Your reps, feedback and Recall cards go for good, and we can’t bring them back.", actions: [
+          ConfirmAction("Delete everything", style: .destructive) {
+            Task {
+              await model.perform {
+                let _: [String: String] = try await model.api.send(
+                  "account", method: "DELETE", command: UUID().uuidString)
+                try await model.signOut(discard: true, deleting: true)
+                dismiss()
+              }
+            }
+          },
+          ConfirmAction("Keep my account"),
+        ])
+      }
       .toolbar {
         ToolbarItem(placement: .confirmationAction) {
           Button("Done") {

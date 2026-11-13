@@ -1,15 +1,17 @@
 import { z } from "zod";
 import { questionGenerationSchema, refineQuestionGeneration, type Settings } from "./domain";
+import { guidanceMode } from "./prompts/teaching";
 import { concepts } from "./taxonomy";
 
 type GenerationInput = { settings: Settings; guidanceMode?: string; instruction?: string; followUp?: unknown };
 
 /** The question-writing context and strict schema; prompt evaluations use this to send exactly what production sends. */
 export function generationRequest(input: GenerationInput, selection: { primaryConceptId: string; reason: string }, historicalSnapshot?: unknown) {
+  const mode = guidanceMode(input.guidanceMode);
   // A mock round always opens with an open prompt the candidate has to scope, like a real one.
-  const mock = input.guidanceMode === "mock_interview";
+  const mock = mode === "mock_interview";
   const exploratory = mock || (["senior", "staff", "principal"].includes(input.settings.engineeringLevel ?? "")
-    && input.guidanceMode !== "learn_together");
+    && mode !== "learn_together");
   // minutes is the round's time budget, set by the model; only Mock interview shows the clock. path is Guided's roadmap. opener is the interviewer's first line at Start.
   const roundLength = { minutes: z.number().int().min(10).max(60), path: z.array(z.string().trim().min(1).max(60)).min(3).max(5), opener: z.string().trim().min(1).max(240) };
   const fields = exploratory

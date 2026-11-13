@@ -60,8 +60,12 @@ struct QuestionFlow: View {
   /// which on device can flash as a black square while it fades.
   @State private var bitMounted = true
   @State private var bitVisible = true
-  /// The bottom bar has Bit or the buttons in it.
-  private var previewBarShown: Bool { (question != nil && revealed) || (bitMounted && !typeSize.isAccessibilitySize) }
+  private var previewReady: Bool { question != nil && revealed }
+  /// While the question is being written, the swap holds its place too if it's likely to be offered.
+  private var offersAnother: Bool {
+    guard let question else { return firstRep ? rerolls < 1 : true }
+    return question.lifecycle == "ready" && (firstRep ? rerolls < 1 : model.mayStartRep(swapping: question))
+  }
   private var previewSegments: [StreamSegment] {
     var segments = [
       // The empty title keeps a caret while a question is on its way; after a failure there is nothing to wait for.
@@ -80,10 +84,17 @@ struct QuestionFlow: View {
     }
     return segments
   }
-  private func arrival(_ order: Int) -> AnyTransition {
-    reduceMotion ? .opacity : .asymmetric(
-      insertion: .opacity.combined(with: .offset(y: 12)).animation(DrillbitMotion.entrance.delay(Double(order) * 0.08)),
-      removal: .opacity.animation(DrillbitMotion.fast))
+  /// Fades and lifts a preview button in once the question is there, `order` steps after the first. Until then it
+  /// only holds its place: no label or identifier, since a hidden flag alone still left it findable.
+  private func arrival<Content: View>(_ order: Int, label: String, id: String? = nil, _ content: Content) -> some View {
+    content
+      .opacity(previewReady ? 1 : 0)
+      .offset(y: previewReady || reduceMotion ? 0 : 12)
+      .animation(previewReady ? DrillbitMotion.entrance.delay(Double(order) * 0.08) : DrillbitMotion.fast, value: previewReady)
+      .allowsHitTesting(previewReady)
+      .accessibilityLabel(previewReady ? label : "")
+      .accessibilityIdentifier(previewReady ? id ?? label : "")
+      .accessibilityHidden(!previewReady)
   }
   var body: some View {
     NavigationStack(path: $browsePath) {
@@ -113,52 +124,45 @@ struct QuestionFlow: View {
         }.frame(maxWidth: .infinity, maxHeight: .infinity)
           .accessibilityIdentifier("questionPreviewScroll")
         .safeAreaInset(edge: .bottom) {
+          // Both buttons keep their places while the question is written, so its arrival only fades them in: a bar
+          // that grew instead re-laid out the whole streamed question on every frame, and the fade stuttered.
           VStack(spacing: 12) {
-            if let question, revealed {
-              let resuming = question.lifecycle == "in_progress"
-              let title = resuming ? "Resume" : "Start"
-              Button {
-                guard !starting else { return }
-                starting = true
-                Task {
-                  do {
-                    let opened = try await model.openForPreview(question)
-                    if visible, scenePhase == .active, account == model.bootstrap?.account.id {
-                      // A fresh start opens the interview out loud; the room always has the keyboard one tap away.
-                      model.talkOnOpen = !resuming && model.voiceFirst ? opened.id : nil
-                      onStart(opened); dismiss()
-                    }
-                  } catch { failure = error.userMessage }
-                  starting = false
-                }
-              } label: {
-                Text(starting ? "Opening…" : title).contentTransition(.opacity)
-                  .animation(reduceMotion ? nil : DrillbitMotion.fast, value: starting)
-              }.buttonStyle(PracticeButtonStyle())
-                .allowsHitTesting(!starting)
-                .sensoryFeedback(.impact(weight: .light), trigger: starting) { _, now in now }
-                .accessibilityLabel(starting ? "Opening" : title)
-                .accessibilityIdentifier("previewStart")
-                .transition(arrival(1))
-            }
-            if let question, revealed, question.lifecycle == "ready" && (firstRep ? rerolls < 1 : model.mayStartRep(swapping: question)) {
-              Button("Choose another question") { chooseAnother(question) }
-                .disabled(starting)
-                .transition(arrival(2))
+            let resuming = question?.lifecycle == "in_progress"
+            let title = resuming ? "Resume" : "Start"
+            arrival(1, label: starting ? "Opening" : title, id: "previewStart", Button {
+              guard let question, !starting else { return }
+              starting = true
+              Task {
+                do {
+                  let opened = try await model.openForPreview(question)
+                  if visible, scenePhase == .active, account == model.bootstrap?.account.id {
+                    // A fresh start opens the interview out loud; the room always has the keyboard one tap away.
+                    model.talkOnOpen = !resuming && model.voiceFirst ? opened.id : nil
+                    onStart(opened); dismiss()
+                  }
+                } catch { failure = error.userMessage }
+                starting = false
+              }
+            } label: {
+              Text(starting ? "Opening…" : title).contentTransition(.opacity)
+                .animation(reduceMotion ? nil : DrillbitMotion.fast, value: starting)
+            }.buttonStyle(PracticeButtonStyle())
+              .allowsHitTesting(!starting)
+              .sensoryFeedback(.impact(weight: .light), trigger: starting) { _, now in now })
+            if offersAnother {
+              arrival(2, label: "Choose another question", Button("Choose another question") { if let question { chooseAnother(question) } }
+                .disabled(starting))
             }
           }
           // Bit holds the slot the Start button arrives in, so the hand-off is a crossfade, not a jump.
-          .frame(minHeight: bitMounted && !typeSize.isAccessibilitySize ? 56 : 0, alignment: .top)
           .overlay(alignment: .top) {
             if bitMounted && !typeSize.isAccessibilitySize {
               BitView(mood: .drilling).frame(height: 56).opacity(bitVisible ? 1 : 0).allowsHitTesting(false)
             }
           }
-          .padding(previewBarShown ? 16 : 0)
-          // Full width when it holds something, nothing at all before: an empty bar was a small page-coloured square
-          // that hid the question's words as they streamed past it.
+          .padding(16)
           .frame(maxWidth: .infinity)
-          .background(previewBarShown ? AppPalette.background : .clear)
+          .background(AppPalette.background)
           .onChange(of: writing) { _, now in
             if now {
               bitMounted = true

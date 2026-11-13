@@ -876,6 +876,14 @@ From the end-to-end sweep after build 29:
 - **Accessibility.** The Recall card has a "Reveal answer" VoiceOver action alongside its button; with Reduce Motion the sign-in screen fades in instead of sliding.
 - **Copy.** The sign-in step after setup reads "Your plan's set." (the question doesn't exist yet). Library says "reps", like the rest of the app ("All reps").
 
+### Build 31 — 13 November 2026
+
+- **Guided is the default mode.** A question with no mode saved, and any generation request without one, is Guided (`guidanceMode()` falls back to `learn_together`; the app's fallbacks match). The first rep was already Guided.
+- **The modes are introduced in the first rep.** The ⋯ tip reads "Three ways to rep": Guided walks you through it, Practice lets you lead, Mock is the real thing. Its Show me opens the mode sheet.
+- **Covered only after real work.** The server keeps a reply's `covered` only once the candidate has given two distinct non-social replies (typed or spoken) or one of 40+ words; a "hi" never brings up "That covers the question". The prompt says the same.
+- **The preview's buttons don't grow the bar.** Start and Choose another hold their places (invisible, unreachable) while the question is written and only fade in, so the bottom inset never changes height and the streamed question isn't re-laid out every frame.
+- **Delete account's confirmations present from the Settings screen**, not from inside the list row, so they fade in like the other confirmations.
+
 ## Backgrounds — 11 November 2026
 
 Only Home, Recall and Library (its list and attempt pages) draw the backdrop, via `.pageBackdrop()` or `PageBackdrop()`. Bit, Settings and its subpages, the interview and onboarding keep the plain background. Three static `Canvas` designs (`Backdrop` in `DesignSystem.swift`):

@@ -440,6 +440,11 @@ final class PracticeUITests: XCTestCase {
     capture("Coachmark stuck", app)
     app.buttons["coachDone"].tap()
     XCTAssertTrue(toolsTip.waitForNonExistence(timeout: 2))
+    // Show me opens the three modes.
+    let modes = app.navigationBars["Session style"]
+    XCTAssertTrue(modes.waitForExistence(timeout: 3))
+    XCTAssertTrue(app.staticTexts["Guided"].exists && app.staticTexts["Practice"].exists)
+    modes.buttons["Back"].tap()
     editor.tap(); editor.typeText("Workers lease jobs and record every attempt.")
     app.buttons["shareAnswer"].tap()
     XCTAssertTrue(app.staticTexts["What happens if a worker stops after completing the operation but before acknowledging it?"].waitForExistence(timeout: 10))
@@ -475,6 +480,8 @@ final class PracticeUITests: XCTestCase {
     app.otherElements["PopoverDismissRegion"].tap()
     XCTAssertTrue(app.descendants(matching: .any)["coach-tools"].waitForExistence(timeout: 5))
     app.buttons["coachDone"].tap()
+    XCTAssertTrue(app.navigationBars["Session style"].waitForExistence(timeout: 3))
+    app.navigationBars["Session style"].buttons["Back"].tap()
     app.buttons["interviewOptions"].tap()
     app.buttons["Skip question"].tap()
     let alert = app.descendants(matching: .any)["confirmDialog"]

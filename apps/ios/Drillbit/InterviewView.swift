@@ -98,7 +98,7 @@ struct InterviewView: View {
       case .voice: seenVoiceTip = true
       case .composer: seenComposerTip = true
       case .path: seenPathTip = true; showingPathSteps = true
-      case .tools: seenToolsTip = true
+      case .tools: seenToolsTip = true; sheet = .style
       case .tabs, .recallPage, .libraryPage, .bitTab: break
       }
     }

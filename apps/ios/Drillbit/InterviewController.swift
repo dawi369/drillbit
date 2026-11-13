@@ -23,7 +23,7 @@ import UIKit
   private var retrySubmission: (kind: String, text: String, command: UUID?)?
   private var saveTask: Task<Void, Never>?
   var selectedMode: GuidanceMode?
-  var mode: GuidanceMode { selectedMode ?? state.guidanceMode ?? challenge.guidanceMode ?? .coachMe }
+  var mode: GuidanceMode { selectedMode ?? state.guidanceMode ?? challenge.guidanceMode ?? .learnTogether }
   var style: InterviewStyle { .standard }
   var pending: PendingInterviewCommand?
   var outgoing: InterviewTurn?

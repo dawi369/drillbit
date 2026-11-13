@@ -167,7 +167,7 @@ struct ReflectionView: View {
   private var challenge: Challenge { current ?? initial }
   private var reflection: Reflection? { challenge.reflection }
   private var warmUp: Bool { initial.isWarmUp }
-  private var mode: GuidanceMode { reflection?.guidanceMode ?? challenge.guidanceMode ?? .coachMe }
+  private var mode: GuidanceMode { reflection?.guidanceMode ?? challenge.guidanceMode ?? .learnTogether }
   private var failedJob: Job? {
     model.bootstrap?.jobs.first { $0.challengeId == initial.id && $0.kind == "summarize" && $0.status == "failed" }
   }

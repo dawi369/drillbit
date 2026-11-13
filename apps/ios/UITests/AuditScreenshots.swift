@@ -466,6 +466,9 @@ final class AuditScreenshots: XCTestCase {
       shot("e10-interview-tools-coach", app)
       app.buttons["coachDone"].tap()
       XCTAssertTrue(app.descendants(matching: .any)["coach-tools"].waitForNonExistence(timeout: 3))
+      XCTAssertTrue(app.navigationBars["Session style"].waitForExistence(timeout: 3))
+      shot("e10b-interview-modes", app)
+      app.navigationBars["Session style"].buttons["Back"].tap()
     }
     editor(app).tap()
     let answer = "I’d start by pinning down what the client can rely on. A ticket is either held, paid, or released; nothing in between is visible. "
@@ -602,7 +605,12 @@ final class AuditScreenshots: XCTestCase {
     deleteAccount.tap()
     XCTAssertTrue(app.descendants(matching: .any)["confirmDialog"].waitForExistence(timeout: 3))
     shot("g07-delete-account-alert", app)
-    app.descendants(matching: .any)["confirmDialog"].buttons["Cancel"].tap()
+    // The second ask follows the first; keeping the account leaves Settings as it was.
+    app.descendants(matching: .any)["confirmDialog"].buttons["Delete"].tap()
+    XCTAssertTrue(app.staticTexts["Sure sure?"].waitForExistence(timeout: 3))
+    shot("g07b-delete-account-sure", app)
+    app.descendants(matching: .any)["confirmDialog"].buttons["Keep my account"].tap()
+    XCTAssertTrue(app.descendants(matching: .any)["confirmDialog"].waitForNonExistence(timeout: 3))
     app.buttons["Done"].tap()
     app.tabBars.buttons["Library"].tap()
     XCTAssertTrue(app.navigationBars["Library"].waitForExistence(timeout: 5))
@@ -898,6 +906,8 @@ final class AuditScreenshots: XCTestCase {
     if app.descendants(matching: .any)["coach-tools"].waitForExistence(timeout: 5) {
       app.buttons["coachDone"].tap()
       XCTAssertTrue(app.descendants(matching: .any)["coach-tools"].waitForNonExistence(timeout: 3))
+      XCTAssertTrue(app.navigationBars["Session style"].waitForExistence(timeout: 3))
+      app.navigationBars["Session style"].buttons["Back"].tap()
     }
     editor(app).tap(); editor(app).typeText("Leases with a visible expiry.")
     app.buttons["shareAnswer"].tap()

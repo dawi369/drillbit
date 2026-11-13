@@ -197,7 +197,8 @@ it("stops a reply that never closes its JSON and pads with whitespace, keeping t
 it('pins teaching mode per job and preserves it through legacy updates and replay', async()=>{
  for (const mode of ['learn_together','coach_me','mock_interview']) {
   const {a,id}=await fixture('in_depth'),cmd=crypto.randomUUID();
-  expect((await interviewFor(e,a,id)).guidanceMode).toBe('coach_me');
+  // No mode saved on the question: Guided, the default.
+  expect((await interviewFor(e,a,id)).guidanceMode).toBe('learn_together');
   const input={kind:'clarification',text:'Where should I start?',revision:2,guidanceMode:mode};
   await requestInterview(e,a,id,cmd,input);
   await requestInterview(e,a,id,cmd,input);

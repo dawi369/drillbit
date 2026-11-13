@@ -536,7 +536,15 @@ export function parseInterviewModelResult(context: unknown, schema: z.ZodType, v
   const guided = isV4 && isGuided(context) ? { choices: parsed.choices ?? [], step: parsed.step ?? 0, ...((parsed.path?.length ?? 0) >= 2 ? { path: parsed.path } : {}) }
     : isV4 && isMock(context) && parsed.curveball && !(context as { interview?: { timing?: { curveballUsed?: boolean } } }).interview?.timing?.curveballUsed ? { curveball: true } : {};
   return schema.parse(contextualInterviewVersions.includes((c.promptVersion ?? INTERVIEW_PROMPT_VERSION))
-    ? { text: parsed.text, outcome: ["answer", "continue"].includes(c.action?.kind ?? "answer") ? "follow_up" : "reply", ...(isV4 ? {parameters} : {}), ...(isV4 && parsed.covered && ["answer", "continue"].includes(c.action?.kind ?? "") ? {covered: true} : {}), ...guided } : parsed) as { outcome: string; text: string; parameters?: {label:string;value:string}[]; choices?: string[]; step?: number; path?: string[]; covered?: boolean };
+    ? { text: parsed.text, outcome: ["answer", "continue"].includes(c.action?.kind ?? "answer") ? "follow_up" : "reply", ...(isV4 ? {parameters} : {}), ...(isV4 && parsed.covered && ["answer", "continue"].includes(c.action?.kind ?? "") && workedOn(context) ? {covered: true} : {}), ...guided } : parsed) as { outcome: string; text: string; parameters?: {label:string;value:string}[]; choices?: string[]; step?: number; path?: string[]; covered?: boolean };
+}
+/** The model has called a question covered after a bare "hi": that needs two real replies, or a solid one. */
+function workedOn(context: unknown) {
+  const c = context as { action?: { text?: string }; interview?: { turns?: { kind?: string; text?: string; voice?: { speaker?: string; text?: string }[] }[] } };
+  const said = [c.action?.text ?? "", ...(c.interview?.turns ?? []).flatMap(turn => ["answer", "continue"].includes(turn.kind ?? "") ? [turn.text ?? ""]
+    : (turn.voice ?? []).filter(fragment => fragment.speaker === "user").map(fragment => fragment.text ?? ""))]
+    .map(text => text.trim()).filter(text => text && !isSocialOpening(text));
+  return new Set(said).size >= 2 || said.join(" ").split(/\s+/).length >= 40;
 }
 function isGuided(context: unknown) {
   return (context as { interview?: { guidanceMode?: string } }).interview?.guidanceMode === "learn_together";

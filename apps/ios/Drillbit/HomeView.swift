@@ -329,7 +329,7 @@ struct HomeView: View {
 
   private func questionTicket(_ challenge: Challenge) -> some View {
     let resuming = challenge.lifecycle == "in_progress"
-    let mode = challenge.guidanceMode ?? .coachMe
+    let mode = challenge.guidanceMode ?? .learnTogether
     let lastLine = challenge.interview.flatMap { $0.turns.isEmpty ? nil : QuestionMarkup.plain($0.prompt) }
     let step = arrival(challenge)
     let ready = step >= Self.arrivalSteps

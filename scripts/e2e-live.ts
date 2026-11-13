@@ -704,9 +704,13 @@ async function dailyRep() {
   check("second visit reuses the question", again.json.challenge?.id === challenge.id && !again.json.job, "Second daily visit didn't return the same question");
   ids.challenges.add(challenge.id);
   if (challenge.questionId) ids.questions.add(challenge.questionId);
+  check("daily question defaults to Guided", challenge.guidanceMode === "learn_together", `Daily question mode ${challenge.guidanceMode}`);
 
   const rep: Rep = { id: challenge.id, mode: "coach_me", challenge: await start("rep A: start", challenge.id) };
   rep.challenge = await getChallenge("rep A: open", rep.id);
+  // A greeting first, like a real person: the interviewer must not call the question covered.
+  const hello = await turn(rep, "rep A: greeting", "answer", "hi");
+  check("a greeting is never covered", hello.saved?.result?.covered !== true, `"hi" came back covered: ${hello.saved?.result?.text}`);
   const first = await turn(rep, "rep A: answer 1", "answer", ANSWERS[0]);
   const replay = await api("rep A: answer 1 replay", "POST", `challenges/${rep.id}/interview`, { body: first.body, command: first.command, contract: "InterviewState" });
   check("interview replay is idempotent", replay.json.turns.filter((t: any) => t.id === first.command).length === 1 && replay.json.turns.length === rep.challenge.interview.turns.length, "Replaying an answer command changed the transcript", "bug", replay.requestId);

@@ -62,7 +62,7 @@ enum CoachMark: String, CaseIterable {
     case .voice: "You’re in voice."
     case .composer: "Your turn."
     case .path: "Your roadmap."
-    case .tools: "Stuck? Tap ⋯ up here."
+    case .tools: "Three ways to rep. Tap ⋯ up here."
     case .tabs: "Three more tabs."
     case .recallPage: "Your cards."
     case .libraryPage: "Every rep, kept."
@@ -74,7 +74,7 @@ enum CoachMark: String, CaseIterable {
     case .voice: "Interviews open out loud, like the real one."
     case .composer: "A rough first take is fine. End a line with “?” to ask the interviewer instead."
     case .path: "The steps a strong answer usually covers. You move along as you cover them."
-    case .tools: "Hints and examples live here, whenever you want one."
+    case .tools: "Guided walks you through it, Practice lets you lead, Mock is the real thing. Switch whenever; hints and examples live here too."
     case .tabs: "Recall, Library and Bit. Ten seconds, then it’s all yours."
     case .recallPage: "Each card comes from something you said in a rep. A quick look every few days makes it stick."
     case .libraryPage: "Every question, your answers and the feedback. Come back to any of them."
@@ -84,7 +84,7 @@ enum CoachMark: String, CaseIterable {
   /// The dismiss button's label; the voice tip asks for the one tap it's pointing at.
   var action: String {
     switch self {
-    case .voice, .path, .tabs: "Show me"
+    case .voice, .path, .tools, .tabs: "Show me"
     case .recallPage, .libraryPage: "Next"
     case .bitTab: "Back home"
     default: "Got it"
